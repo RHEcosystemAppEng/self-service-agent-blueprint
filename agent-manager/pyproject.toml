@@ -1,0 +1,22 @@
+[project]
+name = "agent-manager"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "llama-stack-client>=0.2.16",
+    "logging>=0.4.9.6",
+]
+
+[project.scripts]
+agent-manager = "agent_manager:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
