@@ -1,0 +1,87 @@
+mcp-servers:
+  mcp-employee-info:
+    deploy: true
+    imageRepository: quay.io/ecosystem-appeng/mcp-employee-info
+    imageTag: latest
+    uri: http://mcp-employee-info:8000/sse
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    env: []
+    # - name: LOG_LEVEL
+    #   value: "INFO"
+
+  mcp-servicenow:
+    deploy: true
+    imageRepository: quay.io/ecosystem-appeng/mcp-servicenow
+    imageTag: latest
+    uri: http://mcp-servicenow:8000/sse
+    replicas: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    env: []
+    # - name: SERVICENOW_INSTANCE
+    #   value: "https://dev12345.service-now.com"
+    # - name: SERVICENOW_USERNAME
+    #   valueFrom:
+    #     secretKeyRef:
+    #       name: servicenow-credentials
+    #       key: username
+    # - name: SERVICENOW_PASSWORD
+    #   valueFrom:
+    #     secretKeyRef:
+    #       name: servicenow-credentials
+    #       key: password
+
+# Global settings
+global:
+  imagePullSecrets: []
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1001
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8000
+
+# Ingress configuration (disabled by default)
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  tls: []
+
+# Autoscaling (disabled by default)
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
