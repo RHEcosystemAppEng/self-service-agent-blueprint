@@ -1,0 +1,23 @@
+[project]
+name = "employee-info"
+version = "0.1.0"
+description = "MCP server for employee laptop information management"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp>=0.15.0",
+]
+
+[project.scripts]
+employee-info = "employee_info.server:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "black>=24.0.0",
+    "flake8>=7.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
