@@ -7,7 +7,7 @@ RUN pip3 install --no-cache-dir uv
 WORKDIR /app
 
 COPY test/ ./test
-COPY agent-manager/ ./agent-manager
+COPY asset-manager/ ./asset-manager
 COPY scripts/containers/entrypoint.sh ./entrypoint.sh
 COPY pyproject.toml .
 COPY uv.lock .
@@ -15,7 +15,7 @@ RUN uv sync --frozen --no-cache
 
 # Set up paths
 ENV PATH="/app/.venv/bin:$PATH"
-ENV PYTHONPATH="/app/agent-manager/src:$PYTHONPATH"
+ENV PYTHONPATH="/app/asset-manager/src:$PYTHONPATH"
 
 USER 1001
 

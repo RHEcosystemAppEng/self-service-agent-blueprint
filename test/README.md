@@ -22,6 +22,5 @@ Simple command line chat interface. It can be run after
 the helm deploy completes by using:
 
 ```
-pod=oc get pods |grep self-service-agent | awk '{print $1}'
-oc exec -it $pod -- python test/chat.py
+oc exec -it deploy/self-service-agent -- python test/chat.py
 ```

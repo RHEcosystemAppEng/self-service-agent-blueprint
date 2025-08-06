@@ -1,0 +1,63 @@
+Corporate Laptop Offering List
+
+**Latin America (LATAM)**
+
+Manufacturer: Apple
+Model: MacBook Air M2
+Target User: General Office
+Cost: \$1,250 USD
+Operating System: macOS
+Display Size: 13.6 inches
+Display Resolution: 2560 x 1664
+Graphics Card: Apple M2 GPU
+Minimum Storage: 256 GB SSD
+Weight: 2.7 lbs
+Ports: 2 x Thunderbolt/USB 4, MagSafe
+Minimum Processor: Apple M2
+Minimum Memory: 8 GB
+Dimensions: 11.97 x 8.46 x 0.44 inches
+
+Manufacturer: Apple
+Model: MacBook Pro 14 M3
+Target User: Developers
+Cost: \$1,999 USD
+Operating System: macOS
+Display Size: 14.2 inches
+Display Resolution: 3024 x 1964
+Graphics Card: Apple M3 GPU
+Minimum Storage: 512 GB SSD
+Weight: 3.5 lbs
+Ports: 3 x Thunderbolt 4, HDMI, SDXC, MagSafe
+Minimum Processor: Apple M3
+Minimum Memory: 18 GB
+Dimensions: 12.31 x 8.71 x 0.61 inches
+
+Manufacturer: Lenovo
+Model: ThinkPad T14 Gen 4 Intel
+Target User: General Office
+Cost: \$1,399 USD
+Operating System: Windows 11 Pro
+Display Size: 14 inches
+Display Resolution: 1920 x 1200
+Graphics Card: Integrated Intel Iris Xe
+Minimum Storage: 512 GB SSD
+Weight: 3.2 lbs
+Ports: 2 x USB-C, 2 x USB-A, HDMI, Audio Jack
+Minimum Processor: Intel Core i7-1365U
+Minimum Memory: 16 GB
+Dimensions: 12.5 x 8.8 x 0.7 inches
+
+Manufacturer: Lenovo
+Model: ThinkPad P16s Gen 2
+Target User: Engineers
+Cost: \$2,100 USD
+Operating System: Red Hat Linux
+Display Size: 16 inches
+Display Resolution: 1920 x 1200
+Graphics Card: NVIDIA T500
+Minimum Storage: 1 TB SSD
+Weight: 4.4 lbs
+Ports: 2 x USB-C, 2 x USB-A, HDMI, Ethernet, Audio Jack
+Minimum Processor: Intel Core i7-1360P
+Minimum Memory: 32 GB
+Dimensions: 14.3 x 10.5 x 0.8 inches

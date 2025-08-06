@@ -11,7 +11,7 @@ import logging
 import os
 import uuid
 from llama_stack_client import LlamaStackClient
-from agent_manager.agent_manager import AgentManager
+from asset_manager.agent_manager import AgentManager
 
 
 # remove logging we otherwise get by default

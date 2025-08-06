@@ -1,6 +1,6 @@
 import pytest
-from agent_manager.agent_manager import AgentManager
-from agent_manager.util import load_config_from_path
+from asset_manager.agent_manager import AgentManager
+from asset_manager.util import load_config_from_path
 from pathlib import Path
 
 

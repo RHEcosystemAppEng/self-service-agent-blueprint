@@ -1,16 +1,16 @@
 [project]
-name = "agent-manager"
+name = "asset-manager"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "llama-stack-client>=0.2.16",
+    "llama-stack-client==0.2.16",
     "logging>=0.4.9.6",
 ]
 
 [project.scripts]
-agent-manager = "agent_manager:main"
+asset-manager = "asset_manager:main"
 
 [dependency-groups]
 dev = [

@@ -50,7 +50,7 @@ spec:
               done
               echo "$url is ready."
         - name: register-agents
-          image: "{{ .Values.image.agentManager }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.image.assetManager }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: LLAMA_STACK_MODELS

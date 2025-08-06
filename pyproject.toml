@@ -21,7 +21,7 @@ dependencies = [
     "httpcore==1.0.9",
     "httpx==0.28.1",
     "idna==3.10",
-    "llama-stack-client==0.2.12",
+    "llama-stack-client==0.2.16",
     "markdown==3.8.2",
     "markdown-it-py==3.0.0",
     "mdurl==0.1.2",
