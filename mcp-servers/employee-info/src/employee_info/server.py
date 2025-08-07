@@ -28,7 +28,7 @@ def _get_employee_laptop_info(employee_id: str) -> Dict[str, Any]:
     return employee_data
 
 
-@mcp.tool()
+@mcp.tool
 def get_employee_laptop_info(employee_id: str) -> Dict[str, Any]:
     """Get laptop information for a specific employee.
 
