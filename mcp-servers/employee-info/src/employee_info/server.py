@@ -5,7 +5,7 @@ employee laptop information.
 """
 
 from typing import Dict, Any
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from .data import MOCK_EMPLOYEE_DATA
 
 
