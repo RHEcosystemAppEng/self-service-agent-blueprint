@@ -1,0 +1,27 @@
+# Employee Info MCP Server Container
+FROM registry.access.redhat.com/ubi9/python-312:latest
+
+# Set working directory
+WORKDIR /app
+
+# Copy project files
+COPY pyproject.toml uv.lock* ./
+COPY src/ src/
+COPY tests/ tests/
+
+# Install UV package manager
+USER root
+RUN pip install uv
+USER 1001
+
+# Install dependencies
+RUN uv sync --frozen
+
+# Expose port for HTTP transport (if needed)
+EXPOSE 8080
+
+# Set environment variables
+ENV PYTHONPATH=/app/src
+
+# Run the MCP server
+CMD ["uv", "run", "python", "-m", "employee_info.server"]
