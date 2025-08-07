@@ -1,0 +1,63 @@
+Corporate Laptop Offering List
+
+**Asia-Pacific (APAC)**
+
+Manufacturer: Apple
+Model: MacBook Air M2
+Target User: General Office
+Cost: ¥11,000 CNY
+Operating System: macOS
+Display Size: 13.6 inches
+Display Resolution: 2560 x 1664
+Graphics Card: Apple M2 GPU
+Minimum Storage: 256 GB SSD
+Weight: 2.7 lbs
+Ports: 2 x Thunderbolt/USB 4, MagSafe
+Minimum Processor: Apple M2
+Minimum Memory: 8 GB
+Dimensions: 11.97 x 8.46 x 0.44 inches
+
+Manufacturer: Apple
+Model: MacBook Pro 14 M3
+Target User: Developers
+Cost: ¥15,000 CNY
+Operating System: macOS
+Display Size: 14.2 inches
+Display Resolution: 3024 x 1964
+Graphics Card: Apple M3 GPU
+Minimum Storage: 512 GB SSD
+Weight: 3.5 lbs
+Ports: 3 x Thunderbolt 4, HDMI, SDXC, MagSafe
+Minimum Processor: Apple M3
+Minimum Memory: 18 GB
+Dimensions: 12.31 x 8.71 x 0.61 inches
+
+Manufacturer: Lenovo
+Model: ThinkPad T14 Gen 5 AMD
+Target User: General Office
+Cost: ¥10,000 CNY
+Operating System: Windows 11 Pro
+Display Size: 14 inches
+Display Resolution: 1920 x 1200
+Graphics Card: Integrated AMD Radeon
+Minimum Storage: 512 GB SSD
+Weight: 3.1 lbs
+Ports: 2 x USB-C, 2 x USB-A, HDMI, Ethernet, Audio Jack
+Minimum Processor: AMD Ryzen 7 PRO 7840U
+Minimum Memory: 16 GB
+Dimensions: 12.5 x 8.8 x 0.7 inches
+
+Manufacturer: Lenovo
+Model: ThinkPad P1 Gen 6
+Target User: Engineers
+Cost: ¥18,000 CNY
+Operating System: Red Hat Linux
+Display Size: 16 inches
+Display Resolution: 3840 x 2400
+Graphics Card: NVIDIA RTX A2000
+Minimum Storage: 1 TB SSD
+Weight: 4.1 lbs
+Ports: 2 x USB-C, 2 x USB-A, HDMI, SD Card, Audio Jack
+Minimum Processor: Intel Core i9-13900H
+Minimum Memory: 32 GB
+Dimensions: 14.1 x 9.9 x 0.7 inches

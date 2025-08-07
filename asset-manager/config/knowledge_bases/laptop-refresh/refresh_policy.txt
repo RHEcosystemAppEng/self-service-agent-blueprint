@@ -1,0 +1,31 @@
+Corporate Laptop Refresh Policy
+
+Purpose:
+To ensure employees have reliable, secure, and up-to-date computing equipment that supports productivity and meets business needs, this policy establishes guidelines for the regular refresh of corporate laptops.
+
+	1	Scope: This policy applies to all employees, contractors, and consultants using company-issued laptops.
+	2	Refresh Cycle
+		- Standard laptops will be refreshed every 3 years from the date of issuance.
+		- High-performance or specialized laptops (such as development, design, or engineering devices) may be refreshed on a 2-year cycle based on workload demands.
+		- Exceptions require approval from the IT Manager.
+	3	Eligibility for Refresh
+		- Employees become eligible for a laptop refresh once their current device reaches the end of its refresh cycle.
+		- Early refresh requests may be considered for devices experiencing hardware failures or performance issues, subject to IT approval.
+	4	Device Return and Data Handling
+		- Employees must return their current laptop to IT for secure data backup and device sanitization before receiving a new device.
+		- Personal data should be removed prior to device return; IT will assist with data migration as needed.
+		- Returned devices will be wiped securely and either redeployed, recycled, or disposed of following environmental policies.
+	5	Standard Hardware Configuration
+		- The company will maintain a set of approved laptop models and configurations based on job role requirements and location (including macOS, Windows, and Linux options).
+		- Any special hardware or software requests must be submitted through the IT service request process and approved by management.
+	6	Responsibility
+		- IT Department is responsible for managing the refresh schedule, device procurement, and deployment.
+		- Employees are responsible for reporting device issues promptly and cooperating with IT during the refresh process.
+	7	Exceptions and Special Cases
+		- Employees with laptops requiring specialized software or hardware not supported by standard refresh options may have custom refresh plans.
+		- Remote or international employees may have adjusted refresh timelines due to shipping and logistics considerations.
+	8	Policy Review
+		- This policy will be reviewed annually and updated as needed to reflect changes in technology, security requirements, or business needs.
+
+Effective Date: August 6th, 2025
+Approved by: John Smith

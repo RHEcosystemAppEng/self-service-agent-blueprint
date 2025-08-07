@@ -1,0 +1,63 @@
+Corporate Laptop Offering List
+
+**North America (NA)**
+
+Manufacturer: Apple
+Model: MacBook Air M3
+Target User: General Office
+Cost: \$1,199 USD
+Operating System: macOS
+Display Size: 13.6 inches
+Display Resolution: 2560 x 1664
+Graphics Card: Apple M3 GPU
+Minimum Storage: 256 GB SSD
+Weight: 2.7 lbs
+Ports: 2 x Thunderbolt/USB 4, MagSafe 3
+Minimum Processor: Apple M3
+Minimum Memory: 8 GB
+Dimensions: 11.97 x 8.46 x 0.44 inches
+
+Manufacturer: Apple
+Model: MacBook Pro 14 M3 Pro
+Target User: Developers
+Cost: \$1,999 USD
+Operating System: macOS
+Display Size: 14.2 inches
+Display Resolution: 3024 x 1964
+Graphics Card: Apple M3 Pro GPU
+Minimum Storage: 512 GB SSD
+Weight: 3.5 lbs
+Ports: 3 x Thunderbolt 4, HDMI, SDXC, MagSafe 3
+Minimum Processor: Apple M3 Pro
+Minimum Memory: 18 GB
+Dimensions: 12.31 x 8.71 x 0.61 inches
+
+Manufacturer: Lenovo
+Model: ThinkPad T14 Gen 5 Intel
+Target User: General Office
+Cost: \$1,399 USD
+Operating System: Windows 11 Pro
+Display Size: 14 inches
+Display Resolution: 1920 x 1200
+Graphics Card: Integrated Intel UHD
+Minimum Storage: 512 GB SSD
+Weight: 3.2 lbs
+Ports: 2 x USB-C, 2 x USB-A, HDMI, Ethernet, Audio Jack
+Minimum Processor: Intel Core i7-1555U
+Minimum Memory: 16 GB
+Dimensions: 12.5 x 8.8 x 0.7 inches
+
+Manufacturer: Lenovo
+Model: ThinkPad P1 Gen 7
+Target User: Engineers
+Cost: \$2,499 USD
+Operating System: Red Hat Linux
+Display Size: 16 inches
+Display Resolution: 2560 x 1600
+Graphics Card: NVIDIA RTX A1000
+Minimum Storage: 1 TB SSD
+Weight: 4.1 lbs
+Ports: 2 x USB-C, 2 x USB-A, HDMI, SD Reader, Audio Jack
+Minimum Processor: Intel Core i7-13800H
+Minimum Memory: 32 GB
+Dimensions: 14.1 x 9.9 x 0.7 inches

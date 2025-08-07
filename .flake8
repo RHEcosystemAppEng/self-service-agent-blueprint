@@ -1,0 +1,46 @@
+[flake8]
+# Maximum line length to match Black's default
+max-line-length = 88
+
+# Ignore specific error codes that conflict with Black
+ignore = 
+    # E203: whitespace before ':' (conflicts with Black)
+    E203,
+    # W503: line break before binary operator (conflicts with Black)
+    W503,
+    # E501: line too long (handled by Black)
+    E501
+
+# Exclude common directories
+exclude = 
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    env,
+    .env,
+    build,
+    dist,
+    .eggs,
+    *.egg-info,
+    .pytest_cache,
+    .mypy_cache,
+    .coverage
+
+# Enable specific extensions
+select = 
+    E,  # pycodestyle errors
+    W,  # pycodestyle warnings
+    F,  # pyflakes
+
+# Maximum complexity for McCabe plugin
+max-complexity = 10
+
+# Show source code for each error
+show-source = True
+
+# Show pep8 warning codes
+show-pep8 = True
+
+# Count the number of occurrences of each error/warning code
+statistics = True

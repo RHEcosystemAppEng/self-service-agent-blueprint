@@ -8,7 +8,7 @@ replicaCount: 1
 # This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
 image:
   repository: quay.io/ecosystem-appeng/self-service-agent
-  agentManager: quay.io/ecosystem-appeng/self-service-agent-agent-manager
+  assetManager: quay.io/ecosystem-appeng/self-service-agent-asset-manager
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
@@ -21,17 +21,7 @@ nameOverride: ""
 fullnameOverride: ""
 
 # This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
-serviceAccount:
-  # Specifies whether a service account should be created
-  create: true
-  # Automatically mount a ServiceAccount's API credentials?
-  automount: true
-  # Annotations to add to the service account
-  annotations:
-    serviceaccounts.openshift.io/oauth-redirectreference.self-service-agent: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"self-service-agent-authenticated"}}'
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
-  name: "self-service-agent-proxy-sa"
+serviceAccount: {}
 
 # This is for setting Kubernetes Annotations to a Pod.
 # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
@@ -89,9 +79,3 @@ llama_stack_url: http://llamastack:8321
 
 sessionSecret: {}
  # value: "my-session-secret"
-
-seed:
-  admin_user:
-    username: kubeadmin
-    # email: ""
-
