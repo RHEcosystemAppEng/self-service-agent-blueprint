@@ -23,14 +23,6 @@ Retrieves comprehensive laptop information for a specific employee.
 - Assignment and warranty information
 - IT contact details
 
-### `list_employees()`
-
-Lists all employees with their basic information.
-
-**Returns:**
-- Total count of employees
-- Array of employee basic information
-
 ## Development Commands
 
 Navigate to the `mcp-servers/employee-info/` directory for all development operations:
@@ -69,10 +61,6 @@ async def test_employee_info():
     client = Client("python -m employee_info.server")
     
     async with client:
-        # List all employees
-        employees = await client.call_tool("list_employees", {})
-        print("Employees:", employees.data)
-        
         # Get specific employee laptop info
         laptop_info = await client.call_tool("get_employee_laptop_info", {
             "employee_id": "emp001"

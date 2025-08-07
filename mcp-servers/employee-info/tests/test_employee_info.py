@@ -1,7 +1,7 @@
 """Tests for the Employee Info MCP Server."""
 
 import pytest
-from employee_info.server import _get_employee_laptop_info, _list_employees
+from employee_info.server import _get_employee_laptop_info
 
 
 def test_get_employee_laptop_info_valid_employee():
@@ -32,21 +32,6 @@ def test_get_employee_laptop_info_empty_employee_id():
         _get_employee_laptop_info("")
 
     assert "cannot be empty" in str(exc_info.value)
-
-
-def test_list_employees():
-    """Test listing all employees."""
-    result = _list_employees()
-
-    assert "total_employees" in result
-    assert "employees" in result
-    assert result["total_employees"] == 3
-    assert len(result["employees"]) == 3
-
-    employee_ids = [emp["employee_id"] for emp in result["employees"]]
-    assert "emp001" in employee_ids
-    assert "emp002" in employee_ids
-    assert "emp003" in employee_ids
 
 
 def test_employee_data_structure():

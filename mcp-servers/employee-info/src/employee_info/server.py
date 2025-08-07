@@ -48,31 +48,6 @@ def get_employee_laptop_info(employee_id: str) -> Dict[str, Any]:
     return _get_employee_laptop_info(employee_id)
 
 
-def _list_employees() -> Dict[str, Any]:
-    employees = []
-    for emp_id, data in MOCK_EMPLOYEE_DATA.items():
-        employees.append(
-            {
-                "employee_id": data["employee_id"],
-                "name": data["name"],
-                "department": data["department"],
-                "email": data["email"],
-            }
-        )
-
-    return {"total_employees": len(employees), "employees": employees}
-
-
-@mcp.tool
-def list_employees() -> Dict[str, Any]:
-    """List all employees with basic information.
-
-    Returns:
-        Dictionary containing a list of all employees with their basic info
-    """
-    return _list_employees()
-
-
 def main() -> None:
     """Run the Employee Info MCP server."""
     mcp.run()
