@@ -5,7 +5,7 @@ employee laptop information.
 """
 
 from typing import Dict, Any
-from fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
 from .data import MOCK_EMPLOYEE_DATA
 
 
@@ -28,7 +28,7 @@ def _get_employee_laptop_info(employee_id: str) -> Dict[str, Any]:
     return employee_data
 
 
-@mcp.tool
+@mcp.tool()
 def get_employee_laptop_info(employee_id: str) -> Dict[str, Any]:
     """Get laptop information for a specific employee.
 
