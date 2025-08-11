@@ -87,9 +87,9 @@ claude mcp list
 
 # Get into claude and test the tool
 >  Has the warranty for employee with id emp001 expired?
-# Should ask permission to use tool, return that the warranty has indeed expired
+# Should ask permission to use tool & return that the warranty has indeed expired
 >  Has the warranty for employee with id emp002 expired?
-# Should answer that the warranty has not expired yet
+# Should ask permission to use tool & return that the warranty has not expired yet
 ```
 
 ## Architecture
