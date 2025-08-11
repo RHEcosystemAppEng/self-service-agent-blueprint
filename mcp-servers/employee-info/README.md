@@ -50,25 +50,6 @@ cd mcp-servers/employee-info/
 uv run python -m employee_info.server
 ```
 
-### Testing with FastMCP Client
-
-```python
-import asyncio
-from fastmcp import Client
-
-async def test_employee_info():
-    client = Client("python -m employee_info.server")
-    
-    async with client:
-        # Get specific employee laptop info
-        laptop_info = await client.call_tool("get_employee_laptop_info", {
-            "employee_id": "emp001"
-        })
-        print("Laptop Info:", laptop_info.data)
-
-asyncio.run(test_employee_info())
-```
-
 ## Sample Data
 
 The server includes mock data for three employees:
@@ -87,7 +68,28 @@ cd mcp-servers/employee-info/
 podman build -t employee-info-mcp .
 
 # Run container
-podman run --rm -p 8080:8080 employee-info-mcp
+podman run --rm -i -p 8080:8080 \
+  -e FASTMCP_HOST=0.0.0.0 \
+  -e FASTMCP_PORT=8080 \
+  employee-info-mcp
+```
+
+## Testing with MCP-Server with Claude Code + Podman
+
+```base
+# Add the local empoyee-info-mcp server to claude code 
+claude mcp add --transport http employee-info-mcp http://localhost:8080/mcp
+
+# Check the server has connected (pod should be running before)
+claude mcp list
+# Checking MCP server health...
+# employee-info-mcp: http://localhost:8080/mcp (HTTP) - ✓ Connected
+
+# Get into claude and test the tool
+>  Has the warranty for employee with id emp001 expired?
+# Should ask permission to use tool, return that the warranty has indeed expired
+>  Has the warranty for employee with id emp002 expired?
+# Should answer that the warranty has not expired yet
 ```
 
 ## Architecture
@@ -114,11 +116,3 @@ employee-info/
 ├── uv.lock                    # Dependency lock file
 └── Containerfile             # Container build instructions
 ```
-
-## Development Standards
-
-- Format all Python code with `black`
-- Lint with `flake8`
-- Use type hints and docstrings
-- Follow PEP 8 guidelines
-- Python 3.12+ required
