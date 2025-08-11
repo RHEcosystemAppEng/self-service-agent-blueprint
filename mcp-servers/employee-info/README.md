@@ -56,9 +56,11 @@ The server includes mock data for three employees:
 
 | Employee ID | Name | Department | Device | Warranty Status |
 |-------------|------|------------|--------|--------------|
-| emp001 | Alice Johnson | Engineering | Dell Latitude 7420 | Expired |
-| emp002 | John Doe | Marketing | MacBook Pro 14-inch | Active |
-| emp003 | Maria Garcia | Finance | Lenovo ThinkPad X1 Carbon | Active |
+| emp001      | Alice Johnson | Engineering | Dell Latitude 7420 | Expired |
+| emp002      | John Doe | Marketing | MacBook Pro 14-inch | Active |
+| emp003      | Maria Garcia | Finance | Lenovo ThinkPad X1 Carbon | Active |
+| ...         | ... | ... | ... | ... |
+| emp010      | Ahmed Hassan | Quality Assurance | Inspiron 15 5000 | Expired |
 
 ## Container Operations
 
