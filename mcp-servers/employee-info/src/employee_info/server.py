@@ -4,11 +4,12 @@ A FastMCP server that provides tools for retrieving
 employee laptop information.
 """
 
+import os
 from typing import Dict, Any
 from fastmcp import FastMCP
 from employee_info.data import MOCK_EMPLOYEE_DATA
 
-
+MCP_TRANSPORT = os.environ.get("MCP_TRANSPORT", "http")
 mcp = FastMCP("Employee Info Server")
 
 
@@ -50,7 +51,7 @@ def get_employee_laptop_info(employee_id: str) -> Dict[str, Any]:
 
 def main() -> None:
     """Run the Employee Info MCP server."""
-    mcp.run()
+    mcp.run(transport=MCP_TRANSPORT)
 
 
 if __name__ == "__main__":
