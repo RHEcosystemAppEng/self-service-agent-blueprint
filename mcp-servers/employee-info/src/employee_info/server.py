@@ -6,7 +6,7 @@ employee laptop information.
 
 from typing import Dict, Any
 from fastmcp import FastMCP
-from .data import MOCK_EMPLOYEE_DATA
+from employee_info.data import MOCK_EMPLOYEE_DATA
 
 
 mcp = FastMCP("Employee Info Server")

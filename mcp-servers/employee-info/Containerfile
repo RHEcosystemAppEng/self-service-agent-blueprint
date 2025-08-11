@@ -24,4 +24,5 @@ ENV PYTHONPATH="/app/src:$PYTHONPATH"
 USER 1001
 
 # Command to run the application using the virtual environment
-CMD ["uv", "run", "python", "-m", "employee_info.server"]
+#CMD ["uv", "run", "python", "-m", "employee_info.server"]
+CMD ["python", "src/employee_info/server.py"]
