@@ -10,9 +10,9 @@ MOCK_EMPLOYEE_DATA = {
             "brand": "Dell",
             "model": "Latitude 7420",
             "serial_number": "DL7420001",
-            "assignment_date": "2023-01-15",
-            "warranty_expiry": "2026-01-15",
-            "warranty_status": "Active",
+            "assignment_date": "2020-01-15",
+            "warranty_expiry": "2023-01-15",
+            "warranty_status": "Expired",
             "specs": {
                 "cpu": "Intel Core i7-1165G7",
                 "ram": "16GB DDR4",
