@@ -58,7 +58,10 @@ def get_employee_laptop_info(employee_id: str) -> Dict[str, Any]:
 
 def main() -> None:
     """Run the Employee Info MCP server."""
-    mcp.run(transport=MCP_TRANSPORT)
+    if MCP_TRANSPORT == "http":
+        mcp.run(transport=MCP_TRANSPORT, host="0.0.0.0", port=8000)
+    else:
+        mcp.run(transport=MCP_TRANSPORT)
 
 
 if __name__ == "__main__":
