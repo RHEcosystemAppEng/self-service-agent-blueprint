@@ -8,6 +8,7 @@ import os
 from typing import Dict, Any
 from fastmcp import FastMCP
 from employee_info.data import MOCK_EMPLOYEE_DATA
+from starlette.responses import JSONResponse
 
 MCP_TRANSPORT = os.environ.get("MCP_TRANSPORT", "http")
 mcp = FastMCP("Employee Info Server")
@@ -27,6 +28,12 @@ def _get_employee_laptop_info(employee_id: str) -> Dict[str, Any]:
         )
 
     return employee_data
+
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health(request):
+    """Health check endpoint."""
+    return JSONResponse({"status": "OK"})
 
 
 @mcp.tool
