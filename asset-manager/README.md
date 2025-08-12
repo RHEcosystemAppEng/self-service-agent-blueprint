@@ -43,7 +43,7 @@ For convenience, I set it on my `~/.bashrc` on my Fedora machine.
 3. Run the play app
 
 ```shell
-uv run script/register_agents.py
+uv run script/register_assets.py
 ```
 
 This will create both knowledge bases and agents. The knowledge bases are created from directories in `config/knowledge_bases/`, where each directory becomes a separate vector database with all `.txt` files in that directory inserted as documents.
