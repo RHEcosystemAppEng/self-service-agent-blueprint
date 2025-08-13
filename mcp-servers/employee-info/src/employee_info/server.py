@@ -15,7 +15,7 @@ MCP_PORT = int(os.environ.get("MCP_PORT", "8000"))
 mcp = FastMCP("Employee Info Server")
 
 
-def _get_employee_laptop_info(employee_id: str) -> Dict[str, Any]:
+def _get_employee_laptop_info(employee_id: str) -> str:
     if not employee_id:
         raise ValueError("Employee ID cannot be empty")
 
@@ -28,7 +28,14 @@ def _get_employee_laptop_info(employee_id: str) -> Dict[str, Any]:
             f"Available IDs: {', '.join(available_ids)}"
         )
 
-    return employee_data
+    laptop_info = f"""
+    Employee Laptop Information-
+    Model: {employee_data.get("laptop_model")}
+    Purchase Date: {employee_data.get("laptop", {}).get("purchase_date")}
+    Warranty Expiry Date: {employee_data.get("laptop", {}).get("warranty_expiry")}
+    Warranty Status: {employee_data.get("laptop", {}).get("warranty_status")}
+    """
+    return laptop_info
 
 
 @mcp.custom_route("/health", methods=["GET"])
@@ -38,18 +45,18 @@ async def health(request):
 
 
 @mcp.tool
-def get_employee_laptop_info(employee_id: str) -> Dict[str, Any]:
+def get_employee_laptop_info(employee_id: str) -> str:
     """Get laptop information for a specific employee.
 
     Args:
         employee_id: The unique identifier for the employee (e.g., '1001')
 
     Returns:
-        Dictionary containing employee and laptop information including:
-        - Employee details (name, department, email)
-        - Laptop specifications (brand, model, serial number)
-        - Assignment and warranty information
-        - IT contact details
+        Employee laptop information:
+        - Model
+        - Purchase Date
+        - Warranty Expiry Date
+        - Warranty Status
 
     Raises:
         ValueError: If employee_id is not found in the system
