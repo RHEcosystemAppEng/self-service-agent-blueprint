@@ -80,15 +80,23 @@ llama_stack_url: http://llamastack:8321
 sessionSecret: {}
  # value: "my-session-secret"
 
-# Employee Info service configuration
+# Employee Info MCP Server configuration
 employeeInfo:
-  enabled: false
+  enabled: true
   replicaCount: 1
   image:
-    repository: quay.io/ecosystem-appeng/self-service-agent-employee-info
+    repository: quay.io/ecosystem-appeng/self-service-agent-employee-info-mcp
+
     pullPolicy: Always
-    tag: ""
+    # tag: "1.0.0"
   service:
     type: ClusterIP
-    port: 8080
+    port: 8000
   resources: {}
+  # resources:
+  #   limits:
+  #     cpu: 100m
+  #     memory: 128Mi
+  #   requests:
+  #     cpu: 50m
+  #     memory: 64Mi
