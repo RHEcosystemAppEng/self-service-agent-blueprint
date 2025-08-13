@@ -7,11 +7,13 @@ MOCK_EMPLOYEE_DATA = {
         "department": "Engineering",
         "email": "alice.johnson@company.com",
         "location": "EMEA",
+        "laptop_model": "Latitude 7420",
+        "laptop_serial_number": "DL7420001",
         "laptop": {
             "brand": "Dell",
             "model": "Latitude 7420",
             "serial_number": "DL7420001",
-            "assignment_date": "2020-01-15",
+            "purchase_date": "2020-01-15",
             "warranty_expiry": "2023-01-15",
             "warranty_status": "Expired",
             "specs": {
@@ -33,11 +35,13 @@ MOCK_EMPLOYEE_DATA = {
         "department": "Marketing",
         "email": "john.doe@company.com",
         "location": "EMEA",
+        "laptop_model": "MacBook Pro 14-inch",
+        "laptop_serial_number": "MBP14002",
         "laptop": {
             "brand": "Apple",
             "model": "MacBook Pro 14-inch",
             "serial_number": "MBP14002",
-            "assignment_date": "2023-03-20",
+            "purchase_date": "2023-03-20",
             "warranty_expiry": "2026-03-20",
             "warranty_status": "Active",
             "specs": {
@@ -59,11 +63,13 @@ MOCK_EMPLOYEE_DATA = {
         "department": "Finance",
         "email": "maria.garcia@company.com",
         "location": "LATAM",
+        "laptop_model": "ThinkPad X1 Carbon",
+        "laptop_serial_number": "TP1C003",
         "laptop": {
             "brand": "Lenovo",
             "model": "ThinkPad X1 Carbon",
             "serial_number": "TP1C003",
-            "assignment_date": "2022-11-10",
+            "purchase_date": "2022-11-10",
             "warranty_expiry": "2025-11-10",
             "warranty_status": "Active",
             "specs": {
@@ -85,11 +91,13 @@ MOCK_EMPLOYEE_DATA = {
         "department": "Engineering",
         "email": "oliver.smith@company.com",
         "location": "EMEA",
+        "laptop_model": "EliteBook 840 G7",
+        "laptop_serial_number": "HP840004",
         "laptop": {
             "brand": "HP",
             "model": "EliteBook 840 G7",
             "serial_number": "HP840004",
-            "assignment_date": "2019-05-12",
+            "purchase_date": "2019-05-12",
             "warranty_expiry": "2022-05-12",
             "warranty_status": "Expired",
             "specs": {
@@ -111,11 +119,13 @@ MOCK_EMPLOYEE_DATA = {
         "department": "Product Management",
         "email": "yuki.tanaka@company.com",
         "location": "APAC",
+        "laptop_model": "XPS 13 9310",
+        "laptop_serial_number": "DL13005",
         "laptop": {
             "brand": "Dell",
             "model": "XPS 13 9310",
             "serial_number": "DL13005",
-            "assignment_date": "2018-09-03",
+            "purchase_date": "2018-09-03",
             "warranty_expiry": "2021-09-03",
             "warranty_status": "Expired",
             "specs": {
@@ -137,11 +147,13 @@ MOCK_EMPLOYEE_DATA = {
         "department": "HR",
         "email": "isabella.mueller@company.com",
         "location": "EMEA",
+        "laptop_model": "ThinkPad T14",
+        "laptop_serial_number": "TP14006",
         "laptop": {
             "brand": "Lenovo",
             "model": "ThinkPad T14",
             "serial_number": "TP14006",
-            "assignment_date": "2019-11-18",
+            "purchase_date": "2019-11-18",
             "warranty_expiry": "2022-11-18",
             "warranty_status": "Expired",
             "specs": {
@@ -163,11 +175,13 @@ MOCK_EMPLOYEE_DATA = {
         "department": "Sales",
         "email": "carlos.rodriguez@company.com",
         "location": "LATAM",
+        "laptop_model": "MacBook Air M1",
+        "laptop_serial_number": "MBA1007",
         "laptop": {
             "brand": "Apple",
             "model": "MacBook Air M1",
             "serial_number": "MBA1007",
-            "assignment_date": "2021-02-14",
+            "purchase_date": "2021-02-14",
             "warranty_expiry": "2024-02-14",
             "warranty_status": "Active",
             "specs": {
@@ -189,11 +203,13 @@ MOCK_EMPLOYEE_DATA = {
         "department": "DevOps",
         "email": "david.chen@company.com",
         "location": "APAC",
+        "laptop_model": "ZenBook Pro 15",
+        "laptop_serial_number": "AS15008",
         "laptop": {
             "brand": "ASUS",
             "model": "ZenBook Pro 15",
             "serial_number": "AS15008",
-            "assignment_date": "2020-07-22",
+            "purchase_date": "2020-07-22",
             "warranty_expiry": "2023-07-22",
             "warranty_status": "Expired",
             "specs": {
@@ -215,11 +231,13 @@ MOCK_EMPLOYEE_DATA = {
         "department": "Legal",
         "email": "sophie.dubois@company.com",
         "location": "EMEA",
+        "laptop_model": "Surface Laptop 4",
+        "laptop_serial_number": "MS4009",
         "laptop": {
             "brand": "Microsoft",
             "model": "Surface Laptop 4",
             "serial_number": "MS4009",
-            "assignment_date": "2021-08-05",
+            "purchase_date": "2021-08-05",
             "warranty_expiry": "2024-08-05",
             "warranty_status": "Active",
             "specs": {
@@ -241,11 +259,13 @@ MOCK_EMPLOYEE_DATA = {
         "department": "Quality Assurance",
         "email": "ahmed.hassan@company.com",
         "location": "EMEA",
+        "laptop_model": "Inspiron 15 5000",
+        "laptop_serial_number": "DL15010",
         "laptop": {
             "brand": "Dell",
             "model": "Inspiron 15 5000",
             "serial_number": "DL15010",
-            "assignment_date": "2018-03-14",
+            "purchase_date": "2018-03-14",
             "warranty_expiry": "2021-03-14",
             "warranty_status": "Expired",
             "specs": {

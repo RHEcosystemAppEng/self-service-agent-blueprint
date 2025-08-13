@@ -43,6 +43,9 @@ def test_employee_data_structure():
         "name",
         "department",
         "email",
+        "location",
+        "laptop_model",
+        "laptop_serial_number",
         "laptop",
         "it_contact",
     ]
@@ -53,7 +56,7 @@ def test_employee_data_structure():
         "brand",
         "model",
         "serial_number",
-        "assignment_date",
+        "purchase_date",
         "warranty_expiry",
         "warranty_status",
         "specs",
@@ -64,3 +67,36 @@ def test_employee_data_structure():
     it_contact_fields = ["name", "email", "phone"]
     for field in it_contact_fields:
         assert field in result["it_contact"]
+
+
+def test_new_top_level_laptop_fields():
+    """Test that new laptop fields are present at the top level."""
+    result = _get_employee_laptop_info("1001")
+    
+    # Test top-level laptop fields
+    assert "laptop_model" in result
+    assert "laptop_serial_number" in result
+    assert result["laptop_model"] == "Latitude 7420"
+    assert result["laptop_serial_number"] == "DL7420001"
+    
+    # Test location field exists and has valid values
+    assert "location" in result
+    assert result["location"] in ["NA", "LATAM", "EMEA", "APAC"]
+
+
+def test_purchase_date_field():
+    """Test that purchase_date field exists and is properly formatted."""
+    result = _get_employee_laptop_info("1003")
+    
+    assert "laptop" in result
+    assert "purchase_date" in result["laptop"]
+    
+    # Verify date format (YYYY-MM-DD)
+    purchase_date = result["laptop"]["purchase_date"]
+    assert len(purchase_date) == 10
+    assert purchase_date[4] == "-"
+    assert purchase_date[7] == "-"
+    
+    # Verify year is between 2018-2023 as required
+    year = int(purchase_date[:4])
+    assert 2018 <= year <= 2023

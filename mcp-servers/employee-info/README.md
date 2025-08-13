@@ -17,10 +17,11 @@ Retrieves comprehensive laptop information for a specific employee.
 - `employee_id` (string): The unique identifier for the employee (e.g., '1001')
 
 **Returns:**
-- Employee details (name, department, email)
+- Employee details (name, department, email, location)
 - Laptop specifications (brand, model, serial number, specs)
-- Assignment and warranty information
+- Purchase and warranty information
 - IT contact details
+- Top-level laptop fields (laptop_model, laptop_serial_number)
 
 ## Development Commands
 
