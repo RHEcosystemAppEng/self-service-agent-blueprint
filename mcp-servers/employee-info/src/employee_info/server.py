@@ -46,20 +46,10 @@ async def health(request):
 
 @mcp.tool
 def get_employee_laptop_info(employee_id: str) -> str:
-    """Get laptop information for a specific employee.
+    """Return laptop details for a given employee ID: model, purchase date, warranty expiry date, and warranty status.
 
     Args:
         employee_id: The unique identifier for the employee (e.g., '1001')
-
-    Returns:
-        Employee laptop information:
-        - Model
-        - Purchase Date
-        - Warranty Expiry Date
-        - Warranty Status
-
-    Raises:
-        ValueError: If employee_id is not found in the system
     """
     return _get_employee_laptop_info(employee_id)
 
