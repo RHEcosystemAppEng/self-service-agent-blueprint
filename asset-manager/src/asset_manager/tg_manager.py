@@ -1,9 +1,4 @@
 import logging
-import os
-from pathlib import Path
-from typing import List
-
-from llama_stack_client import LlamaStackClient
 from .manager import Manager
 
 
@@ -17,7 +12,30 @@ class ToolgroupsManager(Manager):
 
     def unregister_toolgroups(self):
         """Unregister all registered toolgroups"""
-        return
+        if self._client is None:
+            self.connect_to_llama_stack()
+
+        logging.debug("Unregistering toolgroups")
+
+        for tg in self._config["toolgroups"]:
+            self.unregister_mcp_toolgroup(tg)
+
+    def unregister_mcp_toolgroup(self, tg: dict):
+        """Unregister a single toolgroup_id"""
+        toolgroup_id = f"mcp::{tg.get("name")}"
+
+        logging.info(f"Unregistering toolgroup_id: {toolgroup_id}")
+
+        try:
+            self._client.toolgroups.unregister(toolgroup_id=toolgroup_id)
+
+            logging.info(f"Unregistered toolgroup: {toolgroup_id}")
+
+            return toolgroup_id
+
+        except Exception as e:
+            logging.error(f"Failed to unregister toolgroup_id {toolgroup_id}: {str(e)}")
+            return None
 
     def register_mcp_toolgroups(self):
         """Register all toolgroups by processing directories in toolgroups path"""
