@@ -18,7 +18,7 @@ Retrieves comprehensive laptop information for a specific employee.
 
 **Returns:**
 - Employee details (name, department, email, location)
-- Laptop specifications (brand, model, serial number, specs)
+- Laptop specifications (brand, specs)
 - Purchase and warranty information
 - IT contact details
 - Top-level laptop fields (laptop_model, laptop_serial_number)

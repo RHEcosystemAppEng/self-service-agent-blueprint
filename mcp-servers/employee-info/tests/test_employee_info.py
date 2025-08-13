@@ -13,7 +13,6 @@ def test_get_employee_laptop_info_valid_employee():
     assert result["department"] == "Engineering"
     assert "laptop" in result
     assert result["laptop"]["brand"] == "Dell"
-    assert result["laptop"]["model"] == "Latitude 7420"
     assert "it_contact" in result
 
 
@@ -54,8 +53,6 @@ def test_employee_data_structure():
 
     laptop_fields = [
         "brand",
-        "model",
-        "serial_number",
         "purchase_date",
         "warranty_expiry",
         "warranty_status",

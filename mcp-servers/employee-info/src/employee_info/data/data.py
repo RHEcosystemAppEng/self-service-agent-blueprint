@@ -11,8 +11,6 @@ MOCK_EMPLOYEE_DATA = {
         "laptop_serial_number": "DL7420001",
         "laptop": {
             "brand": "Dell",
-            "model": "Latitude 7420",
-            "serial_number": "DL7420001",
             "purchase_date": "2020-01-15",
             "warranty_expiry": "2023-01-15",
             "warranty_status": "Expired",
@@ -39,8 +37,6 @@ MOCK_EMPLOYEE_DATA = {
         "laptop_serial_number": "MBP14002",
         "laptop": {
             "brand": "Apple",
-            "model": "MacBook Pro 14-inch",
-            "serial_number": "MBP14002",
             "purchase_date": "2023-03-20",
             "warranty_expiry": "2026-03-20",
             "warranty_status": "Active",
@@ -67,8 +63,6 @@ MOCK_EMPLOYEE_DATA = {
         "laptop_serial_number": "TP1C003",
         "laptop": {
             "brand": "Lenovo",
-            "model": "ThinkPad X1 Carbon",
-            "serial_number": "TP1C003",
             "purchase_date": "2022-11-10",
             "warranty_expiry": "2025-11-10",
             "warranty_status": "Active",
@@ -95,8 +89,6 @@ MOCK_EMPLOYEE_DATA = {
         "laptop_serial_number": "HP840004",
         "laptop": {
             "brand": "HP",
-            "model": "EliteBook 840 G7",
-            "serial_number": "HP840004",
             "purchase_date": "2019-05-12",
             "warranty_expiry": "2022-05-12",
             "warranty_status": "Expired",
@@ -123,8 +115,6 @@ MOCK_EMPLOYEE_DATA = {
         "laptop_serial_number": "DL13005",
         "laptop": {
             "brand": "Dell",
-            "model": "XPS 13 9310",
-            "serial_number": "DL13005",
             "purchase_date": "2018-09-03",
             "warranty_expiry": "2021-09-03",
             "warranty_status": "Expired",
@@ -151,8 +141,6 @@ MOCK_EMPLOYEE_DATA = {
         "laptop_serial_number": "TP14006",
         "laptop": {
             "brand": "Lenovo",
-            "model": "ThinkPad T14",
-            "serial_number": "TP14006",
             "purchase_date": "2019-11-18",
             "warranty_expiry": "2022-11-18",
             "warranty_status": "Expired",
@@ -179,8 +167,6 @@ MOCK_EMPLOYEE_DATA = {
         "laptop_serial_number": "MBA1007",
         "laptop": {
             "brand": "Apple",
-            "model": "MacBook Air M1",
-            "serial_number": "MBA1007",
             "purchase_date": "2021-02-14",
             "warranty_expiry": "2024-02-14",
             "warranty_status": "Active",
@@ -207,8 +193,6 @@ MOCK_EMPLOYEE_DATA = {
         "laptop_serial_number": "AS15008",
         "laptop": {
             "brand": "ASUS",
-            "model": "ZenBook Pro 15",
-            "serial_number": "AS15008",
             "purchase_date": "2020-07-22",
             "warranty_expiry": "2023-07-22",
             "warranty_status": "Expired",
@@ -235,8 +219,6 @@ MOCK_EMPLOYEE_DATA = {
         "laptop_serial_number": "MS4009",
         "laptop": {
             "brand": "Microsoft",
-            "model": "Surface Laptop 4",
-            "serial_number": "MS4009",
             "purchase_date": "2021-08-05",
             "warranty_expiry": "2024-08-05",
             "warranty_status": "Active",
@@ -263,8 +245,6 @@ MOCK_EMPLOYEE_DATA = {
         "laptop_serial_number": "DL15010",
         "laptop": {
             "brand": "Dell",
-            "model": "Inspiron 15 5000",
-            "serial_number": "DL15010",
             "purchase_date": "2018-03-14",
             "warranty_expiry": "2021-03-14",
             "warranty_status": "Expired",
