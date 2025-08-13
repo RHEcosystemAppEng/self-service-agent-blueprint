@@ -46,6 +46,8 @@ spec:
           env:
             - name: MCP_TRANSPORT
               value: "http"
+            - name: MCP_PORT
+              value: "{{ .Values.employeeInfo.service.port }}"
           ports:
             - name: http
               containerPort: {{ .Values.employeeInfo.service.port }}

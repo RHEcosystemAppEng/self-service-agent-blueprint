@@ -11,6 +11,7 @@ from employee_info.data import MOCK_EMPLOYEE_DATA
 from starlette.responses import JSONResponse
 
 MCP_TRANSPORT = os.environ.get("MCP_TRANSPORT", "http")
+MCP_PORT = int(os.environ.get("MCP_PORT", "8000"))
 mcp = FastMCP("Employee Info Server")
 
 
@@ -59,7 +60,7 @@ def get_employee_laptop_info(employee_id: str) -> Dict[str, Any]:
 def main() -> None:
     """Run the Employee Info MCP server."""
     if MCP_TRANSPORT == "http":
-        mcp.run(transport=MCP_TRANSPORT, host="0.0.0.0", port=8000)
+        mcp.run(transport=MCP_TRANSPORT, host="0.0.0.0", port=MCP_PORT)
     else:
         mcp.run(transport=MCP_TRANSPORT)
 
