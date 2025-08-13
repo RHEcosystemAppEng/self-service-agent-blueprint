@@ -17,4 +17,10 @@ def load_config_from_path(path: Path) -> dict:
     for file in agent_path.glob("*.yaml"):
         agent_config = load_yaml(file)
         config["agents"].append(agent_config)
+
+    config["toolgroups"] = []
+    toolgroups_path = path / "toolgroups"
+    for file in toolgroups_path.glob("*.yaml"):
+        agent_config = load_yaml(file)
+        config["toolgroups"].append(agent_config)
     return config
