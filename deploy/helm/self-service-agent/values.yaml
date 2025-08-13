@@ -79,3 +79,16 @@ llama_stack_url: http://llamastack:8321
 
 sessionSecret: {}
  # value: "my-session-secret"
+
+# Employee Info service configuration
+employeeInfo:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: quay.io/ecosystem-appeng/self-service-agent-employee-info
+    pullPolicy: Always
+    tag: ""
+  service:
+    type: ClusterIP
+    port: 8080
+  resources: {}
