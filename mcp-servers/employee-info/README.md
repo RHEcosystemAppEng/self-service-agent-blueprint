@@ -14,7 +14,7 @@ A FastMCP server that provides tools for retrieving employee laptop information.
 Retrieves comprehensive laptop information for a specific employee.
 
 **Parameters:**
-- `employee_id` (string): The unique identifier for the employee (e.g., 'emp001')
+- `employee_id` (string): The unique identifier for the employee (e.g., '1001')
 
 **Returns:**
 - Employee details (name, department, email)
@@ -52,15 +52,15 @@ uv run python -m employee_info.server
 
 ## Sample Data
 
-The server includes mock data for three employees:
+The server includes mock data for ten employees:
 
 | Employee ID | Name | Department | Device | Warranty Status |
 |-------------|------|------------|--------|--------------|
-| emp001      | Alice Johnson | Engineering | Dell Latitude 7420 | Expired |
-| emp002      | John Doe | Marketing | MacBook Pro 14-inch | Active |
-| emp003      | Maria Garcia | Finance | Lenovo ThinkPad X1 Carbon | Active |
+| 1001        | Alice Johnson | Engineering | Dell Latitude 7420 | Expired |
+| 1002        | John Doe | Marketing | MacBook Pro 14-inch | Active |
+| 1003        | Maria Garcia | Finance | Lenovo ThinkPad X1 Carbon | Active |
 | ...         | ... | ... | ... | ... |
-| emp010      | Ahmed Hassan | Quality Assurance | Inspiron 15 5000 | Expired |
+| 1010        | Ahmed Hassan | Quality Assurance | Inspiron 15 5000 | Expired |
 
 ## Container Operations
 
@@ -88,9 +88,9 @@ claude mcp list
 # employee-info-mcp: http://localhost:8080/mcp (HTTP) - ✓ Connected
 
 # Get into claude and test the tool
->  Has the warranty for employee with id emp001 expired?
+>  Has the warranty for employee with id 1001 expired?
 # Should ask permission to use tool & return that the warranty has indeed expired
->  Has the warranty for employee with id emp002 expired?
+>  Has the warranty for employee with id 1002 expired?
 # Should ask permission to use tool & return that the warranty has not expired yet
 ```
 

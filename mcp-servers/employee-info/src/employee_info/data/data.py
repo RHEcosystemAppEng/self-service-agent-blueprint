@@ -1,8 +1,8 @@
 """Employee data for the MCP server."""
 
 MOCK_EMPLOYEE_DATA = {
-    "emp001": {
-        "employee_id": "emp001",
+    "1001": {
+        "employee_id": "1001",
         "name": "Alice Johnson",
         "department": "Engineering",
         "email": "alice.johnson@company.com",
@@ -27,8 +27,8 @@ MOCK_EMPLOYEE_DATA = {
             "phone": "+1-555-0123",
         },
     },
-    "emp002": {
-        "employee_id": "emp002",
+    "1002": {
+        "employee_id": "1002",
         "name": "John Doe",
         "department": "Marketing",
         "email": "john.doe@company.com",
@@ -53,8 +53,8 @@ MOCK_EMPLOYEE_DATA = {
             "phone": "+1-555-0456",
         },
     },
-    "emp003": {
-        "employee_id": "emp003",
+    "1003": {
+        "employee_id": "1003",
         "name": "Maria Garcia",
         "department": "Finance",
         "email": "maria.garcia@company.com",
@@ -79,8 +79,8 @@ MOCK_EMPLOYEE_DATA = {
             "phone": "+1-555-0789",
         },
     },
-    "emp004": {
-        "employee_id": "emp004",
+    "1004": {
+        "employee_id": "1004",
         "name": "Oliver Smith",
         "department": "Engineering",
         "email": "oliver.smith@company.com",
@@ -105,8 +105,8 @@ MOCK_EMPLOYEE_DATA = {
             "phone": "+44-20-7946-0958",
         },
     },
-    "emp005": {
-        "employee_id": "emp005",
+    "1005": {
+        "employee_id": "1005",
         "name": "Yuki Tanaka",
         "department": "Product Management",
         "email": "yuki.tanaka@company.com",
@@ -131,8 +131,8 @@ MOCK_EMPLOYEE_DATA = {
             "phone": "+81-3-1234-5678",
         },
     },
-    "emp006": {
-        "employee_id": "emp006",
+    "1006": {
+        "employee_id": "1006",
         "name": "Isabella Mueller",
         "department": "HR",
         "email": "isabella.mueller@company.com",
@@ -157,8 +157,8 @@ MOCK_EMPLOYEE_DATA = {
             "phone": "+49-30-12345678",
         },
     },
-    "emp007": {
-        "employee_id": "emp007",
+    "1007": {
+        "employee_id": "1007",
         "name": "Carlos Rodriguez",
         "department": "Sales",
         "email": "carlos.rodriguez@company.com",
@@ -183,8 +183,8 @@ MOCK_EMPLOYEE_DATA = {
             "phone": "+55-11-9876-5432",
         },
     },
-    "emp008": {
-        "employee_id": "emp008",
+    "1008": {
+        "employee_id": "1008",
         "name": "David Chen",
         "department": "DevOps",
         "email": "david.chen@company.com",
@@ -209,8 +209,8 @@ MOCK_EMPLOYEE_DATA = {
             "phone": "+86-21-6234-5678",
         },
     },
-    "emp009": {
-        "employee_id": "emp009",
+    "1009": {
+        "employee_id": "1009",
         "name": "Sophie Dubois",
         "department": "Legal",
         "email": "sophie.dubois@company.com",
@@ -235,8 +235,8 @@ MOCK_EMPLOYEE_DATA = {
             "phone": "+33-1-42-34-56-78",
         },
     },
-    "emp010": {
-        "employee_id": "emp010",
+    "1010": {
+        "employee_id": "1010",
         "name": "Ahmed Hassan",
         "department": "Quality Assurance",
         "email": "ahmed.hassan@company.com",

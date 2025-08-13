@@ -34,7 +34,7 @@ def get_employee_laptop_info(employee_id: str) -> Dict[str, Any]:
     """Get laptop information for a specific employee.
 
     Args:
-        employee_id: The unique identifier for the employee (e.g., 'emp001')
+        employee_id: The unique identifier for the employee (e.g., '1001')
 
     Returns:
         Dictionary containing employee and laptop information including:

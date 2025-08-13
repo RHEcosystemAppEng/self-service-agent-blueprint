@@ -6,9 +6,9 @@ from employee_info.server import _get_employee_laptop_info
 
 def test_get_employee_laptop_info_valid_employee():
     """Test retrieving laptop info for a valid employee."""
-    result = _get_employee_laptop_info("emp001")
+    result = _get_employee_laptop_info("1001")
 
-    assert result["employee_id"] == "emp001"
+    assert result["employee_id"] == "1001"
     assert result["name"] == "Alice Johnson"
     assert result["department"] == "Engineering"
     assert "laptop" in result
@@ -36,7 +36,7 @@ def test_get_employee_laptop_info_empty_employee_id():
 
 def test_employee_data_structure():
     """Test that employee data has the expected structure."""
-    result = _get_employee_laptop_info("emp002")
+    result = _get_employee_laptop_info("1002")
 
     required_fields = [
         "employee_id",
