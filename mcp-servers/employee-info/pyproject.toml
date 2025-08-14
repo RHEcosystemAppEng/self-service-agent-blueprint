@@ -5,7 +5,6 @@ description = "MCP server for employee laptop information management"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastmcp>=2.11.2",
     "httpx>=0.28.1",
     "mcp[cli]>=1.6.0",
 ]
