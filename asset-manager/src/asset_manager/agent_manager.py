@@ -1,3 +1,5 @@
+from typing import Any
+
 import logging
 import os
 import httpx
@@ -53,16 +55,16 @@ class AgentManager(Manager):
             self.create_agent(agent)
 
     def create_agent(self, agent: dict):
-        agent_config = {
-            "name": agent["name"],
-            "model": self.model(agent),
-            "instructions": agent["instructions"],
-            "tool_choice": agent["tool_choice"],
-            "input_shields": agent["input_shields"],
-            "output_shields": agent["output_shields"],
-            "max_infer_iters": agent["max_infer_iters"],
-            "toolgroups": toolgroups(agent),
-        }
+        agent_config = AgentUtils.get_agent_config(
+            model=self.model(agent),
+            instructions=agent["instructions"],
+            tools=toolgroups(agent),
+            tool_config=tool_config(agent),
+            max_infer_iters=agent["max_infer_iters"],
+            input_shields=agent["input_shields"],
+            output_shields=agent["output_shields"],
+        )
+        agent_config["name"] = agent["name"]
 
         agentic_system_create_response = self._client.agents.create(
             agent_config=agent_config
@@ -101,18 +103,15 @@ class AgentManager(Manager):
 
         return agents
 
-    def model(self, agent) -> str:
+    def model(self, agent) -> str | None:
         if agent.get("model"):
             return agent["model"]
 
         # Select the first LLM model
-        """
         if self._client is None:
             self.connect_to_llama_stack()
         models = self._client.models.list()
         model_id = next(m for m in models if m.model_type == "llm").identifier
         if model_id:
             return model_id
-        """
-
-        return os.environ["LLAMA_STACK_MODELS"].split(",", 1)[0]
+        return None
