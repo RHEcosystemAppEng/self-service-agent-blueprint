@@ -9,11 +9,14 @@ def test_get_employee_laptop_info_valid_employee():
     result = _get_employee_laptop_info("1001")
 
     expected = f"""
-    Employee Laptop Information-
-    Model: Latitude 7420
-    Purchase Date: 2020-01-15
-    Warranty Expiry Date: 2023-01-15
-    Warranty Status: Expired
+    Employee Name: Alice Johnson
+    Employee ID: 1001
+    Employee Location: EMEA
+    Laptop Model: Latitude 7420
+    Laptop Serial Number: DL7420001
+    Laptop Purchase Date: 2020-01-15
+    Laptop Warranty Expiry Date: 2023-01-15
+    Laptop Warranty: Expired
     """
 
     assert result == expected
