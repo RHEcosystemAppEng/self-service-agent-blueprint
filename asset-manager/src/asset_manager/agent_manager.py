@@ -16,19 +16,19 @@ def toolgroups(agent) -> list[Toolgroup] | None:
         return None
 
     toolgroups: list[Toolgroup] = []
-    mcp_servers = agent.get("mcp_servers")
-    if mcp_servers:
-        for mcp_server in mcp_servers:
-            toolgroups.append("mcp::" + mcp_server["name"])
-
     kbs = agent.get("knowledge_bases")
     if kbs:
         toolgroups.append(
             {
-                "name": "builtin::rag",
+                "name": "builtin::rag/knowledge_search",
                 "args": {"vector_db_ids": kbs},
             }
         )
+
+    mcp_servers = agent.get("mcp_servers")
+    if mcp_servers:
+        for mcp_server in mcp_servers:
+            toolgroups.append("mcp::" + mcp_server)
 
     return toolgroups
 
@@ -53,16 +53,16 @@ class AgentManager(Manager):
             self.create_agent(agent)
 
     def create_agent(self, agent: dict):
-        agent_config = AgentUtils.get_agent_config(
-            model=self.model(agent),
-            instructions=agent["instructions"],
-            tools=toolgroups(agent),
-            tool_config=tool_config(agent),
-            max_infer_iters=agent["max_infer_iters"],
-            input_shields=agent["input_shields"],
-            output_shields=agent["output_shields"],
-        )
-        agent_config["name"] = agent["name"]
+        agent_config = {
+            "name": agent["name"],
+            "model": self.model(agent),
+            "instructions": agent["instructions"],
+            "tool_choice": agent["tool_choice"],
+            "input_shields": agent["input_shields"],
+            "output_shields": agent["output_shields"],
+            "max_infer_iters": agent["max_infer_iters"],
+            "toolgroups": toolgroups(agent),
+        }
 
         agentic_system_create_response = self._client.agents.create(
             agent_config=agent_config
@@ -106,11 +106,13 @@ class AgentManager(Manager):
             return agent["model"]
 
         # Select the first LLM model
+        """
         if self._client is None:
             self.connect_to_llama_stack()
         models = self._client.models.list()
         model_id = next(m for m in models if m.model_type == "llm").identifier
         if model_id:
             return model_id
+        """
 
         return os.environ["LLAMA_STACK_MODELS"].split(",", 1)[0]

@@ -66,10 +66,6 @@ spec:
           env:
             - name: LLAMA_STACK_MODELS
               value: {{ include "self-service-agent.getModelList" . }}
-            {{- if .Values.employeeInfo.enabled }}
-            - name: EMPLOYEE_INFO_SERVICE_URL
-              value: "http://{{ include "self-service-agent.fullname" . }}-employee-info:{{ .Values.employeeInfo.service.port }}/mcp/"
-            {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

@@ -1,4 +1,5 @@
 import yaml
+import os
 from pathlib import Path
 
 
@@ -14,8 +15,12 @@ def load_config_from_path(path: Path) -> dict:
 
     config["agents"] = []
     agent_path = path / "agents"
+    prompts_path = path / "prompts"
     for file in agent_path.glob("*.yaml"):
         agent_config = load_yaml(file)
+        prompt = prompts_path / os.path.join(Path(file).stem + ".txt")
+        if os.path.exists(prompt):
+            agent_config["instructions"] = open(prompt).read()
         config["agents"].append(agent_config)
 
     config["toolgroups"] = []
