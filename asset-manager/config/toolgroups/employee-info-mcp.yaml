@@ -1,0 +1,4 @@
+name: "employee-info"
+description: "An MCP for obtaining employee laptop info"
+uri: "http://self-service-agent-employee-info:8000/sse"
+transport: "http"

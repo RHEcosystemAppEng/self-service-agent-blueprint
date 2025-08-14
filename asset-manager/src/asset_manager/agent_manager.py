@@ -1,3 +1,5 @@
+from typing import Any
+
 import logging
 import os
 import httpx
@@ -16,19 +18,19 @@ def toolgroups(agent) -> list[Toolgroup] | None:
         return None
 
     toolgroups: list[Toolgroup] = []
-    mcp_servers = agent.get("mcp_servers")
-    if mcp_servers:
-        for mcp_server in mcp_servers:
-            toolgroups.append("mcp::" + mcp_server)
-
     kbs = agent.get("knowledge_bases")
     if kbs:
         toolgroups.append(
             {
-                "name": "builtin::rag",
+                "name": "builtin::rag/knowledge_search",
                 "args": {"vector_db_ids": kbs},
             }
         )
+
+    mcp_servers = agent.get("mcp_servers")
+    if mcp_servers:
+        for mcp_server in mcp_servers:
+            toolgroups.append("mcp::" + mcp_server)
 
     return toolgroups
 
@@ -101,7 +103,7 @@ class AgentManager(Manager):
 
         return agents
 
-    def model(self, agent) -> str:
+    def model(self, agent) -> str | None:
         if agent.get("model"):
             return agent["model"]
 
@@ -112,25 +114,4 @@ class AgentManager(Manager):
         model_id = next(m for m in models if m.model_type == "llm").identifier
         if model_id:
             return model_id
-
-        return os.environ["LLAMA_STACK_MODELS"].split(",", 1)[0]
-
-    def get_agent_by_name(self, name: str):
-        if self._client is None:
-            self.connect_to_llama_stack()
-
-        # Get all agents data
-        response = self._client.get("v1/agents", cast_to=httpx.Response)
-        json_string = response.content.decode("utf-8")
-        data = json.loads(json_string)
-
-        # Search for agent by name
-        for agent in data["data"]:
-            if isinstance(agent, dict):
-                agent_config = agent.get("agent_config", {})
-                agent_name = agent_config.get("name")
-
-                if agent_name == name:
-                    return agent
-
         return None

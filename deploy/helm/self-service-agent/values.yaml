@@ -79,3 +79,11 @@ llama_stack_url: http://llamastack:8321
 
 sessionSecret: {}
  # value: "my-session-secret"
+
+mcp-servers:
+  mcp-servers:
+    self-service-agent-employee-info:
+      deploy: true
+      imageRepository: quay.io/ecosystem-appeng/self-service-agent-employee-info-mcp
+      uri: http://self-service-agent-employee-info:8000/sse/
+      imageTag: 0.0.2
