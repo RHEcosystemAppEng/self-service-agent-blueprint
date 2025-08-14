@@ -7,12 +7,12 @@ replicaCount: 1
 
 # This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
 image:
-  repository: quay.io/ecosystem-appeng/self-service-agent
+  repository: quay.io/ecosystem-appeng/slack-service
   assetManager: quay.io/ecosystem-appeng/self-service-agent-asset-manager
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  #tag: "1.1.0"
+  tag: "v1.0.0"
 
 # This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: []
@@ -30,10 +30,12 @@ podAnnotations: {}
 # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
 podLabels: {}
 
-podSecurityContext: {}
+podSecurityContext:
+  {}
   # fsGroup: 2000
 
-securityContext: {}
+securityContext:
+  {}
   # capabilities:
   #   drop:
   #   - ALL
@@ -48,8 +50,15 @@ service:
   # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
   port: 8000
 
+route:
+  enabled: true
+  host: ""
+  tls:
+    enabled: true
+    termination: edge
 
-resources: {}
+resources:
+  {}
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
   # resources, such as Minikube. If you do want to specify resources, uncomment the following
@@ -77,5 +86,10 @@ affinity: {}
 
 llama_stack_url: http://llamastack:8321
 
-sessionSecret: {}
- # value: "my-session-secret"
+sessionSecret:
+  {}
+  # value: "my-session-secret"
+
+# Slack settings
+slack:
+  botToken: ""

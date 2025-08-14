@@ -11,13 +11,18 @@ MAKFLAGS += --no-print-directory
 POSTGRES_USER ?= postgres
 POSTGRES_PASSWORD ?= rag_password
 POSTGRES_DBNAME ?= rag_blueprint
+
+# Prompt for SLACK_BOT_TOKEN if not set
+SLACK_BOT_TOKEN ?= $(shell bash -c 'read -r -p "Enter Slack Bot Token (xoxb-...): " TOKEN; echo $$TOKEN')
+
 # HF_TOKEN is only required if LLM_URL is not set
 ifeq ($(LLM_URL),)
 HF_TOKEN ?= $(shell bash -c 'read -r -p "Enter Hugging Face Token: " HF_TOKEN; echo $$HF_TOKEN')
 else
 HF_TOKEN ?=
 endif
-MAIN_CHART_NAME := self-service-agent 
+
+MAIN_CHART_NAME := self-service-agent
 TOLERATIONS_TEMPLATE=[{"key":"$(1)","effect":"NoSchedule","operator":"Exists"}]
 
 helm_pgvector_args = \
@@ -42,6 +47,7 @@ helm_llama_stack_args = \
     $(if $(SAFETY_API_TOKEN),--set global.models.$(SAFETY).apiToken='$(SAFETY_API_TOKEN)',) \
     $(if $(LLAMA_STACK_ENV),--set-json llama-stack.secrets='$(LLAMA_STACK_ENV)',)
 
+
 # Default target
 .PHONY: help
 help:
@@ -54,6 +60,7 @@ help:
 	@echo "Configuration options (set via environment variables or make arguments):"
 	@echo "  NAMESPACE                - Target namespace (default: llama-stack-rag)"
 	@echo "  HF_TOKEN                 - Hugging Face Token (will prompt if not provided)"
+	@echo "  SLACK_BOT_TOKEN          - Slack Bot Token (will prompt if not provided)"
 	@echo "  {SAFETY,LLM}             - Model id as defined in values (eg. llama-3-2-1b-instruct)"
 	@echo "  {SAFETY,LLM}_URL         - Model URL"
 	@echo "  {SAFETY,LLM}_API_TOKEN   - Model API token for remote models"
@@ -81,6 +88,7 @@ install: namespace depend
 
 	@echo "Installing $(MAIN_CHART_NAME) helm chart"
 	@helm upgrade --install $(MAIN_CHART_NAME) $(MAIN_CHART_NAME) -n $(NAMESPACE) \
+		--set slack.botToken=$(SLACK_BOT_TOKEN) \
 		$(PGVECTOR_ARGS) \
 		$(LLM_SERVICE_ARGS) \
 		$(LLAMA_STACK_ARGS) \
@@ -88,6 +96,8 @@ install: namespace depend
 	@echo "Waiting for model services and llamastack to deploy. It may take around 10-15 minutes depending on the size of the model..."
 	@oc rollout status deploy/$(MAIN_CHART_NAME) -n $(NAMESPACE)
 	@echo "$(MAIN_CHART_NAME) installed successfully"
+	@echo "To get your public URL, run: oc get route $(MAIN_CHART_NAME) -n $(NAMESPACE) -o jsonpath='{.spec.host}'"
+
 
 # Uninstall the deployment and clean up
 .PHONY: uninstall

@@ -66,6 +66,13 @@ spec:
           env:
             - name: LLAMA_STACK_MODELS
               value: {{ include "self-service-agent.getModelList" . }}
+            - name: LLAMASTACK_SERVICE_HOST
+              value: "llamastack.{{ .Release.Namespace }}.svc.cluster.local"
+            - name: SLACK_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "self-service-agent.fullname" . }}-slack-secret
+                  key: SLACK_BOT_TOKEN
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
