@@ -15,7 +15,8 @@ MCP_TRANSPORT = os.environ.get("MCP_TRANSPORT", "sse")
 MCP_PORT = int(
     os.environ.get("SELF_SERVICE_AGENT_EMPLOYEE_INFO_SERVICE_PORT_HTTP", "8000")
 )
-mcp = FastMCP("Employee Info Server", host="0.0.0.0")
+MCP_HOST = os.environ.get("MCP_HOST", "0.0.0.0")
+mcp = FastMCP("Employee Info Server", host=MCP_HOST)
 
 
 def _get_employee_laptop_info(employee_id: str) -> str:
@@ -62,11 +63,7 @@ def get_employee_laptop_info(employee_id: str) -> str:
 
 def main() -> None:
     """Run the Employee Info MCP server."""
-    if MCP_TRANSPORT == "sse":
-        # mcp.run(transport=MCP_TRANSPORT, host="0.0.0.0", port=MCP_PORT)
-        mcp.run(transport=MCP_TRANSPORT)
-    else:
-        mcp.run(transport=MCP_TRANSPORT)
+    mcp.run(transport=MCP_TRANSPORT)
 
 
 if __name__ == "__main__":
