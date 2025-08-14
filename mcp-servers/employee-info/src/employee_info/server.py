@@ -12,7 +12,9 @@ from employee_info.data import MOCK_EMPLOYEE_DATA
 from starlette.responses import JSONResponse
 
 MCP_TRANSPORT = os.environ.get("MCP_TRANSPORT", "sse")
-MCP_PORT = int(os.environ.get("SELF_SERVICE_AGENT_EMPLOYEE_INFO_SERVICE_PORT_HTTP", "8000"))
+MCP_PORT = int(
+    os.environ.get("SELF_SERVICE_AGENT_EMPLOYEE_INFO_SERVICE_PORT_HTTP", "8000")
+)
 mcp = FastMCP("Employee Info Server", host="0.0.0.0")
 
 
@@ -30,11 +32,14 @@ def _get_employee_laptop_info(employee_id: str) -> str:
         )
 
     laptop_info = f"""
-    Employee Laptop Information-
-    Model: {employee_data.get("laptop_model")}
-    Purchase Date: {employee_data.get("laptop", {}).get("purchase_date")}
-    Warranty Expiry Date: {employee_data.get("laptop", {}).get("warranty_expiry")}
-    Warranty Status: {employee_data.get("laptop", {}).get("warranty_status")}
+    Employee Name: {employee_data.get("name")}
+    Employee ID: {employee_data.get("employee_id")}
+    Employee Location: {employee_data.get("location")}
+    Laptop Model: {employee_data.get("laptop_model")}
+    Laptop Serial Number: {employee_data.get("laptop_serial_number")}
+    Laptop Purchase Date: {employee_data.get("laptop", {}).get("purchase_date")}
+    Laptop Warranty Expiry Date: {employee_data.get("laptop", {}).get("warranty_expiry")}
+    Laptop Warranty: {employee_data.get("laptop", {}).get("warranty_status")}
     """
     return laptop_info
 
@@ -58,7 +63,7 @@ def get_employee_laptop_info(employee_id: str) -> str:
 def main() -> None:
     """Run the Employee Info MCP server."""
     if MCP_TRANSPORT == "sse":
-        #mcp.run(transport=MCP_TRANSPORT, host="0.0.0.0", port=MCP_PORT)
+        # mcp.run(transport=MCP_TRANSPORT, host="0.0.0.0", port=MCP_PORT)
         mcp.run(transport=MCP_TRANSPORT)
     else:
         mcp.run(transport=MCP_TRANSPORT)
