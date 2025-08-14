@@ -1,0 +1,38 @@
+
+# Stage 1: Install dependencies
+FROM registry.access.redhat.com/ubi9/python-312:latest as builder
+
+USER root
+RUN dnf update -y && dnf clean all
+RUN pip3 install --no-cache-dir uv
+
+WORKDIR /app
+
+COPY . .
+
+RUN uv sync --frozen --no-cache
+
+# Stage 2: Create the final, minimal image
+FROM registry.access.redhat.com/ubi9/python-312-minimal:latest
+
+WORKDIR /app
+
+# Copy the virtual environment from the builder stage
+COPY --from=builder /app/.venv /app/.venv
+
+# Copy the necessary source code
+COPY slack-service/ ./slack-service
+COPY asset-manager/src/ ./asset-manager/src
+
+# Set up paths
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/asset-manager/src:$PYTHONPATH"
+
+# Drop privileges to a non-root user
+USER 1001
+
+# Expose the port the app will run on
+EXPOSE 8000
+
+# Command to run the application
+CMD ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:8000", "slack-service.app:app"]
