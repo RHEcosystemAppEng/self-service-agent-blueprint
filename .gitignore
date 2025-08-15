@@ -203,4 +203,4 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Helm Chart deployment tgz files
-/deploy/helm/self-service-agent/charts/*
+/helm/charts/*
