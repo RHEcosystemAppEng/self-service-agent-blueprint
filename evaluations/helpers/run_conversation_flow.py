@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+
+import json
+import logging
+import os
+from typing import Dict, List
+
+from .openshift_chat_client import OpenShiftChatClient
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+class ConversationFlowTester:
+    """Test runner for conversation flows"""
+
+    def __init__(self) -> None:
+        """
+        Initialize the ConversationFlowTester.
+
+        Sets up the OpenShift client and initializes conversation history.
+        """
+        self.client = OpenShiftChatClient()
+        self.conversation_history = []
+
+    def run_flow(self, questions) -> List[Dict[str, str]]:
+        """
+        Run a conversation flow with the given questions.
+
+        Starts a session with the agent, sends each question in sequence,
+        and collects the responses. Returns the complete conversation.
+
+        Args:
+            questions: List of questions/messages to send to the agent
+
+        Returns:
+            List of conversation turns with role and content for each message
+
+        Raises:
+            Exception: If there are issues with the OpenShift session or communication
+        """
+        conversation = []
+
+        try:
+            self.client.start_session()
+
+            # First, get the agent initialization message
+            agent_init = self.client.get_agent_initialization()
+            conversation.append({"role": "assistant", "content": agent_init})
+
+            # Then process user questions
+            for i, question in enumerate(questions):
+                response = self.client.send_message(question)
+
+                # Add user message
+                conversation.append({"role": "user", "content": question})
+                # Add assistant response
+                conversation.append({"role": "assistant", "content": response})
+
+                # Keep the old format for conversation_history if needed
+                self.conversation_history.append({"role": "user", "content": question})
+                self.conversation_history.append(
+                    {"role": "assistant", "content": response}
+                )
+
+        finally:
+            self.client.close_session()
+
+        return conversation
+
+    def run_flows(
+        self,
+        input_dir: str = "conversations_config/conversations",
+        output_dir: str = "results/conversation_results",
+    ) -> None:
+        """
+        Process all conversation files in the input directory and run them through run_flow.
+
+        Reads all JSON files from the input directory, extracts user questions
+        from each conversation, runs the flow with those questions, and saves
+        the results to the output directory.
+
+        Args:
+            input_dir: Directory containing conversation JSON files to process
+            output_dir: Directory where results will be saved
+
+        Raises:
+            json.JSONDecodeError: If a conversation file contains invalid JSON
+            Exception: If there are issues processing conversations or saving results
+        """
+
+        # Create directories if they don't exist
+        os.makedirs(input_dir, exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Get all JSON files from the input directory
+        if not os.path.exists(input_dir):
+            logger.warning(f"Input directory {input_dir} does not exist")
+            return
+
+        json_files = [f for f in os.listdir(input_dir) if f.endswith(".json")]
+
+        if not json_files:
+            logger.info(f"No JSON files found in {input_dir}")
+            return
+
+        logger.info(f"Found {len(json_files)} JSON files to process")
+
+        for filename in json_files:
+            input_path = os.path.join(input_dir, filename)
+            output_path = os.path.join(output_dir, filename)
+
+            try:
+                # Load the conversation from JSON
+                with open(input_path, "r", encoding="utf-8") as f:
+                    conversation_data = json.load(f)
+
+                # Extract questions from the conversation data
+                # Assuming the conversation is a list of role/content dictionaries
+                questions = []
+                for turn in conversation_data:
+                    if isinstance(turn, dict) and turn.get("role") == "user":
+                        questions.append(turn.get("content", ""))
+
+                if not questions:
+                    logger.warning(f"No user questions found in {filename}")
+                    continue
+
+                logger.info(f"Processing {filename} with {len(questions)} questions")
+
+                # Run the flow with extracted questions
+                results = self.run_flow(questions)
+
+                # Save results to output directory
+                with open(output_path, "w", encoding="utf-8") as f:
+                    json.dump(results, f, indent=2, ensure_ascii=False)
+
+                logger.info(f"Results saved to {output_path}")
+
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse JSON in {filename}: {e}")
+            except Exception as e:
+                logger.error(f"Error processing {filename}: {e}")
+
+        logger.info("Flows processing completed")

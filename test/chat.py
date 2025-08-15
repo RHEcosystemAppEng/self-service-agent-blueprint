@@ -14,6 +14,8 @@ import uuid
 from asset_manager.agent_manager import AgentManager
 from llama_stack_client import LlamaStackClient
 
+AGENT_MESSAGE_TERMINATOR = os.environ.get("AGENT_MESSAGE_TERMINATOR", "")
+
 # remove logging we otherwise get by default
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
@@ -86,7 +88,7 @@ def main():
         },
     ]
     agent_response = send_message_to_agent(agent_id, session_id, kickoff_messages)
-    print(f"agent: {agent_response}")
+    print(f"agent: {agent_response} {AGENT_MESSAGE_TERMINATOR}")
 
     while True:
         try:
@@ -107,7 +109,7 @@ def main():
                     agent_response = send_message_to_agent(
                         agent_id, session_id, messages
                     )
-                print(f"agent: {agent_response}")
+                print(f"agent: {agent_response} {AGENT_MESSAGE_TERMINATOR}")
         except KeyboardInterrupt:
             break
 
