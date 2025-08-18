@@ -1,4 +1,4 @@
 name: "snow"
 description: "An MCP for ServiceNow laptop refresh ticket management"
-uri: "http://self-service-agent-snow-server:8001/sse"
+uri: "http://self-service-agent-snow:8001/sse"
 transport: "http"

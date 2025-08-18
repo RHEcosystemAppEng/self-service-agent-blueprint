@@ -571,7 +571,7 @@ wheels = [
 ]
 
 [[package]]
-name = "snow-server"
+name = "snow"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

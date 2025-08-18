@@ -1,5 +1,5 @@
 [project]
-name = "snow-server"
+name = "snow"
 version = "0.1.0"
 description = "MCP server for ServiceNow laptop refresh ticket management"
 readme = "README.md"
@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [project.scripts]
-snow-server = "snow_server.server:main"
+snow = "snow.server:main"
 
 [dependency-groups]
 dev = [

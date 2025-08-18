@@ -24,4 +24,4 @@ ENV PYTHONPATH="/app/src:$PYTHONPATH"
 USER 1001
 
 # Command to run the application using the virtual environment
-CMD ["python", "src/snow_server/server.py"]
+CMD ["python", "src/snow/server.py"]

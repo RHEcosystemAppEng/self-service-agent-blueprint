@@ -42,7 +42,7 @@ uv run black .
 uv run flake8 .
 
 # Run the MCP server
-uv run python -m snow_server.server
+uv run python -m snow.server
 ```
 
 ## Usage
@@ -51,7 +51,7 @@ uv run python -m snow_server.server
 
 ```bash
 cd mcp-servers/snow/
-uv run python -m snow_server.server
+uv run python -m snow.server
 ```
 
 ## Sample Usage
@@ -71,25 +71,25 @@ ticket_details = open_laptop_refresh_ticket(
 ```bash
 # Build container
 cd mcp-servers/snow/
-podman build -t snow-server-mcp .
+podman build -t snow-mcp .
 
 # Run container
 podman run --rm -i -p 8001:8001 \
   -e FASTMCP_HOST=0.0.0.0 \
   -e FASTMCP_PORT=8001 \
-  snow-server-mcp
+  snow-mcp
 ```
 
 ## Testing with MCP-Server with Claude Code + Podman
 
 ```bash
-# Add the local snow-server-mcp server to claude code 
-claude mcp add --transport http snow-server-mcp http://localhost:8001/mcp
+# Add the local snow-mcp server to claude code 
+claude mcp add --transport http snow-mcp http://localhost:8001/mcp
 
 # Check the server has connected (pod should be running before)
 claude mcp list
 # Checking MCP server health...
-# snow-server-mcp: http://localhost:8001/mcp (HTTP) - ✓ Connected
+# snow-mcp: http://localhost:8001/mcp (HTTP) - ✓ Connected
 
 # Get into claude and test the tool
 >  I need to open a laptop refresh ticket for employee 1001, Alice Johnson. The current laptop is outdated and affecting productivity.
@@ -111,14 +111,14 @@ This MCP server follows the FastMCP framework patterns:
 ```
 snow/
 ├── src/
-│   └── snow_server/
+│   └── snow/
 │       ├── __init__.py
 │       ├── server.py           # Main MCP server implementation
 │       └── data/
 │           ├── __init__.py
 │           └── data.py         # Mock ServiceNow data and ticket creation
 ├── tests/
-│   └── test_snow_server.py     # Unit tests
+│   └── test_snow.py     # Unit tests
 ├── pyproject.toml              # Project configuration
 ├── README.md                   # This file
 ├── uv.lock                     # Dependency lock file (generated)

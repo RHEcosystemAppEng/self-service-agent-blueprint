@@ -7,7 +7,7 @@ ServiceNow laptop refresh tickets.
 import os
 from mcp.server.fastmcp import FastMCP
 
-from snow_server.data.data import create_laptop_refresh_ticket
+from snow.data.data import create_laptop_refresh_ticket
 from starlette.responses import JSONResponse
 
 MCP_TRANSPORT = os.environ.get("MCP_TRANSPORT", "sse")

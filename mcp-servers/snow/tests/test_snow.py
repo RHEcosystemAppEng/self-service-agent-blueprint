@@ -1,7 +1,7 @@
 """Tests for Snow Server MCP server."""
 
 import pytest
-from snow_server.server import open_laptop_refresh_ticket
+from snow.server import open_laptop_refresh_ticket
 
 
 def test_open_laptop_refresh_ticket_success():
