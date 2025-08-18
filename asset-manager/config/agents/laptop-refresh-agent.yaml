@@ -15,5 +15,5 @@ tool_choice: "required"
 input_shields: []
 output_shields: []
 max_infer_iters: 25
-mcp_servers: ["employee-info"]
+mcp_servers: ["employee-info", "snow"]
 knowledge_bases: ["laptop-refresh"]
