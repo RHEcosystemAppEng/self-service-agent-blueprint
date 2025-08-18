@@ -60,7 +60,7 @@ def open_laptop_refresh_ticket(
 
     ticket_details = f"""
     ServiceNow Ticket Created Successfully!
-    
+
     Ticket Number: {ticket_data['ticket_number']}
     Employee: {ticket_data['employee_name']} (ID: {ticket_data['employee_id']})
     Request Type: {ticket_data['request_type']}
@@ -71,7 +71,7 @@ def open_laptop_refresh_ticket(
     Created Date: {ticket_data['created_date']}
     Expected Completion: {ticket_data['expected_completion']}
     Assigned Group: {ticket_data['assigned_group']}
-    
+
     Your laptop refresh request has been submitted and will be processed by the IT Hardware Team.
     You will receive updates via email as the ticket progresses.
     """

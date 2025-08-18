@@ -2,7 +2,6 @@
 
 import pytest
 from snow_server.server import open_laptop_refresh_ticket
-from snow_server.data.data import MOCK_TICKET_DATA
 
 
 def test_open_laptop_refresh_ticket_success():
