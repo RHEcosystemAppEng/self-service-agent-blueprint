@@ -1,6 +1,7 @@
-import yaml
 import os
 from pathlib import Path
+
+import yaml
 
 
 def load_yaml(file_path) -> dict:
