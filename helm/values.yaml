@@ -90,5 +90,5 @@ mcp-servers:
     self-service-agent-snow:
       deploy: true
       imageRepository: quay.io/ecosystem-appeng/self-service-agent-snow-mcp
-      uri: http://self-service-agent-snow:8001/sse/
-      imageTag: 0.0.1
+      uri: http://self-service-agent-snow:8000/sse/
+      imageTag: 0.0.2

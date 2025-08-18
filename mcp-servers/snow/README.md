@@ -74,22 +74,19 @@ cd mcp-servers/snow/
 podman build -t snow-mcp .
 
 # Run container
-podman run --rm -i -p 8001:8001 \
-  -e FASTMCP_HOST=0.0.0.0 \
-  -e FASTMCP_PORT=8001 \
-  snow-mcp
+podman run --rm -i -p 8000:800 snow-mcp
 ```
 
 ## Testing with MCP-Server with Claude Code + Podman
 
 ```bash
 # Add the local snow-mcp server to claude code 
-claude mcp add --transport http snow-mcp http://localhost:8001/mcp
+claude mcp add --transport http snow-mcp http://localhost:8000/mcp
 
 # Check the server has connected (pod should be running before)
 claude mcp list
 # Checking MCP server health...
-# snow-mcp: http://localhost:8001/mcp (HTTP) - ✓ Connected
+# snow-mcp: http://localhost:8000/mcp (HTTP) - ✓ Connected
 
 # Get into claude and test the tool
 >  I need to open a laptop refresh ticket for employee 1001, Alice Johnson. The current laptop is outdated and affecting productivity.
