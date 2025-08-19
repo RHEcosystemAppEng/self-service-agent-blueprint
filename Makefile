@@ -59,7 +59,7 @@ help:
 	@echo "  build-agent-image           - Build the self-service agent container image"
 	@echo "  build-asset-mgr-image       - Build the asset manager container image"
 	@echo "  build-mcp-emp-info-image    - Build the employee info MCP server container image"
-	@echo "  format                      - Run Black formatting on entire codebase"
+	@echo "  format                      - Run isort import sorting and Black formatting on entire codebase"
 	@echo "  helm-depend                 - Update Helm dependencies"
 	@echo "  helm-install                - Install the RAG deployment (creates namespace, secrets, and deploys Helm chart)"
 	@echo "  helm-list-models            - List available models"
@@ -151,6 +151,8 @@ lint:
 
 .PHONY: format
 format:
+	@echo "Running isort import sorting on entire codebase..."
+	uv run isort .
 	@echo "Running Black formatting on entire codebase..."
 	uv run black .
 	@echo "Formatting completed successfully!"

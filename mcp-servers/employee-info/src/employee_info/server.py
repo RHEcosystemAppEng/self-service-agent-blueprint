@@ -5,9 +5,9 @@ employee laptop information.
 """
 
 import os
-from mcp.server.fastmcp import FastMCP
 
 from employee_info.data import MOCK_EMPLOYEE_DATA
+from mcp.server.fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
 MCP_TRANSPORT = os.environ.get("MCP_TRANSPORT", "sse")

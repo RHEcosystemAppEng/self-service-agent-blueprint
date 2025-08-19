@@ -76,5 +76,6 @@ python_functions = ["test_*"]
 dev = [
     "black>=25.1.0",
     "flake8>=7.3.0",
+    "isort>=5.13.0",
     "pytest>=8.4.1",
 ]

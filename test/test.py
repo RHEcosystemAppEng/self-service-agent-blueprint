@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
+import json
 import logging
 import os
+
 import httpx
-import json
 from llama_stack_client import LlamaStackClient
 
 # remove logging we otherwise get by default
