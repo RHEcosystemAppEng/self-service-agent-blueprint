@@ -8,7 +8,7 @@ def test_get_employee_laptop_info_valid_employee():
     """Test retrieving laptop info for a valid employee."""
     result = _get_employee_laptop_info("1001")
 
-    expected = f"""
+    expected = """
     Employee Name: Alice Johnson
     Employee ID: 1001
     Employee Location: EMEA
