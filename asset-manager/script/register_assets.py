@@ -1,8 +1,9 @@
+from pathlib import Path
+
 from asset_manager.agent_manager import AgentManager
 from asset_manager.kb_manager import KnowledgeBaseManager
 from asset_manager.tg_manager import ToolgroupsManager
 from asset_manager.util import load_config_from_path
-from pathlib import Path
 
 
 def main():

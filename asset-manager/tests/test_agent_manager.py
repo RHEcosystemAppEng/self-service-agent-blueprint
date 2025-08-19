@@ -1,7 +1,9 @@
+from pathlib import Path
+
 import pytest
+
 from asset_manager.agent_manager import AgentManager
 from asset_manager.util import load_config_from_path
-from pathlib import Path
 
 
 @pytest.fixture
