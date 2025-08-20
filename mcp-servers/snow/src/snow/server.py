@@ -5,8 +5,8 @@ ServiceNow laptop refresh tickets.
 """
 
 import os
-from mcp.server.fastmcp import FastMCP
 
+from mcp.server.fastmcp import FastMCP
 from snow.data.data import create_laptop_refresh_ticket
 from starlette.responses import JSONResponse
 
