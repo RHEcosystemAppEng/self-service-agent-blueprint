@@ -1,0 +1,24 @@
+[project]
+name = "snow"
+version = "0.1.0"
+description = "MCP server for ServiceNow laptop refresh ticket management"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.1",
+    "mcp[cli]>=1.6.0",
+]
+
+[project.scripts]
+snow = "snow.server:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "black>=24.0.0",
+    "flake8>=7.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

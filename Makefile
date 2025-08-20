@@ -9,8 +9,9 @@ VERSION ?= 0.0.2
 CONTAINER_TOOL ?= podman
 REGISTRY ?= quay.io/ecosystem-appeng
 AGENT_IMG ?= $(REGISTRY)/self-service-agent:$(VERSION)
-ASSET_MGR_IMG ?= $(REGISTRY)/self-service-asset-manager:$(VERSION)
+ASSET_MGR_IMG ?= $(REGISTRY)/self-service-agent-asset-manager:$(VERSION)
 MCP_EMP_INFO_IMG ?= $(REGISTRY)/self-service-agent-employee-info-mcp:$(VERSION)
+MCP_SNOW_IMG ?= $(REGISTRY)/self-service-agent-snow-mcp:$(VERSION)
 
 MAKFLAGS += --no-print-directory
 
@@ -55,10 +56,11 @@ helm_llama_stack_args = \
 .PHONY: help
 help:
 	@echo "Available targets:"
-	@echo "  build-all-images            - Build all container images (agent, asset-manager, employee-info-mcp)"
+	@echo "  build-all-images            - Build all container images (agent, asset-manager, employee-info-mcp, snow-mcp)"
 	@echo "  build-agent-image           - Build the self-service agent container image"
 	@echo "  build-asset-mgr-image       - Build the asset manager container image"
 	@echo "  build-mcp-emp-info-image    - Build the employee info MCP server container image"
+	@echo "  build-mcp-snow-image        - Build the snow MCP server container image"
 	@echo "  format                      - Run isort import sorting and Black formatting on entire codebase"
 	@echo "  helm-depend                 - Update Helm dependencies"
 	@echo "  helm-install                - Install the RAG deployment (creates namespace, secrets, and deploys Helm chart)"
@@ -69,15 +71,18 @@ help:
 	@echo "  install                     - Install dependencies for self-service agent"
 	@echo "  install-asset-manager       - Install dependencies for asset manager"
 	@echo "  install-mcp-emp-info        - Install dependencies for employee info MCP server"
+	@echo "  install-mcp-snow            - Install dependencies for snow MCP server"
 	@echo "  lint                        - Run flake8 linting on entire codebase"
 	@echo "  push-all-images             - Push all container images to registry"
 	@echo "  push-agent-image            - Push the self-service agent container image to registry"
 	@echo "  push-asset-mgr-image        - Push the asset manager container image to registry"
 	@echo "  push-mcp-emp-info-image     - Push the employee info MCP server container image to registry"
+	@echo "  push-mcp-snow-image         - Push the snow MCP server container image to registry"
 	@echo "  test-all                    - Run tests for all projects"
 	@echo "  test                        - Run tests for self-service agent"
 	@echo "  test-asset-manager          - Run tests for asset manager"
 	@echo "  test-mcp-emp-info           - Run tests for employee info MCP server"
+	@echo "  test-mcp-snow               - Run tests for snow MCP server"
 	@echo ""
 	@echo "Configuration options (set via environment variables or make arguments):"
 	@echo "  CONTAINER_TOOL           - Container build tool (default: podman)"
@@ -86,6 +91,7 @@ help:
 	@echo "  AGENT_IMG                - Full agent image name (default: \$${REGISTRY}/self-service-agent:\$${VERSION})"
 	@echo "  ASSET_MGR_IMG            - Full asset manager image name (default: \$${REGISTRY}/self-service-asset-manager:\$${VERSION})"
 	@echo "  MCP_EMP_INFO_IMG         - Full employee info MCP image name (default: \$${REGISTRY}/self-service-agent-employee-info-mcp:\$${VERSION})"
+	@echo "  MCP_SNOW_IMG             - Full snow MCP image name (default: \$${REGISTRY}/self-service-agent-snow-mcp:\$${VERSION})"
 	@echo "  NAMESPACE                - Target namespace (default: llama-stack-rag)"
 	@echo "  HF_TOKEN                 - Hugging Face Token (will prompt if not provided)"
 	@echo "  {SAFETY,LLM}             - Model id as defined in values (eg. llama-3-2-1b-instruct)"
@@ -97,7 +103,7 @@ help:
 # Build function: $(call build_image,IMAGE_NAME,DESCRIPTION,CONTAINERFILE_PATH,BUILD_CONTEXT)
 define build_image
 	@echo "Building $(2): $(1)"
-	$(CONTAINER_TOOL) build -t $(1) $(if $(3),-f $(3),) $(4)
+	$(CONTAINER_TOOL) build -t $(1) --platform=linux/amd64 $(if $(3),-f $(3),) $(4)
 	@echo "Successfully built $(1)"
 endef
 
@@ -110,7 +116,7 @@ endef
 
 # Build container images
 .PHONY: build-all-images
-build-all-images: build-agent-image build-asset-mgr-image build-mcp-emp-info-image
+build-all-images: build-agent-image build-asset-mgr-image build-mcp-emp-info-image build-mcp-snow-image
 	@echo "All container images built successfully!"
 
 .PHONY: build-agent-image
@@ -125,9 +131,13 @@ build-asset-mgr-image:
 build-mcp-emp-info-image:
 	$(call build_image,$(MCP_EMP_INFO_IMG),employee info MCP image,mcp-servers/employee-info/Containerfile,mcp-servers/employee-info/)
 
+.PHONY: build-mcp-snow-image
+build-mcp-snow-image:
+	$(call build_image,$(MCP_SNOW_IMG),snow MCP image,mcp-servers/snow/Containerfile,mcp-servers/snow/)
+
 # Push container images
 .PHONY: push-all-images
-push-all-images: push-agent-image push-asset-mgr-image push-mcp-emp-info-image
+push-all-images: push-agent-image push-asset-mgr-image push-mcp-emp-info-image push-mcp-snow-image
 	@echo "All container images pushed successfully!"
 
 .PHONY: push-agent-image
@@ -141,6 +151,10 @@ push-asset-mgr-image:
 .PHONY: push-mcp-emp-info-image
 push-mcp-emp-info-image:
 	$(call push_image,$(MCP_EMP_INFO_IMG),employee info MCP image)
+
+.PHONY: push-mcp-snow-image
+push-mcp-snow-image:
+	$(call push_image,$(MCP_SNOW_IMG),snow MCP image)
 
 # Code quality
 .PHONY: lint
@@ -159,7 +173,7 @@ format:
 
 # Install dependencies
 .PHONY: install-all
-install-all: install install-asset-manager install-mcp-emp-info
+install-all: install install-asset-manager install-mcp-emp-info install-mcp-snow
 	@echo "All dependencies installed successfully!"
 
 .PHONY: install
@@ -180,9 +194,15 @@ install-mcp-emp-info:
 	cd mcp-servers/employee-info && uv sync
 	@echo "Employee info MCP dependencies installed successfully!"
 
+.PHONY: install-mcp-snow
+install-mcp-snow:
+	@echo "Installing snow MCP dependencies..."
+	cd mcp-servers/snow && uv sync
+	@echo "Snow MCP dependencies installed successfully!"
+
 # Test code
 .PHONY: test-all
-test-all: test test-asset-manager test-mcp-emp-info
+test-all: test test-asset-manager test-mcp-emp-info test-mcp-snow
 	@echo "All tests completed successfully!"
 
 .PHONY: test
@@ -202,6 +222,12 @@ test-mcp-emp-info:
 	@echo "Running employee info MCP tests..."
 	cd mcp-servers/employee-info && uv run python -m pytest tests/
 	@echo "Employee info MCP tests completed successfully!"
+
+.PHONY: test-mcp-snow
+test-mcp-snow:
+	@echo "Running snow MCP tests..."
+	cd mcp-servers/snow && uv run python -m pytest tests/
+	@echo "Snow MCP tests completed successfully!"
 
 # Create namespace and deploy
 namespace:
