@@ -103,7 +103,7 @@ help:
 # Build function: $(call build_image,IMAGE_NAME,DESCRIPTION,CONTAINERFILE_PATH,BUILD_CONTEXT)
 define build_image
 	@echo "Building $(2): $(1)"
-	$(CONTAINER_TOOL) build -t $(1) $(if $(3),-f $(3),) $(4)
+	$(CONTAINER_TOOL) build -t $(1) $(if $(shell uname -m | grep -q arm64 && echo true),--platform=linux/amd64,) $(if $(3),-f $(3),) $(4)
 	@echo "Successfully built $(1)"
 endef
 
