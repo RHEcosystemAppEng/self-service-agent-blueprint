@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  CHART_FILE: deploy/helm/self-service-agent/Chart.yaml
+  CHART_FILE: helm/Chart.yaml
 
 jobs:
   build-and-push:
