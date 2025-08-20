@@ -6,9 +6,6 @@ on:
       - 'main'
   workflow_dispatch:
 
-env:
-  CHART_FILE: helm/Chart.yaml
-
 jobs:
   build-and-push:
     if: github.repository_owner == 'RHEcosystemAppEng'
@@ -36,10 +33,10 @@ jobs:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
 
-      - name: Extract version from Chart.yaml
+      - name: Extract version from the GitHub context
         id: version
         run: |
-          version=$(grep '^appVersion:' ${{ env.CHART_FILE }} | awk '{print $2}')
+          version=${{ github.head_ref }}.${{ github.sha }}
           echo "tag=$version" >> $GITHUB_OUTPUT
 
       - name: Build and push ${{ matrix.name }}
