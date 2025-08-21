@@ -8,16 +8,12 @@ import sys
 from typing import Dict, List, Optional
 
 from deepeval.evaluate import DisplayConfig, evaluate
-from deepeval.metrics import (
-    ConversationalGEval,
-    ConversationCompletenessMetric,
-    RoleAdherenceMetric,
-    TurnRelevancyMetric,
-)
+from deepeval.metrics import (ConversationalGEval,
+                              ConversationCompletenessMetric,
+                              RoleAdherenceMetric, TurnRelevancyMetric)
 from deepeval.models import DeepEvalBaseLLM
 from deepeval.test_case import ConversationalTestCase, Turn, TurnParams
 from deepeval.test_run import global_test_run_manager
-
 from helpers.copy_context import copy_context_files
 from helpers.custom_llm import CustomLLM, get_api_configuration
 from helpers.deep_eval_summary import print_final_summary
