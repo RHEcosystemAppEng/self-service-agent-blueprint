@@ -66,6 +66,9 @@ packages = ["test"]
 line-length = 88
 target-version = ["py38"]
 
+[tool.isort]
+profile = "black"
+
 [tool.pytest.ini_options]
 testpaths = ["test"]
 python_files = ["test_*.py"]
