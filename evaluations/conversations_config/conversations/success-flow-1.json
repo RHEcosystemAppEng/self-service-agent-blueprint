@@ -1,9 +1,5 @@
 [
     {
-        "role": "assistant",
-        "content": "Hello! I'm a routing agent, and I'm here to help you get connected with the right person who can assist with your request. I can help with a limited set of issues, specifically with refreshing a laptop or updating your email address. How can I assist you today?"
-    },
-    {
         "role": "user",
         "content": "refresh"
     },
