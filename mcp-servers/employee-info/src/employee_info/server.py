@@ -44,7 +44,7 @@ def _get_employee_laptop_info(employee_id: str) -> str:
     """
     logging.info(
         "returning laptop info for employee",
-        {employee_id: employee_data.get("employee_id")},
+        extra={"employee_id": employee_data.get("employee_id")}
     )
     return laptop_info
 

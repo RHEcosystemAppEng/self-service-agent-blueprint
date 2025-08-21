@@ -78,7 +78,7 @@ def open_laptop_refresh_ticket(
     """
     logging.info(
         "created service now ticket",
-        {"employee_id": employee_id, "ticket_number": ticket_data["ticket_number"]},
+        extra={"employee_id": employee_id, "ticket_number": ticket_data["ticket_number"]}
     )
     return ticket_details
 
