@@ -4,6 +4,7 @@ A FastMCP server that provides tools for creating
 ServiceNow laptop refresh tickets.
 """
 
+import logging
 import os
 
 from mcp.server.fastmcp import FastMCP
@@ -75,7 +76,9 @@ def open_laptop_refresh_ticket(
     Your laptop refresh request has been submitted and will be processed by the IT Hardware Team.
     You will receive updates via email as the ticket progresses.
     """
-
+    logging.info(
+        f"created service now ticket - employee_id: {employee_id}, ticket_number: {ticket_data['ticket_number']}"
+    )
     return ticket_details
 
 

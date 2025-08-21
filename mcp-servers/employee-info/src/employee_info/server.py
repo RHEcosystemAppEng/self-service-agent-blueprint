@@ -4,6 +4,7 @@ A FastMCP server that provides tools for retrieving
 employee laptop information.
 """
 
+import logging
 import os
 
 from employee_info.data import MOCK_EMPLOYEE_DATA
@@ -41,6 +42,9 @@ def _get_employee_laptop_info(employee_id: str) -> str:
     Laptop Warranty Expiry Date: {employee_data.get("laptop", {}).get("warranty_expiry")}
     Laptop Warranty: {employee_data.get("laptop", {}).get("warranty_status")}
     """
+    logging.info(
+        f"returning laptop info for employee - employee_id: {employee_data.get('employee_id')}"
+    )
     return laptop_info
 
 
