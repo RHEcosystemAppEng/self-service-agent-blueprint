@@ -10,6 +10,7 @@ CONTAINER_TOOL ?= podman
 REGISTRY ?= quay.io/ecosystem-appeng
 AGENT_IMG ?= $(REGISTRY)/self-service-agent:$(VERSION)
 ASSET_MGR_IMG ?= $(REGISTRY)/self-service-agent-asset-manager:$(VERSION)
+SLACK_SERVICE_IMG ?= $(REGISTRY)/self-service-agent-slack-service:$(VERSION)
 MCP_EMP_INFO_IMG ?= $(REGISTRY)/self-service-agent-employee-info-mcp:$(VERSION)
 MCP_SNOW_IMG ?= $(REGISTRY)/self-service-agent-snow-mcp:$(VERSION)
 
@@ -29,6 +30,11 @@ endif
 
 MAIN_CHART_NAME := self-service-agent 
 TOLERATIONS_TEMPLATE=[{"key":"$(1)","effect":"NoSchedule","operator":"Exists"}]
+
+# Slack Configuration
+SLACK_SERVICE_CHART_NAME := slack-service
+SLACK_BOT_TOKEN ?= $(shell bash -c 'read -r -p "Enter Slack Bot Token (xoxb-...): " TOKEN; echo $$TOKEN')
+SLACK_SIGNING_SECRET ?= $(shell bash -c 'read -r -p "Enter Slack Signing Secret: " SECRET; echo $$SECRET')
 
 helm_pgvector_args = \
     --set pgvector.secret.user=$(POSTGRES_USER) \
@@ -61,26 +67,32 @@ version:
 .PHONY: help
 help:
 	@echo "Available targets:"
-	@echo "  build-all-images            - Build all container images (agent, asset-manager, employee-info-mcp, snow-mcp)"
+	@echo "  build-all-images            - Build all container images (agent, asset-manager, slack-service, employee-info-mcp, snow-mcp)"
 	@echo "  build-agent-image           - Build the self-service agent container image"
 	@echo "  build-asset-mgr-image       - Build the asset manager container image"
+	@echo "  build-slack-service-image   - Build the slack service container image"
 	@echo "  build-mcp-emp-info-image    - Build the employee info MCP server container image"
 	@echo "  build-mcp-snow-image        - Build the snow MCP server container image"
 	@echo "  format                      - Run isort import sorting and Black formatting on entire codebase"
 	@echo "  helm-depend                 - Update Helm dependencies"
 	@echo "  helm-install                - Install the RAG deployment (creates namespace, secrets, and deploys Helm chart)"
+	@echo "  helm-install-self-service-agent - Install the self-service agent Helm chart"
+	@echo "  helm-install-slack          - Install the Slack service Helm chart"
 	@echo "  helm-list-models            - List available models"
 	@echo "  helm-status                 - Check status of the deployment"
 	@echo "  helm-uninstall              - Uninstall the RAG deployment and clean up resources"
+	@echo "  helm-uninstall-slack        - Uninstall the Slack service Helm chart"
 	@echo "  install-all                 - Install dependencies for all projects"
 	@echo "  install                     - Install dependencies for self-service agent"
 	@echo "  install-asset-manager       - Install dependencies for asset manager"
+	@echo "  install-slack-service-dependencies - Install dependencies for slack service"
 	@echo "  install-mcp-emp-info        - Install dependencies for employee info MCP server"
 	@echo "  install-mcp-snow            - Install dependencies for snow MCP server"
 	@echo "  lint                        - Run flake8 linting on entire codebase"
 	@echo "  push-all-images             - Push all container images to registry"
 	@echo "  push-agent-image            - Push the self-service agent container image to registry"
 	@echo "  push-asset-mgr-image        - Push the asset manager container image to registry"
+	@echo "  push-slack-service-image    - Push the slack service container image to registry"
 	@echo "  push-mcp-emp-info-image     - Push the employee info MCP server container image to registry"
 	@echo "  push-mcp-snow-image         - Push the snow MCP server container image to registry"
 	@echo "  test-all                    - Run tests for all projects"
@@ -97,6 +109,7 @@ help:
 	@echo "  VERSION                  - Image version tag (default: 0.0.2)"
 	@echo "  AGENT_IMG                - Full agent image name (default: \$${REGISTRY}/self-service-agent:\$${VERSION})"
 	@echo "  ASSET_MGR_IMG            - Full asset manager image name (default: \$${REGISTRY}/self-service-asset-manager:\$${VERSION})"
+	@echo "  SLACK_SERVICE_IMG        - Full slack service image name (default: \$${REGISTRY}/self-service-agent-slack-service:\$${VERSION})"
 	@echo "  MCP_EMP_INFO_IMG         - Full employee info MCP image name (default: \$${REGISTRY}/self-service-agent-employee-info-mcp:\$${VERSION})"
 	@echo "  MCP_SNOW_IMG             - Full snow MCP image name (default: \$${REGISTRY}/self-service-agent-snow-mcp:\$${VERSION})"
 	@echo "  NAMESPACE                - Target namespace (default: llama-stack-rag)"
@@ -123,7 +136,7 @@ endef
 
 # Build container images
 .PHONY: build-all-images
-build-all-images: build-agent-image build-asset-mgr-image build-mcp-emp-info-image build-mcp-snow-image
+build-all-images: build-agent-image build-asset-mgr-image build-slack-service-image build-mcp-emp-info-image build-mcp-snow-image
 	@echo "All container images built successfully!"
 
 .PHONY: build-agent-image
@@ -133,6 +146,10 @@ build-agent-image:
 .PHONY: build-asset-mgr-image
 build-asset-mgr-image:
 	$(call build_image,$(ASSET_MGR_IMG),asset manager image,asset-manager/Containerfile,asset-manager/)
+
+.PHONY: build-slack-service-image
+build-slack-service-image:
+	$(call build_image,$(SLACK_SERVICE_IMG),slack service image,slack-service/Containerfile,.)
 
 .PHONY: build-mcp-emp-info-image
 build-mcp-emp-info-image:
@@ -144,7 +161,7 @@ build-mcp-snow-image:
 
 # Push container images
 .PHONY: push-all-images
-push-all-images: push-agent-image push-asset-mgr-image push-mcp-emp-info-image push-mcp-snow-image
+push-all-images: push-agent-image push-asset-mgr-image push-slack-service-image push-mcp-emp-info-image push-mcp-snow-image
 	@echo "All container images pushed successfully!"
 
 .PHONY: push-agent-image
@@ -154,6 +171,10 @@ push-agent-image:
 .PHONY: push-asset-mgr-image
 push-asset-mgr-image:
 	$(call push_image,$(ASSET_MGR_IMG),asset manager image)
+
+.PHONY: push-slack-service-image
+push-slack-service-image:
+	$(call push_image,$(SLACK_SERVICE_IMG),slack service image)
 
 .PHONY: push-mcp-emp-info-image
 push-mcp-emp-info-image:
@@ -180,7 +201,7 @@ format:
 
 # Install dependencies
 .PHONY: install-all
-install-all: install install-asset-manager install-mcp-emp-info install-mcp-snow
+install-all: install install-asset-manager install-slack-service-dependencies install-mcp-emp-info install-mcp-snow
 	@echo "All dependencies installed successfully!"
 
 .PHONY: install
@@ -194,6 +215,12 @@ install-asset-manager:
 	@echo "Installing asset manager dependencies..."
 	cd asset-manager && uv sync
 	@echo "Asset manager dependencies installed successfully!"
+
+.PHONY: install-slack-service-dependencies
+install-slack-service-dependencies:
+	@echo "Installing slack service dependencies..."
+	cd slack-service && uv sync
+	@echo "Slack service dependencies installed successfully!"
 
 .PHONY: install-mcp-emp-info
 install-mcp-emp-info:
@@ -256,8 +283,21 @@ helm-depend:
 helm-list-models: helm-depend
 	@helm template dummy-release helm --set llm-service._debugListModels=true | grep ^model:
 
-.PHONY: helm-install
-helm-install: namespace helm-depend
+.PHONY: helm-install-slack
+helm-install-slack: namespace
+	@echo "Installing $(SLACK_SERVICE_CHART_NAME) helm chart"
+	@helm upgrade --install $(SLACK_SERVICE_CHART_NAME) helm/$(SLACK_SERVICE_CHART_NAME) -n $(NAMESPACE) \
+	--set slack.botToken=$(SLACK_BOT_TOKEN) \
+	--set slack.signingSecret=$(SLACK_SIGNING_SECRET)
+	@echo "Waiting for $(SLACK_SERVICE_CHART_NAME) to deploy..."
+	@oc rollout status deploy/$(SLACK_SERVICE_CHART_NAME) -n $(NAMESPACE)
+	@echo "$(SLACK_SERVICE_CHART_NAME) installed successfully"
+	@echo "Your Slack Event URL:"
+	@sleep 10
+	@echo "    https://$$(oc get route $(SLACK_SERVICE_CHART_NAME) -n $(NAMESPACE) -o jsonpath='{.spec.host}')/slack/events"
+
+.PHONY: helm-install-self-service-agent
+helm-install-self-service-agent: namespace helm-depend
 	@$(eval PGVECTOR_ARGS := $(call helm_pgvector_args))
 	@$(eval LLM_SERVICE_ARGS := $(call helm_llm_service_args))
 	@$(eval LLAMA_STACK_ARGS := $(call helm_llama_stack_args))
@@ -272,9 +312,19 @@ helm-install: namespace helm-depend
 	@oc rollout status deploy/$(MAIN_CHART_NAME) -n $(NAMESPACE)
 	@echo "$(MAIN_CHART_NAME) installed successfully"
 
+.PHONY: helm-install
+helm-install: helm-install-self-service-agent helm-install-slack
+	@echo "Both CLI and Slack services installed successfully!"
+	
+
+.PHONY: uninstall-slack
+uninstall-slack:
+	@echo "Uninstalling $(SLACK_SERVICE_CHART_NAME) helm chart"
+	@helm uninstall --ignore-not-found $(SLACK_SERVICE_CHART_NAME) -n $(NAMESPACE)
+
 # Uninstall the deployment and clean up
 .PHONY: helm-uninstall
-helm-uninstall:
+helm-uninstall: uninstall-slack
 	@echo "Uninstalling $(MAIN_CHART_NAME) helm chart"
 	@helm uninstall --ignore-not-found $(MAIN_CHART_NAME) -n $(NAMESPACE)
 	@echo "Removing pgvector PVCs from $(NAMESPACE)"
