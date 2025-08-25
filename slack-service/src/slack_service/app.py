@@ -4,7 +4,7 @@ from pathlib import Path
 from asset_manager.agent_manager import AgentManager
 from asset_manager.util import load_config_from_path
 from flask import Flask, request
-from session_manager.SessionManager import SessionManager
+from session_manager.session_manager import SessionManager
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from slack_sdk.signature import SignatureVerifier

@@ -19,7 +19,7 @@ WORKDIR /app
 
 COPY --from=builder /app/slack-service/.venv /app/.venv
 COPY slack-service/src/slack_service/ ./slack_service
-COPY session-manager/ ./session_manager
+COPY session-manager/src/session_manager/ ./session_manager
 COPY asset-manager/src/asset_manager/ ./asset_manager
 COPY asset-manager/config/ ./asset_manager/config
 
