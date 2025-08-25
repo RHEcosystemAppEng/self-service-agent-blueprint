@@ -38,32 +38,14 @@ dependencies = [
 # Development dependencies for testing
 dev = [
     "pytest>=8.4.0",
-]
-
-# Additional LLM providers (not currently used but available for extension)
-llm-extra = [
-    "anthropic>=0.64.0",
-    "ollama>=0.5.0",
-    "google-genai>=1.30.0",
-]
-
-# HTTP clients for potential future API integrations
-http-clients = [
-    "httpx>=0.28.0",
-    "requests>=2.32.0",
-]
-
-# CLI and output formatting enhancements
-ui-enhancements = [
-    "typer>=0.16.0",
-    "rich>=14.1.0",
-    "click>=8.0.0,!=8.2.2",
-    "tqdm>=4.67.0",
+    "black>=25.1.0",
+    "flake8>=7.3.0",
+    "isort>=5.13.0",
 ]
 
 # Complete development environment
 all = [
-    "conversation-evaluations[dev,llm-extra,http-clients,ui-enhancements]",
+    "conversation-evaluations[dev]",
 ]
 
 [project.scripts]
