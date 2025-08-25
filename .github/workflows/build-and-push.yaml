@@ -6,6 +6,9 @@ on:
       - 'main'
   workflow_dispatch:
 
+env:
+ BRANCH_NAME: ${{ github.head_ref || github.ref_name }}    
+
 jobs:
   build-and-push:
     if: github.repository_owner == 'RHEcosystemAppEng'
@@ -36,7 +39,7 @@ jobs:
       - name: Extract version from the GitHub context
         id: version
         run: |
-          version=${{ github.head_ref }}.${{ github.sha }}
+          version=${{ env.BRANCH_NAME }}.${{ github.sha }}
           echo "tag=$version" >> $GITHUB_OUTPUT
 
       - name: Build and push ${{ matrix.name }}
