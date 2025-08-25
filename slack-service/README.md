@@ -30,34 +30,34 @@ You must create the Slack app first to get the **Bot Token**, which is required 
     - Under the **"Show Tabs"** section, make sure **"Messages Tab"** is enabled and check **"Allow users to send Slash commands and messages from the messages tab"**.
     - Scroll down and check **"Always Show My Bot as Online"**.
 
-4.  **Install the App and Get the Token:**
+4.  **Get the Signing Secret:**
+
+    - Go to **"Basic Information"** in the left sidebar of your Slack app settings.
+    - Scroll down to **"App Credentials"** section.
+    - Copy the **"Signing Secret"**. Keep it safe for the deployment step.
+
+5.  **Install the App and Get the Token:**
 
     - At the top of the **"OAuth & Permissions"** page, click **"Install to Workspace"** and authorize it.
     - After installation, **copy the "Bot User OAuth Token"**. It will start with `xoxb-`. Keep it safe for the next step.
 
 ### Step 2: Deploy the Application with Helm
 
-The `Makefile` simplifies the deployment process. It will prompt you for the Slack Bot Token you just copied.
+You can deploy the Slack bot using the provided `Makefile`, which will help you set up the necessary Kubernetes resources via Helm. The deployment process will require your Slack Bot Token and Signing Secret.
 
-1.  **Navigate to the Helm directory:**
+**To deploy:**
 
-    ```bash
-    cd deploy/helm
-    ```
-
-2.  **Run the installation command:**
-
-    - The command will ask you to enter your Slack Bot Token.
-
-    <!-- end list -->
+1. Run the following command, replacing the placeholders with your values:
 
     ```bash
-    make install NAMESPACE=<Your-namespace> \
+    make helm-install NAMESPACE=<your-namespace> \
       LLM=llama-4-scout-17b-16e-w4a16 \
       LLM_ID=llama-4-scout-17b-16e-w4a16 \
       LLM_URL=https://llama-4-scout-17b-16e-w4a16-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com:443/v1 \
-      LLM_API_TOKEN=<Your-API-Token>
+      LLM_API_TOKEN=<your-api-token>
     ```
+
+2. The script will prompt you to enter your Slack Bot Token and Signing Secret when required.
 
 ### Step 3: Connect Slack to Your Deployed Bot
 
@@ -66,7 +66,7 @@ Once the deployment is complete, you need to get the public URL and give it to S
 1.  **Get the Public URL from the Route:**
 
     ```bash
-    oc get route self-service-agent -n self-service-agent-manager -o jsonpath='{.spec.host}'
+    oc get route <slack-service-chart-name> -n <your-namespace> -o jsonpath='{.spec.host}'
     ```
 
 2.  **Configure Slack's Event Subscriptions:**
@@ -102,6 +102,7 @@ For testing on your local machine without deploying to a cluster.
       --name slack-bot \
       -p 3000:8000 \
       -e SLACK_BOT_TOKEN="xoxb-your-bot-token-here" \
+      -e SLACK_SIGNING_SECRET="your-signing-secret-here" \
       -e LLAMASTACK_SERVICE_HOST="127.0.0.1" \
       slack-service
     ```
