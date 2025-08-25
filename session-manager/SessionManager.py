@@ -1,5 +1,6 @@
 import uuid
 
+
 class SessionManager:
     def __init__(self, agent_manager):
         """
@@ -9,7 +10,7 @@ class SessionManager:
             agent_manager: An initialized AgentManager instance.
         """
         self.agent_manager = agent_manager
-        self.agents = agent_manager.agents()    
+        self.agents = agent_manager.agents()
         self.user_sessions = {}
 
     def _generate_session_name(self, user_id: str, agent_name: str = None) -> str:
@@ -59,17 +60,17 @@ class SessionManager:
         """Routes the conversation to a specialist agent."""
         print(f"Routing to agent: {agent_name}")
         new_agent_id = self.agents[agent_name]
-        
+
         # Create a new session for the specialist agent
         session_name = self._generate_session_name(user_id, agent_name)
         new_session = self.agent_manager._client.agents.session.create(
             new_agent_id, session_name=session_name
         )
-        
+
         # Update the current session to the new specialist agent
         current_session["agent_id"] = new_agent_id
         current_session["session_id"] = new_session.session_id
-        
+
         # Send the message to the new agent
         agent_response = self.send_message_to_agent(
             new_agent_id, current_session["session_id"], text
@@ -113,6 +114,8 @@ class SessionManager:
             and potential_agent_name != "routing-agent"
             and current_session["agent_id"] == self.agents.get("routing-agent")
         ):
-            return self._route_to_specialist(user_id, potential_agent_name, text, current_session)
+            return self._route_to_specialist(
+                user_id, potential_agent_name, text, current_session
+            )
 
         return agent_response

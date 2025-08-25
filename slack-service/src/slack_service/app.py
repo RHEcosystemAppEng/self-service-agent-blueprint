@@ -9,6 +9,7 @@ from session_manager.SessionManager import SessionManager
 from asset_manager.agent_manager import AgentManager
 from asset_manager.util import load_config_from_path
 
+
 def create_app(config_path="asset_manager/config"):
     """Creates and configures a new instance of the Flask application."""
 
@@ -21,11 +22,7 @@ def create_app(config_path="asset_manager/config"):
     # Load configuration and initialize AgentManager
     config = load_config_from_path(Path("asset_manager/config"))
     agent_manager = AgentManager(config)
-    session_manager = SessionManager(
-        agent_manager=agent_manager
-    )
-
-
+    session_manager = SessionManager(agent_manager=agent_manager)
 
     @app.route("/slack/events", methods=["POST"])
     def slack_events():
@@ -67,8 +64,9 @@ def create_app(config_path="asset_manager/config"):
     def health_check():
         """Health check endpoint"""
         return {"status": "healthy", "agents": len(session_manager.agents)}, 200
-    
+
     return app
+
 
 if __name__ == "__main__":
     app = create_app()
