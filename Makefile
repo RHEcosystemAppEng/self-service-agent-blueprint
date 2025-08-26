@@ -83,6 +83,7 @@ help:
 	@echo "  test-asset-manager          - Run tests for asset manager"
 	@echo "  test-mcp-emp-info           - Run tests for employee info MCP server"
 	@echo "  test-mcp-snow               - Run tests for snow MCP server"
+	@echo "  test-short-integration      - Run short integration tests"
 	@echo ""
 	@echo "Configuration options (set via environment variables or make arguments):"
 	@echo "  CONTAINER_TOOL           - Container build tool (default: podman)"
@@ -228,6 +229,12 @@ test-mcp-snow:
 	@echo "Running snow MCP tests..."
 	cd mcp-servers/snow && uv run python -m pytest tests/
 	@echo "Snow MCP tests completed successfully!"
+
+.PHONY: test-short-integration
+test-short-integration:
+	@echo "Running short integration test..."
+	cd evaluations && uv run python evaluate.py -n 1
+	@echo "short integrations tests completed successfully!"
 
 # Create namespace and deploy
 namespace:
