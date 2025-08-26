@@ -29,7 +29,6 @@ classifiers = [
 dependencies = [
     # Core evaluation framework
     "deepeval>=3.3.9",
-    
     # LLM integration
     "openai>=1.99.0",
 ]
