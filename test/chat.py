@@ -54,10 +54,17 @@ def send_message_to_agent(agent_id: str, session_id: str, messages: list) -> str
     for chunk in response_stream:
         if hasattr(chunk, "event") and hasattr(chunk.event, "payload"):
             if chunk.event.payload.event_type == "turn_complete":
-                if chunk.event.payload.turn.output_message.stop_reason == 'end_of_turn':
-                    response = response + chunk.event.payload.turn.output_message.content
+                if chunk.event.payload.turn.output_message.stop_reason == "end_of_turn":
+                    response = (
+                        response + chunk.event.payload.turn.output_message.content
+                    )
                 else:
-                    response = response + "!!!![" + chunk.event.payload.turn.output_message.stop_reason + "]!!!!"
+                    response = (
+                        response
+                        + "!!!!["
+                        + chunk.event.payload.turn.output_message.stop_reason
+                        + "]!!!!"
+                    )
     return response
 
 
