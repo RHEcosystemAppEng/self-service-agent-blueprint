@@ -1,0 +1,19 @@
+[project]
+name = "slack-service"
+version = "1.0.0"
+description = "Slack integration service for self-service agent"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "flask>=3.1.0",
+    "gunicorn>=23.0.0",
+    "slack_sdk>=3.36.0",
+    "llama-stack-client>=0.2.16",
+    "httpx>=0.28.0",
+    "pydantic>=2.11.0",
+    "pyyaml>=6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

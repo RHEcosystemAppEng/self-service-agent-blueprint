@@ -1,0 +1,6 @@
+apiVersion: v2
+name: slack-service
+description: A Helm chart for the Slack integration service
+type: application
+version: 0.1.0
+appVersion: 0.0.2
