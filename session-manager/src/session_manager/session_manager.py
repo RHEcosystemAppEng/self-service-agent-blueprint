@@ -2,6 +2,10 @@ import uuid
 
 
 class SessionManager:
+    """
+    Manages user sessions and conversations with agents.
+    """
+    ROUTING_AGENT_NAME = "routing-agent"
     def __init__(self, agent_manager):
         """
         Initializes the SessionManager.
@@ -27,7 +31,7 @@ class SessionManager:
     ) -> str:
         """Send a message to an agent and return the response"""
         try:
-            response_stream = self.agent_manager._client.agents.turn.create(
+            response_stream = self.agent_manager.create_agent_turn(
                 agent_id=agent_id,
                 session_id=session_id,
                 stream=True,
@@ -63,7 +67,7 @@ class SessionManager:
 
         # Create a new session for the specialist agent
         session_name = self._generate_session_name(user_id, agent_name)
-        new_session = self.agent_manager._client.agents.session.create(
+        new_session = self.agent_manager.create_session(
             new_agent_id, session_name=session_name
         )
 
@@ -85,12 +89,12 @@ class SessionManager:
         Handles an incoming message, manages sessions and history, and returns a response.
         """
         if user_id not in self.user_sessions:
-            routing_agent_id = self.agents.get("routing-agent")
+            routing_agent_id = self.agents.get(self.ROUTING_AGENT_NAME)
             if not routing_agent_id:
                 return "Error: Core routing agent not available."
 
             session_name = self._generate_session_name(user_id)
-            session = self.agent_manager._client.agents.session.create(
+            session = self.agent_manager.create_session(
                 routing_agent_id, session_name=session_name
             )
             self.user_sessions[user_id] = {
@@ -111,11 +115,21 @@ class SessionManager:
         potential_agent_name = agent_response.strip()
         if (
             potential_agent_name in self.agents
-            and potential_agent_name != "routing-agent"
-            and current_session["agent_id"] == self.agents.get("routing-agent")
+            and potential_agent_name != self.ROUTING_AGENT_NAME
+            and current_session["agent_id"] == self.agents.get(self.ROUTING_AGENT_NAME)
         ):
             return self._route_to_specialist(
                 user_id, potential_agent_name, text, current_session
             )
 
         return agent_response
+
+    def reset_user_session(self, user_id: str):
+        """
+        Removes a user's session from the session manager.
+        """
+        if user_id in self.user_sessions:
+            del self.user_sessions[user_id]
+            print(f"Session for user {user_id} has been reset.")
+            return True
+        return False
