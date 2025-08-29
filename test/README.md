@@ -22,5 +22,5 @@ Simple command line chat interface. It can be run after
 the helm deploy completes by using:
 
 ```
-oc exec -it deploy/self-service-agent -- python test/chat.py
+kubectl exec -it deploy/self-service-agent -- python test/chat.py
 ```
