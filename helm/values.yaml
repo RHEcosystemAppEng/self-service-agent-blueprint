@@ -111,6 +111,21 @@ llama-stack:
             user: ${env.POSTGRES_USER:=pgvector}
             password: ${env.POSTGRES_PASSWORD:=pgvector}
 
+# Slack integration settings
+slack:
+  enabled: true
+  botToken: ""
+  signingSecret: ""
+  service:
+    type: ClusterIP
+    port: 8080
+  route:
+    enabled: true
+    host: ""
+    tls:
+      enabled: true
+      termination: edge
+
 mcp-servers:
   mcp-servers:
     self-service-agent-employee-info:

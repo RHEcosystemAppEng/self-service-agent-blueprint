@@ -1,0 +1,18 @@
+{{- if .Values.slack.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-slack
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: slack
+spec:
+  type: {{ .Values.slack.service.type | default "ClusterIP" }}
+  ports:
+    - port: {{ .Values.slack.service.port | default 8080 }}
+      targetPort: slack
+      protocol: TCP
+      name: slack
+  selector:
+    {{- include "self-service-agent.selectorLabels" . | nindent 4 }}
+{{- end }}

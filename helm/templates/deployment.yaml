@@ -66,9 +66,20 @@ spec:
           env:
             - name: LLAMA_STACK_MODELS
               value: {{ include "self-service-agent.getModelList" . }}
+            {{- if .Values.slack.botToken }}
+            - name: SLACK_BOT_TOKEN
+              value: {{ .Values.slack.botToken | quote }}
+            {{- end }}
+            {{- if .Values.slack.signingSecret }}
+            - name: SLACK_SIGNING_SECRET
+              value: {{ .Values.slack.signingSecret | quote }}
+            {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
+              protocol: TCP
+            - name: slack
+              containerPort: {{ .Values.slack.service.port | default 8080 }}
               protocol: TCP
           {{- with .Values.livenessProbe }}
           livenessProbe:

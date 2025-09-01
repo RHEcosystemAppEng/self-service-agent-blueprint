@@ -1,4 +1,5 @@
 import os
+import threading
 from pathlib import Path
 
 from asset_manager.agent_manager import AgentManager
@@ -20,9 +21,23 @@ def create_app(config_path="asset_manager/config"):
     signature_verifier = SignatureVerifier(os.environ.get("SLACK_SIGNING_SECRET"))
 
     # Load configuration and initialize AgentManager
-    config = load_config_from_path(Path("asset_manager/config"))
+    # Use absolute path since we might be running from different working directory
+    config_path = Path("/app/asset-manager/config")
+    if not config_path.exists():
+        config_path = Path("asset_manager/config")  # fallback to relative path
+    config = load_config_from_path(config_path)
     agent_manager = AgentManager(config)
     session_manager = SessionManager(agent_manager=agent_manager)
+
+    def process_message(user_id, text, user_email, channel_id):
+        """Processes the user message and sends a response back to Slack."""
+        response_text = session_manager.handle_user_message(
+            user_id, text, user_email
+        )
+        try:
+            client.chat_postMessage(channel=channel_id, text=response_text)
+        except SlackApiError as e:
+            print(f"Error posting message: {e}")
 
     @app.route("/slack/events", methods=["POST"])
     def slack_events():
@@ -49,15 +64,14 @@ def create_app(config_path="asset_manager/config"):
                     print(f"Error fetching user info: {e}")
                     user_email = None
 
-                response_text = session_manager.handle_user_message(
-                    user_id, text, user_email
+                # Run the message processing in a separate thread
+                thread = threading.Thread(
+                    target=process_message,
+                    args=(user_id, text, user_email, channel_id),
                 )
+                thread.start()
 
-                try:
-                    client.chat_postMessage(channel=channel_id, text=response_text)
-                except SlackApiError as e:
-                    print(f"Error posting message: {e}")
-
+        # Immediately acknowledge the request
         return "OK", 200
 
     @app.route("/health", methods=["GET"])
