@@ -31,9 +31,7 @@ def create_app(config_path="asset_manager/config"):
 
     def process_message(user_id, text, user_email, channel_id):
         """Processes the user message and sends a response back to Slack."""
-        response_text = session_manager.handle_user_message(
-            user_id, text, user_email
-        )
+        response_text = session_manager.handle_user_message(user_id, text, user_email)
         try:
             client.chat_postMessage(channel=channel_id, text=response_text)
         except SlackApiError as e:
