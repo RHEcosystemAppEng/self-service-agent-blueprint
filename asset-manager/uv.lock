@@ -30,9 +30,11 @@ name = "asset-manager"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "fire" },
     { name = "llama-stack-client" },
     { name = "logging" },
     { name = "openai" },
+    { name = "requests" },
 ]
 
 [package.dev-dependencies]
@@ -45,9 +47,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "fire", specifier = ">=0.5.0" },
     { name = "llama-stack-client", specifier = "==0.2.18" },
     { name = "logging", specifier = ">=0.4.9.6" },
     { name = "openai", specifier = ">=1.0.0" },
+    { name = "requests", specifier = ">=2.31.0" },
 ]
 
 [package.metadata.requires-dev]

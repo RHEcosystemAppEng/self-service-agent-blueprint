@@ -1,0 +1,63 @@
+{
+  "display_information": {
+    "name": "Self-Service Agent",
+    "description": "AI-powered self-service agent that helps users with laptop refresh, email updates, and other IT requests",
+    "background_color": "#2c3e50",
+    "long_description": "The Self-Service Agent is an AI-powered assistant that helps employees with common IT requests like laptop refresh, email address updates, and other self-service tasks.\n\nFeatures:\n- Intelligent routing to appropriate agents\n- Real-time responses via Slack\n- Session-based conversations\n- Integration with existing IT workflows\n\nSimply send a request through your organization's request system and receive responses directly in Slack!"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "Self-Service Agent",
+      "always_online": true
+    },
+    "app_home": {
+      "home_tab_enabled": false,
+      "messages_tab_enabled": true,
+      "messages_tab_read_only_enabled": false
+    },
+    "slash_commands": [
+      {
+        "command": "/agent",
+        "description": "Interact with the self-service agent",
+        "usage_hint": "[your request or question]",
+        "should_escape": false,
+        "url": "https://self-service-agent-integration-dispatcher-${NAMESPACE}.${DOMAIN}/slack/commands"
+      }
+    ]
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "chat:write",
+        "chat:write.public",
+        "users:read",
+        "users:read.email",
+        "im:write",
+        "im:read",
+        "im:history",
+        "channels:read",
+        "channels:history",
+        "groups:read",
+        "app_mentions:read",
+        "commands"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "request_url": "https://self-service-agent-integration-dispatcher-${NAMESPACE}.${DOMAIN}/slack/events",
+      "bot_events": [
+        "message.im",
+        "app_mention",
+        "message.channels"
+      ]
+    },
+    "interactivity": {
+      "is_enabled": true,
+      "request_url": "https://self-service-agent-integration-dispatcher-${NAMESPACE}.${DOMAIN}/slack/interactive"
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": false
+  }
+}

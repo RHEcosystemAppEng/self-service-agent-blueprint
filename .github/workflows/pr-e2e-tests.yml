@@ -29,12 +29,6 @@ jobs:
           version: "0.6.17"
           python-version: "3.12"
 
-      - name: Install Local Dependencies
-        shell: bash
-        run: |
-          make oc
-          echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
-
       - name: Initialize cluster and deploy application
         uses: ./.github/actions/kind
         with:

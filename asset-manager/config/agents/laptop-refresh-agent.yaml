@@ -5,14 +5,14 @@ system_message: "You are a helpful laptop refresh assistant. Speak directly to u
 tool_choice: "required"
 input_shields: []
 output_shields: []
-max_infer_iters: 25
+max_infer_iters: 30
 enable_session_persistence: true
 lg_state_machine_config: "config/lg-prompts/chat-lg-state.yaml"
 sampling_params:
   strategy:
     type: "top_p"
-    temperature: 0.7
-    top_p: 0.95
-  max_tokens: 2000
+    temperature: 0.1
+    top_p: 0.9
+  max_tokens: 4000
 mcp_servers: ["employee-info", "snow"]
 knowledge_bases: ["laptop-refresh"]

@@ -23,7 +23,7 @@ class ToolgroupsManager(Manager):
 
     def unregister_mcp_toolgroup(self, tg: dict):
         """Unregister a single toolgroup_id"""
-        toolgroup_id = f"mcp::{tg.get("name")}"
+        toolgroup_id = f"mcp::{tg.get('name')}"
 
         logging.info(f"Unregistering toolgroup_id: {toolgroup_id}")
 
@@ -50,7 +50,7 @@ class ToolgroupsManager(Manager):
 
     def register_mcp_toolgroup(self, tg: dict):
         """Register a single toolgroup_id from a directory"""
-        toolgroup_id = f"mcp::{tg.get("name")}"
+        toolgroup_id = f"mcp::{tg.get('name')}"
 
         logging.info(f"Registering toolgroup_id: {toolgroup_id}")
 

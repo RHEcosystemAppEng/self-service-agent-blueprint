@@ -1,0 +1,29 @@
+{{- if .Values.serviceAccount.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ include "self-service-agent.fullname" . }}-init-job-reader
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+rules:
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-init-job-reader
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "self-service-agent.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ include "self-service-agent.fullname" . }}-init-job-reader
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

@@ -1,0 +1,276 @@
+"""Centralized HTTP client for service-to-service communication."""
+
+import os
+from typing import Any, Dict, Optional, Union
+
+import httpx
+import structlog
+from agent_service.schemas import SessionResponse
+from shared_models.models import AgentResponse
+
+logger = structlog.get_logger()
+
+
+class ServiceClient:
+    """Centralized HTTP client for service-to-service communication."""
+
+    def __init__(self, base_url: str, timeout: float = 30.0, verify_ssl: bool = True):
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+        self.verify_ssl = verify_ssl
+        self.client = httpx.AsyncClient(
+            timeout=timeout,
+            verify=verify_ssl,
+            follow_redirects=True,
+        )
+
+    async def get(self, path: str, **kwargs) -> httpx.Response:
+        """Make a GET request."""
+        url = f"{self.base_url}{path}"
+        logger.debug("Making GET request", url=url)
+        return await self.client.get(url, **kwargs)
+
+    async def post(self, path: str, **kwargs) -> httpx.Response:
+        """Make a POST request."""
+        url = f"{self.base_url}{path}"
+        logger.debug("Making POST request", url=url)
+        return await self.client.post(url, **kwargs)
+
+    async def put(self, path: str, **kwargs) -> httpx.Response:
+        """Make a PUT request."""
+        url = f"{self.base_url}{path}"
+        logger.debug("Making PUT request", url=url)
+        return await self.client.put(url, **kwargs)
+
+    async def delete(self, path: str, **kwargs) -> httpx.Response:
+        """Make a DELETE request."""
+        url = f"{self.base_url}{path}"
+        logger.debug("Making DELETE request", url=url)
+        return await self.client.delete(url, **kwargs)
+
+    async def close(self):
+        """Close the HTTP client."""
+        await self.client.aclose()
+
+
+class AgentServiceClient(ServiceClient):
+    """Client for communicating with the Agent Service."""
+
+    def __init__(self, base_url: Optional[str] = None, timeout: float = 120.0):
+        url = base_url or os.getenv(
+            "AGENT_SERVICE_URL", "http://self-service-agent-agent-service:80"
+        )
+        super().__init__(url, timeout)
+
+    async def process_request(
+        self, request_data: Union[Dict[str, Any], Any]
+    ) -> Optional[AgentResponse]:
+        """Process a request with the agent service."""
+        try:
+            # Handle both Pydantic models and dictionaries
+            if hasattr(request_data, "model_dump"):
+                json_data = request_data.model_dump(mode="json")
+            else:
+                json_data = request_data
+            response = await self.post("/process", json=json_data)
+            response.raise_for_status()
+            return AgentResponse.model_validate(response.json())
+        except Exception as e:
+            logger.error("Failed to process request with agent service", error=str(e))
+            return None
+
+    async def create_session(
+        self, session_data: Dict[str, Any]
+    ) -> Optional[SessionResponse]:
+        """Create a new session."""
+        try:
+            response = await self.post("/api/v1/sessions", json=session_data)
+            response.raise_for_status()
+            return SessionResponse.model_validate(response.json())
+        except Exception as e:
+            logger.error("Failed to create session", error=str(e))
+            return None
+
+    async def get_session(self, session_id: str) -> Optional[SessionResponse]:
+        """Get session information."""
+        try:
+            response = await self.get(f"/api/v1/sessions/{session_id}")
+            response.raise_for_status()
+            return SessionResponse.model_validate(response.json())
+        except Exception as e:
+            logger.error("Failed to get session", session_id=session_id, error=str(e))
+            return None
+
+    async def update_session(
+        self, session_id: str, session_update: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Update session information."""
+        try:
+            response = await self.put(
+                f"/api/v1/sessions/{session_id}", json=session_update
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(
+                "Failed to update session", session_id=session_id, error=str(e)
+            )
+            return None
+
+    async def increment_request_count(self, session_id: str, request_id: str) -> bool:
+        """Increment request count for a session."""
+        try:
+            response = await self.post(
+                f"/api/v1/sessions/{session_id}/increment",
+                params={"request_id": request_id},
+            )
+            response.raise_for_status()
+            return True
+        except Exception as e:
+            logger.error(
+                "Failed to increment request count", session_id=session_id, error=str(e)
+            )
+            return False
+
+    async def list_agents(self) -> Optional[Dict[str, Any]]:
+        """List available agents."""
+        try:
+            response = await self.get("/agents")
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("Failed to list agents", error=str(e))
+            return None
+
+
+class RequestManagerClient(ServiceClient):
+    """Client for communicating with the Request Manager."""
+
+    def __init__(self, base_url: Optional[str] = None, timeout: float = 30.0):
+        url = base_url or os.getenv(
+            "REQUEST_MANAGER_URL", "http://self-service-agent-request-manager:80"
+        )
+        super().__init__(url, timeout)
+
+    async def send_slack_request(
+        self, request_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Send a Slack request."""
+        try:
+            response = await self.post("/api/v1/requests/slack", json=request_data)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("Failed to send Slack request", error=str(e))
+            return None
+
+    async def send_web_request(
+        self, request_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Send a web request."""
+        try:
+            response = await self.post("/api/v1/requests/web", json=request_data)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("Failed to send web request", error=str(e))
+            return None
+
+    async def send_cli_request(
+        self, request_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Send a CLI request."""
+        try:
+            response = await self.post("/api/v1/requests/cli", json=request_data)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error("Failed to send CLI request", error=str(e))
+            return None
+
+
+class IntegrationDispatcherClient(ServiceClient):
+    """Client for communicating with the Integration Dispatcher."""
+
+    def __init__(self, base_url: Optional[str] = None, timeout: float = 30.0):
+        url = base_url or os.getenv(
+            "INTEGRATION_DISPATCHER_URL",
+            "http://self-service-agent-integration-dispatcher:8080",
+        )
+        super().__init__(url, timeout)
+
+    async def deliver_response(self, delivery_data) -> bool:
+        """Deliver a response to the integration dispatcher."""
+        try:
+            # Handle both Pydantic models and dictionaries
+            if hasattr(delivery_data, "model_dump"):
+                json_data = delivery_data.model_dump(mode="json")
+            else:
+                json_data = delivery_data
+            response = await self.post("/deliver", json=json_data)
+            response.raise_for_status()
+            return True
+        except Exception as e:
+            logger.error("Failed to deliver response", error=str(e))
+            return False
+
+
+# Global client instances
+_agent_client: Optional[AgentServiceClient] = None
+_request_manager_client: Optional[RequestManagerClient] = None
+_integration_dispatcher_client: Optional[IntegrationDispatcherClient] = None
+
+
+def get_agent_client() -> Optional[AgentServiceClient]:
+    """Get the global agent service client."""
+    return _agent_client
+
+
+def get_request_manager_client() -> Optional[RequestManagerClient]:
+    """Get the global request manager client."""
+    return _request_manager_client
+
+
+def get_integration_dispatcher_client() -> Optional[IntegrationDispatcherClient]:
+    """Get the global integration dispatcher client."""
+    return _integration_dispatcher_client
+
+
+def initialize_service_clients(
+    agent_service_url: Optional[str] = None,
+    request_manager_url: Optional[str] = None,
+    integration_dispatcher_url: Optional[str] = None,
+    agent_timeout: float = 120.0,
+    integration_timeout: float = 30.0,
+):
+    """Initialize the global service client instances."""
+    global _agent_client, _request_manager_client, _integration_dispatcher_client
+
+    _agent_client = AgentServiceClient(agent_service_url, agent_timeout)
+    _request_manager_client = RequestManagerClient(
+        request_manager_url, integration_timeout
+    )
+    _integration_dispatcher_client = IntegrationDispatcherClient(
+        integration_dispatcher_url, integration_timeout
+    )
+
+    logger.info("Initialized service clients")
+
+
+async def cleanup_service_clients():
+    """Clean up the global service client instances."""
+    global _agent_client, _request_manager_client, _integration_dispatcher_client
+
+    if _agent_client:
+        await _agent_client.close()
+        _agent_client = None
+
+    if _request_manager_client:
+        await _request_manager_client.close()
+        _request_manager_client = None
+
+    if _integration_dispatcher_client:
+        await _integration_dispatcher_client.close()
+        _integration_dispatcher_client = None
+
+    logger.info("Cleaned up service clients")

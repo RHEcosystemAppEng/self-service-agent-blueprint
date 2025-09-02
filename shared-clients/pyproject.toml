@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "self-service-agent-shared-clients"
+version = "0.1.0"
+description = "Shared client libraries for the self-service agent blueprint"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.25.0",
+    "structlog>=23.2.0",
+    "pydantic>=2.5.0",
+    "self-service-agent-shared-models",
+    "self-service-agent-service",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/shared_clients"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.uv.sources]
+self-service-agent-shared-models = { path = "../shared-models" }
+self-service-agent-service = { path = "../agent-service" }

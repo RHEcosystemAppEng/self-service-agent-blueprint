@@ -1,0 +1,49 @@
+# Multi-stage build for MCP servers
+# Build args must be defined before first FROM
+ARG SERVICE_NAME
+ARG MODULE_NAME
+
+# Builder stage
+FROM registry.access.redhat.com/ubi9/python-312:latest as builder
+
+USER root
+RUN dnf update -y && dnf clean all
+RUN pip3 install --no-cache-dir uv
+
+WORKDIR /app
+
+ARG SERVICE_NAME
+COPY ${SERVICE_NAME}/ .
+RUN uv sync --frozen --no-cache
+
+# Production stage
+FROM registry.access.redhat.com/ubi9/python-312-minimal:latest
+
+WORKDIR /app
+
+# Copy virtual environment from builder
+COPY --from=builder /app/.venv /app/.venv
+
+# Copy application source
+ARG SERVICE_NAME
+ARG MODULE_NAME
+COPY ${SERVICE_NAME}/src/ ./src/
+COPY ${SERVICE_NAME}/pyproject.toml ./
+
+# Set environment variables
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/src"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Set the module name as an environment variable so it can be used in CMD
+ENV MODULE_NAME=${MODULE_NAME}
+
+# Drop privileges
+USER 1001
+
+# Expose port (MCP servers typically use different ports)
+EXPOSE 8080
+
+# Run the MCP server
+CMD python -m $MODULE_NAME

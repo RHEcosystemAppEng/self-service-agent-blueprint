@@ -1,0 +1,63 @@
+# Unified Containerfile for self-service-agent
+# Supports three execution modes:
+# 1. Database migration: python shared-models/scripts/migrate.py
+# 2. Asset registration: python -m asset_manager.script.register_assets  
+# 3. Main service: ./entrypoint.sh (or custom command)
+
+# ---------- Build Stage ----------
+FROM registry.access.redhat.com/ubi9/python-312:latest as builder
+
+USER root
+RUN dnf update -y && dnf clean all
+RUN pip3 install --no-cache-dir uv
+WORKDIR /app
+
+# Copy all dependency files first for better caching
+COPY pyproject.toml uv.lock README.md ./
+COPY agent-service/pyproject.toml ./agent-service/
+COPY asset-manager/pyproject.toml asset-manager/README.md ./asset-manager/
+COPY shared-clients/pyproject.toml shared-clients/README.md ./shared-clients/
+COPY shared-models/pyproject.toml ./shared-models/
+
+# Copy test directory (needed for root package build)
+COPY test/ ./test
+
+# Install dependencies
+RUN uv sync --frozen --no-cache
+
+# Copy all remaining source code
+COPY agent-service/ ./agent-service
+COPY asset-manager/ ./asset-manager
+COPY shared-clients/ ./shared-clients
+COPY shared-models/ ./shared-models
+COPY session-manager/ ./session-manager
+COPY scripts/ ./scripts
+
+# ---------- Production Stage ----------
+FROM registry.access.redhat.com/ubi9/python-312-minimal:latest
+
+WORKDIR /app
+
+# Copy virtual environment and all necessary files
+COPY --from=builder /app/.venv /app/.venv
+COPY --from=builder /app/agent-service /app/agent-service
+COPY --from=builder /app/asset-manager /app/asset-manager
+COPY --from=builder /app/shared-clients /app/shared-clients
+COPY --from=builder /app/shared-models /app/shared-models
+COPY --from=builder /app/session-manager /app/session-manager
+COPY --from=builder /app/scripts /app/scripts
+COPY --from=builder /app/test /app/test
+
+# Set up environment
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/agent-service/src:/app/asset-manager/src:/app/shared-clients/src:/app/shared-models/src:/app/session-manager/src:$PYTHONPATH"
+
+# Drop privileges
+USER 1001
+
+# Expose port for main service
+EXPOSE 8080
+
+# Default command (can be overridden in deployment)
+# This runs the main service spinning loop
+CMD ["./scripts/containers/entrypoint.sh"]

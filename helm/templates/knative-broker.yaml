@@ -1,0 +1,35 @@
+{{- if and .Values.requestManagement.enabled .Values.requestManagement.knative.eventing.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.requestManagement.knative.broker.name }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+data:
+  bootstrap.servers: "{{ .Values.requestManagement.kafka.name }}-kafka-bootstrap.{{ .Release.Namespace }}.svc:9092"
+  default.topic.partitions: "{{ .Values.requestManagement.knative.broker.config.numPartitions | default 3 }}"
+  default.topic.replication.factor: "{{ .Values.requestManagement.knative.broker.config.replicationFactor | default 1 }}"
+---
+apiVersion: eventing.knative.dev/v1
+kind: Broker
+metadata:
+  name: {{ .Values.requestManagement.knative.broker.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+  annotations:
+    eventing.knative.dev/broker.class: Kafka
+spec:
+  config:
+    apiVersion: v1
+    kind: ConfigMap
+    name: {{ .Values.requestManagement.knative.broker.name }}-config
+    namespace: {{ .Release.Namespace }}
+  delivery:
+    retry: 10
+    backoffPolicy: exponential
+    backoffDelay: PT0.2S
+    # Dead letter handling is done automatically by Kafka Broker
+{{- end }}

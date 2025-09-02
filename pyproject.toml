@@ -28,6 +28,7 @@ dependencies = [
     "langgraph-checkpoint-sqlite>=2.0.0",
     "llama-stack-client==0.2.18",
     "openai>=1.0.0",
+    "requests>=2.31.0",
     "markdown==3.8.2",
     "markdown-it-py==3.0.0",
     "mdurl==0.1.2",
@@ -58,6 +59,9 @@ dependencies = [
     "gunicorn>=23.0.0",
     "slack_sdk>=3.36.0",
     "slack-bolt>=1.18.0",
+    "self-service-agent-shared-clients",
+    "self-service-agent-shared-models",
+    "asset-manager",
 ]
 
 [project.optional-dependencies]
@@ -85,10 +89,17 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 
+[tool.uv.sources]
+self-service-agent-shared-clients = { path = "shared-clients" }
+self-service-agent-shared-models = { path = "shared-models" }
+asset-manager = { path = "asset-manager" }
+
 [dependency-groups]
 dev = [
     "black>=25.1.0",
     "flake8>=7.3.0",
     "isort>=5.13.0",
+    "mypy>=1.17.1",
     "pytest>=8.4.1",
+    "types-pyyaml>=6.0.12.20250915",
 ]
