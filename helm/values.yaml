@@ -5,28 +5,50 @@
 # This will set the replicaset count more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/
 replicaCount: 1
 
+# Global log level for all services (DEBUG, INFO, WARNING, ERROR)
+logLevel: "INFO"
+
 # This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
 image:
   registry: quay.io/ecosystem-appeng
   repository: self-service-agent
-  assetManager: self-service-agent-asset-manager
+  requestManager: self-service-agent-request-manager
+  agentService: self-service-agent-service
+  integrationDispatcher: self-service-agent-integration-dispatcher
+  mockEventing: self-service-agent-mock-eventing
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  #tag: "1.1.0"
+  tag: "0.0.2"
 
-# This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-imagePullSecrets: []
+# Test Integration Configuration
+testIntegrationEnabled: false
+
 # This is to override the chart name.
-nameOverride: ""
-fullnameOverride: ""
+# nameOverride: ""
+# fullnameOverride: ""
+
+# Database Configuration
+database:
+  # Expected migration version that services should wait for
+  expectedMigrationVersion: "001"
+  
+  # Database connection URL - leave empty to use default pgvector service
+  # Format: postgresql://username:password@host:port/database
+  url: ""  # Uses default: postgresql://postgres:changeme@self-service-agent-pgvector:5432/postgres
 
 # This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
-serviceAccount: {}
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
 
-# This is for setting Kubernetes Annotations to a Pod.
-# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
-podAnnotations: {}
 # This is for setting Kubernetes Labels to a Pod.
 # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
 podLabels: {}
@@ -78,8 +100,6 @@ affinity: {}
 
 llama_stack_url: http://llamastack:8321
 
-sessionSecret: {}
- # value: "my-session-secret"
 
 # PostgreSQL configuration for llama-stack agent persistence
 pgvector:
@@ -91,6 +111,8 @@ pgvector:
 
 # Llama Stack agents configuration with PostgreSQL persistence
 llama-stack:
+  initContainers:
+    enabled: true
   providers:
     agents:
       - provider_id: meta-ref-postgres
@@ -112,7 +134,8 @@ llama-stack:
             user: ${env.POSTGRES_USER:=pgvector}
             password: ${env.POSTGRES_PASSWORD:=pgvector}
 
-# Slack integration settings
+# Slack integration is now handled by the integration-dispatcher
+# Configuration is in the requestManagement section below
 slack:
   enabled: true
   botToken: ""
@@ -149,3 +172,354 @@ mcp-servers:
 # Enable/disable the llm-service dependency
 llm-service:
   enabled: true
+
+# Request Management Layer Configuration
+requestManagement:
+  enabled: true
+  
+  # External Access Configuration
+  externalAccess:
+    enabled: true  # Set to true to create external access via OpenShift Routes
+    # When disabled, services are only accessible within the cluster
+    
+  # Knative Eventing Configuration (for event-driven architecture)
+  knative:
+    enabled: true
+    eventing:
+      enabled: false  # Set to true to enable Knative eventing (production mode)
+    broker:
+      name: "self-service-agent-broker"
+      # Centralized broker URL configuration
+      url: "http://kafka-broker-ingress.knative-eventing.svc.cluster.local"
+      config:
+        # Kafka Broker configuration
+        numPartitions: 3
+        replicationFactor: 1
+        retentionDuration: P7D
+    
+    # Mock Eventing Service (for testing and CI when Knative eventing is disabled)
+    mockEventing:
+      enabled: false  # Set to true to use mock eventing service (testing/CI mode)
+      logLevel: "INFO"
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "256Mi"
+          cpu: "200m"
+
+    # KnativeKafka configuration (automatically enabled when eventing is enabled)
+    kafka:
+      # enabled is automatically set to true when eventing.enabled is true
+      # name: "self-service-agent-kafka-eventing"  # Defaults to include release namespace
+      replicas: 1
+      logLevel: "INFO"
+      
+      
+      # Broker configuration (Knative Kafka Broker - enables Kafka broker support)
+      broker:
+        numPartitions: 10
+      
+      
+      # Resource limits for KnativeKafka components
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "100m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+      
+      # Security configuration
+      security:
+        protocol: "PLAINTEXT"  # or "SASL_PLAINTEXT", "SSL", "SASL_SSL"
+        sasl:
+          enabled: false
+          mechanism: "PLAIN"  # or "SCRAM-SHA-256", "SCRAM-SHA-512"
+          user: ""
+          secretName: ""
+          secretKey: ""
+  
+  # Kafka cluster configuration for KnativeKafka channels
+  kafka:
+    enabled: true
+    name: "self-service-agent-kafka"
+    replicas: 1
+    storage:
+      type: "ephemeral"  # Use "persistent-claim" for production
+      size: "10Gi"       # Only used if type is "persistent-claim"
+    config:
+      defaultReplicationFactor: 1
+      minInSyncReplicas: 1
+      offsetsTopicReplicationFactor: 1
+      transactionStateLogMinIsr: 1
+      transactionStateLogReplicationFactor: 1
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+    entityOperator:
+      topicOperator:
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      userOperator:
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+
+  
+  # Network Policies Configuration
+  networkPolicies:
+    enabled: true  # Enable network policies for cross-namespace communication
+    additionalIngressRules: []  # Additional ingress rules if needed
+  
+  # Request Manager Service
+  requestManager:
+    replicas: 1
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    # Health check configuration
+    healthChecks:
+      livenessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 3
+        successThreshold: 1
+      readinessProbe:
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        timeoutSeconds: 3
+        failureThreshold: 3
+        successThreshold: 1
+      startupProbe:
+        initialDelaySeconds: 10
+        periodSeconds: 5
+        timeoutSeconds: 5
+        failureThreshold: 30
+        successThreshold: 1
+    # HPA-style autoscaling
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 10
+      targetCPUUtilization: 70
+      targetMemoryUtilization: 80
+  
+  # Integration Dispatcher Service
+  integrationDispatcher:
+    replicas: 1
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    # Health check configuration (optimized for SMTP services)
+    healthChecks:
+      livenessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 60        # Reduced from 10s to avoid SMTP rate limits
+        timeoutSeconds: 5
+        failureThreshold: 3
+        successThreshold: 1
+      readinessProbe:
+        initialDelaySeconds: 5
+        periodSeconds: 30        # Reduced from 5s to avoid SMTP rate limits
+        timeoutSeconds: 3
+        failureThreshold: 3
+        successThreshold: 1
+      startupProbe:
+        initialDelaySeconds: 20
+        periodSeconds: 5         # Keep startup probe frequent for faster startup
+        timeoutSeconds: 10
+        failureThreshold: 30
+        successThreshold: 1
+    # HPA-style autoscaling
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 5
+      targetCPUUtilization: 70
+      targetMemoryUtilization: 80
+  
+  # Agent Configuration
+  agent:
+    # Default agent ID for routing (can be overridden)
+    defaultAgentId: "routing-agent"
+    # Agent response timeout in seconds
+    timeout: 120
+    # Always refresh agent mapping from LlamaStack on each request
+    # Set to false for better performance, true for maximum reliability
+    alwaysRefreshMapping: true
+
+  # Agent Service
+  agentService:
+    replicas: 1
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    # Health check configuration
+    healthChecks:
+      livenessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 3
+        successThreshold: 1
+      readinessProbe:
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        timeoutSeconds: 3
+        failureThreshold: 3
+        successThreshold: 1
+      startupProbe:
+        initialDelaySeconds: 10
+        periodSeconds: 5
+        timeoutSeconds: 5
+        failureThreshold: 30
+        successThreshold: 1
+    # HPA-style autoscaling
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 5
+      targetCPUUtilization: 70
+      targetMemoryUtilization: 80
+  
+  # Init Job
+  initJob:
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "200m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+  
+  # Integration Configuration
+  integrations:
+    # Service-level configuration
+    services:
+      email:
+        enabled: false
+        smtpHost: "smtp.example.com"
+        smtpPort: "587"
+        smtpUseTls: "true"
+        fromEmail: "noreply@selfservice.local"
+        fromName: "Self-Service Agent"
+      slack:
+        enabled: false
+        # Slack credentials loaded from secrets
+    
+    # User defaults (auto-enabled based on service configuration)
+    userDefaults:
+      SLACK:
+        # Allow Slack to be enabled when health check passes
+        enabled: true
+        priority: 1
+        retryCount: 3
+        retryDelaySeconds: 60
+      EMAIL:
+        # Allow Email to be enabled when health check passes
+        enabled: true
+        priority: 2
+        retryCount: 3
+        retryDelaySeconds: 60
+      WEBHOOK:
+        # Webhook controlled by URL presence - no enabled flag needed
+        # url: "https://your-webhook-endpoint.com/webhook"
+        priority: 3
+        retryCount: 1
+        retryDelaySeconds: 30
+      TEST:
+        # Allow Test integration to be enabled when health check passes
+        enabled: true
+        priority: 5
+        retryCount: 1
+        retryDelaySeconds: 10
+  
+  # Database Migration
+  dbMigration:
+    enabled: true
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "50m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+
+# Security Configuration
+security:
+  # API Keys for tool integrations
+  apiKeys:
+    # Tool API keys (for external integrations)
+    snowIntegration: ""
+    hrSystem: ""
+    monitoringSystem: ""
+    # Web API keys for testing and internal tools
+    webKeys:
+      # Format: "key-name": "user-email"
+      "web-test-user": "test@company.com"
+      "web-admin": "admin@company.com"
+      "web-demo": "demo@company.com"
+  
+  # Slack configuration
+  slack:
+    signingSecret: ""
+    botToken: ""  # For Integration Dispatcher
+  
+  # JWT Authentication Configuration
+  jwt:
+    enabled: false  # Set to true to enable JWT validation
+    issuers:
+      # Example: Red Hat SSO
+      - issuer: "https://sso.redhat.com/auth/realms/redhat-external"
+        jwksUri: "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/certs"
+        audience: "selfservice-api"
+        algorithms: ["RS256"]
+      # Example: Custom OIDC provider
+      - issuer: "https://auth.company.com"
+        jwksUri: "https://auth.company.com/.well-known/jwks.json"
+        audience: "selfservice-api"
+        algorithms: ["RS256", "HS256"]
+    validation:
+      verifySignature: true
+      verifyExpiration: true
+      verifyAudience: true
+      verifyIssuer: true
+      leeway: 60  # Seconds of leeway for clock skew
+
+  # Email configuration for Integration Dispatcher
+  email:
+    smtpHost: ""
+    smtpPort: "587"
+    smtpUsername: ""
+    smtpPassword: ""
+    smtpUseTls: "true"
+    fromEmail: "noreply@selfservice.local"
+    fromName: "Self-Service Agent"

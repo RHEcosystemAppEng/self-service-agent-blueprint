@@ -15,6 +15,7 @@ def test_get_employee_laptop_info_valid_employee():
     Laptop Model: Latitude 7420
     Laptop Serial Number: DL7420001
     Laptop Purchase Date: 2020-01-15
+    Laptop Age: 5 years and 8 months
     Laptop Warranty Expiry Date: 2023-01-15
     Laptop Warranty: Expired
     """

@@ -1,0 +1,72 @@
+# Multi-stage build for Python services
+# Build args must be defined before first FROM
+ARG SERVICE_NAME
+ARG MODULE_NAME
+ARG BUILD_CONTEXT=.
+
+# Builder stage
+FROM registry.access.redhat.com/ubi9/python-312:latest as builder
+
+USER root
+RUN dnf update -y && dnf clean all
+RUN pip3 install --no-cache-dir uv
+
+WORKDIR /app
+
+# Copy shared database if needed (most services need it)
+COPY shared-models ./shared-models/
+
+# Copy shared clients package
+COPY shared-clients ./shared-clients/
+
+# Copy agent-service (needed by request-manager and integration-dispatcher)
+COPY agent-service ./agent-service/
+
+# Copy service files
+ARG SERVICE_NAME
+COPY ${SERVICE_NAME}/pyproject.toml ${SERVICE_NAME}/uv.lock ./${SERVICE_NAME}/
+WORKDIR /app/${SERVICE_NAME}
+
+# Install dependencies
+RUN uv sync --frozen --no-cache --no-dev
+
+# Production stage
+FROM registry.access.redhat.com/ubi9/python-312-minimal:latest
+
+WORKDIR /app
+
+# Copy shared database if needed
+COPY --from=builder /app/shared-models /app/shared-models
+
+# Copy shared clients package
+COPY --from=builder /app/shared-clients /app/shared-clients
+
+# Copy agent-service (needed by request-manager and integration-dispatcher)
+COPY --from=builder /app/agent-service /app/agent-service
+
+# Copy virtual environment from builder (service-specific, but ARG not needed yet)
+ARG SERVICE_NAME
+COPY --from=builder /app/${SERVICE_NAME}/.venv /app/.venv
+
+# Copy application source
+ARG MODULE_NAME
+COPY ${SERVICE_NAME}/src/ ./src/
+COPY ${SERVICE_NAME}/pyproject.toml ./
+
+# Set environment variables
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/agent-service/src:/app/shared-models/src:/app/shared-clients/src:/app/src"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Set the module name as an environment variable so it can be used in CMD
+ENV MODULE_NAME=${MODULE_NAME}
+
+# Drop privileges
+USER 1001
+
+# Expose port
+EXPOSE 8080
+
+# Run the application
+CMD python -m uvicorn $MODULE_NAME:app --host 0.0.0.0 --port 8080

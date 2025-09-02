@@ -1,0 +1,51 @@
+{{- if and .Values.requestManagement.enabled .Values.requestManagement.externalAccess.enabled }}
+---
+# OpenShift Route for direct external access to Request Manager
+# This provides simple external access via OpenShift Routes
+# Agent Service and Integration Dispatcher remain cluster-internal
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-request-manager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app: {{ include "self-service-agent.fullname" . }}-request-manager
+    component: request-manager
+  annotations:
+    # OpenShift Route for external access
+    # Extended timeout for synchronous API endpoints (default is 30s)
+    haproxy.router.openshift.io/timeout: "180s"
+spec:
+  to:
+    kind: Service
+    name: {{ include "self-service-agent.fullname" . }}-request-manager
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-integration-dispatcher
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: integration-dispatcher
+  annotations:
+    haproxy.router.openshift.io/timeout: "180s"
+spec:
+  to:
+    kind: Service
+    name: {{ include "self-service-agent.fullname" . }}-integration-dispatcher
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+{{- end }}

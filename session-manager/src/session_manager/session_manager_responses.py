@@ -100,15 +100,13 @@ class SessionManagerResponses(SessionManagerBase):
         return self.agent_manager.get_agent(agent_name)
 
     def _create_session_for_agent(
-        self,
-        agent,
-        agent_name: str,
-        user_id: str,
-        session_name: str = None,
-        resume_thread_id: str = None,
-        authoritative_user_id: str = None,
+        self, agent, agent_name: str, user_id: str, session_name: str = None, **kwargs
     ):
         """Create a new session for the given agent."""
+        # Extract parameters from kwargs
+        resume_thread_id = kwargs.get("resume_thread_id")
+        authoritative_user_id = kwargs.get("authoritative_user_id")
+
         # Use provided thread_id for resumption or generate a new one
         if resume_thread_id:
             session_thread_id = resume_thread_id

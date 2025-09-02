@@ -1,2 +1,3 @@
 conversations_config/default_context/*
 results/conversation_results/*
+results/token_usage/*

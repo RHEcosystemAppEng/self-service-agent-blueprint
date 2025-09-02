@@ -1,0 +1,109 @@
+{{- if and .Values.requestManagement.enabled (not .Values.requestManagement.knative.eventing.enabled) .Values.requestManagement.knative.mockEventing.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-mock-eventing-setup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mock-eventing-setup
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "self-service-agent.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mock-eventing-setup
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: setup-mock-eventing
+        image: curlimages/curl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Setting up mock eventing subscriptions..."
+          
+          # Wait for mock eventing service to be ready
+          echo "Waiting for mock eventing service..."
+          until curl -f http://{{ include "self-service-agent.fullname" . }}-mock-eventing:8080/health; do
+            echo "Waiting for mock eventing service to be ready..."
+            sleep 5
+          done
+          
+          # Configure event subscriptions to match the real Knative triggers
+          echo "Configuring event subscriptions..."
+          
+          # Request created trigger -> Agent Service
+          curl -X POST http://{{ include "self-service-agent.fullname" . }}-mock-eventing:8080/subscriptions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "event_type": "com.self-service-agent.request.created",
+              "subscriber_url": "http://{{ include "self-service-agent.fullname" . }}-agent-service.{{ .Release.Namespace }}.svc.cluster.local/api/v1/events/cloudevents"
+            }'
+          
+          # Agent response trigger -> Integration Dispatcher
+          curl -X POST http://{{ include "self-service-agent.fullname" . }}-mock-eventing:8080/subscriptions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "event_type": "com.self-service-agent.agent.response-ready",
+              "subscriber_url": "http://{{ include "self-service-agent.fullname" . }}-integration-dispatcher.{{ .Release.Namespace }}.svc.cluster.local",
+              "filter_attributes": {
+                "source": "request-manager"
+              }
+            }'
+          
+          # Routing trigger -> Agent Service
+          curl -X POST http://{{ include "self-service-agent.fullname" . }}-mock-eventing:8080/subscriptions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "event_type": "com.self-service-agent.request.created",
+              "subscriber_url": "http://{{ include "self-service-agent.fullname" . }}-agent-service.{{ .Release.Namespace }}.svc.cluster.local/api/v1/events/cloudevents",
+              "filter_attributes": {
+                "requiresrouting": "true"
+              }
+            }'
+          
+          # Agent response to Request Manager (for sync API)
+          curl -X POST http://{{ include "self-service-agent.fullname" . }}-mock-eventing:8080/subscriptions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "event_type": "com.self-service-agent.agent.response-ready",
+              "subscriber_url": "http://{{ include "self-service-agent.fullname" . }}-request-manager.{{ .Release.Namespace }}.svc.cluster.local/api/v1/events/cloudevents",
+              "filter_attributes": {
+                "source": "agent-service"
+              }
+            }'
+          
+          # Request notification trigger -> Integration Dispatcher
+          curl -X POST http://{{ include "self-service-agent.fullname" . }}-mock-eventing:8080/subscriptions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "event_type": "com.self-service-agent.request.created",
+              "subscriber_url": "http://{{ include "self-service-agent.fullname" . }}-integration-dispatcher.{{ .Release.Namespace }}.svc.cluster.local/notifications"
+            }'
+          
+          # Processing notification trigger -> Integration Dispatcher
+          curl -X POST http://{{ include "self-service-agent.fullname" . }}-mock-eventing:8080/subscriptions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "event_type": "com.self-service-agent.request.processing",
+              "subscriber_url": "http://{{ include "self-service-agent.fullname" . }}-integration-dispatcher.{{ .Release.Namespace }}.svc.cluster.local/notifications"
+            }'
+          
+          # Database update trigger -> Agent Service
+          curl -X POST http://{{ include "self-service-agent.fullname" . }}-mock-eventing:8080/subscriptions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "event_type": "com.self-service-agent.request.database-update",
+              "subscriber_url": "http://{{ include "self-service-agent.fullname" . }}-agent-service.{{ .Release.Namespace }}.svc.cluster.local/api/v1/events/cloudevents",
+              "filter_attributes": {
+                "source": "request-manager"
+              }
+            }'
+
+          echo "Mock eventing setup completed successfully!"
+      backoffLimit: 3
+{{- end }}

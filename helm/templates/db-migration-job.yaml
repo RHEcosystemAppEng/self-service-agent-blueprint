@@ -1,0 +1,93 @@
+{{- if .Values.requestManagement.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-db-migration
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app: {{ include "self-service-agent.fullname" . }}-db-migration
+  # Remove Helm hooks - let jobs run naturally with Makefile cleanup
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        {{- include "self-service-agent.labels" . | nindent 8 }}
+        app: {{ include "self-service-agent.fullname" . }}-db-migration
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: wait-for-db
+        image: postgres:15-alpine
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ['sh', '-c']
+        args:
+        - |
+          until pg_isready -h pgvector -p 5432 -U "$POSTGRES_USER"; do
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 5
+          done
+          echo "PostgreSQL is ready!"
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: user
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+      containers:
+      - name: db-migration
+        image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["python", "shared-models/scripts/migrate.py"]
+        env:
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: host
+        - name: POSTGRES_PORT
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: port
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: dbname
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: password
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+{{- end }}

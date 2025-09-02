@@ -1,0 +1,71 @@
+{{- if and .Values.requestManagement.enabled (not .Values.requestManagement.knative.eventing.enabled) .Values.requestManagement.knative.mockEventing.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-mock-eventing
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mock-eventing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "self-service-agent.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mock-eventing
+  template:
+    metadata:
+      labels:
+        {{- include "self-service-agent.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mock-eventing
+    spec:
+      containers:
+      - name: mock-eventing-service
+        image: "{{ .Values.image.registry }}/{{ .Values.image.mockEventing }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8080"
+        - name: HOST
+          value: "0.0.0.0"
+        - name: LOG_LEVEL
+          value: {{ .Values.requestManagement.knative.mockEventing.logLevel | default "INFO" | quote }}
+        resources:
+          {{- toYaml .Values.requestManagement.knative.mockEventing.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-mock-eventing
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mock-eventing
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "self-service-agent.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mock-eventing
+{{- end }}

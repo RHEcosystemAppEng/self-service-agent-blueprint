@@ -171,7 +171,7 @@ def _aggregate_token_usage() -> Dict[str, Any]:
     Returns:
         Dictionary containing aggregated token statistics
     """
-    aggregated_stats = {
+    aggregated_stats: dict = {
         "total_input_tokens": 0,
         "total_output_tokens": 0,
         "total_tokens": 0,

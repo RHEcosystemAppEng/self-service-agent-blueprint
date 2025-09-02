@@ -1,0 +1,60 @@
+{{- if and .Values.requestManagement.enabled .Values.requestManagement.knative.eventing.enabled }}
+---
+# KnativeKafka for self-service-agent namespace
+apiVersion: operator.serverless.openshift.io/v1alpha1
+kind: KnativeKafka
+metadata:
+  name: {{ .Values.requestManagement.knative.kafka.name | default (printf "self-service-agent-kafka-eventing-%s" .Release.Namespace) }}
+  namespace: knative-eventing
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+spec:
+  # Kafka Channel configuration (disabled - using Kafka brokers instead)
+  channel:
+    enabled: false
+
+  # Kafka Broker configuration (for Knative Kafka Broker, different from your Knative Broker)
+  broker:
+    enabled: true
+    defaultConfig:
+      bootstrapServers: "{{ .Values.requestManagement.kafka.name }}-kafka-bootstrap.{{ .Release.Namespace }}.svc:9092"
+      authSecretName: ""
+      numPartitions: {{ .Values.requestManagement.knative.kafka.broker.numPartitions | default 10 }}
+      replicationFactor: {{ .Values.requestManagement.kafka.config.defaultReplicationFactor }}
+
+  # Kafka Source configuration (disabled - not used)
+  source:
+    enabled: false
+
+  # Kafka Sink configuration (disabled - not used)
+  sink:
+    enabled: false
+
+  # High availability configuration
+  high-availability:
+    replicas: {{ .Values.requestManagement.knative.kafka.replicas | default 1 }}
+
+  # Logging configuration
+  logging:
+    level: {{ .Values.requestManagement.knative.kafka.logLevel | default "INFO" }}
+    
+  # Resource configuration for Knative Kafka components (commented out - not supported in current KnativeKafka CRD)
+  # resources:
+  #   requests:
+  #     memory: {{ .Values.requestManagement.knative.kafka.resources.requests.memory | default "256Mi" }}
+  #     cpu: {{ .Values.requestManagement.knative.kafka.resources.requests.cpu | default "100m" }}
+  #   limits:
+  #     memory: {{ .Values.requestManagement.knative.kafka.resources.limits.memory | default "512Mi" }}
+  #     cpu: {{ .Values.requestManagement.knative.kafka.resources.limits.cpu | default "500m" }}
+
+  # Security configuration (commented out - not supported in current KnativeKafka CRD)
+  # security:
+  #   securityProtocol: {{ .Values.requestManagement.knative.kafka.security.protocol | default "PLAINTEXT" }}
+  #   {{- if .Values.requestManagement.knative.kafka.security.sasl.enabled }}
+  #   sasl:
+  #     mechanism: {{ .Values.requestManagement.knative.kafka.security.sasl.mechanism }}
+  #     user: {{ .Values.requestManagement.knative.kafka.security.sasl.user }}
+  #     secretName: {{ .Values.requestManagement.knative.kafka.security.sasl.secretName }}
+  #     secretKey: {{ .Values.requestManagement.knative.kafka.security.sasl.secretKey }}
+  #   {{- end }}
+{{- end }}

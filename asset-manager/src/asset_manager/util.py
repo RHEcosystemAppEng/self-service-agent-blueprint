@@ -11,8 +11,15 @@ def load_yaml(file_path) -> dict:
 
 def load_config_from_path(path: Path) -> dict:
     config = {}
+    # Load main config.yaml first to ensure base settings are loaded
+    main_config_file = path / "config.yaml"
+    if main_config_file.exists():
+        config.update(load_yaml(main_config_file))
+
+    # Load other YAML files (excluding config.yaml to avoid overwriting)
     for file in path.glob("*.yaml"):
-        config.update(load_yaml(file))
+        if file.name != "config.yaml":
+            config.update(load_yaml(file))
 
     config["agents"] = []
     agent_path = path / "agents"
