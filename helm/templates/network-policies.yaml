@@ -1,0 +1,56 @@
+{{- if .Values.requestManagement.enabled }}
+{{- if .Values.requestManagement.networkPolicies.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-allow-knative-eventing-to-agent
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ include "self-service-agent.fullname" . }}-agent-service
+      {{- include "self-service-agent.selectorLabels" . | nindent 6 }}
+      component: agent-service
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow access from knative-eventing namespace (for Kafka broker dispatcher)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: knative-eventing
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 80
+  # Allow access from knative-eventing namespace (alternative label)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: knative-eventing
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 80
+  # Allow access from same namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Release.Namespace }}
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 80
+{{- if .Values.requestManagement.networkPolicies.additionalIngressRules }}
+  # Additional ingress rules from values
+  {{- toYaml .Values.requestManagement.networkPolicies.additionalIngressRules | nindent 2 }}
+{{- end }}
+{{- end }}
+{{- end }}

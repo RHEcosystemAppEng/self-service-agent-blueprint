@@ -1,0 +1,68 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-init
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: init
+spec:
+  # Allow job to retry on failure
+  backoffLimit: 6
+  # Keep failed pods for debugging
+  ttlSecondsAfterFinished: 86400  # 24 hours
+  template:
+    metadata:
+      annotations:
+        app.kubernetes.io/component: "init"
+      labels:
+        {{- include "self-service-agent.labels" . | nindent 8 }}
+        app.kubernetes.io/component: init
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "self-service-agent.serviceAccountName" . }}
+      restartPolicy: OnFailure
+      containers:
+        - name: init-and-complete
+          image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: LLAMA_STACK_MODELS
+              value: {{ include "self-service-agent.getModelList" . }}
+            - name: LLAMA_STACK_URL
+              value: {{ .Values.llama_stack_url }}
+            - name: LLAMASTACK_SERVICE_HOST
+              value: "llamastack"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+
+              
+              echo "Waiting for LlamaStack at $LLAMA_STACK_URL..."
+              until curl -ks "$LLAMA_STACK_URL/" --max-time 5 --silent --fail || curl -ks "$LLAMA_STACK_URL" --max-time 5 --silent; do
+                echo "Still waiting for LlamaStack..."
+                sleep 10
+              done
+              echo "LlamaStack is ready"
+              
+              echo "Registering agents..."
+              
+              # Change to the asset manager directory and run the registration script
+              cd /app/asset-manager
+              
+              # Activate virtual environment and run the asset registration script
+              echo "Running asset registration script..."
+              /app/.venv/bin/python -m asset_manager.script.register_assets
+              
+              echo "Agents registered successfully"
+              
+              echo "Initialization job completed successfully"
+              
+              # Job completed successfully
+              
+              exit 0

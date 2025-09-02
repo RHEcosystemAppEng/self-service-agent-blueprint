@@ -1,0 +1,1 @@
+{{ include "self-service-agent.requestManagementService" (dict "serviceName" "integration-dispatcher" "serviceConfig" .Values.requestManagement.integrationDispatcher "imageKey" "integrationDispatcher" "context" .) }}

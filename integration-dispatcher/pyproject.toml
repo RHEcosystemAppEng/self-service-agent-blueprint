@@ -1,0 +1,61 @@
+[project]
+name = "self-service-agent-integration-dispatcher"
+version = "0.1.0"
+description = "Multi-tenant Integration Dispatcher for Self-Service Agent Blueprint"
+authors = [
+    {name = "Self-Service Agent Team", email = "team@example.com"}
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.5.0",
+    "cloudevents>=1.10.0",
+    "httpx>=0.25.0",
+    "structlog>=23.2.0",
+    "python-multipart>=0.0.6",
+    "python-json-logger>=2.0.7",
+    "jinja2>=3.1.0", # For email templates
+    "aiosmtplib>=3.0.0", # For email sending
+    "slack-sdk>=3.26.0", # For Slack integration
+    "aiohttp>=3.8.0", # Required by slack-sdk for async operations
+    "self-service-agent-shared-db",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.9.0",
+    "flake8>=6.1.0",
+    "isort>=5.12.0",
+    "mypy>=1.6.0"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/integration_dispatcher"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.uv.sources]
+self-service-agent-shared-db = { path = "../shared-db" }

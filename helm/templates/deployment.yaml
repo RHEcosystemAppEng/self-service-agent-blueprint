@@ -13,14 +13,19 @@ spec:
   selector:
     matchLabels:
       {{- include "self-service-agent.selectorLabels" . | nindent 6 }}
+      app: {{ include "self-service-agent.fullname" . }}
+      component: self-service-agent
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
+        # Pod annotations
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
       labels:
         {{- include "self-service-agent.labels" . | nindent 8 }}
+        app: {{ include "self-service-agent.fullname" . }}
+        component: self-service-agent
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -35,27 +40,25 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       initContainers:
-        - name: wait-for-llamastack
-          image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+        - name: wait-for-init-job
+          image: quay.io/openshift/origin-cli:latest
           command:
             - /bin/bash
             - -c
             - |
               set -e
-              url=http://llamastack.{{ .Release.Namespace }}.svc.cluster.local:8321
-              echo "Waiting for $url..."
-              until curl -ks "$url"; do
-                echo "Still waiting for $url ..."
+              echo "Waiting for initialization job to complete..."
+              while true; do
+                JOB_STATUS=$(kubectl get job {{ include "self-service-agent.fullname" . }}-init -n {{ .Release.Namespace }} \
+                  -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' 2>/dev/null || echo "")
+                if [ "$JOB_STATUS" = "True" ]; then
+                  echo "Initialization job completed successfully."
+                  break
+                fi
+                echo "Still waiting for init job completion..."
                 sleep 10
               done
               echo "$url is ready."
-        - name: register-agents
-          image: "{{ .Values.image.registry }}/{{ .Values.image.assetManager }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          env:
-            - name: LLAMA_STACK_MODELS
-              value: {{ include "self-service-agent.getModelList" . }}
       containers:
         - name: {{ .Chart.Name }}
           {{- with .Values.securityContext }}
@@ -64,23 +67,15 @@ spec:
           {{- end }}
           image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["./scripts/containers/entrypoint.sh"]
           env:
             - name: LLAMA_STACK_MODELS
               value: {{ include "self-service-agent.getModelList" . }}
-            {{- if .Values.slack.botToken }}
-            - name: SLACK_BOT_TOKEN
-              value: {{ .Values.slack.botToken | quote }}
-            {{- end }}
-            {{- if .Values.slack.signingSecret }}
-            - name: SLACK_SIGNING_SECRET
-              value: {{ .Values.slack.signingSecret | quote }}
-            {{- end }}
+            - name: REQUEST_MANAGER_URL
+              value: "http://{{ include "self-service-agent.fullname" . }}-request-manager.{{ .Release.Namespace }}.svc.cluster.local:80"
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
-              protocol: TCP
-            - name: slack
-              containerPort: {{ .Values.slack.service.port | default 8080 }}
               protocol: TCP
           {{- with .Values.livenessProbe }}
           livenessProbe:

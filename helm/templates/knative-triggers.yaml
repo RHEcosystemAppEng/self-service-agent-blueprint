@@ -1,0 +1,124 @@
+{{- if and .Values.requestManagement.enabled .Values.requestManagement.knative.eventing.enabled }}
+---
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-request-created-trigger
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+spec:
+  broker: {{ .Values.requestManagement.knative.broker.name }}
+  filter:
+    attributes:
+      type: com.self-service-agent.request.created
+  subscriber:
+    uri: http://{{ include "self-service-agent.fullname" . }}-agent-service.{{ .Release.Namespace }}.svc.cluster.local
+  delivery:
+    retry: 3
+    backoffPolicy: exponential
+    backoffDelay: PT1S
+    # Dead letter handling is done automatically by Kafka Broker
+---
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-agent-response-trigger
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+spec:
+  broker: {{ .Values.requestManagement.knative.broker.name }}
+  filter:
+    attributes:
+      type: com.self-service-agent.agent.response-ready
+      source: request-manager
+  subscriber:
+    uri: http://{{ include "self-service-agent.fullname" . }}-integration-dispatcher.{{ .Release.Namespace }}.svc.cluster.local
+  delivery:
+    retry: 3
+    backoffPolicy: exponential
+    backoffDelay: PT1S
+    # Dead letter handling is done automatically by Kafka Broker
+---
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-routing-trigger
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+spec:
+  broker: {{ .Values.requestManagement.knative.broker.name }}
+  filter:
+    attributes:
+      type: com.self-service-agent.request.created
+      requiresrouting: "true"
+  subscriber:
+    uri: http://{{ include "self-service-agent.fullname" . }}-agent-service.{{ .Release.Namespace }}.svc.cluster.local
+  delivery:
+    retry: 3
+    backoffPolicy: exponential
+    backoffDelay: PT1S
+    # Dead letter handling is done automatically by Kafka Broker
+---
+# Trigger for Request Manager to receive agent responses (needed for sync API)
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-agent-response-to-request-manager-trigger
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+spec:
+  broker: {{ .Values.requestManagement.knative.broker.name }}
+  filter:
+    attributes:
+      type: com.self-service-agent.agent.response-ready
+  subscriber:
+    uri: http://{{ include "self-service-agent.fullname" . }}-request-manager.{{ .Release.Namespace }}.svc.cluster.local/api/v1/events/cloudevents
+  delivery:
+    retry: 2
+    backoffPolicy: exponential
+    backoffDelay: PT0.5S
+---
+# Trigger for immediate user notifications (request acknowledgment)
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-request-notification-trigger
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+spec:
+  broker: {{ .Values.requestManagement.knative.broker.name }}
+  filter:
+    attributes:
+      type: com.self-service-agent.request.created
+  subscriber:
+    uri: http://{{ include "self-service-agent.fullname" . }}-integration-dispatcher.{{ .Release.Namespace }}.svc.cluster.local/notifications
+  delivery:
+    retry: 2
+    backoffPolicy: exponential
+    backoffDelay: PT0.5S
+---
+# Trigger for processing status notifications
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-processing-notification-trigger
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+spec:
+  broker: {{ .Values.requestManagement.knative.broker.name }}
+  filter:
+    attributes:
+      type: com.self-service-agent.request.processing
+  subscriber:
+    uri: http://{{ include "self-service-agent.fullname" . }}-integration-dispatcher.{{ .Release.Namespace }}.svc.cluster.local/notifications
+  delivery:
+    retry: 2
+    backoffPolicy: exponential
+    backoffDelay: PT0.5S
+{{- end }}

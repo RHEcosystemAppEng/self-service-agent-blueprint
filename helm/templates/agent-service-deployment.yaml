@@ -1,0 +1,1 @@
+{{ include "self-service-agent.requestManagementService" (dict "serviceName" "agent-service" "serviceConfig" .Values.requestManagement.agentService "imageKey" "agentService" "context" .) }}

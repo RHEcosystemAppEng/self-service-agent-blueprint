@@ -26,6 +26,7 @@ dependencies = [
     "langgraph>=0.2.0",
     "llama-stack-client==0.2.18",
     "openai>=1.0.0",
+    "requests>=2.31.0",
     "markdown==3.8.2",
     "markdown-it-py==3.0.0",
     "mdurl==0.1.2",
@@ -56,6 +57,9 @@ dependencies = [
     "gunicorn>=23.0.0",
     "slack_sdk>=3.36.0",
     "slack-bolt>=1.18.0",
+    "shared-clients",
+    "self-service-agent-shared-db",
+    "asset-manager",
 ]
 
 [project.optional-dependencies]
@@ -82,6 +86,11 @@ testpaths = ["test"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+
+[tool.uv.sources]
+shared-clients = { path = "shared-clients" }
+self-service-agent-shared-db = { path = "shared-db" }
+asset-manager = { path = "asset-manager" }
 
 [dependency-groups]
 dev = [
