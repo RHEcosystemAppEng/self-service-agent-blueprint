@@ -47,17 +47,45 @@ You can deploy the Slack bot using the provided `Makefile`, which will help you 
 
 **To deploy:**
 
-1. Run the following command, replacing the placeholders with your values:
+1. **Option 1: Deploy with Slack prompts**
+
+    Set `ENABLE_SLACK=true` and the script will prompt your Slack credentials:
 
     ```bash
     make helm-install NAMESPACE=<your-namespace> \
       LLM=llama-4-scout-17b-16e-w4a16 \
       LLM_ID=llama-4-scout-17b-16e-w4a16 \
-      LLM_URL=https://llama-4-scout-17b-16e-w4a16-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com:443/v1 \
+      LLM_URL=<llm-url>  \
+      LLM_API_TOKEN=<your-api-token> \
+      ENABLE_SLACK=true
+    ```
+
+2. **Option 2: Deploy with pre-set Slack credentials**
+
+    Export your Slack credentials as environment variables:
+
+    ```bash
+    export SLACK_BOT_TOKEN="xoxb-your-bot-token-here"
+    export SLACK_SIGNING_SECRET="your-signing-secret-here"
+    
+    make helm-install NAMESPACE=<your-namespace> \
+      LLM=llama-4-scout-17b-16e-w4a16 \
+      LLM_ID=llama-4-scout-17b-16e-w4a16 \
+      LLM_URL=<llm-url>  \
       LLM_API_TOKEN=<your-api-token>
     ```
 
-2. The script will prompt you to enter your Slack Bot Token and Signing Secret when required.
+3. **Option 3: Deploy without Slack integration**
+
+    Deploy without Slack support:
+
+    ```bash
+    make helm-install NAMESPACE=<your-namespace> \
+      LLM=llama-4-scout-17b-16e-w4a16 \
+      LLM_ID=llama-4-scout-17b-16e-w4a16 \
+      LLM_URL=<llm-url>  \
+      LLM_API_TOKEN=<your-api-token>
+    ```
 
 ### Step 3: Connect Slack to Your Deployed Bot
 
