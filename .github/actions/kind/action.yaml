@@ -1,0 +1,40 @@
+name: Initialize cluster and deploy application
+description: Initialize cluster and deploy application
+
+inputs:
+  namespace:
+    description: The namespace to deploy the application to
+    required: false
+    default: test
+  llm:
+    description: The LLM to use
+    required: false
+    default: llama-4-scout-17b-16e-w4a16
+  llm_id:
+    description: The LLM ID
+    required: false
+    default: llama-4-scout-17b-16e-w4a16
+  llm_url:
+    description: The LLM URL
+    required: false
+    default: https://llama-4-scout-17b-16e-w4a16-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com:443/v1
+
+runs:
+  using: composite
+  steps:
+
+    - name: Install Kind
+      run: go install sigs.k8s.io/kind@v0.30.0
+      shell: bash
+
+    - name: Create Kind Cluster
+      run: ./scripts/ci/kind-with-registry.sh
+      shell: bash
+
+    - name: Helm Depend
+      run: make helm-depend
+      shell: bash
+
+    - name: Helm Install
+      run: make helm-install NAMESPACE=${{inputs.namespace}} LLM=${{inputs.llm}} LLM_ID=${{inputs.llm_id}} LLM_URL=${{inputs.llm_url}} LLM_API_TOKEN=$LLM_API_TOKEN
+      shell: bash

@@ -35,7 +35,7 @@ ifeq ($(ENABLE_SLACK),true)
 ifndef SLACK_BOT_TOKEN
 SLACK_BOT_TOKEN := $(shell bash -c 'read -r -p "Enter Slack Bot Token (xoxb-...): " TOKEN; echo $$TOKEN')
 endif
-ifndef SLACK_SIGNING_SECRET  
+ifndef SLACK_SIGNING_SECRET
 SLACK_SIGNING_SECRET := $(shell bash -c 'read -r -p "Enter Slack Signing Secret: " SECRET; echo $$SECRET')
 endif
 endif
@@ -53,7 +53,8 @@ helm_llm_service_args = \
     $(if $(LLM),--set global.models.$(LLM).enabled=true,) \
     $(if $(SAFETY),--set global.models.$(SAFETY).enabled=true,) \
     $(if $(LLM_TOLERATION),--set-json global.models.$(LLM).tolerations='$(call TOLERATIONS_TEMPLATE,$(LLM_TOLERATION))',) \
-    $(if $(SAFETY_TOLERATION),--set-json global.models.$(SAFETY).tolerations='$(call TOLERATIONS_TEMPLATE,$(SAFETY_TOLERATION))',)
+    $(if $(SAFETY_TOLERATION),--set-json global.models.$(SAFETY).tolerations='$(call TOLERATIONS_TEMPLATE,$(SAFETY_TOLERATION))',) \
+    $(if $(LLM_URL),--set llm-service.enabled=false,)
 
 helm_llama_stack_args = \
     $(if $(LLM),--set global.models.$(LLM).enabled=true,) \
@@ -266,8 +267,8 @@ test-short-integration:
 
 # Create namespace and deploy
 namespace:
-	@oc create namespace $(NAMESPACE) &> /dev/null && oc label namespace $(NAMESPACE) modelmesh-enabled=false ||:
-	@oc project $(NAMESPACE) &> /dev/null ||:
+	@kubectl create namespace $(NAMESPACE) &> /dev/null && kubectl label namespace $(NAMESPACE) modelmesh-enabled=false ||:
+	@kubectl get namespaces &> /dev/null ||:
 
 .PHONY: helm-depend
 helm-depend:
@@ -289,11 +290,14 @@ helm-install: namespace helm-depend
 		$(PGVECTOR_ARGS) \
 		$(LLM_SERVICE_ARGS) \
 		$(LLAMA_STACK_ARGS) \
+		--set image.registry=$(REGISTRY) \
+		--set mcp-servers.mcp-servers.self-service-agent-employee-info.imageRepository=$(REGISTRY)/self-service-agent-employee-info-mcp \
+		--set mcp-servers.mcp-servers.self-service-agent-snow.imageRepository=$(REGISTRY)/self-service-agent-snow-mcp \
 		--set slack.enabled=$(SLACK_ENABLED) \
 		$(if $(filter true,$(SLACK_ENABLED)),--set slack.botToken=$(SLACK_BOT_TOKEN) --set slack.signingSecret=$(SLACK_SIGNING_SECRET),) \
 		$(EXTRA_HELM_ARGS)
 	@echo "Waiting for model services and llamastack to deploy. It may take around 10-15 minutes depending on the size of the model..."
-	@oc rollout status deploy/$(MAIN_CHART_NAME) -n $(NAMESPACE)
+	@kubectl rollout status deploy/$(MAIN_CHART_NAME) -n $(NAMESPACE) --timeout 20m
 	@echo "$(MAIN_CHART_NAME) installed successfully"
 	$(if $(filter true,$(SLACK_ENABLED)),$(PRINT_SLACK_URL))
 
@@ -303,11 +307,11 @@ helm-uninstall:
 	@echo "Uninstalling $(MAIN_CHART_NAME) helm chart"
 	@helm uninstall --ignore-not-found $(MAIN_CHART_NAME) -n $(NAMESPACE)
 	@echo "Removing pgvector PVCs from $(NAMESPACE)"
-	@oc get pvc -n $(NAMESPACE) -o custom-columns=NAME:.metadata.name | grep -E '^(pg)-data' | xargs -I {} oc delete pvc -n $(NAMESPACE) {} ||:
+	@kubectl get pvc -n $(NAMESPACE) -o custom-columns=NAME:.metadata.name | grep -E '^(pg)-data' | xargs -I {} kubectl delete pvc -n $(NAMESPACE) {} ||:
 	@echo "Deleting remaining pods in namespace $(NAMESPACE)"
-	@oc delete pods -n $(NAMESPACE) --all
+	@kubectl delete pods -n $(NAMESPACE) --all
 	@echo "Checking for any remaining resources in namespace $(NAMESPACE)..."
-	@echo "If you want to completely remove the namespace, run: oc delete project $(NAMESPACE)"
+	@echo "If you want to completely remove the namespace, run: kubectl delete namespace $(NAMESPACE)"
 	@echo "Remaining resources in namespace $(NAMESPACE):"
 	@$(MAKE) helm-status
 
@@ -315,16 +319,32 @@ helm-uninstall:
 .PHONY: helm-status
 helm-status:
 	@echo "Listing pods..."
-	oc get pods -n $(NAMESPACE) || true
+	kubectl get pods -n $(NAMESPACE) || true
 
 	@echo "Listing services..."
-	oc get svc -n $(NAMESPACE) || true
+	kubectl get svc -n $(NAMESPACE) || true
 
 	@echo "Listing routes..."
-	oc get routes -n $(NAMESPACE) || true
+	kubectl get routes -n $(NAMESPACE) || true
 
 	@echo "Listing secrets..."
-	oc get secrets -n $(NAMESPACE) | grep huggingface-secret || true
+	kubectl get secrets -n $(NAMESPACE) | grep huggingface-secret || true
 
 	@echo "Listing pvcs..."
-	oc get pvc -n $(NAMESPACE) || true
+	kubectl get pvc -n $(NAMESPACE) || true	
+
+.PHONY: oc
+export OC = ./bin/oc
+oc: ## Download oc locally if necessary.
+ifeq (,$(wildcard $(OC)))
+ifeq (,$(shell which oc 2>/dev/null))
+	@{ \
+	set -e ;\
+	mkdir -p $(dir $(OC)) ;\
+	curl -sSLo oc.tar.gz https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/4.11.6/openshift-client-linux.tar.gz ;\
+	tar -xf oc.tar.gz -C $(dir $(OC)) oc ;\
+	}
+else
+OC = $(shell which oc)
+endif
+endif

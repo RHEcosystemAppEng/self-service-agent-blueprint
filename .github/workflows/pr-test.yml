@@ -6,6 +6,12 @@ on:
 
 env:
   ASSET_MANAGER_DIR: asset-manager
+  # TODO: I tried to define LLM_API_TOKEN as a ${{ secret.LLM_API_TOKEN }}, 
+  # but it didn't work for the upstream repo.
+  # It only worked for the downstream repo.
+  # I spent a lot of time trying to figure out why it didn't work, but I couldn't :(
+  LLM_API_TOKEN: d81971fa4ad90db0134fd2a1ce3cd21e
+  LLM_URL: https://llama-4-scout-17b-16e-w4a16-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com:443/v1
 
 jobs:
   pull-request-tests:
@@ -34,4 +40,51 @@ jobs:
   
       - name: Run tests
         run: uv run pytest tests
+
+  e2e-tests:
+    name: Run e2e tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate LLM_API_TOKEN secret
+        shell: bash
+        env:
+          LLM_API_TOKEN: ${{ env.LLM_API_TOKEN }}
+        run: |
+          if [ -z "${LLM_API_TOKEN}" ]; then
+            echo "LLM_API_TOKEN secret is missing or empty. Set it in repository or organization secrets."
+            exit 1
+          fi
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.6.17"
+          python-version: "3.12"
+
+      - name: Install Local Dependencies
+        shell: bash
+        run: |
+          make oc
+          echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
+
+      - name: Initialize cluster and deploy application
+        uses: ./.github/actions/kind
+        env:
+          LLM_API_TOKEN: ${{ env.LLM_API_TOKEN }}
+
+      - name: Install evaluations dependencies
+        run: |
+          uv --directory evaluations sync
+
+      - name: Run evaluations
+        run: |
+          uv --directory evaluations run evaluate.py
+
+      - name: Inspect Cluster - Self-Service Agent
+        if: failure()
+        uses: ./.github/actions/inspect
+        with:
+          artifactPrefix: self-service-agent
       

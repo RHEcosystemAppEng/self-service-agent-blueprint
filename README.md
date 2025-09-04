@@ -16,6 +16,7 @@ A comprehensive blueprint for building self-service AI agents with modular compo
 - [uv](https://github.com/astral-sh/uv) - Fast Python package installer
 - [Podman](https://podman.io/) or Docker - Container runtime
 - [Helm](https://helm.sh/) - Kubernetes package manager (for deployment)
+- [kubectl](https://kubernetes.io/docs/reference/kubectl/) - Kubernetes Command line tool
 
 ### Installation
 
@@ -124,3 +125,19 @@ Run `make help` to see all available commands with descriptions.
 
 - [Asset Manager](asset-manager/README.md) - Detailed asset manager documentation
 - [Employee Info MCP](mcp-servers/employee-info/README.md) - Employee information service documentation
+
+## Local Deployment with Kind cluster
+
+It is possible to run a local Kubernetes cluster with a container used as registry, running the script:
+
+```bash
+sh ./scripts/ci/kind-with-registry.sh
+```
+
+When a cluster is disposed using the command:
+
+```bash
+kind delete cluster
+```
+
+The images will be cached on the registry container.

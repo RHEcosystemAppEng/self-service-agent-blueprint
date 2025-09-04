@@ -204,3 +204,5 @@ __marimo__/
 
 # Helm Chart deployment tgz files
 /helm/charts/*
+evaluations/.deepeval/*
+evaluations/results/deep_eval_results/*.json
