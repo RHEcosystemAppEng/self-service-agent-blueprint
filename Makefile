@@ -121,6 +121,7 @@ help:
 	@echo "  {SAFETY,LLM}_TOLERATION  - Model pod toleration"
 	@echo "  SLACK_BOT_TOKEN          - Slack Bot Token (xoxb-...) for Slack integration"
 	@echo "  SLACK_SIGNING_SECRET     - Slack Signing Secret for request verification"
+	@echo "  ENABLE_SLACK             - Set to 'true' to enable Slack integration and prompt for tokens"
 
 # Build function: $(call build_image,IMAGE_NAME,DESCRIPTION,CONTAINERFILE_PATH,BUILD_CONTEXT)
 define build_image
