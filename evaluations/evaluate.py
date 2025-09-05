@@ -168,6 +168,12 @@ def _parse_arguments() -> argparse.Namespace:
         action="store_true",
         help="Check known bad conversations - run deepeval on results/known_bad_conversation_results and expect failures",
     )
+    parser.add_argument(
+        "--test-script",
+        type=str,
+        default="chat.py",
+        help="Name of the test script to execute (default: chat.py)",
+    )
     return parser.parse_args()
 
 
@@ -437,7 +443,10 @@ def run_check_known_bad_conversations(timeout: int = 600) -> int:
 
 
 def run_evaluation_pipeline(
-    num_conversations: int = 20, timeout: int = 600, max_turns: int = 20
+    num_conversations: int = 20,
+    timeout: int = 600,
+    max_turns: int = 20,
+    test_script: str = "chat.py",
 ) -> int:
     """
     Run the complete evaluation pipeline.
@@ -452,6 +461,7 @@ def run_evaluation_pipeline(
         num_conversations: Number of conversations to generate with generator.py
         timeout: Timeout in seconds for each script execution
         max_turns: Maximum number of turns per conversation in generator.py
+        test_script: Name of the test script to execute
 
     Returns:
         Exit code (0 for success, 1 for any failures)
@@ -468,7 +478,10 @@ def run_evaluation_pipeline(
 
     # Step 1: Run conversation flows
     logger.info("📋 Step 1/3: Running predefined conversation flows...")
-    if not run_script("run_conversations.py", timeout=timeout):
+    run_conversations_args = ["--test-script", test_script]
+    if not run_script(
+        "run_conversations.py", args=run_conversations_args, timeout=timeout
+    ):
         failed_steps.append("run_conversations.py")
         logger.error("❌ Step 1 failed - continuing with remaining steps")
     else:
@@ -480,7 +493,13 @@ def run_evaluation_pipeline(
     logger.info(
         f"🤖 Step 2/3: Generating {num_conversations} additional test conversations..."
     )
-    generator_args = [str(num_conversations), "--max-turns", str(max_turns)]
+    generator_args = [
+        str(num_conversations),
+        "--max-turns",
+        str(max_turns),
+        "--test-script",
+        test_script,
+    ]
     if not run_script("generator.py", args=generator_args, timeout=timeout):
         failed_steps.append("generator.py")
         logger.error("❌ Step 2 failed - continuing with remaining steps")
@@ -537,6 +556,7 @@ def main() -> int:
                 num_conversations=args.num_conversations,
                 timeout=args.timeout,
                 max_turns=args.max_turns,
+                test_script=args.test_script,
             )
     except KeyboardInterrupt:
         logger.warning("⚠️  Pipeline interrupted by user")

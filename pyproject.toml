@@ -2,6 +2,7 @@
 requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
+
 [project]
 name = "self-service-agent-test"
 version = "0.1.0"
@@ -21,7 +22,10 @@ dependencies = [
     "httpcore==1.0.9",
     "httpx==0.28.1",
     "idna==3.10",
-    "llama-stack-client==0.2.16",
+    "langchain-core>=0.3.0",
+    "langgraph>=0.2.0",
+    "llama-stack-client==0.2.18",
+    "openai>=1.0.0",
     "markdown==3.8.2",
     "markdown-it-py==3.0.0",
     "mdurl==0.1.2",

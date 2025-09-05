@@ -1,9 +1,28 @@
 #!/usr/bin/env python3
 
+import argparse
+
 from helpers.run_conversation_flow import ConversationFlowTester
 
+
+def _parse_arguments() -> argparse.Namespace:
+    """Parse command line arguments for the conversation runner."""
+    parser = argparse.ArgumentParser(
+        description="Run predefined conversation flows with the agent"
+    )
+    parser.add_argument(
+        "--test-script",
+        type=str,
+        default="chat.py",
+        help="Name of the test script to execute (default: chat.py)",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    tester = ConversationFlowTester()
+    args = _parse_arguments()
+
+    tester = ConversationFlowTester(test_script=args.test_script)
     tester.run_flows(
         "conversations_config/conversations", "results/conversation_results"
     )

@@ -15,13 +15,16 @@ logger = logging.getLogger(__name__)
 class ConversationFlowTester:
     """Test runner for conversation flows"""
 
-    def __init__(self) -> None:
+    def __init__(self, test_script: str = "chat.py") -> None:
         """
         Initialize the ConversationFlowTester.
 
         Sets up the OpenShift client and initializes conversation history.
+
+        Args:
+            test_script: Name of the test script to execute (default: "chat.py")
         """
-        self.client = OpenShiftChatClient()
+        self.client = OpenShiftChatClient(test_script=test_script)
         self.conversation_history = []
 
     def run_flow(self, questions) -> List[Dict[str, str]]:

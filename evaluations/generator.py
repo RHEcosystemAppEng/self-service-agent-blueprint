@@ -45,8 +45,8 @@ from helpers.openshift_chat_client import OpenShiftChatClient
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize the OpenShift client (for agent under test)
-client = OpenShiftChatClient()
+# Initialize the OpenShift client (for agent under test) - will be updated with test_script in main
+client = None
 
 random.seed()
 
@@ -68,6 +68,12 @@ def _parse_arguments() -> argparse.Namespace:
         type=int,
         default=30,
         help="Maximum number of turns per conversation (default: 20)",
+    )
+    parser.add_argument(
+        "--test-script",
+        type=str,
+        default="chat.py",
+        help="Name of the test script to execute (default: chat.py)",
     )
     return parser.parse_args()
 
@@ -171,6 +177,9 @@ def _save_conversation_to_file(
 if __name__ == "__main__":
     # Parse command line arguments
     args = _parse_arguments()
+
+    # Initialize the OpenShift client with the test script parameter
+    client = OpenShiftChatClient(test_script=args.test_script)
 
     # Get API configuration from environment variables
     api_key, api_endpoint, model_name = get_api_configuration()

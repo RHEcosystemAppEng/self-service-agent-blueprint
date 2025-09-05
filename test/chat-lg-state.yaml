@@ -1,0 +1,410 @@
+# State Machine Configuration for Laptop Refresh Agent
+# Each state defines its behavior, prompts, and transition conditions
+
+# Global settings
+settings:
+  initial_state: "collect_employee_id"
+  terminator_env_var: "AGENT_MESSAGE_TERMINATOR"
+  agent_name: "laptop-refresh"
+  terminal_state: "end"
+  waiting_state_prefix: "waiting_"
+  empty_response_retry_count: 3
+
+# State structure definition - completely configurable
+state_schema:
+  # Required system fields
+  system_fields:
+    messages:
+      type: "list"
+      description: "Conversation message history"
+      default: []
+    current_state:
+      type: "string"
+      description: "Current state machine state"
+      default: null  # Will be set to initial_state
+  
+  # Business logic fields - customize for your domain
+  business_fields:
+    employee_id:
+      type: "string"
+      description: "4-digit employee identifier"
+      default: null
+    employee_info:
+      type: "dict"
+      description: "Employee information from lookup"
+      default: null
+    laptop_eligibility:
+      type: "dict"
+      description: "Laptop refresh eligibility assessment"
+      default: null
+    eligibility_status:
+      type: "string"
+      description: "Eligibility classification result (ELIGIBLE, NOT, UNCLEAR)"
+      default: null
+    selected_laptop:
+      type: "string"
+      description: "User's selected laptop model"
+      default: null
+    selected_laptop_details:
+      type: "dict"
+      description: "Full details of the selected laptop"
+      default: null
+    laptop_options:
+      type: "dict"
+      description: "Available laptop options shown to user"
+      default: null
+    ticket_created:
+      type: "boolean"
+      description: "Whether ServiceNow ticket was created"
+      default: false
+    user_wants_to_proceed:
+      type: "boolean"
+      description: "User's decision to proceed with process"
+      default: null
+
+# State definitions
+states:
+  # State 1: Collect Employee ID (Initial Greeting)
+  collect_employee_id:
+    type: "llm_processor"
+    temperature: 0.2  # Conversational, can be creative
+    prompt: "You are a helpful laptop refresh assistant. Please introduce yourself and ask the user for their 4-digit employee ID to help with their laptop refresh request."
+    transitions:
+      success: "waiting_employee_id"
+
+  # Waiting State: Collect Employee ID Input  
+  waiting_employee_id:
+    type: "waiting"
+    transitions:
+      user_input: "validate_employee_id"
+
+  # State 1a: Validate Employee ID Input
+  validate_employee_id:
+    type: "llm_processor"
+    temperature: 0.1  # Very deterministic for data extraction
+    prompt: |
+      The user provided: "{last_user_message}"
+      
+      Extract a 4-digit employee ID from their input. Look for any 4-digit number (like 1234, 0001, 1010, etc.) in the text.
+      
+      Examples:
+      - "It's 1010." → EMPLOYEE_ID:1010
+      - "My ID is 0005" → EMPLOYEE_ID:0005  
+      - "1234 and 5678" → NEEDS_CLARIFICATION
+      - "I don't know" → NO_EMPLOYEE_ID
+      
+      Respond with EXACTLY one of these formats - no other text:
+      
+      EMPLOYEE_ID:#### (if you find exactly one 4-digit number)
+      NEEDS_CLARIFICATION (if you find multiple 4-digit numbers)  
+      NO_EMPLOYEE_ID (if you find no 4-digit numbers)
+      
+      Do not include any other text in your response.
+    response_analysis:
+      conditions:
+        - name: "valid_id_extracted"
+          trigger_phrases: ["EMPLOYEE_ID:"]
+          actions:
+            - type: "extract_data"
+              pattern: "EMPLOYEE_ID:(\\d+)"
+              field_name: "employee_id"
+              source: "response"
+            - type: "transition"
+              target: "lookup_employee"
+        - name: "needs_clarification"
+          trigger_phrases: ["NEEDS_CLARIFICATION"]
+          actions:
+            - type: "add_message"
+              message: "I found multiple 4-digit numbers in your message. Please specify which one is your employee ID."
+            - type: "transition"
+              target: "waiting_employee_id"
+        - name: "no_employee_id"
+          trigger_phrases: ["NO_EMPLOYEE_ID"]
+          actions:
+            - type: "add_message"
+              message: "I need your 4-digit employee ID to help you. Could you please provide it?"
+            - type: "transition"
+              target: "waiting_employee_id"
+      default_transition: "waiting_employee_id"
+
+  # State 1b: Lookup Employee Information
+  lookup_employee:
+    type: "llm_processor"
+    temperature: 0.3  # Factual lookup, should be consistent
+    prompt: |
+      Look up the laptop information for employee ID {employee_id}. CRITICAL use the get_employee_laptop_info tool to get the laptop information. 
+      Provide their current laptop details including: name, employee ID, region, purchase date, laptop age, model, and serial number.
+      If the employee ID is not found, simply say 'Employee ID {employee_id} was not found in the database.'
+    transitions:
+      success: "classify_lookup_result"
+    data_storage:
+      employee_info: "llm_response"
+
+  # State 1c: Classify Lookup Result
+  classify_lookup_result:
+    type: "llm_processor"
+    temperature: 0.1  # Very deterministic classification
+    prompt: |
+      Analyze this employee lookup response: "{employee_info.response}"
+      
+      Classify the result as SUCCESS, NOT_FOUND, or ERROR:
+      - SUCCESS: if employee information was found (contains details like name, region, laptop model, etc.)
+      - NOT_FOUND: if the employee ID was not found in the database
+      - ERROR: if there was a system error or unclear response
+      
+      Respond with only the classification: SUCCESS, NOT_FOUND, or ERROR
+    response_analysis:
+      conditions:
+        - name: "success"
+          trigger_phrases: ["SUCCESS"]
+          actions:
+            - type: "transition"
+              target: "check_eligibility"
+        - name: "not_found"
+          trigger_phrases: ["NOT_FOUND"]
+          actions:
+            - type: "add_message"
+              message: "I'm sorry, employee ID {employee_id} was not found in our database. Could you please provide your correct 4-digit employee ID?"
+            - type: "transition"
+              target: "waiting_employee_id"
+        - name: "error"
+          trigger_phrases: ["ERROR"]
+          actions:
+            - type: "add_message"
+              message: "I encountered an issue looking up your information. Please try providing your employee ID again."
+            - type: "transition"
+              target: "waiting_employee_id"
+      default_transition: "waiting_employee_id"
+
+  # State 2: Check Eligibility
+  check_eligibility:
+    type: "llm_processor"
+    temperature: 0.4  # Mix of factual lookup + conversational response
+    prompt: |
+      You have the employee information for employee ID {employee_id}: {employee_info.response}
+
+      Search the laptop refresh knowledge base for the company's laptop refresh policy and determine if this employee is eligible for a laptop replacement. Specifically:
+
+      1. Look up the corporate laptop refresh policy to find the refresh cycle/interval
+      2. Compare the users current laptop age against the policy requirements
+      3. Provide a clear summary to the user including their laptop details and eligibility status. The summary should speak directly to the user.
+      4. Include their current laptop details (name, employee ID, region, purchase date, laptop age, model, serial number)
+      5. Clearly state whether they can request a replacement today and explain the policy
+      6. If eligible as if they would like to proceed to reviewing the laptop options. Do not ask for any additional information.
+
+      Be conversational and helpful.
+    transitions:
+      success: "classify_eligibility_result"
+    data_storage:
+      laptop_eligibility: "llm_response"
+
+  # State 2a: Classify Eligibility Result
+  classify_eligibility_result:
+    type: "llm_processor"
+    temperature: 0.1  # Very deterministic classification
+    prompt: |
+      This is the summary of the user's eligibility: "{laptop_eligibility.response}"
+      
+      If the response says the user is eligible for a laptop replacement, respond: ELIGIBLE
+      If the response says the user is not eligible, respond: NOT
+      If unclear, respond: UNCLEAR
+      
+      Respond with only one word: ELIGIBLE, NOT, or UNCLEAR
+    response_analysis:
+      conditions:
+        - name: "eligible"
+          trigger_phrases: ["ELIGIBLE"]
+          actions:
+            - type: "set_field"
+              field_name: "eligibility_status"
+              value: "ELIGIBLE"
+            - type: "add_message"
+              message: "{laptop_eligibility.response}"
+            - type: "transition"
+              target: "proceed_confirmation"
+        - name: "not_eligible"
+          trigger_phrases: ["NOT"]
+          actions:
+            - type: "set_field"
+              field_name: "eligibility_status"
+              value: "NOT_ELIGIBLE"
+            - type: "add_message"
+              message: "{laptop_eligibility.response}"
+            - type: "transition"
+              target: "waiting_general_input"
+        - name: "unclear"
+          trigger_phrases: ["UNCLEAR"]
+          actions:
+            - type: "set_field"
+              field_name: "eligibility_status"
+              value: "UNCLEAR"
+            - type: "add_message"
+              message: "Let me double-check your eligibility status. Could you please confirm your employee ID so I can review your information again?"
+            - type: "transition"
+              target: "waiting_employee_id"
+      default_transition: "waiting_employee_id"
+
+  # State 3: Waiting for General Input (Ineligible Users)
+  waiting_general_input:
+    type: "intent_classifier"
+    temperature: 0.2  # Deterministic intent classification
+    intent_prompt: |
+      Analyze the user's message and determine their intent. The user said: "{user_input}"
+      
+      Context: This user is NOT currently eligible for a laptop replacement under standard policy.
+      
+      Classify the user's intent as one of the following:
+      1. FAREWELL - User wants to end the conversation (goodbye, bye, thanks, etc.)
+      2. PROCEED_ANYWAY - User wants to see laptop options despite being ineligible (proceed, show options, I want to see, etc.)
+      3. GENERAL_QUESTION - User has questions about policy or general assistance
+      
+      Respond with only the classification: FAREWELL, PROCEED_ANYWAY, or GENERAL_QUESTION
+    intent_actions:
+      FAREWELL:
+        response: "Thank you for using the laptop refresh service. Have a great day!"
+        next_state: "end"
+      PROCEED_ANYWAY:
+        response: "I understand you'd like to proceed. While you're not currently eligible under the standard policy, I can show you the available options. Please note that any request would need special approval and may be subject to additional justification requirements. Would you like to see the available laptop options?"
+        data_storage:
+          user_wants_to_proceed: true
+        next_state: "select_laptop"
+      GENERAL_QUESTION:
+        prompt: |
+          Previously retrieved information on laptop eligibility: {laptop_eligibility.response}
+ 
+          The user said '{user_input}'. This user is NOT currently eligible for a laptop replacement under standard policy but is allowed to proceed anyway as long as they undertand that the request may be rejected or require additional approval. Provide a helpful response about laptop refresh policies or general assistance. If they're asking about their eligibility again, remind them they are not currently eligible and when they will become eligible.
+        next_state: "waiting_general_input"
+
+  # State 4: Proceed Confirmation
+  proceed_confirmation:
+    type: "intent_classifier"
+    temperature: 0.2  # Deterministic yes/no classification
+    intent_prompt: |
+      The user was asked if they want to proceed with reviewing laptop options. They responded: "{user_input}"
+      
+      Classify their response as one of the following:
+      1. YES - User wants to proceed (yes, sure, okay, proceed, continue, etc.)
+      2. NO - User does not want to proceed or wants to end conversation (no, cancel, stop, bye, etc.)
+      3. UNCLEAR - Response is ambiguous or unclear
+      
+      Respond with only the classification: YES, NO, or UNCLEAR
+    intent_actions:
+      "YES":
+        next_state: "select_laptop"
+        data_storage:
+          user_wants_to_proceed: true
+      "NO":
+        response: "No problem! If you change your mind or need help with anything else, feel free to ask."
+        next_state: "end"
+        data_storage:
+          user_wants_to_proceed: false
+      "UNCLEAR":
+        response: "Please let me know if you'd like to proceed with reviewing the available laptop options (yes/no)."
+        next_state: "proceed_confirmation"
+
+  # State 5: Select Laptop
+  select_laptop:
+    type: "llm_processor"
+    temperature: 0.2  # Mix of factual info + conversational presentation
+    conditional_prompts:
+      - condition: "user_is_ineligible"
+        check_field: "eligibility_status"
+        check_phrases: ["NOT"]
+        prompt: |
+          Previously retrieved information on laptop eligibility: {laptop_eligibility.response}
+         
+          The user wants to see laptop options based on\n {employee_info.response}\n even though they are not currently eligible under standard policy. Search the laptop refresh knowledge base and present them with all available laptop models based on their region. CRITICAL Include detailed specifications for each option and ask them to choose one specific laptop. CRITICAL only show them the list of laptops for their region.
+          
+          IMPORTANT: Include a warning that they are not currently eligible under standard policy and any request would require special approval and justification.
+          
+          Ask them to choose one specific laptop if they wish to proceed with a special request.
+          
+          Only use information from the knowledge base - don't add external details.
+      - condition: "default"
+        prompt: |
+          The user wants to see their laptop options based on {employee_info.response}.\n Search the laptop refresh knowledge base and present them with all available laptop models based on their region. CRITICAL Include detailed specifications for each option and ask them to choose one specific laptop. CRITICAL only show them the list of laptops for their region.
+
+          Only use information from the knowledge base - don't add external details.
+    transitions:
+      success: "waiting_laptop_selection"
+    data_storage:
+      laptop_options: "llm_response"
+
+  # State 6: Waiting for Laptop Selection
+  waiting_laptop_selection:
+    type: "intent_classifier"
+    temperature: 0.2  # Deterministic selection validation
+    intent_prompt: |
+      The user said: "{user_input}"
+      
+      Based on the laptop options "{laptop_options.response}", determine if they made a valid laptop selection:
+      - VALID_SELECTION: User mentioned a specific laptop model, number, or clear selection
+      - INVALID_SELECTION: User's choice is clearly invalid or nonsensical
+      - UNCLEAR: User's response is unclear or doesn't contain a laptop selection
+      
+      Respond with only: VALID_SELECTION, INVALID_SELECTION, or UNCLEAR
+    intent_actions:
+      "VALID_SELECTION":
+        next_state: "confirm_laptop_selection"
+        data_storage:
+          selected_laptop: "{user_input}"
+      "INVALID_SELECTION":
+        response: "I don't see that option in the available laptop list. Please choose one of the specific laptop models I showed you earlier."
+        next_state: "waiting_laptop_selection"
+      "UNCLEAR":
+        response: "Please specify which laptop model you'd like to select from the options I provided."
+        next_state: "waiting_laptop_selection"
+
+  # State 6a: Confirm Laptop Selection with Full Details
+  confirm_laptop_selection:
+    type: "llm_processor"
+    temperature: 0.2  # Mix of factual lookup + conversational confirmation
+    prompt: |
+      The users employee id is: {employee_id}
+      The user selected: "{selected_laptop}"
+      
+      From the following laptop options, find the details for the user's selection and provide them with the complete specifications:
+      
+      {laptop_options.response}
+      
+      Then ask them to confirm that is the correct laptop and that they would like you to create a Service Now ticket. CRITICAL do not ask for any information other than if they would like you to create the service now ticket.
+    transitions:
+      success: "waiting_ticket_confirmation"
+    data_storage:
+      selected_laptop_details: "llm_response"
+
+  # State 7: Waiting for Ticket Confirmation
+  waiting_ticket_confirmation:
+    type: "intent_classifier"
+    temperature: 0.2  # Deterministic yes/no classification
+    intent_prompt: |
+      The user was asked if they want to create a ServiceNow ticket for their laptop refresh request. They responded: "{user_input}"
+      
+      Classify their response as one of the following:
+      1. YES - User wants to create the ticket (yes, proceed, create, sure, okay, etc.)
+      2. NO - User does not want to create the ticket (no, cancel, stop, etc.)
+      3. UNCLEAR - Response is ambiguous or unclear
+      
+      Respond with only the classification: YES, NO, or UNCLEAR
+    intent_actions:
+      "YES":
+        prompt: |
+          Laptop details: {selected_laptop_details}
+          Create a ServiceNow ticket for employee {employee_id} requesting laptop: {selected_laptop} by calling the open_laptop_refresh_ticket tool with the employee ID, laptop information, and business justification "agent submission". CRITICAL use the open_laptop_refresh_ticket tool to create the ticket. 
+          Tell the user their ticket number after creation.
+        next_state: "end"
+        data_storage:
+          ticket_created: true
+      "NO":
+        prompt: "Acknowledge that the user doesn't want to create a ticket and offer to help with anything else."
+        next_state: "end"
+      "UNCLEAR":
+        prompt: "The user said '{user_input}' when asked about creating a ticket. Ask them to clarify: do they want to create the ServiceNow ticket? (yes/no)"
+        next_state: "waiting_ticket_confirmation"
+
+  # End state
+  end:
+    type: "terminal"
+    reset_behavior:
+      reset_state: "waiting_employee_id"  # Start in waiting state to collect user input
+      clear_data: ["messages", "employee_id", "employee_info", "laptop_eligibility", "selected_laptop", "selected_laptop_details", "laptop_options", "eligibility_status", "ticket_created", "current_state", "user_wants_to_proceed"]

@@ -146,7 +146,7 @@ def get_metrics(
             threshold=1.0,
             evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
             evaluation_steps=[
-                f"If the agent states how often laptops are refreshed validate that it matches the refresh interval as explained below\n\n{default_context}",
+                f"Validate that if the agent mentions the refresh interval, what is says is consistent with the additional context\n\nadditional-context-start\n{default_context}\nadditional-context-end",
             ],
             **model_kwargs,
         ),
@@ -155,7 +155,7 @@ def get_metrics(
             threshold=1.0,
             evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
             evaluation_steps=[
-                "Valiate that there are no problems with system responses",
+                "Validate that there are no problems with system responses",
             ],
             **model_kwargs,
         ),
@@ -164,9 +164,7 @@ def get_metrics(
             threshold=1.0,
             evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
             evaluation_steps=[
-                "To evaludate 1) extract the location of the user from the conversation (EMEA, LATAM etc.)",
-                "2) Extract the list of laptop options provided to the user in the conversation",
-                f"3) Validate the list of laptop options provided to the user matches the options for their location and includes all of the options as documented below \n\n {default_context}",
+                f"Validate that if the agent provides a list of laptop options in the conversation, the list includes all of the available options in the additional context for the user's location.\n\nadditional-context-start\n{default_context}\nadditional-context-end",
             ],
             **model_kwargs,
         ),

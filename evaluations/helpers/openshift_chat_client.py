@@ -13,14 +13,20 @@ AGENT_MESSAGE_TERMINATOR = ":DONE"
 class OpenShiftChatClient:
     """Client for interacting with the self-service agent via OpenShift exec"""
 
-    def __init__(self, deployment_name: str = "deploy/self-service-agent"):
+    def __init__(
+        self,
+        deployment_name: str = "deploy/self-service-agent",
+        test_script: str = "chat.py",
+    ):
         """
         Initialize the OpenShift chat client.
 
         Args:
             deployment_name: Name of the OpenShift deployment to connect to
+            test_script: Name of the test script to execute (default: "chat.py")
         """
         self.deployment_name = deployment_name
+        self.test_script = test_script
         self.process = None
         self.session_active = False
 
@@ -45,7 +51,7 @@ class OpenShiftChatClient:
                 "--",
                 "bash",
                 "-c",
-                f"AGENT_MESSAGE_TERMINATOR={AGENT_MESSAGE_TERMINATOR} /app/.venv/bin/python /app/test/chat.py",
+                f"AGENT_MESSAGE_TERMINATOR={AGENT_MESSAGE_TERMINATOR} /app/.venv/bin/python {'/app/test/' + self.test_script if not self.test_script.startswith('/') else self.test_script}",
             ]
             self.process = subprocess.Popen(
                 cmd,

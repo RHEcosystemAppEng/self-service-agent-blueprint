@@ -170,7 +170,7 @@ def _evaluate_conversations(
             test_case = ConversationalTestCase(
                 turns=turns,
                 context=test_case_context,
-                chatbot_role="You are an IT Support Agent specializing in hardware replacement. Your task is to determine if an employee's laptop is eligible for replacement based on the company policy and the specific context of their request.",
+                chatbot_role="You are an IT Support Agent specializing in hardware replacement. Your task is to determine if an employee's laptop is eligible for replacement based on the company policy and the specific context of their request. If the user is not eligible they are allowed to request a replacement anyway, but they should be warned that it may not be accepted",
             )
 
             # Execute evaluation with suppressed output for cleaner reporting

@@ -3,6 +3,14 @@
 Simple scripts that we can use to test out pieces as we build
 up the initial functionality
 
+To run in pod using terminal you mus use 
+
+```
+/app/.venv/bin/python XXX
+```
+
+where XXX is the script name
+
 
 ## test.py
 
