@@ -850,6 +850,7 @@ dependencies = [
     { name = "requests" },
     { name = "rich" },
     { name = "six" },
+    { name = "slack-bolt" },
     { name = "slack-sdk" },
     { name = "sniffio" },
     { name = "soupsieve" },
@@ -918,6 +919,7 @@ requires-dist = [
     { name = "requests", specifier = "==2.32.4" },
     { name = "rich", specifier = "==14.0.0" },
     { name = "six", specifier = "==1.17.0" },
+    { name = "slack-bolt", specifier = ">=1.18.0" },
     { name = "slack-sdk", specifier = ">=3.36.0" },
     { name = "sniffio", specifier = "==1.3.1" },
     { name = "soupsieve", specifier = "==2.7" },
@@ -947,6 +949,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
+]
+
+[[package]]
+name = "slack-bolt"
+version = "1.24.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "slack-sdk" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/06/af/95750d5c7f56be5266e6e4eb6b44f689423f44f0d2e2fa222e2c4c808305/slack_bolt-1.24.0.tar.gz", hash = "sha256:203249338454d3c8d096a6a1f4ebe09f48da2f572268835d1c5ed2a64eae898d", size = 131100, upload-time = "2025-08-27T18:51:40.026Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ee/31/61985f6fe279e247789040f1c726a6b09e4c0388f1ba7265b1705956fed7/slack_bolt-1.24.0-py2.py3-none-any.whl", hash = "sha256:10245bac8b6768434885cc6e896a91daf815f1f566e83c0ddb6ad846d838248e", size = 230046, upload-time = "2025-08-27T18:51:38.326Z" },
 ]
 
 [[package]]

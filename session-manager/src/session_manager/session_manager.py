@@ -1,4 +1,7 @@
 import uuid
+from pathlib import Path
+from asset_manager.agent_manager import AgentManager
+from asset_manager.util import load_config_from_path
 
 
 class SessionManager:
@@ -49,10 +52,15 @@ class SessionManager:
                     hasattr(chunk, "event")
                     and hasattr(chunk.event, "payload")
                     and chunk.event.payload.event_type == "turn_complete"
+                    and hasattr(chunk.event.payload.turn, "output_message")
                 ):
-                    if hasattr(chunk.event.payload.turn, "output_message"):
-                        content = chunk.event.payload.turn.output_message.content
-                        response += content
+                    turn = chunk.event.payload.turn
+                    stop_reason = turn.output_message.stop_reason
+
+                    if stop_reason == "end_of_turn":
+                        response += turn.output_message.content
+                    else:
+                        print(f"Agent turn stopped for reason: {stop_reason}")
 
             return response.strip()
 
@@ -133,3 +141,20 @@ class SessionManager:
             print(f"Session for user {user_id} has been reset.")
             return True
         return False
+
+
+def create_session_manager():
+    """
+    Factory function to load config, initialize an AgentManager,
+    and return a fully configured SessionManager instance.
+    """
+    # Use absolute path since we might be running from different working directory
+    config_path = Path("/app/asset-manager/config")
+    if not config_path.exists():
+        config_path = Path("asset_manager/config")  # fallback to relative path
+    
+    config = load_config_from_path(config_path)
+    agent_manager = AgentManager(config)
+    session_manager = SessionManager(agent_manager=agent_manager)
+    
+    return session_manager

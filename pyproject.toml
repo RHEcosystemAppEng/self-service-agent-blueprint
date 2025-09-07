@@ -51,6 +51,7 @@ dependencies = [
     "flask>=3.1.0",
     "gunicorn>=23.0.0",
     "slack_sdk>=3.36.0",
+    "slack-bolt>=1.18.0",
 ]
 
 [project.optional-dependencies]
