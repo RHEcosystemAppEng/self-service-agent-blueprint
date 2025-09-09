@@ -10,6 +10,7 @@ session management, and integrated tools.
 import logging
 import os
 import uuid
+
 from session_manager.session_manager import create_session_manager
 
 AGENT_MESSAGE_TERMINATOR = os.environ.get("AGENT_MESSAGE_TERMINATOR", "")
@@ -17,17 +18,18 @@ AGENT_MESSAGE_TERMINATOR = os.environ.get("AGENT_MESSAGE_TERMINATOR", "")
 # remove logging we otherwise get by default
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
+
 def main():
     """
     Main chat application loop using SessionManager.
-    
+
     """
     # Create configured SessionManager
     session_manager = create_session_manager()
     user_id = str(uuid.uuid4())  # user ID for CLI sessions
-    
+
     print("CLI Chat - Type 'quit' to exit, 'reset' to clear session")
-    
+
     # Initial greeting
     kickoff_message = "please introduce yourself and tell me how you can help"
     agent_response = session_manager.handle_user_message(user_id, kickoff_message)
@@ -44,12 +46,12 @@ def main():
                 else:
                     print("No active session to clear.")
                 continue
-                
+
             if message.strip():
                 # Use SessionManager to handle the message (same as Slack service)
                 agent_response = session_manager.handle_user_message(user_id, message)
                 print(f"agent: {agent_response} {AGENT_MESSAGE_TERMINATOR}")
-                
+
         except KeyboardInterrupt:
             break
 

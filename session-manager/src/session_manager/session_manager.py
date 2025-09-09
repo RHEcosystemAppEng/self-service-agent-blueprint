@@ -1,5 +1,6 @@
 import uuid
 from pathlib import Path
+
 from asset_manager.agent_manager import AgentManager
 from asset_manager.util import load_config_from_path
 
@@ -8,7 +9,9 @@ class SessionManager:
     """
     Manages user sessions and conversations with agents.
     """
+
     ROUTING_AGENT_NAME = "routing-agent"
+
     def __init__(self, agent_manager):
         """
         Initializes the SessionManager.
@@ -123,8 +126,12 @@ class SessionManager:
         signal = agent_response.strip().lower()
         print(f"agent response: {signal}")
 
-        if(signal == "task_complete_return_to_router") and current_session["agent_id"] != self.agents.get(self.ROUTING_AGENT_NAME):
-            print(f"Specialist task complete. Returning user {user_id} to the routing agent.")
+        if (signal == "task_complete_return_to_router") and current_session[
+            "agent_id"
+        ] != self.agents.get(self.ROUTING_AGENT_NAME):
+            print(
+                f"Specialist task complete. Returning user {user_id} to the routing agent."
+            )
             self.reset_user_session(user_id)
             return self.handle_user_message(user_id, "hi", user_email)
 
@@ -133,9 +140,7 @@ class SessionManager:
             and signal != self.ROUTING_AGENT_NAME
             and current_session["agent_id"] == self.agents.get(self.ROUTING_AGENT_NAME)
         ):
-            return self._route_to_specialist(
-                user_id, signal, text, current_session
-            )
+            return self._route_to_specialist(user_id, signal, text, current_session)
 
         return agent_response
 
@@ -159,9 +164,9 @@ def create_session_manager():
     config_path = Path("/app/asset-manager/config")
     if not config_path.exists():
         config_path = Path("asset_manager/config")  # fallback to relative path
-    
+
     config = load_config_from_path(config_path)
     agent_manager = AgentManager(config)
     session_manager = SessionManager(agent_manager=agent_manager)
-    
+
     return session_manager

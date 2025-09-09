@@ -41,6 +41,7 @@ You must create the Slack app first to get the **Bot Token**, which is required 
     - At the top of the **"OAuth & Permissions"** page, click **"Install to Workspace"** and authorize it.
     - After installation, **copy the "Bot User OAuth Token"**. It will start with `xoxb-`. Keep it safe for the next step.
 
+
 ### Step 2: Deploy the Application with Helm
 
 You can deploy the Slack bot using the provided `Makefile`, which will help you set up the necessary Kubernetes resources via Helm. The deployment process will require your Slack Bot Token and Signing Secret.
@@ -108,7 +109,17 @@ Once the deployment is complete, you need to get the public URL and give it to S
     - You sould see that the URL is verified
     - Go to OAuth & Permissions to reinstall the Bot to the workspace
 
-3.  **Save your changes.**
+3.  **Configure Slash Commands:**
+
+    - In the app's settings, go to **"Features"** > **"Slash Commands"** in the left sidebar.
+    - Click **"Create New Command"** button.
+    - Input the command information:
+      - **Command:** `/reset`
+      - **Request URL:** `<route-url>.../slack/events` (use the same URL from step 1)
+      - **Short Description:** `Reset the current conversation session`
+    - Click **"Save"** button.
+
+4.  **Save your changes.**
 
 ### Step 4: Add the Bot to a Channel
 

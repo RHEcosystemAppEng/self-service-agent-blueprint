@@ -168,18 +168,17 @@ class AgentManager(Manager):
         return None
 
     def create_session(self, agent_id: str, session_name: str = None):
-            """Create a new session for an agent"""
-            if self._client is None:
-                self.connect_to_llama_stack()
-            return self._client.agents.session.create(agent_id, session_name=session_name)
+        """Create a new session for an agent"""
+        if self._client is None:
+            self.connect_to_llama_stack()
+        return self._client.agents.session.create(agent_id, session_name=session_name)
 
-    def create_agent_turn(self, agent_id: str, session_id: str, stream: bool = True, messages: list = None):
+    def create_agent_turn(
+        self, agent_id: str, session_id: str, stream: bool = True, messages: list = None
+    ):
         """Send a turn to an agent"""
         if self._client is None:
             self.connect_to_llama_stack()
         return self._client.agents.turn.create(
-            agent_id=agent_id,
-            session_id=session_id,
-            stream=stream,
-            messages=messages
+            agent_id=agent_id, session_id=session_id, stream=stream, messages=messages
         )
