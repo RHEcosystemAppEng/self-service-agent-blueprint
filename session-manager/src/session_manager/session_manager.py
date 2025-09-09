@@ -120,14 +120,21 @@ class SessionManager:
             text,
         )
 
-        potential_agent_name = agent_response.strip()
+        signal = agent_response.strip().lower()
+        print(f"agent response: {signal}")
+
+        if(signal == "task_complete_return_to_router") and current_session["agent_id"] != self.agents.get(self.ROUTING_AGENT_NAME):
+            print(f"Specialist task complete. Returning user {user_id} to the routing agent.")
+            self.reset_user_session(user_id)
+            return self.handle_user_message(user_id, "hi", user_email)
+
         if (
-            potential_agent_name in self.agents
-            and potential_agent_name != self.ROUTING_AGENT_NAME
+            signal in self.agents
+            and signal != self.ROUTING_AGENT_NAME
             and current_session["agent_id"] == self.agents.get(self.ROUTING_AGENT_NAME)
         ):
             return self._route_to_specialist(
-                user_id, potential_agent_name, text, current_session
+                user_id, signal, text, current_session
             )
 
         return agent_response

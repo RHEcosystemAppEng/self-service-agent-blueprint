@@ -8,7 +8,7 @@ endif
 VERSION ?= 0.0.2
 CONTAINER_TOOL ?= podman
 REGISTRY ?= quay.io/ecosystem-appeng
-AGENT_IMG ?= quay.io/rh-ee-lbitan/self-service-agent:$(VERSION)
+AGENT_IMG ?= $(REGISTRY)/self-service-agent:$(VERSION)
 ASSET_MGR_IMG ?= $(REGISTRY)/self-service-agent-asset-manager:$(VERSION)
 MCP_EMP_INFO_IMG ?= $(REGISTRY)/self-service-agent-employee-info-mcp:$(VERSION)
 MCP_SNOW_IMG ?= $(REGISTRY)/self-service-agent-snow-mcp:$(VERSION)
