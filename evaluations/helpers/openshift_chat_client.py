@@ -45,7 +45,7 @@ class OpenShiftChatClient:
                 "--",
                 "bash",
                 "-c",
-                f"AGENT_MESSAGE_TERMINATOR={AGENT_MESSAGE_TERMINATOR} /app/.venv/bin/python test/chat.py",
+                f"AGENT_MESSAGE_TERMINATOR={AGENT_MESSAGE_TERMINATOR} /app/.venv/bin/python /app/test/chat.py",
             ]
             self.process = subprocess.Popen(
                 cmd,
@@ -191,7 +191,7 @@ class OpenShiftChatClient:
         if self.process:
             try:
                 self.process.terminate()
-                self.process.wait(timeout=5)
+                self.process.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 self.process.kill()
             finally:
