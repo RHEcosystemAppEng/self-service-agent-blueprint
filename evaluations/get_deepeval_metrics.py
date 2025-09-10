@@ -146,7 +146,7 @@ def get_metrics(
             threshold=1.0,
             evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
             evaluation_steps=[
-                f"Validate that if the agent mentions the refresh interval, what is says is consistent with the additional context\n\nadditional-context-start\n{default_context}\nadditional-context-end",
+                f"Validate that if the agent states the number of years afer which laptops are refreshed, what is says is consistent with the additional context. It is ok if the user is not yet eligible. Do not assess anything other than the number of years stated.\n\nadditional-context-start\n{default_context}\nadditional-context-end",
             ],
             **model_kwargs,
         ),

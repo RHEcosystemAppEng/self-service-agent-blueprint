@@ -7,6 +7,8 @@ from typing import Any, Optional, Tuple
 import openai
 from deepeval.models import DeepEvalBaseLLM
 
+from .token_counter import count_tokens_from_response
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -63,6 +65,12 @@ class CustomLLM(DeepEvalBaseLLM):
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
             )
+
+            # Count tokens from the response
+            count_tokens_from_response(
+                response, self.model_name, "custom_llm_evaluation"
+            )
+
             return response.choices[0].message.content
         except Exception as e:
             logger.error(f"Error generating response: {e}")
@@ -92,6 +100,11 @@ class CustomLLM(DeepEvalBaseLLM):
                 model=self.model_name,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
+            )
+
+            # Count tokens from the response
+            count_tokens_from_response(
+                response, self.model_name, "custom_llm_evaluation_async"
             )
 
             return response.choices[0].message.content

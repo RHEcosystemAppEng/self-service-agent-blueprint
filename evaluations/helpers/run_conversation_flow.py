@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
+import datetime
 import json
 import logging
 import os
 from typing import Dict, List
 
 from .openshift_chat_client import OpenShiftChatClient
+from .token_counter import get_token_stats
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +28,7 @@ class ConversationFlowTester:
         """
         self.client = OpenShiftChatClient(test_script=test_script)
         self.conversation_history = []
+        self.total_app_tokens = {"input": 0, "output": 0, "total": 0, "calls": 0}
 
     def run_flow(self, questions) -> List[Dict[str, str]]:
         """
@@ -68,7 +71,31 @@ class ConversationFlowTester:
                 )
 
         finally:
+            # Request token summary before closing (if supported by deployed version)
+            try:
+                if self.client.session_active:
+                    logger.debug("Attempting to request token summary from agent...")
+                    # This will work when chat-lg-state.py includes the **tokens** command
+                    token_response = self.client.send_message("**tokens**")
+                    logger.debug(f"Token request response: {token_response}")
+            except Exception as e:
+                logger.debug(f"Token request not supported by current deployment: {e}")
+
             self.client.close_session()
+
+            # Collect app tokens from this conversation
+            app_tokens = self.client.get_app_tokens()
+            logger.info(f"App tokens from conversation: {app_tokens}")
+            logger.info(
+                f"Session captured {len(self.client.session_output)} lines of output"
+            )
+
+            self.total_app_tokens["input"] += app_tokens["input"]
+            self.total_app_tokens["output"] += app_tokens["output"]
+            self.total_app_tokens["total"] += app_tokens["total"]
+            self.total_app_tokens["calls"] += app_tokens["calls"]
+
+            logger.info(f"Total app tokens so far: {self.total_app_tokens}")
 
         return conversation
 
@@ -147,3 +174,66 @@ class ConversationFlowTester:
                 logger.error(f"Error processing {filename}: {e}")
 
         logger.info("Flows processing completed")
+
+        # Print token usage summary with separate app and evaluation tokens
+        print("\n=== Token Usage Summary ===")
+
+        # Get evaluation token stats
+        eval_stats = get_token_stats()
+
+        # Display app tokens (from chat-lg-state.py via oc exec)
+        print("\n📱 App Tokens (from chat agent):")
+        print(f"  Input tokens: {self.total_app_tokens['input']:,}")
+        print(f"  Output tokens: {self.total_app_tokens['output']:,}")
+        print(f"  Total tokens: {self.total_app_tokens['total']:,}")
+        print(f"  API calls: {self.total_app_tokens['calls']:,}")
+
+        # Display evaluation tokens (from evaluation LLM calls)
+        print("\n🔬 Evaluation Tokens (from evaluation LLM calls):")
+        print(f"  Input tokens: {eval_stats.total_input_tokens:,}")
+        print(f"  Output tokens: {eval_stats.total_output_tokens:,}")
+        print(f"  Total tokens: {eval_stats.total_tokens:,}")
+        print(f"  API calls: {eval_stats.call_count:,}")
+
+        # Display combined totals
+        combined_input = self.total_app_tokens["input"] + eval_stats.total_input_tokens
+        combined_output = (
+            self.total_app_tokens["output"] + eval_stats.total_output_tokens
+        )
+        combined_total = self.total_app_tokens["total"] + eval_stats.total_tokens
+        combined_calls = self.total_app_tokens["calls"] + eval_stats.call_count
+
+        print("\n📊 Combined Totals:")
+        print(f"  Input tokens: {combined_input:,}")
+        print(f"  Output tokens: {combined_output:,}")
+        print(f"  Total tokens: {combined_total:,}")
+        print(f"  API calls: {combined_calls:,}")
+
+        # Save token stats to file
+        if eval_stats.call_count > 0 or self.total_app_tokens["calls"] > 0:
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            token_dir = "results/token_usage"
+            token_file = os.path.join(token_dir, f"run_conversations_{timestamp}.json")
+
+            # Create comprehensive token data including app and evaluation tokens
+            comprehensive_stats = {
+                "summary": {
+                    "total_input_tokens": combined_input,
+                    "total_output_tokens": combined_output,
+                    "total_tokens": combined_total,
+                    "call_count": combined_calls,
+                },
+                "app_tokens": self.total_app_tokens,
+                "evaluation_tokens": {
+                    "total_input_tokens": eval_stats.total_input_tokens,
+                    "total_output_tokens": eval_stats.total_output_tokens,
+                    "total_tokens": eval_stats.total_tokens,
+                    "call_count": eval_stats.call_count,
+                },
+                "detailed_calls": getattr(eval_stats, "detailed_calls", []),
+            }
+
+            os.makedirs(token_dir, exist_ok=True)
+            with open(token_file, "w") as f:
+                json.dump(comprehensive_stats, f, indent=2)
+            print(f"Token usage saved to: {token_file}")

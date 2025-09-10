@@ -8,6 +8,7 @@ chat-lg-state.yaml, making the conversation flow easily configurable and maintai
 
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Annotated, Dict, List, Optional, TypedDict
 
@@ -17,6 +18,11 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from llama_stack_client import LlamaStackClient
+from token_counter import (
+    count_tokens_from_response,
+    get_token_stats,
+    print_token_summary,
+)
 
 AGENT_MESSAGE_TERMINATOR = os.environ.get("AGENT_MESSAGE_TERMINATOR", "")
 
@@ -343,6 +349,9 @@ class Agent:
 
             logger.debug(f"Received response from LlamaStack: {type(response)}")
 
+            # Count tokens from the response
+            count_tokens_from_response(response, self.model, "chat_agent")
+
             # Check for error conditions in the response
             error_info = self._check_response_errors(response)
             if error_info:
@@ -537,6 +546,17 @@ class StateMachine:
                     break
             format_data["last_user_message"] = last_user_message
 
+            # Add conversation_history placeholder
+            conversation_history = ""
+            for i, msg in enumerate(messages):
+                if hasattr(msg, "content"):
+                    msg_type = getattr(msg, "__class__", None).__name__
+                    if msg_type == "HumanMessage":
+                        conversation_history += f"User: {msg.content}\n"
+                    elif msg_type == "AIMessage":
+                        conversation_history += f"Assistant: {msg.content}\n"
+            format_data["conversation_history"] = conversation_history.strip()
+
             # Custom dot notation replacement
             def replace_placeholders(text, data):
                 # First, temporarily replace escaped braces to protect them
@@ -583,8 +603,44 @@ class StateMachine:
         # Step 1: Determine the prompt to use
         prompt = self._get_prompt_for_state(state, state_config)
 
-        # Step 2: Send prompt to LLM and get response with retry logic for empty responses
-        messages_to_send = [{"role": "user", "content": prompt}]
+        # Step 2: Prepare messages and send to LLM with retry logic for empty responses
+        # Check if state config wants to use conversation history
+        use_conversation_history = state_config.get("use_conversation_history", False)
+
+        if use_conversation_history:
+            # Convert state messages to API format and add current prompt as system message
+            messages_to_send = []
+
+            # Add the prompt as a system message
+            messages_to_send.append({"role": "system", "content": prompt})
+
+            # Add conversation history
+            state_messages = state.get("messages", [])
+            logger.info(
+                f"Using conversation history with {len(state_messages)} messages"
+            )
+            for msg in state_messages:
+                if hasattr(msg, "content"):
+                    msg_type = getattr(msg, "__class__", None).__name__
+                    if msg_type == "HumanMessage":
+                        messages_to_send.append(
+                            {"role": "user", "content": msg.content}
+                        )
+                    elif msg_type == "AIMessage":
+                        messages_to_send.append(
+                            {"role": "assistant", "content": msg.content}
+                        )
+
+            logger.info(
+                f"Sending {len(messages_to_send)} messages to LLM (1 system + {len(messages_to_send) - 1} conversation)"
+            )
+        else:
+            # Traditional approach - send prompt as single user message
+            messages_to_send = [{"role": "user", "content": prompt}]
+            logger.info(
+                "Using traditional approach - sending prompt as single user message"
+            )
+
         temperature = state_config.get(
             "temperature"
         )  # Get temperature from state config
@@ -1107,13 +1163,8 @@ class StateMachine:
             return state
 
 
-# Create global state machine instance
-try:
-    config_path = Path(__file__).parent / "chat-lg-state.yaml"
-except NameError:
-    # Handle case when __file__ is not defined (e.g., when executed via exec())
-    config_path = Path("/tmp/chat-lg-state.yaml")
-state_machine = StateMachine(config_path)
+# Global state machine instance - will be initialized in main()
+state_machine = None
 
 
 # Main dispatcher function
@@ -1168,12 +1219,30 @@ def create_laptop_refresh_graph() -> StateGraph:
     return workflow.compile(debug=False)
 
 
-def main():
+def main(config_file=None):
     """Main function to run the configurable state machine laptop refresh agent."""
+    global state_machine
+
+    # Initialize state machine with specified config file
+    if config_file:
+        if Path(config_file).is_absolute():
+            config_path = Path(config_file)
+        else:
+            config_path = Path(__file__).parent / config_file
+    else:
+        try:
+            config_path = Path(__file__).parent / "chat-lg-state.yaml"
+        except NameError:
+            config_path = Path("/tmp/chat-lg-state.yaml")
+
     print("=== Configurable LangGraph Laptop Refresh Agent ===")
+    print(f"Using configuration: {config_path}")
     print("This agent uses a YAML-configured state machine with LlamaStack")
     print("Type 'quit' to exit")
     print("-" * 50)
+
+    # Create state machine with specified config
+    state_machine = StateMachine(config_path)
 
     # Create the graph
     app = create_laptop_refresh_graph()
@@ -1202,6 +1271,16 @@ def main():
             try:
                 user_input = input("\n> ")
                 if user_input.lower() in ["quit", "exit", "q"]:
+                    break
+
+                # Special command to print token summary immediately
+                if user_input.lower() == "**tokens**":
+                    stats = get_token_stats()
+                    print(
+                        f"CURRENT_TOKEN_SUMMARY:INPUT:{stats.total_input_tokens}:OUTPUT:{stats.total_output_tokens}:TOTAL:{stats.total_tokens}:CALLS:{stats.call_count}:MAX_SINGLE_INPUT:{stats.max_input_tokens}:MAX_SINGLE_OUTPUT:{stats.max_output_tokens}:MAX_SINGLE_TOTAL:{stats.max_total_tokens}"
+                    )
+                    print("TOKEN_SUMMARY_END")
+                    sys.stdout.flush()
                     break
 
                 if user_input.strip():
@@ -1242,12 +1321,41 @@ def main():
 
             except KeyboardInterrupt:
                 break
+            except EOFError:
+                print("\nInput stream closed. Ending session.")
+                break
 
     except Exception as e:
         print(f"Error running agent: {e}")
 
     print("\nGoodbye!")
 
+    # Print token usage summary for human viewing
+    print("\n" + "=" * 50)
+    print_token_summary(prefix="  ")
+    print("=" * 50)
+
+    # Print machine-readable token counts for parsing by callers
+    stats = get_token_stats()
+    print(
+        f"TOKEN_SUMMARY:INPUT:{stats.total_input_tokens}:OUTPUT:{stats.total_output_tokens}:TOTAL:{stats.total_tokens}:CALLS:{stats.call_count}:MAX_SINGLE_INPUT:{stats.max_input_tokens}:MAX_SINGLE_OUTPUT:{stats.max_output_tokens}:MAX_SINGLE_TOTAL:{stats.max_total_tokens}"
+    )
+    print("TOKEN_SUMMARY_END")
+
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Configurable LangGraph Laptop Refresh Agent"
+    )
+    parser.add_argument(
+        "--config",
+        "-c",
+        type=str,
+        default="chat-lg-state.yaml",
+        help="Path to YAML configuration file (default: chat-lg-state.yaml)",
+    )
+
+    args = parser.parse_args()
+    main(args.config)

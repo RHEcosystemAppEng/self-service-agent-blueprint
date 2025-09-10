@@ -313,7 +313,7 @@ states:
         prompt: |
           Previously retrieved information on laptop eligibility: {laptop_eligibility.response}
          
-          The user wants to see laptop options based on\n {employee_info.response}\n even though they are not currently eligible under standard policy. Search the laptop refresh knowledge base and present them with all available laptop models based on their region. CRITICAL Include detailed specifications for each option and ask them to choose one specific laptop. CRITICAL only show them the list of laptops for their region.
+          The user wants to see laptop options based on\n {employee_info.response}\n even though they are not currently eligible under standard policy. Search the laptop refresh knowledge base and present them with all available laptop models based on their region. CRITICAL Include detailed specifications for each option and ask them to choose one specific laptop. CRITICAL only show them the numbered list of laptops for their region.
           
           IMPORTANT: Include a warning that they are not currently eligible under standard policy and any request would require special approval and justification.
           
@@ -322,7 +322,7 @@ states:
           Only use information from the knowledge base - don't add external details.
       - condition: "default"
         prompt: |
-          The user wants to see their laptop options based on {employee_info.response}.\n Search the laptop refresh knowledge base and present them with all available laptop models based on their region. CRITICAL Include detailed specifications for each option and ask them to choose one specific laptop. CRITICAL only show them the list of laptops for their region.
+          The user wants to see their laptop options based on {employee_info.response}.\n Search the laptop refresh knowledge base and present them with numbered list of all available laptop models based on their region. CRITICAL Include detailed specifications for each option and ask them to choose one specific laptop. CRITICAL only show them the list of laptops for their region.
 
           Only use information from the knowledge base - don't add external details.
     transitions:
@@ -389,7 +389,8 @@ states:
     intent_actions:
       "YES":
         prompt: |
-          Laptop details: {selected_laptop_details}
+          You have the employee information for employee ID {employee_id}: {employee_info.response}
+          Selected Laptop details: {selected_laptop_details}
           Create a ServiceNow ticket for employee {employee_id} requesting laptop: {selected_laptop} by calling the open_laptop_refresh_ticket tool with the employee ID, laptop information, and business justification "agent submission". CRITICAL use the open_laptop_refresh_ticket tool to create the ticket. 
           Tell the user their ticket number after creation.
         next_state: "end"

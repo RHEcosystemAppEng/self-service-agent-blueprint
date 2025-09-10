@@ -3,7 +3,7 @@
 import logging
 import subprocess
 import time
-from typing import List
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,16 @@ class OpenShiftChatClient:
         self.test_script = test_script
         self.process = None
         self.session_active = False
+        self.session_output = []  # Capture all output for token parsing
+        self.app_tokens = {
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "calls": 0,
+            "max_input": 0,
+            "max_output": 0,
+            "max_total": 0,
+        }
 
     def start_session(self) -> None:
         """
@@ -162,6 +172,12 @@ class OpenShiftChatClient:
 
                 s = line.strip()
 
+                # Capture all output for potential token parsing
+                self.session_output.append(s)
+
+                # Check for token summary output
+                self._parse_token_output(s)
+
                 if not agent_started:
                     start_idx = s.find("agent:")
                     if start_idx == -1:
@@ -186,6 +202,58 @@ class OpenShiftChatClient:
 
         return "\n".join(response_parts).strip()
 
+    def _parse_token_output(self, line: str) -> None:
+        """
+        Parse token summary output from chat-lg-state.py.
+
+        Looks for lines in format:
+        TOKEN_SUMMARY:INPUT:123:OUTPUT:456:TOTAL:579:CALLS:2:MAX_SINGLE_INPUT:50:MAX_SINGLE_OUTPUT:75:MAX_SINGLE_TOTAL:125
+
+        Args:
+            line: Output line to check for token information
+        """
+        if line.startswith("TOKEN_SUMMARY:") or line.startswith(
+            "CURRENT_TOKEN_SUMMARY:"
+        ):
+            try:
+                # Parse extended format with maximum values
+                parts = line.split(":")
+                if len(parts) >= 8:
+                    self.app_tokens["input"] = int(parts[2])
+                    self.app_tokens["output"] = int(parts[4])
+                    self.app_tokens["total"] = int(parts[6])
+                    self.app_tokens["calls"] = int(parts[8])
+
+                    # Parse maximum values if present (new format)
+                    if len(parts) >= 14:
+                        self.app_tokens["max_input"] = int(
+                            parts[10]
+                        )  # MAX_SINGLE_INPUT
+                        self.app_tokens["max_output"] = int(
+                            parts[12]
+                        )  # MAX_SINGLE_OUTPUT
+                        self.app_tokens["max_total"] = int(
+                            parts[14]
+                        )  # MAX_SINGLE_TOTAL
+                    else:
+                        # Legacy format without maximums
+                        self.app_tokens["max_input"] = 0
+                        self.app_tokens["max_output"] = 0
+                        self.app_tokens["max_total"] = 0
+
+                    logger.info(f"Successfully parsed app tokens: {self.app_tokens}")
+            except (ValueError, IndexError) as e:
+                logger.warning(f"Failed to parse token output '{line}': {e}")
+
+    def get_app_tokens(self) -> Dict[str, int]:
+        """
+        Get the app tokens collected from the session.
+
+        Returns:
+            Dictionary with input, output, total, and calls counts
+        """
+        return self.app_tokens.copy()
+
     def close_session(self) -> None:
         """
         Close the chat session.
@@ -196,6 +264,30 @@ class OpenShiftChatClient:
         """
         if self.process:
             try:
+                # Try to read any remaining output before terminating
+                # This might contain token summary information
+                import select
+
+                # Set a short timeout to capture any remaining output
+                remaining_output = []
+                try:
+                    if hasattr(select, "select") and self.process.stdout:
+                        # Non-blocking read for remaining output
+                        ready, _, _ = select.select([self.process.stdout], [], [], 2.0)
+                        if ready:
+                            while True:
+                                line = self.process.stdout.readline()
+                                if not line:
+                                    break
+                                s = line.strip()
+                                remaining_output.append(s)
+                                self.session_output.append(s)
+                                self._parse_token_output(s)
+                                if s == "TOKEN_SUMMARY_END":
+                                    break
+                except Exception as e:
+                    logger.debug(f"Error reading remaining output: {e}")
+
                 self.process.terminate()
                 self.process.wait(timeout=10)
             except subprocess.TimeoutExpired:

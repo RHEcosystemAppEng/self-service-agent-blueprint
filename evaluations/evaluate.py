@@ -34,7 +34,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 # Configure logging
 logging.basicConfig(
@@ -111,27 +111,376 @@ def run_script(
 
 def _cleanup_generated_files() -> None:
     """
-    Remove all files starting with 'generated_flow' from results/conversation_results/.
+    Remove all files starting with 'generated_flow' from results/conversation_results/
+    and all token usage files from results/token_usage/.
 
     This ensures a clean slate for each evaluation run by removing files from
-    previous generator.py executions.
+    previous executions.
     """
-    results_dir = Path("results/conversation_results")
+    # Clean up generated conversation files
+    conversation_results_dir = Path("results/conversation_results")
+    if conversation_results_dir.exists():
+        # Find all files starting with 'generated_flow'
+        generated_files = list(conversation_results_dir.glob("generated_flow*"))
 
-    if not results_dir.exists():
-        return
+        if generated_files:
+            logger.info(
+                f"Removing {len(generated_files)} generated conversation files from previous runs"
+            )
+            for file_path in generated_files:
+                try:
+                    file_path.unlink()
+                except Exception as e:
+                    logger.warning(f"Failed to remove {file_path.name}: {e}")
 
-    # Find all files starting with 'generated_flow'
-    generated_files = list(results_dir.glob("generated_flow*"))
+    # Clean up token usage files
+    token_usage_dir = Path("results/token_usage")
+    if token_usage_dir.exists():
+        # Find all token usage files (all patterns)
+        token_patterns = [
+            "token_usage_*.json",
+            "run_conversations_*.json",
+            "generator_*.json",
+            "deep_eval_*.json",
+            "pipeline_aggregated_*.json",
+        ]
 
-    if not generated_files:
-        return
+        all_token_files = []
+        for pattern in token_patterns:
+            token_files = list(token_usage_dir.glob(pattern))
+            all_token_files.extend(token_files)
 
-    for file_path in generated_files:
+        if all_token_files:
+            logger.info(
+                f"Removing {len(all_token_files)} token usage files from previous runs"
+            )
+            for file_path in all_token_files:
+                try:
+                    file_path.unlink()
+                except Exception as e:
+                    logger.warning(f"Failed to remove {file_path.name}: {e}")
+
+
+def _aggregate_token_usage() -> Dict[str, Any]:
+    """
+    Aggregate token usage statistics from all token usage files generated during the pipeline.
+
+    Searches for token_usage_*.json files in various results directories and combines
+    their statistics into a comprehensive summary. Now handles separate app and evaluation tokens.
+
+    Returns:
+        Dictionary containing aggregated token statistics
+    """
+    aggregated_stats = {
+        "total_input_tokens": 0,
+        "total_output_tokens": 0,
+        "total_tokens": 0,
+        "total_calls": 0,
+        "max_input_tokens": 0,
+        "max_output_tokens": 0,
+        "max_total_tokens": 0,
+        "app_tokens": {
+            "input": 0,
+            "output": 0,
+            "total": 0,
+            "calls": 0,
+            "max_input": 0,
+            "max_output": 0,
+            "max_total": 0,
+        },
+        "evaluation_tokens": {
+            "total_input_tokens": 0,
+            "total_output_tokens": 0,
+            "total_tokens": 0,
+            "call_count": 0,
+            "max_input_tokens": 0,
+            "max_output_tokens": 0,
+            "max_total_tokens": 0,
+        },
+        "scripts": {},
+        "detailed_calls": [],
+    }
+
+    # Search for token usage files in various directories
+    search_dirs = [
+        Path("results/token_usage"),
+        Path("results/deep_eval_results"),
+        Path("results"),
+        Path("."),
+    ]
+
+    found_files = []
+    for search_dir in search_dirs:
+        if search_dir.exists():
+            # Look for all token usage files with various naming patterns
+            patterns = [
+                "token_usage_*.json",  # Old naming pattern
+                "run_conversations_*.json",  # New naming pattern
+                "generator_*.json",  # New naming pattern
+                "deep_eval_*.json",  # New naming pattern
+                "pipeline_aggregated_*.json",  # Skip aggregated files to avoid double counting
+            ]
+            for pattern in patterns:
+                if pattern != "pipeline_aggregated_*.json":  # Skip aggregated files
+                    token_files = list(search_dir.glob(pattern))
+                    found_files.extend(token_files)
+
+    logger.info(f"Found {len(found_files)} token usage files to aggregate")
+
+    for token_file in found_files:
         try:
-            file_path.unlink()
+            with open(token_file, "r") as f:
+                token_data = json.load(f)
+
+            # Extract summary data
+            summary = token_data.get("summary", {})
+            script_name = token_file.stem  # Get filename without extension
+
+            # Aggregate totals
+            aggregated_stats["total_input_tokens"] += summary.get(
+                "total_input_tokens", 0
+            )
+            aggregated_stats["total_output_tokens"] += summary.get(
+                "total_output_tokens", 0
+            )
+            aggregated_stats["total_tokens"] += summary.get("total_tokens", 0)
+            aggregated_stats["total_calls"] += summary.get("call_count", 0)
+
+            # Aggregate maximum values
+            aggregated_stats["max_input_tokens"] = max(
+                aggregated_stats["max_input_tokens"], summary.get("max_input_tokens", 0)
+            )
+            aggregated_stats["max_output_tokens"] = max(
+                aggregated_stats["max_output_tokens"],
+                summary.get("max_output_tokens", 0),
+            )
+            aggregated_stats["max_total_tokens"] = max(
+                aggregated_stats["max_total_tokens"], summary.get("max_total_tokens", 0)
+            )
+
+            # Aggregate app tokens if present
+            app_tokens = token_data.get("app_tokens", {})
+            if app_tokens:
+                aggregated_stats["app_tokens"]["input"] += app_tokens.get("input", 0)
+                aggregated_stats["app_tokens"]["output"] += app_tokens.get("output", 0)
+                aggregated_stats["app_tokens"]["total"] += app_tokens.get("total", 0)
+                aggregated_stats["app_tokens"]["calls"] += app_tokens.get("calls", 0)
+
+                # Aggregate app token maximums
+                aggregated_stats["app_tokens"]["max_input"] = max(
+                    aggregated_stats["app_tokens"]["max_input"],
+                    app_tokens.get("max_input", 0),
+                )
+                aggregated_stats["app_tokens"]["max_output"] = max(
+                    aggregated_stats["app_tokens"]["max_output"],
+                    app_tokens.get("max_output", 0),
+                )
+                aggregated_stats["app_tokens"]["max_total"] = max(
+                    aggregated_stats["app_tokens"]["max_total"],
+                    app_tokens.get("max_total", 0),
+                )
+
+            # Aggregate evaluation tokens if present
+            eval_tokens = token_data.get("evaluation_tokens", {})
+            if eval_tokens:
+                aggregated_stats["evaluation_tokens"][
+                    "total_input_tokens"
+                ] += eval_tokens.get("total_input_tokens", 0)
+                aggregated_stats["evaluation_tokens"][
+                    "total_output_tokens"
+                ] += eval_tokens.get("total_output_tokens", 0)
+                aggregated_stats["evaluation_tokens"][
+                    "total_tokens"
+                ] += eval_tokens.get("total_tokens", 0)
+                aggregated_stats["evaluation_tokens"]["call_count"] += eval_tokens.get(
+                    "call_count", 0
+                )
+
+                # Aggregate evaluation token maximums
+                aggregated_stats["evaluation_tokens"]["max_input_tokens"] = max(
+                    aggregated_stats["evaluation_tokens"]["max_input_tokens"],
+                    eval_tokens.get("max_input_tokens", 0),
+                )
+                aggregated_stats["evaluation_tokens"]["max_output_tokens"] = max(
+                    aggregated_stats["evaluation_tokens"]["max_output_tokens"],
+                    eval_tokens.get("max_output_tokens", 0),
+                )
+                aggregated_stats["evaluation_tokens"]["max_total_tokens"] = max(
+                    aggregated_stats["evaluation_tokens"]["max_total_tokens"],
+                    eval_tokens.get("max_total_tokens", 0),
+                )
+
+            # Store script-specific data
+            aggregated_stats["scripts"][script_name] = {
+                "summary": summary,
+                "app_tokens": app_tokens,
+                "evaluation_tokens": eval_tokens,
+            }
+
+            # Aggregate detailed calls
+            detailed_calls = token_data.get("detailed_calls", [])
+            aggregated_stats["detailed_calls"].extend(detailed_calls)
+
+            logger.debug(
+                f"Aggregated {summary.get('call_count', 0)} calls from {token_file.name}"
+            )
+
         except Exception as e:
-            logger.warning(f"Failed to remove {file_path.name}: {e}")
+            logger.warning(f"Failed to process token file {token_file.name}: {e}")
+
+    return aggregated_stats
+
+
+def _print_aggregated_token_summary(stats: Dict[str, Any]) -> None:
+    """
+    Print a comprehensive summary of aggregated token usage from all pipeline steps.
+    Now includes separate app and evaluation token tracking.
+
+    Args:
+        stats: Aggregated token statistics dictionary
+    """
+    print("\n" + "=" * 80)
+    print("=== COMPLETE PIPELINE TOKEN USAGE SUMMARY ===")
+    print("=" * 80)
+
+    # App tokens (from chat agents)
+    app_tokens = stats.get("app_tokens", {})
+    print("\n📱 App Tokens (from chat agents):")
+    print(f"  Input tokens: {app_tokens.get('input', 0):,}")
+    print(f"  Output tokens: {app_tokens.get('output', 0):,}")
+    print(f"  Total tokens: {app_tokens.get('total', 0):,}")
+    print(f"  API calls: {app_tokens.get('calls', 0):,}")
+    if app_tokens.get("calls", 0) > 0:
+        print(f"  Max single request input: {app_tokens.get('max_input', 0):,}")
+        print(f"  Max single request output: {app_tokens.get('max_output', 0):,}")
+        print(f"  Max single request total: {app_tokens.get('max_total', 0):,}")
+
+    # Evaluation tokens (from evaluation LLM calls)
+    eval_tokens = stats.get("evaluation_tokens", {})
+    print("\n🔬 Evaluation Tokens (from evaluation LLM calls):")
+    print(f"  Input tokens: {eval_tokens.get('total_input_tokens', 0):,}")
+    print(f"  Output tokens: {eval_tokens.get('total_output_tokens', 0):,}")
+    print(f"  Total tokens: {eval_tokens.get('total_tokens', 0):,}")
+    print(f"  API calls: {eval_tokens.get('call_count', 0):,}")
+    if eval_tokens.get("call_count", 0) > 0:
+        print(f"  Max single request input: {eval_tokens.get('max_input_tokens', 0):,}")
+        print(
+            f"  Max single request output: {eval_tokens.get('max_output_tokens', 0):,}"
+        )
+        print(f"  Max single request total: {eval_tokens.get('max_total_tokens', 0):,}")
+
+    # Aggregate by script type
+    script_types = {
+        "run_conversations": {
+            "max_input": 0,
+            "max_output": 0,
+            "max_total": 0,
+            "total_calls": 0,
+            "total_tokens": 0,
+        },
+        "generator": {
+            "max_input": 0,
+            "max_output": 0,
+            "max_total": 0,
+            "total_calls": 0,
+            "total_tokens": 0,
+        },
+        "deep_eval": {
+            "max_input": 0,
+            "max_output": 0,
+            "max_total": 0,
+            "total_calls": 0,
+            "total_tokens": 0,
+        },
+    }
+
+    # Categorize and aggregate by script type
+    for script_name, script_data in stats["scripts"].items():
+        summary = script_data.get("summary", {})
+        script_type = None
+
+        if script_name.startswith("run_conversations_"):
+            script_type = "run_conversations"
+        elif script_name.startswith("generator_"):
+            script_type = "generator"
+        elif script_name.startswith("deep_eval_"):
+            script_type = "deep_eval"
+
+        if script_type and summary:
+            # Update maximums for this script type
+            script_types[script_type]["max_input"] = max(
+                script_types[script_type]["max_input"],
+                summary.get("max_input_tokens", 0),
+            )
+            script_types[script_type]["max_output"] = max(
+                script_types[script_type]["max_output"],
+                summary.get("max_output_tokens", 0),
+            )
+            script_types[script_type]["max_total"] = max(
+                script_types[script_type]["max_total"],
+                summary.get("max_total_tokens", 0),
+            )
+            script_types[script_type]["total_calls"] += summary.get("call_count", 0)
+            script_types[script_type]["total_tokens"] += summary.get("total_tokens", 0)
+
+    # Overall totals
+    print("\n📊 Combined Pipeline Statistics:")
+    print(f"  Total LLM calls: {stats['total_calls']:,}")
+    print(f"  Total input tokens: {stats['total_input_tokens']:,}")
+    print(f"  Total output tokens: {stats['total_output_tokens']:,}")
+    print(f"  Total tokens used: {stats['total_tokens']:,}")
+    if stats["total_calls"] > 0:
+        print(f"  Max single request input: {stats['max_input_tokens']:,}")
+        print(f"  Max single request output: {stats['max_output_tokens']:,}")
+        print(f"  Max single request total: {stats['max_total_tokens']:,}")
+
+    if stats["total_calls"] > 0:
+        avg_input = stats["total_input_tokens"] / stats["total_calls"]
+        avg_output = stats["total_output_tokens"] / stats["total_calls"]
+        avg_total = stats["total_tokens"] / stats["total_calls"]
+        print(
+            f"  Average per call: {avg_input:.1f} input, {avg_output:.1f} output, {avg_total:.1f} total"
+        )
+
+    # Show breakdown by script type
+    print("\n📈 Maximum Tokens by Script Type:")
+    for script_type, data in script_types.items():
+        if data["total_calls"] > 0:
+            print(f"  {script_type.replace('_', ' ').title()}:")
+            print(f"    Max single request input: {data['max_input']:,}")
+            print(f"    Max single request output: {data['max_output']:,}")
+            print(f"    Max single request total: {data['max_total']:,}")
+            print(f"    Total calls: {data['total_calls']:,}")
+            print(f"    Total tokens: {data['total_tokens']:,}")
+
+    # Per-script breakdown
+    if stats["scripts"]:
+        print("\nBreakdown by Script:")
+        print("-" * 60)
+        for script_name, script_data in stats["scripts"].items():
+            summary = script_data.get("summary", {})
+            app_tokens_script = script_data.get("app_tokens", {})
+            eval_tokens_script = script_data.get("evaluation_tokens", {})
+
+            print(f"  📄 {script_name}:")
+
+            if app_tokens_script:
+                print(
+                    f"    📱 App tokens: {app_tokens_script.get('total', 0):,} total, {app_tokens_script.get('calls', 0):,} calls"
+                )
+
+            if eval_tokens_script:
+                print(
+                    f"    🔬 Eval tokens: {eval_tokens_script.get('total_tokens', 0):,} total, {eval_tokens_script.get('call_count', 0):,} calls"
+                )
+
+            # Show summary if no separate app/eval breakdown available
+            if not app_tokens_script and not eval_tokens_script and summary:
+                call_count = summary.get("call_count", 0)
+                total_tokens = summary.get("total_tokens", 0)
+                print(f"    📊 Total: {total_tokens:,} tokens, {call_count:,} calls")
+
+    print("=" * 80)
 
 
 def _parse_arguments() -> argparse.Namespace:
@@ -522,6 +871,28 @@ def run_evaluation_pipeline(
     logger.info(
         f"🏁 Evaluation Pipeline Complete (Total Duration: {pipeline_duration:.2f}s)"
     )
+
+    # Aggregate and display token usage from all pipeline steps
+    logger.info("📊 Aggregating token usage statistics...")
+    try:
+        aggregated_stats = _aggregate_token_usage()
+        _print_aggregated_token_summary(aggregated_stats)
+
+        # Save aggregated token stats to file
+        if aggregated_stats["total_calls"] > 0:
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            aggregated_file = (
+                Path("results/token_usage") / f"pipeline_aggregated_{timestamp}.json"
+            )
+            aggregated_file.parent.mkdir(exist_ok=True)
+
+            with open(aggregated_file, "w") as f:
+                json.dump(aggregated_stats, f, indent=2)
+
+            logger.info(f"💾 Aggregated token usage saved to: {aggregated_file}")
+
+    except Exception as e:
+        logger.warning(f"⚠️  Failed to aggregate token usage: {e}")
 
     if failed_steps:
         logger.error(f"❌ Pipeline completed with {len(failed_steps)} failed step(s):")

@@ -40,6 +40,7 @@ from deepeval.simulator import ConversationSimulator
 from deepeval.test_case import ConversationalTestCase, Turn
 from helpers.custom_llm import CustomLLM, get_api_configuration
 from helpers.openshift_chat_client import OpenShiftChatClient
+from helpers.token_counter import get_token_stats
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -47,6 +48,9 @@ logger = logging.getLogger(__name__)
 
 # Initialize the OpenShift client (for agent under test) - will be updated with test_script in main
 client = None
+
+# Track app tokens separately from evaluation tokens
+total_app_tokens = {"input": 0, "output": 0, "total": 0, "calls": 0}
 
 random.seed()
 
@@ -248,7 +252,27 @@ if __name__ == "__main__":
                     f"Conversation {conversation_number} simulation completed successfully"
                 )
 
+                # Request token summary before closing
+                try:
+                    if client.session_active:
+                        logger.info("Requesting token summary from agent...")
+                        token_response = client.send_message("**tokens**")
+                        logger.info(f"Token request response: {token_response}")
+                except Exception as e:
+                    logger.warning(f"Failed to request tokens: {e}")
+
                 client.close_session()
+
+                # Collect app tokens from this conversation
+                app_tokens = client.get_app_tokens()
+                total_app_tokens["input"] += app_tokens["input"]
+                total_app_tokens["output"] += app_tokens["output"]
+                total_app_tokens["total"] += app_tokens["total"]
+                total_app_tokens["calls"] += app_tokens["calls"]
+
+                logger.info(
+                    f"App tokens from conversation {conversation_number}: {app_tokens}"
+                )
 
                 # Process the generated test case(s) for this conversation
                 for j, test_case in enumerate(conversational_test_cases):
@@ -295,6 +319,93 @@ if __name__ == "__main__":
         else:
             logger.warning("No conversation files were saved")
 
+        # Print token usage summary with separate app and evaluation tokens
+        print("\n=== Token Usage Summary ===")
+
+        # Get evaluation token stats
+        eval_stats = get_token_stats()
+
+        # Display app tokens (from chat-lg-state.py via oc exec)
+        print("\n📱 App Tokens (from chat agent):")
+        print(f"  Input tokens: {total_app_tokens['input']:,}")
+        print(f"  Output tokens: {total_app_tokens['output']:,}")
+        print(f"  Total tokens: {total_app_tokens['total']:,}")
+        print(f"  API calls: {total_app_tokens['calls']:,}")
+
+        # Display evaluation tokens (from evaluation LLM calls)
+        print("\n🔬 Evaluation Tokens (from evaluation LLM calls):")
+        print(f"  Input tokens: {eval_stats.total_input_tokens:,}")
+        print(f"  Output tokens: {eval_stats.total_output_tokens:,}")
+        print(f"  Total tokens: {eval_stats.total_tokens:,}")
+        print(f"  API calls: {eval_stats.call_count:,}")
+        if eval_stats.call_count > 0:
+            print(f"  Max single request input: {eval_stats.max_input_tokens:,}")
+            print(f"  Max single request output: {eval_stats.max_output_tokens:,}")
+            print(f"  Max single request total: {eval_stats.max_total_tokens:,}")
+
+        # Display combined totals
+        combined_input = total_app_tokens["input"] + eval_stats.total_input_tokens
+        combined_output = total_app_tokens["output"] + eval_stats.total_output_tokens
+        combined_total = total_app_tokens["total"] + eval_stats.total_tokens
+        combined_calls = total_app_tokens["calls"] + eval_stats.call_count
+
+        # Calculate combined maximums (we don't have max values for app tokens yet)
+        combined_max_input = (
+            eval_stats.max_input_tokens
+        )  # Only have eval maximums for now
+        combined_max_output = eval_stats.max_output_tokens
+        combined_max_total = eval_stats.max_total_tokens
+
+        print("\n📊 Combined Totals:")
+        print(f"  Input tokens: {combined_input:,}")
+        print(f"  Output tokens: {combined_output:,}")
+        print(f"  Total tokens: {combined_total:,}")
+        print(f"  API calls: {combined_calls:,}")
+        if combined_calls > 0:
+            print(f"  Max single request input: {combined_max_input:,}")
+            print(f"  Max single request output: {combined_max_output:,}")
+            print(f"  Max single request total: {combined_max_total:,}")
+
+        # Save token stats to file
+        if eval_stats.call_count > 0 or total_app_tokens["calls"] > 0:
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            token_dir = "results/token_usage"
+            token_file = os.path.join(token_dir, f"generator_{timestamp}.json")
+
+            # Create comprehensive token data including app and evaluation tokens
+            comprehensive_stats = {
+                "summary": {
+                    "total_input_tokens": combined_input,
+                    "total_output_tokens": combined_output,
+                    "total_tokens": combined_total,
+                    "call_count": combined_calls,
+                    "max_input_tokens": combined_max_input,
+                    "max_output_tokens": combined_max_output,
+                    "max_total_tokens": combined_max_total,
+                },
+                "app_tokens": {
+                    **total_app_tokens,
+                    "max_input": 0,  # App tokens don't have max tracking yet
+                    "max_output": 0,
+                    "max_total": 0,
+                },
+                "evaluation_tokens": {
+                    "total_input_tokens": eval_stats.total_input_tokens,
+                    "total_output_tokens": eval_stats.total_output_tokens,
+                    "total_tokens": eval_stats.total_tokens,
+                    "call_count": eval_stats.call_count,
+                    "max_input_tokens": eval_stats.max_input_tokens,
+                    "max_output_tokens": eval_stats.max_output_tokens,
+                    "max_total_tokens": eval_stats.max_total_tokens,
+                },
+                "detailed_calls": getattr(eval_stats, "detailed_calls", []),
+            }
+
+            os.makedirs(token_dir, exist_ok=True)
+            with open(token_file, "w") as f:
+                json.dump(comprehensive_stats, f, indent=2)
+            print(f"Token usage saved to: {token_file}")
+
     except Exception as e:
         logger.error(f"Error during simulation: {e}", exc_info=True)
     finally:
@@ -305,3 +416,50 @@ if __name__ == "__main__":
             logger.info("OpenShift client session closed successfully")
         except Exception as e:
             logger.error(f"Error closing session: {e}", exc_info=True)
+
+        # Final token summary even if there were errors
+        print("\n=== Final Token Usage Summary ===")
+
+        # Get evaluation token stats
+        eval_stats = get_token_stats()
+
+        # Display app tokens (from chat-lg-state.py via oc exec)
+        print("\n📱 App Tokens (from chat agent):")
+        print(f"  Input tokens: {total_app_tokens['input']:,}")
+        print(f"  Output tokens: {total_app_tokens['output']:,}")
+        print(f"  Total tokens: {total_app_tokens['total']:,}")
+        print(f"  API calls: {total_app_tokens['calls']:,}")
+
+        # Display evaluation tokens (from evaluation LLM calls)
+        print("\n🔬 Evaluation Tokens (from evaluation LLM calls):")
+        print(f"  Input tokens: {eval_stats.total_input_tokens:,}")
+        print(f"  Output tokens: {eval_stats.total_output_tokens:,}")
+        print(f"  Total tokens: {eval_stats.total_tokens:,}")
+        print(f"  API calls: {eval_stats.call_count:,}")
+        if eval_stats.call_count > 0:
+            print(f"  Max single request input: {eval_stats.max_input_tokens:,}")
+            print(f"  Max single request output: {eval_stats.max_output_tokens:,}")
+            print(f"  Max single request total: {eval_stats.max_total_tokens:,}")
+
+        # Display combined totals
+        combined_input = total_app_tokens["input"] + eval_stats.total_input_tokens
+        combined_output = total_app_tokens["output"] + eval_stats.total_output_tokens
+        combined_total = total_app_tokens["total"] + eval_stats.total_tokens
+        combined_calls = total_app_tokens["calls"] + eval_stats.call_count
+
+        # Calculate combined maximums (we don't have max values for app tokens yet)
+        combined_max_input = (
+            eval_stats.max_input_tokens
+        )  # Only have eval maximums for now
+        combined_max_output = eval_stats.max_output_tokens
+        combined_max_total = eval_stats.max_total_tokens
+
+        print("\n📊 Combined Totals:")
+        print(f"  Input tokens: {combined_input:,}")
+        print(f"  Output tokens: {combined_output:,}")
+        print(f"  Total tokens: {combined_total:,}")
+        print(f"  API calls: {combined_calls:,}")
+        if combined_calls > 0:
+            print(f"  Max single request input: {combined_max_input:,}")
+            print(f"  Max single request output: {combined_max_output:,}")
+            print(f"  Max single request total: {combined_max_total:,}")
