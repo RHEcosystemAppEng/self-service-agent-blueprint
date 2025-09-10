@@ -124,7 +124,6 @@ class SessionManager:
         )
 
         signal = agent_response.strip().lower()
-        print(f"agent response: {signal}")
 
         if (signal == "task_complete_return_to_router") and current_session[
             "agent_id"
