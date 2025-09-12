@@ -42,11 +42,18 @@ jobs:
         env:
           LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_INFERENCE }}
 
+      - name: Set `test` as default namespace on Kind
+        shell: bash
+        run: |
+          kubectl config set-context --current --namespace=test
+
       - name: Install evaluations dependencies
+        shell: bash
         run: |
           make sync-evaluations
 
       - name: Run evaluations
+        shell: bash
         run: |
           make test-short-integration
         env:
