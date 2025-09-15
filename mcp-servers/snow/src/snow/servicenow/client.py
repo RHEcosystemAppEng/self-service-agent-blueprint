@@ -14,7 +14,6 @@ from .models import (
     AuthConfig,
     AuthType,
     BasicAuthConfig,
-    CatalogResponse,
     OAuthConfig,
     OpenServiceNowLaptopRefreshRequestParams,
     ServerConfig,

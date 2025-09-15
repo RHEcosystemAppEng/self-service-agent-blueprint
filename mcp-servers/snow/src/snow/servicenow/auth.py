@@ -4,7 +4,6 @@ Authentication manager for the ServiceNow MCP server.
 
 import base64
 import logging
-import os
 from typing import Dict, Optional
 
 import requests
