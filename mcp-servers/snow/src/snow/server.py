@@ -6,7 +6,7 @@ ServiceNow laptop refresh tickets and ServiceNow API operations.
 
 import logging
 import os
-from typing import Dict, Any
+from typing import Any, Dict
 
 from mcp.server.fastmcp import FastMCP
 from snow.data.data import create_laptop_refresh_ticket

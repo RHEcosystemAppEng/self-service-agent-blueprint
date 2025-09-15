@@ -4,20 +4,20 @@ ServiceNow API client for laptop refresh requests.
 
 import logging
 import os
-from typing import Dict, Any
+from typing import Any, Dict
 
 import requests
 
 from .auth import AuthManager
 from .models import (
+    ApiKeyConfig,
     AuthConfig,
     AuthType,
     BasicAuthConfig,
-    OAuthConfig,
-    ApiKeyConfig,
-    ServerConfig,
-    OpenServiceNowLaptopRefreshRequestParams,
     CatalogResponse,
+    OAuthConfig,
+    OpenServiceNowLaptopRefreshRequestParams,
+    ServerConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,9 @@ class ServiceNowClient:
             username = os.getenv("SERVICENOW_USERNAME")
             password = os.getenv("SERVICENOW_PASSWORD")
             if not username or not password:
-                raise ValueError("SERVICENOW_USERNAME and SERVICENOW_PASSWORD are required for basic auth")
+                raise ValueError(
+                    "SERVICENOW_USERNAME and SERVICENOW_PASSWORD are required for basic auth"
+                )
 
             auth_config = AuthConfig(
                 type=AuthType.BASIC,
@@ -69,7 +71,9 @@ class ServiceNowClient:
             password = os.getenv("SERVICENOW_PASSWORD")
 
             if not client_id or not client_secret:
-                raise ValueError("SERVICENOW_CLIENT_ID and SERVICENOW_CLIENT_SECRET are required for OAuth")
+                raise ValueError(
+                    "SERVICENOW_CLIENT_ID and SERVICENOW_CLIENT_SECRET are required for OAuth"
+                )
 
             auth_config = AuthConfig(
                 type=AuthType.OAUTH,
@@ -91,7 +95,9 @@ class ServiceNowClient:
                 type=AuthType.API_KEY,
                 api_key=ApiKeyConfig(
                     api_key=api_key,
-                    header_name=os.getenv("SERVICENOW_API_KEY_HEADER", "X-ServiceNow-API-Key"),
+                    header_name=os.getenv(
+                        "SERVICENOW_API_KEY_HEADER", "X-ServiceNow-API-Key"
+                    ),
                 ),
             )
 
@@ -120,7 +126,9 @@ class ServiceNowClient:
         logger.info("Opening ServiceNow laptop refresh request")
 
         # Build the API URL with the hardcoded laptop refresh ID
-        laptop_refresh_id = os.getenv("SERVICENOW_LAPTOP_REFRESH_ID", "1d3eae4f93232210eead74418bba10f4")
+        laptop_refresh_id = os.getenv(
+            "SERVICENOW_LAPTOP_REFRESH_ID", "1d3eae4f93232210eead74418bba10f4"
+        )
         url = f"{self.config.instance_url}/api/sn_sc/servicecatalog/items/{laptop_refresh_id}/order_now"
 
         # Prepare request body
@@ -128,15 +136,17 @@ class ServiceNowClient:
             "sysparm_quantity": params.sysparm_quantity,
             "variables": {
                 "laptop_choices": params.laptop_choices,
-                "who_is_this_request_for": params.who_is_this_request_for
-            }
+                "who_is_this_request_for": params.who_is_this_request_for,
+            },
         }
 
         # Make the API request
         headers = self.auth_manager.get_headers()
 
         try:
-            response = requests.post(url, headers=headers, json=body, timeout=self.config.timeout)
+            response = requests.post(
+                url, headers=headers, json=body, timeout=self.config.timeout
+            )
             response.raise_for_status()
 
             # Process the response

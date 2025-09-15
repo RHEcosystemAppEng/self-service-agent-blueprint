@@ -3,7 +3,7 @@ ServiceNow API models and data structures.
 """
 
 from enum import Enum
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -68,16 +68,12 @@ class OpenServiceNowLaptopRefreshRequestParams(BaseModel):
 
     laptop_choices: str = Field(
         "lenovo_think_pad_p_16_gen_2",
-        description="Laptop choice for the refresh request"
+        description="Laptop choice for the refresh request",
     )
     who_is_this_request_for: str = Field(
-        ...,
-        description="User ID for whom this request is being made"
+        ..., description="User ID for whom this request is being made"
     )
-    sysparm_quantity: int = Field(
-        1,
-        description="Quantity for the request"
-    )
+    sysparm_quantity: int = Field(1, description="Quantity for the request")
 
 
 class CatalogResponse(BaseModel):

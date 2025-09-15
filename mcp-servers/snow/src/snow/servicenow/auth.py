@@ -96,16 +96,16 @@ class AuthManager:
         auth_header = base64.b64encode(auth_str.encode()).decode()
         headers = {
             "Authorization": f"Basic {auth_header}",
-            "Content-Type": "application/x-www-form-urlencoded"
+            "Content-Type": "application/x-www-form-urlencoded",
         }
 
         # Try client_credentials grant first
-        data_client_credentials = {
-            "grant_type": "client_credentials"
-        }
+        data_client_credentials = {"grant_type": "client_credentials"}
 
         logger.info("Attempting client_credentials grant...")
-        response = requests.post(token_url, headers=headers, data=data_client_credentials)
+        response = requests.post(
+            token_url, headers=headers, data=data_client_credentials
+        )
 
         logger.info(f"client_credentials response status: {response.status_code}")
         logger.info(f"client_credentials response body: {response.text}")
@@ -121,7 +121,7 @@ class AuthManager:
             data_password = {
                 "grant_type": "password",
                 "username": oauth_config.username,
-                "password": oauth_config.password
+                "password": oauth_config.password,
             }
 
             logger.info("Attempting password grant...")
@@ -136,7 +136,9 @@ class AuthManager:
                 self.token_type = token_data.get("token_type", "Bearer")
                 return
 
-        raise ValueError("Failed to get OAuth token using both client_credentials and password grants.")
+        raise ValueError(
+            "Failed to get OAuth token using both client_credentials and password grants."
+        )
 
     def refresh_token(self):
         """Refresh the OAuth token if using OAuth authentication."""
