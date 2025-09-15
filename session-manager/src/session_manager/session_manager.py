@@ -1,16 +1,15 @@
-import uuid
 from pathlib import Path
 
 from asset_manager.agent_manager import AgentManager
 from asset_manager.util import load_config_from_path
 
+from .session_manager_base import SessionManagerBase
 
-class SessionManager:
-    """
-    Manages user sessions and conversations with agents.
-    """
 
-    ROUTING_AGENT_NAME = "routing-agent"
+class SessionManager(SessionManagerBase):
+    """
+    Manages user sessions and conversations with agents using AgentManager.
+    """
 
     def __init__(self, agent_manager):
         """
@@ -19,18 +18,7 @@ class SessionManager:
         Args:
             agent_manager: An initialized AgentManager instance.
         """
-        self.agent_manager = agent_manager
-        self.agents = agent_manager.agents()
-        self.user_sessions = {}
-
-    def _generate_session_name(self, user_id: str, agent_name: str = None) -> str:
-        """Generate a unique session name"""
-        unique_id = str(uuid.uuid4())[:8]  # First 8 characters of UUID
-
-        if agent_name:
-            return f"slack-session-{user_id}-{agent_name}-{unique_id}"
-        else:
-            return f"slack-session-{user_id}-{unique_id}"
+        super().__init__(agent_manager)
 
     def send_message_to_agent(
         self, agent_id: str, session_id: str, message: str
@@ -65,93 +53,62 @@ class SessionManager:
                     else:
                         print(f"Agent turn stopped for reason: {stop_reason}")
 
-            return response.strip()
+            return self._process_agent_response(response)
 
         except Exception as e:
-            print(f"Error in send_message_to_agent: {e}")
-            return f"Error: {str(e)}"
+            return self._handle_agent_error(e)
 
-    def _route_to_specialist(self, user_id, agent_name, text, current_session):
-        """Routes the conversation to a specialist agent."""
-        print(f"Routing to agent: {agent_name}")
-        new_agent_id = self.agents[agent_name]
+    def _build_initial_session_data(
+        self, routing_agent, session, session_name: str, user_email: str
+    ) -> dict:
+        """Build initial session data structure for a new user."""
+        return {
+            "agent_id": routing_agent,
+            "agent_name": self.ROUTING_AGENT_NAME,  # Add agent_name for consistency
+            "session_id": session.session_id,
+            "email": user_email,
+        }
 
-        # Create a new session for the specialist agent
-        session_name = self._generate_session_name(user_id, agent_name)
-        new_session = self.agent_manager.create_session(
-            new_agent_id, session_name=session_name
-        )
-
-        # Update the current session to the new specialist agent
-        current_session["agent_id"] = new_agent_id
-        current_session["session_id"] = new_session.session_id
-
-        # Send the message to the new agent
-        agent_response = self.send_message_to_agent(
-            new_agent_id, current_session["session_id"], text
-        )
-
-        return agent_response
-
-    def handle_user_message(
-        self, user_id: str, text: str, user_email: str = None
-    ) -> str:
-        """
-        Handles an incoming message, manages sessions and history, and returns a response.
-        """
-        if user_id not in self.user_sessions:
-            routing_agent_id = self.agents.get(self.ROUTING_AGENT_NAME)
-            if not routing_agent_id:
-                return "Error: Core routing agent not available."
-
-            session_name = self._generate_session_name(user_id)
-            session = self.agent_manager.create_session(
-                routing_agent_id, session_name=session_name
-            )
-            self.user_sessions[user_id] = {
-                "agent_id": routing_agent_id,
-                "session_id": session.session_id,
-                "email": user_email,
-            }
-            print(f"New session for user {user_id} ({user_email})")
-
-        current_session = self.user_sessions[user_id]
-
-        agent_response = self.send_message_to_agent(
+    def _send_message_to_current_session(self, current_session, text: str) -> str:
+        """Send message to the current session and return response"""
+        return self.send_message_to_agent(
             current_session["agent_id"],
             current_session["session_id"],
             text,
         )
 
-        signal = agent_response.strip().lower()
+    def _cleanup_session(self, session_info):
+        """Clean up session-specific resources"""
+        # No special cleanup needed for AgentManager sessions
+        pass
 
-        if (signal == "task_complete_return_to_router") and current_session[
-            "agent_id"
-        ] != self.agents.get(self.ROUTING_AGENT_NAME):
-            print(
-                f"Specialist task complete. Returning user {user_id} to the routing agent."
-            )
-            self.reset_user_session(user_id)
-            return self.handle_user_message(user_id, "hi", user_email)
+    def _get_agent_for_routing(self, agent_name: str):
+        """Get the agent object/identifier for routing."""
+        return self.agents.get(agent_name)
 
-        if (
-            signal in self.agents
-            and signal != self.ROUTING_AGENT_NAME
-            and current_session["agent_id"] == self.agents.get(self.ROUTING_AGENT_NAME)
-        ):
-            return self._route_to_specialist(user_id, signal, text, current_session)
+    def _create_session_for_agent(
+        self, agent, agent_name: str, user_id: str, session_name: str = None, **kwargs
+    ):
+        """Create a new session for the given agent."""
+        if not session_name:
+            session_name = self._generate_session_name(user_id, agent_name)
+        return self.agent_manager.create_session(agent, session_name=session_name)
 
-        return agent_response
+    def _build_session_data(
+        self, agent, agent_name: str, session, session_name: str
+    ) -> dict:
+        """Build session data dictionary for updating current session."""
+        return {
+            "agent_id": agent,
+            "agent_name": agent_name,  # Add agent_name for consistency
+            "session_id": session.session_id,
+        }
 
-    def reset_user_session(self, user_id: str):
-        """
-        Removes a user's session from the session manager.
-        """
-        if user_id in self.user_sessions:
-            del self.user_sessions[user_id]
-            print(f"Session for user {user_id} has been reset.")
-            return True
-        return False
+    def _update_session_fields(self, current_session, session_data):
+        """Update the current session fields with new session data."""
+        current_session["agent_id"] = session_data["agent_id"]
+        current_session["agent_name"] = session_data["agent_name"]
+        current_session["session_id"] = session_data["session_id"]
 
 
 def create_session_manager():

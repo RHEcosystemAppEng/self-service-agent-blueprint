@@ -5,9 +5,14 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiosqlite>=0.19.0",
+    "langchain-core>=0.3.0",
+    "langgraph>=0.6.7",
+    "langgraph-checkpoint-sqlite>=2.0.0",
     "llama-stack-client==0.2.18",
     "logging>=0.4.9.6",
     "openai>=1.0.0",
+    "pyyaml>=6.0.0",
 ]
 
 [project.scripts]

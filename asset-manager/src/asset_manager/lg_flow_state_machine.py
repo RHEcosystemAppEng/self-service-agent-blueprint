@@ -1,445 +1,30 @@
 #!/usr/bin/env python3
 """
-LangGraph-based laptop refresh agent implementation using a configurable state machine.
+LangGraph-based state machine and agent session management.
 
-This module implements a state machine engine that reads its configuration from
-chat-lg-state.yaml, making the conversation flow easily configurable and maintainable.
+This module contains the StateMachine and AgentSession classes for managing
+conversational flows using LangGraph with persistent checkpoint storage.
 """
-
 import logging
-import os
-import sys
 from pathlib import Path
 from typing import Annotated, Dict, List, Optional, TypedDict
 
 import yaml
-from asset_manager.util import load_config_from_path
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
-from llama_stack_client import LlamaStackClient
-from token_counter import (
-    count_tokens_from_response,
-    get_token_stats,
-    print_token_summary,
-)
 
-AGENT_MESSAGE_TERMINATOR = os.environ.get("AGENT_MESSAGE_TERMINATOR", "")
+# Import SqliteSaver - assume it's available with minimal fallback for development
+try:
+    from langgraph_checkpoint_sqlite import SqliteSaver
+except ImportError:
+    try:
+        from langgraph.checkpoint.sqlite import SqliteSaver
+    except ImportError:
+        # Minimal fallback for development environments
+        SqliteSaver = None
 
-# Configure logging - suppress INFO messages, only show WARNING and above
-logging.basicConfig(
-    level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
 logger = logging.getLogger(__name__)
-
-# Set this module's logger to WARNING level to suppress INFO messages
-logger.setLevel(logging.WARNING)
-
-# Remove logging we otherwise get by default
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("langgraph").setLevel(logging.WARNING)
-
-# LlamaStack responses logging removed
-
-# Initialize LlamaStack client
-llama_stack_host = os.environ["LLAMASTACK_SERVICE_HOST"]
-llama_client = LlamaStackClient(
-    base_url=f"http://{llama_stack_host}:8321",
-    timeout=120.0,
-)
-
-
-class Agent:
-    """
-    Agent that loads configuration from agent YAML files and provides LlamaStack integration.
-    (Same as original implementation)
-    """
-
-    def __init__(self, agent_name: str, system_message: str = None):
-        """Initialize agent with configuration from agent YAML file."""
-        self.agent_name = agent_name
-        self.config = self._load_agent_config()
-        self.model = self._get_model_for_agent()
-        self.default_response_config = self._get_response_config()
-        self.openai_client = self._create_openai_client()
-        self.system_message = system_message or self._get_default_system_message()
-
-        # Build tools once during initialization
-        mcp_servers = self.config.get("mcp_servers", [])
-        self.tools = self._get_mcp_tools_to_use(mcp_servers)
-
-        logger.info(
-            f"Initialized Agent '{agent_name}' with model '{self.model}' and {len(self.tools)} tools"
-        )
-
-    def _load_agent_config(self) -> dict:
-        agents = load_config_from_path(Path("/app/asset-manager/config"))
-        for agent in agents.get("agents", []):
-            if agent.get("name") == self.agent_name:
-                return agent
-        raise FileNotFoundError(f"Could not load agent config for: {self.agent_name}")
-
-    def _get_model_for_agent(self) -> str:
-        """Get the model to use for the agent from configuration."""
-        if self.config and self.config.get("model"):
-            logger.info(f"Using configured model: {self.config['model']}")
-            return self.config["model"]
-
-        try:
-            models = llama_client.models.list()
-            model_id = next(m.identifier for m in models if m.model_type == "llm")
-            if model_id:
-                logger.info(f"Using first available LLM model: {model_id}")
-                return model_id
-        except Exception as e:
-            logger.error(f"Error getting models from LlamaStack: {e}")
-
-        raise RuntimeError(
-            "Could not determine model from agent configuration or LlamaStack - no LLM models available"
-        )
-
-    def _get_response_config(self) -> dict:
-        """Get response configuration from agent config with defaults."""
-        base_config = {
-            "stream": False,
-            "temperature": 0.7,
-        }
-
-        if self.config and "sampling_params" in self.config:
-            sampling_params = self.config["sampling_params"]
-            if "strategy" in sampling_params:
-                strategy = sampling_params["strategy"]
-                if "temperature" in strategy:
-                    base_config["temperature"] = strategy["temperature"]
-
-        return base_config
-
-    def _get_default_system_message(self) -> str:
-        """Get default system message for the agent."""
-        if self.config and self.config.get("system_message"):
-            return self.config["system_message"]
-
-        return "You are a helpful laptop refresh assistant. Speak directly to users in a conversational and professional manner. CRITICAL do not share your internal thinking"
-
-    def _create_openai_client(self):
-        """Create OpenAI client pointing to LlamaStack instance."""
-        import openai
-
-        return openai.OpenAI(
-            api_key="dummy-key",
-            base_url=f"http://{llama_stack_host}:8321/v1/openai/v1",
-            timeout=120,
-        )
-
-    def _get_vector_store_id(self, kb_name: str) -> str:
-        """Get the vector store ID for a specific knowledge base."""
-        try:
-            vector_stores = self.openai_client.vector_stores.list()
-            matching_stores = []
-            for vs in vector_stores.data:
-                if vs.name and kb_name in vs.name:
-                    matching_stores.append(vs)
-
-            if matching_stores:
-                latest_store = max(matching_stores, key=lambda x: x.created_at)
-                logger.info(
-                    f"Found existing vector store: {latest_store.id} with name: {latest_store.name}"
-                )
-                return latest_store.id
-            else:
-                logger.warning(
-                    f"No vector store found for knowledge base '{kb_name}', using fallback"
-                )
-                return kb_name
-
-        except Exception as e:
-            logger.error(
-                f"Error finding vector store for knowledge base '{kb_name}': {e}"
-            )
-            return None
-
-    def _get_mcp_tools_to_use(self, requested_servers: list = None) -> list:
-        """Get complete tools array for LlamaStack responses API."""
-        tools_to_use = []
-
-        # Add file_search tools for knowledge bases from agent config
-        knowledge_bases = self.config.get("knowledge_bases", [])
-        if knowledge_bases:
-            vector_store_ids = []
-            for kb_name in knowledge_bases:
-                vector_store_id = self._get_vector_store_id(kb_name)
-                if vector_store_id:
-                    vector_store_ids.append(vector_store_id)
-
-            if vector_store_ids:
-                knowledge_base_tool = {
-                    "type": "file_search",
-                    "vector_store_ids": vector_store_ids,
-                }
-                tools_to_use.append(knowledge_base_tool)
-
-        # Add MCP tools for requested servers
-        if requested_servers:
-            for server_name in requested_servers:
-                try:
-                    llama_tools = llama_client.tools.list()
-                    server_url = None
-                    for tool in llama_tools:
-                        if (
-                            tool.provider_id == "model-context-protocol"
-                            and hasattr(tool, "metadata")
-                            and tool.metadata
-                        ):
-                            endpoint = tool.metadata.get("endpoint")
-                            if endpoint:
-                                from urllib.parse import urlparse
-
-                                parsed_url = urlparse(endpoint)
-                                hostname = parsed_url.hostname
-                                if (
-                                    hostname
-                                    and f"self-service-agent-{server_name}" in hostname
-                                ):
-                                    server_url = endpoint
-                                    break
-
-                    mcp_tool = {
-                        "type": "mcp",
-                        "server_label": server_name,
-                        "server_url": server_url,
-                        "require_approval": "never",
-                    }
-                    tools_to_use.append(mcp_tool)
-
-                except Exception as e:
-                    logger.error(
-                        f"Error building MCP tool for server '{server_name}': {e}"
-                    )
-
-            logger.info(f"Built tools array with {len(tools_to_use)} tools")
-
-        return tools_to_use
-
-    def create_response_with_retry(
-        self, messages: list, max_retries: int = 3, temperature: float = None
-    ) -> str:
-        """Create a response with retry logic for empty responses and errors."""
-        response = None
-        last_error = None
-
-        for attempt in range(max_retries + 1):  # +1 for initial attempt plus retries
-            try:
-                response = self.create_response(messages, temperature=temperature)
-
-                # Check if response is empty or contains error
-                if response and response.strip():
-                    # Check if it's an error message that we should retry
-                    if response.startswith("Error: Unable to get response"):
-                        last_error = response
-                        response = ""  # Treat as empty to continue retry loop
-                    else:
-                        # Valid response, break out of retry loop
-                        break
-
-                # Empty response or error detected
-                if attempt < max_retries:
-                    retry_delay = min(
-                        2**attempt, 8
-                    )  # Exponential backoff: 1s, 2s, 4s, 8s max
-                    logger.info(
-                        f"Empty/error response on attempt {attempt + 1}/{max_retries + 1}, retrying in {retry_delay}s..."
-                    )
-                    import time
-
-                    time.sleep(retry_delay)
-                else:
-                    logger.warning(
-                        f"All {max_retries + 1} attempts failed. Last error: {last_error or 'Empty response'}"
-                    )
-                    response = "I apologize, but I'm having difficulty generating a response right now. Please try again."
-
-            except Exception as e:
-                last_error = str(e)
-                logger.warning(f"Exception on attempt {attempt + 1}: {e}")
-                if attempt >= max_retries:
-                    response = "I apologize, but I'm experiencing technical difficulties. Please try again later."
-                    break
-
-        return response
-
-    def _check_response_errors(self, response) -> str:
-        """Check for various error conditions in the LlamaStack response.
-
-        Returns:
-            str: Error description if error found, empty string if no error
-        """
-        try:
-            # Check for explicit error field
-            if hasattr(response, "error") and response.error:
-                return f"Response error field: {response.error}"
-
-            # Check for error status
-            if hasattr(response, "status"):
-                status = str(response.status).lower()
-                if "error" in status or "fail" in status or "timeout" in status:
-                    return f"Error status: {response.status}"
-
-            # Check for tool call errors
-            if hasattr(response, "tool_calls") and response.tool_calls:
-                for tool_call in response.tool_calls:
-                    if hasattr(tool_call, "error") and tool_call.error:
-                        return f"Tool call error: {tool_call.error}"
-                    if hasattr(tool_call, "status"):
-                        status = str(tool_call.status).lower()
-                        if "error" in status or "fail" in status:
-                            return f"Tool call status error: {tool_call.status}"
-
-            # Check for completion message errors
-            if hasattr(response, "completion_message"):
-                completion = response.completion_message
-                if hasattr(completion, "error") and completion.error:
-                    return f"Completion error: {completion.error}"
-
-            # Check for output structure issues
-            if hasattr(response, "output") and response.output:
-                if len(response.output) == 0:
-                    return "Empty output array"
-
-                output_msg = response.output[0]
-                if hasattr(output_msg, "content"):
-                    if not output_msg.content or len(output_msg.content) == 0:
-                        return "Empty content array in output message"
-
-            # Check for rate limiting or quota errors
-            if hasattr(response, "id") and not response.id:
-                return "Missing response ID (possible rate limit or quota issue)"
-
-            return ""  # No errors detected
-
-        except Exception as e:
-            logger.warning(f"Error while checking response errors: {e}")
-            return f"Error checking failed: {e}"
-
-    def create_response(self, messages: list, temperature: float = None) -> str:
-        """Create a response using LlamaStack responses API."""
-        try:
-            messages_with_system = [
-                {"role": "system", "content": self.system_message}
-            ] + messages
-
-            logger.debug(f"Using model: {self.model}")
-            logger.debug(f"Using tools for responses API: {self.tools}")
-
-            logger.debug(
-                f"Calling LlamaStack with {len(messages_with_system)} messages"
-            )
-
-            # Override temperature if provided
-            response_config = dict(self.default_response_config)
-            if temperature is not None:
-                response_config["temperature"] = temperature
-                logger.debug(f"Using custom temperature: {temperature}")
-
-            response = llama_client.responses.create(
-                input=messages_with_system,
-                model=self.model,
-                **response_config,
-                tools=self.tools,
-            )
-
-            logger.debug(f"Received response from LlamaStack: {type(response)}")
-
-            count_tokens_from_response(
-                response, self.model, "chat_agent", messages_with_system
-            )
-
-            # Check for error conditions in the response
-            error_info = self._check_response_errors(response)
-            if error_info:
-                logger.warning(f"Response error detected: {error_info}")
-                return ""  # Return empty to trigger retry logic
-
-            # Extract content from LlamaStack responses API format
-            try:
-                if hasattr(response, "output_text"):
-                    content = response.output_text
-                    logger.debug(f"Extracted output_text: {content}")
-                    if not content or content.strip() == "":
-                        logger.warning("Empty response detected from output_text")
-                        return ""  # Return empty to trigger retry logic
-                    return content
-                elif hasattr(response, "output") and response.output:
-                    output_message = response.output[0]
-                    if hasattr(output_message, "content") and output_message.content:
-                        content_item = output_message.content[0]
-                        if hasattr(content_item, "text"):
-                            content = content_item.text
-                            logger.debug(f"Extracted text content: {content}")
-                            if not content or content.strip() == "":
-                                logger.warning(
-                                    "Empty response detected from content.text"
-                                )
-                                return ""  # Return empty to trigger retry logic
-                            return content
-
-                if hasattr(response, "completion_message") and hasattr(
-                    response.completion_message, "content"
-                ):
-                    content = response.completion_message.content
-                    logger.debug(f"Response content (completion_message): {content}")
-                    return content
-                elif hasattr(response, "content"):
-                    content = response.content
-                    logger.debug(f"Response content (direct): {content}")
-                    return content
-                elif hasattr(response, "output_text"):
-                    content = response.output_text
-                    logger.debug(f"Response content (output_text): {content}")
-                    return content
-                elif hasattr(response, "output"):
-                    content = response.output
-                    logger.debug(f"Response content (output): {content}")
-                    return content
-                elif hasattr(response, "text"):
-                    content = response.text
-                    logger.debug(f"Response content (text): {content}")
-                    return content
-                else:
-                    print(
-                        f"Could not extract content from response. Response attributes: {dir(response)}"
-                    )
-                    logger.warning(
-                        f"Could not extract content from response. Response attributes: {dir(response)}"
-                    )
-                    logger.warning(
-                        "Could not extract content from response, returning fallback message"
-                    )
-                    return ""  # Return empty to trigger retry logic
-
-            except Exception as e:
-                logger.error(f"Error extracting content from response: {e}")
-                return f"Error processing response: {e}"
-
-        except TimeoutError as e:
-            logger.warning(f"Timeout calling LlamaStack responses API: {e}")
-            return ""  # Return empty to trigger retry with longer timeout
-        except ConnectionError as e:
-            logger.warning(f"Connection error calling LlamaStack responses API: {e}")
-            return ""  # Return empty to trigger retry
-        except Exception as e:
-            error_msg = str(e).lower()
-            if (
-                "timeout" in error_msg
-                or "connection" in error_msg
-                or "network" in error_msg
-            ):
-                logger.warning(f"Network-related error calling LlamaStack: {e}")
-                return ""  # Return empty to trigger retry
-            else:
-                logger.error(f"Unexpected error calling LlamaStack responses API: {e}")
-                return (
-                    f"Error: Unable to get response from LlamaStack responses API: {e}"
-                )
 
 
 # Dynamic state definition created from YAML configuration
@@ -487,9 +72,6 @@ def create_agent_state_class(state_schema: dict):
     return TypedDict("AgentState", fields)
 
 
-# AgentState will be created dynamically after loading configuration
-
-
 class StateMachine:
     """Configurable state machine engine for conversation flows."""
 
@@ -497,7 +79,6 @@ class StateMachine:
         """Initialize the state machine with configuration from YAML file."""
         self.config_path = Path(config_path)
         self.config = self._load_config()
-        self.agent = None  # Lazy initialization
 
         # Create dynamic AgentState class from configuration
         state_schema = self.config.get("state_schema", {})
@@ -512,15 +93,6 @@ class StateMachine:
             raise RuntimeError(
                 f"Failed to load state machine config from {self.config_path}: {e}"
             )
-
-    def _get_agent(self) -> Agent:
-        """Get the LlamaStack agent, creating it lazily if needed."""
-        if self.agent is None:
-            settings = self.config.get("settings", {})
-            agent_name = settings.get("agent_name", "laptop-refresh")
-            system_msg = "You are a helpful laptop refresh assistant. Speak directly to users in a conversational and professional manner. CRITICAL do not share your internal thinking"
-            self.agent = Agent(agent_name, system_msg)
-        return self.agent
 
     def _get_retry_count(self) -> int:
         """Get the configured retry count for empty responses."""
@@ -598,7 +170,9 @@ class StateMachine:
             logger.warning(f"Error formatting text: {e}, returning original text")
             return text
 
-    def process_llm_processor_state(self, state: dict, state_config: dict) -> dict:
+    def process_llm_processor_state(
+        self, state: dict, state_config: dict, agent
+    ) -> dict:
         """Process llm_processor type states - completely generic and configuration-driven."""
 
         # Step 1: Determine the prompt to use
@@ -645,7 +219,7 @@ class StateMachine:
         temperature = state_config.get(
             "temperature"
         )  # Get temperature from state config
-        response = self._get_agent().create_response_with_retry(
+        response = agent.create_response_with_retry(
             messages_to_send, self._get_retry_count(), temperature=temperature
         )
 
@@ -986,7 +560,9 @@ class StateMachine:
 
         return state
 
-    def process_intent_classifier_state(self, state: dict, state_config: dict) -> dict:
+    def process_intent_classifier_state(
+        self, state: dict, state_config: dict, agent
+    ) -> dict:
         """Process intent_classifier type states."""
         messages = state["messages"]
         last_message = messages[-1] if messages else None
@@ -1006,8 +582,7 @@ class StateMachine:
             "temperature"
         )  # Get temperature from state config
         intent_response = (
-            self._get_agent()
-            .create_response_with_retry(
+            agent.create_response_with_retry(
                 intent_messages, self._get_retry_count(), temperature=temperature
             )
             .strip()
@@ -1035,7 +610,7 @@ class StateMachine:
                     action_temperature = state_config.get(
                         "temperature", 0.6
                     )  # Fallback to 0.6
-                    response = self._get_agent().create_response_with_retry(
+                    response = agent.create_response_with_retry(
                         messages_to_send,
                         self._get_retry_count(),
                         temperature=action_temperature,
@@ -1061,7 +636,9 @@ class StateMachine:
         state["current_state"] = f"waiting_{state['current_state']}"
         return state
 
-    def process_llm_validator_state(self, state: dict, state_config: dict) -> dict:
+    def process_llm_validator_state(
+        self, state: dict, state_config: dict, agent
+    ) -> dict:
         """Process llm_validator type states (like laptop selection validation)."""
         messages = state["messages"]
         last_message = messages[-1] if messages else None
@@ -1089,7 +666,7 @@ class StateMachine:
 
         messages_to_send.append({"role": "system", "content": validation_prompt})
         temperature = state_config.get("temperature", 0.3)  # Default for validation
-        response = self._get_agent().create_response_with_retry(
+        response = agent.create_response_with_retry(
             messages_to_send, self._get_retry_count(), temperature=temperature
         )
 
@@ -1100,8 +677,7 @@ class StateMachine:
         )
         validation_messages = [{"role": "user", "content": success_validation_prompt}]
         validation_response = (
-            self._get_agent()
-            .create_response_with_retry(
+            agent.create_response_with_retry(
                 validation_messages,
                 self._get_retry_count(),
                 temperature=0.1,  # Very deterministic for validation classification
@@ -1132,7 +708,7 @@ class StateMachine:
         state["current_state"] = "end"
         return state
 
-    def process_state(self, state: dict) -> dict:
+    def process_state(self, state: dict, agent) -> dict:
         """Process the current state based on its configuration."""
         current_state_name = state.get("current_state", "")
 
@@ -1151,11 +727,11 @@ class StateMachine:
         state_type = state_config.get("type", "")
 
         if state_type == "llm_processor":
-            return self.process_llm_processor_state(state, state_config)
+            return self.process_llm_processor_state(state, state_config, agent)
         elif state_type == "intent_classifier":
-            return self.process_intent_classifier_state(state, state_config)
+            return self.process_intent_classifier_state(state, state_config, agent)
         elif state_type == "llm_validator":
-            return self.process_llm_validator_state(state, state_config)
+            return self.process_llm_validator_state(state, state_config, agent)
         elif state_type == "terminal":
             return self.process_terminal_state(state, state_config)
         else:
@@ -1164,199 +740,237 @@ class StateMachine:
             return state
 
 
-# Global state machine instance - will be initialized in main()
-state_machine = None
+class ConversationSession:
+    """
+    Encapsulates the state machine, graph, and persistent conversation state for a single conversation session.
+    Uses LangGraph checkpoints and threads for persistence across process restarts.
+    """
 
+    def __init__(
+        self,
+        agent,
+        thread_id: str = None,
+        checkpoint_db_path: str = None,
+    ):
+        """
+        Initialize a new conversation session with persistent checkpoint storage.
 
-# Main dispatcher function
-def dispatcher(state: dict) -> dict:
-    """Main dispatcher that processes states using the state machine."""
-    logger.info(f"Dispatcher called with current_state: {state.get('current_state')}")
-    return state_machine.process_state(state)
+        Args:
+            agent: Agent instance to use for this session (config includes state machine path)
+            thread_id: Thread identifier for conversation persistence (defaults to generated ID)
+            checkpoint_db_path: Path to SQLite checkpoint database (defaults to memory)
+        """
+        import uuid
 
+        self.thread_id = thread_id or str(uuid.uuid4())
+        self.agent = agent
 
-# Routing function
-def route_next_step(state: dict) -> str:
-    """Route to the next step based on current state - completely configuration-driven."""
-    settings = state_machine.config.get("settings", {})
-    current_state = state.get(
-        "current_state", settings.get("initial_state", "collect_employee_id")
-    )
-
-    # Terminal state
-    if state_machine.is_terminal_state(current_state):
-        return END
-
-    # Waiting states end (wait for user input)
-    if state_machine.is_waiting_state(current_state):
-        return END
-
-    # All other states continue to dispatcher
-    return "dispatcher"
-
-
-# Create the graph
-def create_laptop_refresh_graph() -> StateGraph:
-    """Create and configure the LangGraph for laptop refresh workflow."""
-    # Use the dynamic AgentState from the state machine
-    workflow = StateGraph(state_machine.AgentState)
-
-    # Add single dispatcher node
-    workflow.add_node("dispatcher", dispatcher)
-
-    # Set entry point
-    workflow.set_entry_point("dispatcher")
-
-    # Add conditional routing from dispatcher
-    workflow.add_conditional_edges(
-        "dispatcher",
-        route_next_step,
-        {
-            "dispatcher": "dispatcher",
-            END: END,
-        },
-    )
-
-    return workflow.compile(debug=False)
-
-
-def main(config_file=None):
-    """Main function to run the configurable state machine laptop refresh agent."""
-    global state_machine
-
-    # Initialize state machine with specified config file
-    if config_file:
-        if Path(config_file).is_absolute():
-            config_path = Path(config_file)
-        else:
-            config_path = Path(__file__).parent / config_file
-    else:
-        try:
-            config_path = Path(__file__).parent / "chat-lg-state.yaml"
-        except NameError:
-            config_path = Path("/tmp/chat-lg-state.yaml")
-
-    print("=== Configurable LangGraph Laptop Refresh Agent ===")
-    print(f"Using configuration: {config_path}")
-    print("This agent uses a YAML-configured state machine with LlamaStack")
-    print("Type 'quit' to exit")
-    print("-" * 50)
-
-    # Create state machine with specified config
-    state_machine = StateMachine(config_path)
-
-    # Create the graph
-    app = create_laptop_refresh_graph()
-
-    # Initial state - completely configuration-driven
-    initial_state = state_machine.create_initial_state()
-
-    # Run the initial step
-    try:
-        logger.info("Starting initial invocation of the graph")
-        result = app.invoke(initial_state)
-        logger.info(
-            f"Initial invocation completed, result state: {result.get('current_state')}"
+        # Get state machine config path from agent configuration
+        lg_config_path = agent.config.get(
+            "lg_state_machine_config", "config/lg-prompts/chat-lg-state.yaml"
         )
 
-        # Print initial response
-        if result["messages"]:
-            print(
-                f"\nagent: {result['messages'][-1].content} {AGENT_MESSAGE_TERMINATOR}"
-            )
+        # Convert to absolute path relative to this script's location
+        if not Path(lg_config_path).is_absolute():
+            # Path relative to asset-manager root (parent of src/asset_manager)
+            asset_manager_root = Path(__file__).parent.parent.parent
+            self.config_path = asset_manager_root / lg_config_path
         else:
-            print("\nNo response received from agent")
+            self.config_path = Path(lg_config_path)
 
-        # Interactive loop
-        while True:
+        # Initialize checkpoint storage with SqliteSaver
+        self.checkpointer_cm = SqliteSaver.from_conn_string(str(checkpoint_db_path))
+        self.checkpointer = self.checkpointer_cm.__enter__()
+
+        # Initialize state machine
+        self.state_machine = StateMachine(self.config_path)
+
+        # Create the graph with checkpointer
+        self.app = self._create_graph()
+
+        # Thread configuration for this session
+        self.thread_config = {"configurable": {"thread_id": self.thread_id}}
+
+    def _create_graph(self):
+        """Create the LangGraph workflow for this session with checkpoint persistence."""
+        # Use the dynamic AgentState from the state machine
+        workflow = StateGraph(self.state_machine.AgentState)
+
+        # Add single dispatcher node
+        workflow.add_node("dispatcher", self._dispatcher)
+
+        # Set entry point
+        workflow.set_entry_point("dispatcher")
+
+        # Add conditional routing from dispatcher
+        workflow.add_conditional_edges(
+            "dispatcher",
+            self._route_next_step,
+            {
+                "dispatcher": "dispatcher",
+                END: END,
+            },
+        )
+
+        # Compile with checkpointer for persistence
+        return workflow.compile(checkpointer=self.checkpointer, debug=False)
+
+    def _dispatcher(self, state: dict) -> dict:
+        """Dispatcher that processes states using this session's state machine."""
+        logger.info(
+            f"Thread {self.thread_id} dispatcher called with current_state: {state.get('current_state')}"
+        )
+
+        # Use session agent
+        return self.state_machine.process_state(state, self.agent)
+
+    def _route_next_step(self, state: dict) -> str:
+        """Route to the next step based on current state."""
+        settings = self.state_machine.config.get("settings", {})
+        current_state = state.get(
+            "current_state", settings.get("initial_state", "collect_employee_id")
+        )
+
+        # Terminal state
+        if self.state_machine.is_terminal_state(current_state):
+            return END
+
+        # Waiting states end (wait for user input)
+        if self.state_machine.is_waiting_state(current_state):
+            return END
+
+        # All other states continue to dispatcher
+        return "dispatcher"
+
+    def get_initial_response(self) -> str:
+        """Get the initial response from the agent by checking conversation history."""
+        try:
+            # Check if there's existing conversation state
+            current_state = self.app.get_state(self.thread_config)
+
+            if current_state.values and current_state.values.get("messages"):
+                return ""
+            else:
+                # New conversation - initialize and get first response
+                initial_state = self.state_machine.create_initial_state()
+                result = self.app.invoke(initial_state, config=self.thread_config)
+
+                if result.get("messages"):
+                    last_message = result["messages"][-1]
+                    if isinstance(last_message, AIMessage):
+                        return last_message.content
+                return ""
+        except Exception as e:
+            logger.error(
+                f"Error getting initial response for thread {self.thread_id}: {e}"
+            )
+            return ""
+
+    def send_message(self, message: str) -> str:
+        """
+        Send a message to the agent and return the response.
+        Uses checkpointed thread state for persistence across process restarts.
+
+        Args:
+            message: The user message to send to the agent
+
+        Returns:
+            The agent's response message as a string
+        """
+
+        # Handle special commands
+        if message.lower() in ["quit", "exit", "q"]:
+            return "Session ended."
+
+        if message.lower() == "**tokens**":
             try:
-                user_input = input("\n> ")
-                if user_input.lower() in ["quit", "exit", "q"]:
-                    break
+                # Try to import token stats, but handle gracefully if not available
+                try:
+                    from asset_manager.token_counter import get_token_stats
 
-                # Special command to print token summary immediately
-                if user_input.lower() == "**tokens**":
                     stats = get_token_stats()
-                    print(
-                        f"CURRENT_TOKEN_SUMMARY:INPUT:{stats.total_input_tokens}:OUTPUT:{stats.total_output_tokens}:TOTAL:{stats.total_tokens}:CALLS:{stats.call_count}:MAX_SINGLE_INPUT:{stats.max_input_tokens}:MAX_SINGLE_OUTPUT:{stats.max_output_tokens}:MAX_SINGLE_TOTAL:{stats.max_total_tokens}"
+                    return f"CURRENT_TOKEN_SUMMARY:INPUT:{stats.total_input_tokens}:OUTPUT:{stats.total_output_tokens}:TOTAL:{stats.total_tokens}:CALLS:{stats.call_count}:MAX_SINGLE_INPUT:{stats.max_input_tokens}:MAX_SINGLE_OUTPUT:{stats.max_output_tokens}:MAX_SINGLE_TOTAL:{stats.max_total_tokens}"
+                except ImportError:
+                    return "Token stats not available"
+            except Exception:
+                return "Token stats not available"
+
+        if not message.strip():
+            return "Please provide a valid message."
+
+        try:
+            # Get current thread state
+            current_state = self.app.get_state(self.thread_config)
+
+            # Initialize conversation if needed
+            if not current_state.values:
+                # First message - initialize with empty state and let the graph handle initialization
+                initial_state = self.state_machine.create_initial_state()
+                # Add the user message to initial state
+                initial_state["messages"].append(HumanMessage(content=message))
+                result = self.app.invoke(initial_state, config=self.thread_config)
+            else:
+                # Existing conversation - add user message and continue
+                # Create input with just the new user message
+                user_input = {"messages": [HumanMessage(content=message)]}
+
+                # Get current state values
+                current_values = current_state.values
+                current_state_name = current_values.get("current_state")
+
+                # Handle waiting states
+                if self.state_machine.is_waiting_state(current_state_name):
+                    states_config = self.state_machine.config.get("states", {})
+                    if current_state_name in states_config:
+                        state_config = states_config[current_state_name]
+                        transitions = state_config.get("transitions", {})
+                        next_state = transitions.get("user_input", current_state_name)
+                        user_input["current_state"] = next_state
+
+                # Invoke with the new message
+                result = self.app.invoke(user_input, config=self.thread_config)
+
+            # Extract agent response
+            agent_response = ""
+            if result and result.get("messages"):
+                # Find the last AI message
+                for msg in reversed(result["messages"]):
+                    if isinstance(msg, AIMessage):
+                        agent_response = msg.content
+                        break
+
+            # Check if conversation ended and reset if needed
+            if result and self.state_machine.is_terminal_state(
+                result.get("current_state")
+            ):
+                # Reset the thread for a new conversation
+                reset_state = self.state_machine.reset_state_for_new_conversation()
+                self.app.update_state(self.thread_config, reset_state)
+                if agent_response:
+                    agent_response += (
+                        "\n\n[Conversation completed! Starting new conversation...]"
                     )
-                    print("TOKEN_SUMMARY_END")
-                    sys.stdout.flush()
-                    break
+                else:
+                    agent_response = (
+                        "Conversation completed! Starting new conversation..."
+                    )
 
-                if user_input.strip():
-                    # Add user message to state
-                    result["messages"].append(HumanMessage(content=user_input))
+            return (
+                agent_response if agent_response else "No response received from agent"
+            )
 
-                    # Reset current_state to continue processing based on current state
-                    current_state = result.get("current_state")
-                    if state_machine.is_waiting_state(current_state):
-                        # Use standard transition mechanism for waiting states
-                        states_config = state_machine.config.get("states", {})
-                        if current_state in states_config:
-                            state_config = states_config[current_state]
-                            transitions = state_config.get("transitions", {})
-                            next_state = transitions.get("user_input", current_state)
-                            result["current_state"] = next_state
+        except Exception as e:
+            logger.error(f"Error processing message for thread {self.thread_id}: {e}")
+            return f"Error processing message: {e}"
 
-                    # Continue the conversation
-                    result = app.invoke(result)
+    def close(self):
+        """Clean up resources, especially the SQLite context manager."""
+        if hasattr(self, "checkpointer_cm") and self.checkpointer_cm is not None:
+            try:
+                self.checkpointer_cm.__exit__(None, None, None)
+            except Exception as e:
+                logger.warning(f"Error closing checkpointer context manager: {e}")
 
-                    # Print agent response
-                    if result["messages"] and len(result["messages"]) > 0:
-                        last_message = result["messages"][-1]
-                        if isinstance(last_message, AIMessage):
-                            print(
-                                f"\nagent: {last_message.content} {AGENT_MESSAGE_TERMINATOR}"
-                            )
-
-                    # Check if conversation ended
-                    if state_machine.is_terminal_state(result.get("current_state")):
-                        print("\n" + "=" * 50)
-                        print("Conversation completed!")
-                        print("Starting new conversation...")
-                        print("=" * 50)
-
-                        # Reset state for next conversation - completely configuration-driven
-                        result = state_machine.reset_state_for_new_conversation()
-
-            except KeyboardInterrupt:
-                break
-            except EOFError:
-                print("\nInput stream closed. Ending session.")
-                break
-
-    except Exception as e:
-        print(f"Error running agent: {e}")
-
-    print("\nGoodbye!")
-
-    # Print token usage summary for human viewing
-    print("\n" + "=" * 50)
-    print_token_summary(prefix="  ")
-    print("=" * 50)
-
-    # Print machine-readable token counts for parsing by callers
-    stats = get_token_stats()
-    print(
-        f"TOKEN_SUMMARY:INPUT:{stats.total_input_tokens}:OUTPUT:{stats.total_output_tokens}:TOTAL:{stats.total_tokens}:CALLS:{stats.call_count}:MAX_SINGLE_INPUT:{stats.max_input_tokens}:MAX_SINGLE_OUTPUT:{stats.max_output_tokens}:MAX_SINGLE_TOTAL:{stats.max_total_tokens}"
-    )
-    print("TOKEN_SUMMARY_END")
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        description="Configurable LangGraph Laptop Refresh Agent"
-    )
-    parser.add_argument(
-        "--config",
-        "-c",
-        type=str,
-        default="chat-lg-state.yaml",
-        help="Path to YAML configuration file (default: chat-lg-state.yaml)",
-    )
-
-    args = parser.parse_args()
-    main(args.config)
+    def __del__(self):
+        """Destructor to ensure cleanup."""
+        self.close()

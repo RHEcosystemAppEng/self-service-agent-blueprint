@@ -1,0 +1,149 @@
+# State Machine Configuration for Routing Agent
+# Simple routing logic to identify user intent and direct to appropriate specialist
+
+# Global settings
+settings:
+  initial_state: "greet_and_identify_need"
+  terminator_env_var: "AGENT_MESSAGE_TERMINATOR"
+  agent_name: "routing-agent"
+  terminal_state: "end"
+  waiting_state_prefix: "waiting_"
+  empty_response_retry_count: 3
+
+# State structure definition
+state_schema:
+  # Required system fields
+  system_fields:
+    messages:
+      type: "list"
+      description: "Conversation message history"
+      default: []
+    current_state:
+      type: "string"
+      description: "Current state machine state"
+      default: null  # Will be set to initial_state
+
+  # Business logic fields
+  business_fields:
+    user_intent:
+      type: "string"
+      description: "Identified user intent for routing"
+      default: null
+    routing_decision:
+      type: "string"
+      description: "Final routing decision"
+      default: null
+
+# State definitions
+states:
+  # State 1: Greet and Identify Need
+  greet_and_identify_need:
+    type: "llm_processor"
+    temperature: 0.3
+    prompt: |
+      You are a routing agent specializing in getting users to the correct specialist agent. Be helpful, friendly, and efficient in determining their needs.
+
+      Greet the user and clearly identify yourself as the routing agent. Ask them what they need help with today.
+
+      Currently you can help with:
+      - Laptop refresh requests
+      - Email address updates
+
+      Ask them to describe what they need help with.
+    transitions:
+      success: "waiting_user_need"
+
+  # Waiting State: User describes their need
+  waiting_user_need:
+    type: "waiting"
+    transitions:
+      user_input: "classify_user_intent"
+
+  # State 2: Classify User Intent
+  classify_user_intent:
+    type: "llm_processor"
+    temperature: 0.1  # Very deterministic for classification
+    prompt: |
+      The user said: "{last_user_message}"
+
+      Analyze their request and determine what they need help with:
+
+      1. LAPTOP_REFRESH - User wants help with laptop refresh, replacement, new laptop, laptop upgrade, hardware refresh. Also includes requests that just say "refresh" or similar terms.
+      2. EMAIL_CHANGE - User wants to update, change, or modify their email address
+      3. OTHER - User needs help with something else or request is unclear
+
+      Examples of LAPTOP_REFRESH requests:
+      - "I need a new laptop"
+      - "laptop refresh"
+      - "refresh"
+      - "I want to refresh my laptop"
+      - "hardware refresh"
+
+      Respond with exactly one of: LAPTOP_REFRESH, EMAIL_CHANGE, or OTHER
+    response_analysis:
+      conditions:
+        - name: "laptop_refresh"
+          trigger_phrases: ["LAPTOP_REFRESH"]
+          actions:
+            - type: "set_field"
+              field_name: "user_intent"
+              value: "laptop_refresh"
+            - type: "set_field"
+              field_name: "routing_decision"
+              value: "laptop-refresh"
+            - type: "add_message"
+              message: "laptop-refresh"
+            - type: "transition"
+              target: "end"
+        - name: "email_change"
+          trigger_phrases: ["EMAIL_CHANGE"]
+          actions:
+            - type: "set_field"
+              field_name: "user_intent"
+              value: "email_change"
+            - type: "set_field"
+              field_name: "routing_decision"
+              value: "EMAIL_CHANGE_AGENT"
+            - type: "add_message"
+              message: "EMAIL_CHANGE_AGENT"
+            - type: "transition"
+              target: "end"
+        - name: "other_request"
+          trigger_phrases: ["OTHER"]
+          actions:
+            - type: "set_field"
+              field_name: "user_intent"
+              value: "other"
+            - type: "transition"
+              target: "handle_other_request"
+      default_transition: "handle_other_request"
+
+  # State 3: Handle Other/Unclear Requests
+  handle_other_request:
+    type: "llm_processor"
+    temperature: 0.3
+    prompt: |
+      The user said: "{last_user_message}"
+
+      Their request doesn't clearly match our available services. Politely explain that you can currently help with:
+      - Laptop refresh requests
+      - Email address updates
+
+      Ask them to clarify if they need help with one of these areas, or let them know you cannot help with their specific request.
+
+      Be helpful and professional.
+    transitions:
+      success: "waiting_clarification"
+
+  # Waiting State: User clarifies their need
+  waiting_clarification:
+    type: "waiting"
+    transitions:
+      user_input: "classify_user_intent"
+
+  # End state
+  end:
+    type: "terminal"
+    reset_behavior:
+      reset_state: "greet_and_identify_need"
+      clear_data: ["messages", "user_intent", "routing_decision", "current_state"]

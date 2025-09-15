@@ -10,6 +10,7 @@ description = "Test utilities for self-service agent blueprint"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiosqlite>=0.19.0",
     "annotated-types==0.7.0",
     "anyio==4.9.0",
     "beautifulsoup4==4.13.4",
@@ -23,7 +24,8 @@ dependencies = [
     "httpx==0.28.1",
     "idna==3.10",
     "langchain-core>=0.3.0",
-    "langgraph>=0.2.0",
+    "langgraph>=0.6.7",
+    "langgraph-checkpoint-sqlite>=2.0.0",
     "llama-stack-client==0.2.18",
     "openai>=1.0.0",
     "markdown==3.8.2",

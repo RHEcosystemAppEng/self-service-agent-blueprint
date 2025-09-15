@@ -1,11 +1,13 @@
 name: "laptop-refresh"
 description: "An agent that can help with laptop refresh requests."
 instructions: "in file in config/prompts directory"
+system_message: "You are a helpful laptop refresh assistant. Speak directly to users in a conversational and professional manner. CRITICAL do not share your internal thinking"
 tool_choice: "required"
 input_shields: []
 output_shields: []
 max_infer_iters: 25
 enable_session_persistence: true
+lg_state_machine_config: "config/lg-prompts/chat-lg-state.yaml"
 sampling_params:
   strategy:
     type: "top_p"
