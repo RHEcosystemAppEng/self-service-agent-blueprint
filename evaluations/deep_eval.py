@@ -16,7 +16,6 @@ from helpers.custom_llm import CustomLLM, get_api_configuration
 from helpers.deep_eval_summary import print_final_summary
 from helpers.extract_deepeval_metrics import extract_metrics_from_results
 from helpers.load_conversation_context import load_context_for_file
-from helpers.token_counter import get_token_stats
 
 # Configure logging for evaluation process tracking
 logging.basicConfig(level=logging.INFO)
@@ -427,84 +426,14 @@ if __name__ == "__main__":
         context_dir=args.context_dir,
     )
 
-    # Print token usage summary
+    # Print token usage summary using shared function
     print("\n" + "=" * 80)
-    print("=== Token Usage Summary ===")
+    from helpers.token_counter import print_token_summary
 
-    # Get evaluation token stats
-    eval_stats = get_token_stats()
-
-    # deep_eval.py only uses evaluation tokens (no app interaction)
-    print("\n📱 App Tokens (from chat agent):")
-    print("  Input tokens: 0")
-    print("  Output tokens: 0")
-    print("  Total tokens: 0")
-    print("  API calls: 0")
-
-    print("\n🔬 Evaluation Tokens (from evaluation LLM calls):")
-    print(f"  Input tokens: {eval_stats.total_input_tokens:,}")
-    print(f"  Output tokens: {eval_stats.total_output_tokens:,}")
-    print(f"  Total tokens: {eval_stats.total_tokens:,}")
-    print(f"  API calls: {eval_stats.call_count:,}")
-    if eval_stats.call_count > 0:
-        print(f"  Max single request input: {eval_stats.max_input_tokens:,}")
-        print(f"  Max single request output: {eval_stats.max_output_tokens:,}")
-        print(f"  Max single request total: {eval_stats.max_total_tokens:,}")
-
-    print("\n📊 Combined Totals:")
-    print(f"  Input tokens: {eval_stats.total_input_tokens:,}")
-    print(f"  Output tokens: {eval_stats.total_output_tokens:,}")
-    print(f"  Total tokens: {eval_stats.total_tokens:,}")
-    print(f"  API calls: {eval_stats.call_count:,}")
-    if eval_stats.call_count > 0:
-        print(f"  Max single request input: {eval_stats.max_input_tokens:,}")
-        print(f"  Max single request output: {eval_stats.max_output_tokens:,}")
-        print(f"  Max single request total: {eval_stats.max_total_tokens:,}")
-
-    # Save token stats to file
-    if eval_stats.call_count > 0:
-        import datetime
-
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        token_dir = "results/token_usage"
-        token_file = os.path.join(token_dir, f"deep_eval_{timestamp}.json")
-
-        # Create comprehensive token data (deep_eval only has evaluation tokens)
-        comprehensive_stats = {
-            "summary": {
-                "total_input_tokens": eval_stats.total_input_tokens,
-                "total_output_tokens": eval_stats.total_output_tokens,
-                "total_tokens": eval_stats.total_tokens,
-                "call_count": eval_stats.call_count,
-                "max_input_tokens": eval_stats.max_input_tokens,
-                "max_output_tokens": eval_stats.max_output_tokens,
-                "max_total_tokens": eval_stats.max_total_tokens,
-            },
-            "app_tokens": {
-                "input": 0,
-                "output": 0,
-                "total": 0,
-                "calls": 0,
-                "max_input": 0,
-                "max_output": 0,
-                "max_total": 0,
-            },
-            "evaluation_tokens": {
-                "total_input_tokens": eval_stats.total_input_tokens,
-                "total_output_tokens": eval_stats.total_output_tokens,
-                "total_tokens": eval_stats.total_tokens,
-                "call_count": eval_stats.call_count,
-                "max_input_tokens": eval_stats.max_input_tokens,
-                "max_output_tokens": eval_stats.max_output_tokens,
-                "max_total_tokens": eval_stats.max_total_tokens,
-            },
-            "detailed_calls": getattr(eval_stats, "detailed_calls", []),
-        }
-
-        os.makedirs(token_dir, exist_ok=True)
-        with open(token_file, "w") as f:
-            json.dump(comprehensive_stats, f, indent=2)
-        print(f"Token usage saved to: {token_file}")
+    print_token_summary(
+        app_tokens=None,  # deep_eval.py only uses evaluation tokens
+        save_file_prefix="deep_eval",
+    )
 
     print("=" * 80)
 
