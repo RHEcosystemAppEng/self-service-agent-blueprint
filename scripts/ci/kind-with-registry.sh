@@ -1,6 +1,13 @@
 #!/bin/sh
 set -o errexit
 
+if ! command -v docker &> /dev/null; then
+    echo "docker not installed, trying podman"
+    function docker() {
+        podman "$@"
+    }
+fi
+
 # 1. Create registry container unless it already exists
 reg_name='kind-registry'
 reg_port='5001'
