@@ -2,7 +2,6 @@
 FROM registry.access.redhat.com/ubi9/python-312:latest as builder
 
 USER root
-RUN dnf update -y && dnf clean all
 RUN pip3 install --no-cache-dir uv
 
 WORKDIR /app
