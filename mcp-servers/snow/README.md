@@ -135,3 +135,7 @@ The server validates all required parameters and returns meaningful error messag
 - Empty employee ID, name, or business justification will raise `ValueError`
 - All successful ticket creations return formatted ticket details
 - Health check endpoint available at `/health`
+
+## Attribution
+
+The ServiceNow integration code in `src/snow/servicenow/` is based on the work from the [servicenow-mcp](https://github.com/echelon-ai-labs/servicenow-mcp) project by Echelon AI Labs. We acknowledge and appreciate their contribution to the ServiceNow MCP implementation.
