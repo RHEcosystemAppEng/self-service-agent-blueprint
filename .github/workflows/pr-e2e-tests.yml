@@ -19,7 +19,9 @@ jobs:
             exit 1
           fi
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v6
