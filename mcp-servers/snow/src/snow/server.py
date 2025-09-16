@@ -87,14 +87,14 @@ def open_laptop_refresh_ticket(
 
 @mcp.tool()
 def open_service_now_laptop_refresh_request(
-    preferred_model: str = "lenovo_think_pad_p_16_gen_2",
     employee_service_now_id: str = "",
+    preferred_model: str = "lenovo_think_pad_p_16_gen_2",
 ) -> Dict[str, Any]:
     """Open a ServiceNow laptop refresh request using the ServiceNow API.
 
     Args:
-        preferred_model: Laptop choice for the refresh request (default: lenovo_think_pad_p_16_gen_2)
         employee_service_now_id: User ID for whom this request is being made (required)
+        preferred_model: Laptop choice for the refresh request (default: lenovo_think_pad_p_16_gen_2)
 
     Returns:
         A dictionary containing the result of the ServiceNow API call
@@ -105,8 +105,8 @@ def open_service_now_laptop_refresh_request(
     try:
         client = ServiceNowClient()
         params = OpenServiceNowLaptopRefreshRequestParams(
-            laptop_choices=preferred_model,
             who_is_this_request_for=employee_service_now_id,
+            laptop_choices=preferred_model,
         )
 
         result = client.open_laptop_refresh_request(params)
