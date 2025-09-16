@@ -88,34 +88,34 @@ def open_laptop_refresh_ticket(
 @mcp.tool()
 def open_service_now_laptop_refresh_request(
     laptop_choices: str = "lenovo_think_pad_p_16_gen_2",
-    who_is_this_request_for: str = "",
+    employee_service_now_id: str = "",
     sysparm_quantity: int = 1,
 ) -> Dict[str, Any]:
     """Open a ServiceNow laptop refresh request using the ServiceNow API.
 
     Args:
         laptop_choices: Laptop choice for the refresh request (default: lenovo_think_pad_p_16_gen_2)
-        who_is_this_request_for: User ID for whom this request is being made (required)
+        employee_service_now_id: User ID for whom this request is being made (required)
         sysparm_quantity: Quantity for the request (default: 1)
 
     Returns:
         A dictionary containing the result of the ServiceNow API call
     """
-    if not who_is_this_request_for:
-        raise ValueError("who_is_this_request_for parameter is required")
+    if not employee_service_now_id:
+        raise ValueError("employee_service_now_id parameter is required")
 
     try:
         client = ServiceNowClient()
         params = OpenServiceNowLaptopRefreshRequestParams(
             laptop_choices=laptop_choices,
-            who_is_this_request_for=who_is_this_request_for,
+            who_is_this_request_for=employee_service_now_id,
             sysparm_quantity=sysparm_quantity,
         )
 
         result = client.open_laptop_refresh_request(params)
 
         logging.info(
-            f"ServiceNow API request completed - user: {who_is_this_request_for}, "
+            f"ServiceNow API request completed - employee ID: {employee_service_now_id}, "
             f"laptop: {laptop_choices}, success: {result.get('success', False)}"
         )
 
