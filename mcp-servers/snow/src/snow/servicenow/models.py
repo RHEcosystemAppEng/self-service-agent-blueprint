@@ -73,7 +73,6 @@ class OpenServiceNowLaptopRefreshRequestParams(BaseModel):
     who_is_this_request_for: str = Field(
         ..., description="User ID for whom this request is being made"
     )
-    sysparm_quantity: int = Field(1, description="Quantity for the request")
 
 
 class CatalogResponse(BaseModel):

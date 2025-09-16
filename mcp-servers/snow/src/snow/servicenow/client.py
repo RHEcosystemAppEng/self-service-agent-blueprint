@@ -132,7 +132,7 @@ class ServiceNowClient:
 
         # Prepare request body
         body = {
-            "sysparm_quantity": params.sysparm_quantity,
+            "sysparm_quantity": 1,
             "variables": {
                 "laptop_choices": params.laptop_choices,
                 "who_is_this_request_for": params.who_is_this_request_for,
