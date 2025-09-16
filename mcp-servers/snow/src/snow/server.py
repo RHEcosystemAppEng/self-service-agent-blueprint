@@ -89,7 +89,7 @@ def open_laptop_refresh_ticket(
 def open_service_now_laptop_refresh_request(
     employee_service_now_id: str = "",
     preferred_model: str = "lenovo_think_pad_p_16_gen_2",
-) -> Dict[str, Any]:
+) -> str:
     """Open a ServiceNow laptop refresh request using the ServiceNow API.
 
     Args:
@@ -97,7 +97,7 @@ def open_service_now_laptop_refresh_request(
         preferred_model: Laptop choice for the refresh request (default: lenovo_think_pad_p_16_gen_2)
 
     Returns:
-        A dictionary containing the result of the ServiceNow API call
+        A formatted string containing the request number, employee ID, and system ID
     """
     if not employee_service_now_id:
         raise ValueError("employee_service_now_id parameter is required")
@@ -111,21 +111,27 @@ def open_service_now_laptop_refresh_request(
 
         result = client.open_laptop_refresh_request(params)
 
-        logging.info(
-            f"ServiceNow API request completed - employee ID: {employee_service_now_id}, "
-            f"laptop: {preferred_model}, success: {result.get('success', False)}"
-        )
+        # Extract the required fields from the result
+        if result.get("success") and result.get("data", {}).get("result"):
+            logging.info(
+                f"ServiceNow API request completed - employee ID: {employee_service_now_id}, "
+                f"laptop: {preferred_model}, success: {result.get('success', False)}"
+            )
 
-        return result
+            result_data = result["data"]["result"]
+            request_number = result_data.get("request_number", "N/A")
+            sys_id = result_data.get("sys_id", "N/A")
+
+            return f"{request_number} opened for employee {employee_service_now_id}. System ID: {sys_id}"
+        else:
+            # Return error message if the request failed
+            error_msg = result.get("message", "Unknown error occurred")
+            return f"Failed to open laptop refresh request for employee {employee_service_now_id}: {error_msg}"
 
     except Exception as e:
         error_msg = f"Error opening ServiceNow laptop refresh request: {str(e)}"
         logging.error(error_msg)
-        return {
-            "success": False,
-            "message": error_msg,
-            "data": None,
-        }
+        return f"Failed to open laptop refresh request for employee {employee_service_now_id}: {error_msg}"
 
 
 def main() -> None:
