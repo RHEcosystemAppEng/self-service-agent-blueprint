@@ -28,9 +28,9 @@ class RequestNormalizer:
         """Normalize a request to the internal format."""
         request_id = str(uuid.uuid4())
 
-        # Use current session agent if available, otherwise leave target_agent_id as None
-        # This allows routing detection to work for new sessions
-        target_agent_id = current_agent_id
+        # Always start with target_agent_id as None to allow routing detection to work
+        # The routing logic will determine the correct agent based on the conversation
+        target_agent_id = None
 
         # Extract common fields
         base_data = {

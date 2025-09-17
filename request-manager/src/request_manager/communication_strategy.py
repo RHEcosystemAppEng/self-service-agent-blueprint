@@ -201,8 +201,21 @@ class UnifiedRequestProcessor:
         self, agent_response, normalized_request, agent_client, db: AsyncSession
     ):
         """Handle agent routing detection and processing."""
+        # Convert agent UUID to agent name for routing detection
+        from .routing import _get_available_agents
+
+        available_agents = await _get_available_agents()
+        current_agent_name = available_agents.get_name(agent_response.agent_id)
+
+        if not current_agent_name:
+            logger.warning(
+                "Could not find agent name for UUID, skipping routing detection",
+                agent_uuid=agent_response.agent_id,
+            )
+            return agent_response
+
         routed_agent = await detect_and_validate_agent_routing(
-            agent_response.content, agent_response.agent_id
+            agent_response.content, current_agent_name, available_agents
         )
 
         if routed_agent:
@@ -441,14 +454,10 @@ class UnifiedRequestProcessor:
             )
             if current_session and not current_session.current_agent_id:
                 # Convert agent UUID to agent name for session storage
-                from .main import _get_available_agents
+                from .routing import _get_available_agents
 
                 available_agents = await _get_available_agents()
-                agent_name = None
-                for name, uuid in available_agents.items():
-                    if uuid == agent_response.agent_id:
-                        agent_name = name
-                        break
+                agent_name = available_agents.get_name(agent_response.agent_id)
 
                 if agent_name:
                     await session_manager.update_session(

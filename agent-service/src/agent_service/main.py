@@ -12,6 +12,7 @@ import structlog
 from cloudevents.http import CloudEvent, to_structured
 from fastapi import FastAPI, HTTPException, Request, status
 from llama_stack_client import LlamaStackClient
+from shared_db import AgentMapping, create_agent_mapping
 
 # BaseModel no longer needed since NormalizedRequest is imported from shared_db
 from shared_db.models import AgentResponse, NormalizedRequest
@@ -70,7 +71,9 @@ class AgentService:
         self.client: Optional[LlamaStackClient] = None
         self.http_client = httpx.AsyncClient(timeout=30.0)
         self.sessions: Dict[str, str] = {}  # session_id -> llama_stack_session_id
-        self.agent_name_to_id: Dict[str, str] = {}  # agent_name -> agent_id
+        self.agent_mapping: AgentMapping = create_agent_mapping(
+            {}
+        )  # Type-safe agent mapping
 
     async def initialize(self) -> None:
         """Initialize the agent service."""
@@ -101,7 +104,7 @@ class AgentService:
         try:
             logger.info("Building agent name to ID mapping...")
             agents_response = self.client.agents.list()
-            self.agent_name_to_id = {}
+            raw_mapping = {}
 
             logger.info(
                 "Retrieved agents from LlamaStack", count=len(agents_response.data)
@@ -124,11 +127,15 @@ class AgentService:
                         agent, "agent_id", getattr(agent, "id", "unknown")
                     )
 
-                self.agent_name_to_id[agent_name] = agent_id
+                raw_mapping[agent_name] = agent_id
                 logger.info("Mapped agent", name=agent_name, id=agent_id)
 
+            # Create type-safe mapping
+            self.agent_mapping = create_agent_mapping(raw_mapping)
+
             logger.info(
-                "Agent mapping completed", total_agents=len(self.agent_name_to_id)
+                "Agent mapping completed",
+                total_agents=len(self.agent_mapping.get_all_names()),
             )
 
         except Exception as e:
@@ -137,7 +144,7 @@ class AgentService:
                 error=str(e),
                 error_type=type(e).__name__,
             )
-            self.agent_name_to_id = {}
+            self.agent_mapping = create_agent_mapping({})
             # Continue initialization even if mapping fails
 
     async def process_request(self, request: NormalizedRequest) -> AgentResponse:
@@ -364,21 +371,17 @@ class AgentService:
             # Always refresh agent mapping to ensure we have latest agents
             await self._build_agent_mapping()
 
-            # If target_agent_id is already a UUID, return it directly
-            if request.target_agent_id in self.agent_name_to_id.values():
-                return request.target_agent_id
-
-            # Otherwise, treat it as an agent name and resolve to UUID
-            if request.target_agent_id in self.agent_name_to_id:
-                agent_id = self.agent_name_to_id[request.target_agent_id]
+            # Use simple conversion
+            agent_uuid = self.agent_mapping.convert_to_uuid(request.target_agent_id)
+            if agent_uuid:
                 logger.info(
                     "Resolved target agent name to ID",
                     agent_name=request.target_agent_id,
-                    agent_id=agent_id,
+                    agent_id=agent_uuid,
                 )
-                return agent_id
+                return agent_uuid
             else:
-                available_agents = list(self.agent_name_to_id.keys())
+                available_agents = self.agent_mapping.get_all_names()
                 logger.error(
                     "Target agent not found in mapping",
                     target_agent_id=request.target_agent_id,
@@ -394,25 +397,25 @@ class AgentService:
         agent_name = self.config.default_agent_id
 
         # Refresh agent mapping if we haven't done it already for this request
-        if not self.agent_name_to_id:
+        if len(self.agent_mapping.get_all_names()) == 0:
             logger.debug("Refreshing agent mapping for request", agent_name=agent_name)
             await self._build_agent_mapping()
 
-        # Resolve agent name to ID
+        # Resolve agent name to ID using simple conversion
         logger.debug(
             "Resolving agent name to ID",
             agent_name=agent_name,
-            available_agents=list(self.agent_name_to_id.keys()),
+            available_agents=self.agent_mapping.get_all_names(),
         )
 
-        if agent_name in self.agent_name_to_id:
-            agent_id = self.agent_name_to_id[agent_name]
+        agent_uuid = self.agent_mapping.convert_to_uuid(agent_name)
+        if agent_uuid:
             logger.info(
-                "Resolved agent name to ID", agent_name=agent_name, agent_id=agent_id
+                "Resolved agent name to ID", agent_name=agent_name, agent_id=agent_uuid
             )
-            return agent_id
+            return agent_uuid
         else:
-            available_agents = list(self.agent_name_to_id.keys())
+            available_agents = self.agent_mapping.get_all_names()
             logger.error(
                 "Agent name not found in mapping",
                 agent_name=agent_name,
@@ -655,8 +658,8 @@ async def list_agents() -> Dict[str, Any]:
         await _agent_service._build_agent_mapping()
 
         return {
-            "agents": _agent_service.agent_name_to_id,
-            "count": len(_agent_service.agent_name_to_id),
+            "agents": _agent_service.agent_mapping.to_dict(),
+            "count": len(_agent_service.agent_mapping.get_all_names()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:

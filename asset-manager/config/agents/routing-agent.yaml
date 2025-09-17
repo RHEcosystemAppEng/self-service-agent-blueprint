@@ -13,12 +13,7 @@ instructions: |
   If the user wants to submit an email change request send them to the agent with tag EMAIL_CHANGE_AGENT
   Otherwise respond telling the user that you cannot help them with their request
 
-  To send them to the right agent, respond with:
-  ROUTE_TO: [agent-name]
-
-  For example:
-  - ROUTE_TO: laptop-refresh
-  - ROUTE_TO: EMAIL_CHANGE_AGENT
+  To send them to the right agent respond only with the tag for the correct agent
 tool_choice: "none"
 input_shields: []
 output_shields: []
