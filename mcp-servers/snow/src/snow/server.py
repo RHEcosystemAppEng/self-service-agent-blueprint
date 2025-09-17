@@ -1,7 +1,7 @@
 """Snow Server MCP Server.
 
 A FastMCP server that provides tools for creating
-ServiceNow laptop refresh tickets and ServiceNow API operations.
+ServiceNow laptop refresh tickets.
 """
 
 import logging
