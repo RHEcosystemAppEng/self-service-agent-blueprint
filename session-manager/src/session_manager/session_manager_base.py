@@ -201,6 +201,13 @@ class SessionManagerBase(ABC):
                 # If no agent name found in lines, use first line (fallback)
                 signal = lines[0].strip()
 
+        # If no agent found yet, check if any agent name appears at the end of the response
+        if signal not in self.agents:
+            for agent_name in self.agents:
+                if signal.endswith(agent_name):
+                    signal = agent_name
+                    break
+
         # Handle task completion - return to router
         if (signal == "task_complete_return_to_router") and self._is_specialist_session(
             current_session
