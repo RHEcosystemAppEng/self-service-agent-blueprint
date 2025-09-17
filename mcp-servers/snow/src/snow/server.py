@@ -67,7 +67,7 @@ def _create_mock_ticket(
     employee_id: str,
     employee_name: str,
     business_justification: str,
-    preferred_model: str
+    preferred_model: str,
 ) -> str:
     """Create a mock ticket using the existing mock implementation."""
     ticket_data = create_laptop_refresh_ticket(
@@ -147,8 +147,9 @@ def open_laptop_refresh_ticket(
 
     # Use mock implementation
     logging.info(f"Using mock ServiceNow implementation for employee {employee_id}")
-    return _create_mock_ticket(employee_id, employee_name, business_justification, model)
-
+    return _create_mock_ticket(
+        employee_id, employee_name, business_justification, model
+    )
 
 
 def main() -> None:
