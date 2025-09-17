@@ -273,8 +273,8 @@ LOG_LEVEL=INFO
 ```bash
 LLAMA_STACK_URL=http://llamastack:8321
 BROKER_URL=http://broker-ingress.knative-eventing.svc.cluster.local
-DEFAULT_AGENT_ID=routing-agent
-AGENT_TIMEOUT=120
+DEFAULT_AGENT_ID=routing-agent  # Configurable via Helm values
+AGENT_TIMEOUT=120  # Configurable via Helm values
 ```
 
 #### Integration Dispatcher

@@ -71,6 +71,7 @@ helm_llama_stack_args = \
 helm_request_management_args = \
     $(if $(REQUEST_MANAGEMENT),--set requestManagement.enabled=$(REQUEST_MANAGEMENT),) \
     $(if $(KNATIVE_EVENTING),--set requestManagement.knative.eventing.enabled=$(KNATIVE_EVENTING),) \
+    $(if $(MOCK_EVENTING),--set requestManagement.knative.mockEventing.enabled=$(MOCK_EVENTING),) \
     $(if $(SLACK_SIGNING_SECRET),--set-string security.slack.signingSecret='$(SLACK_SIGNING_SECRET)',) \
     $(if $(SNOW_API_KEY),--set-string security.apiKeys.snowIntegration='$(SNOW_API_KEY)',) \
     $(if $(HR_API_KEY),--set-string security.apiKeys.hrSystem='$(HR_API_KEY)',)
@@ -84,80 +85,98 @@ version:
 .PHONY: help
 help:
 	@echo "Available targets:"
-	@echo "  build-all-images            - Build all container images (unified agent, request-manager, agent-service, integration-dispatcher, employee-info-mcp, snow-mcp)"
-	@echo "  build-agent-image           - Build the unified self-service agent container image (includes asset-manager and db-migration functionality)"
-	@echo "  build-request-mgr-image     - Build the request manager container image"
-	@echo "  build-agent-service-image   - Build the agent service container image"
-	@echo "  build-integration-dispatcher-image - Build the integration dispatcher container image"
-	@echo "  build-mcp-emp-info-image    - Build the employee info MCP server container image"
-	@echo "  build-mcp-snow-image        - Build the snow MCP server container image"
-	@echo "  format                      - Run isort import sorting and Black formatting on entire codebase"
-	@echo "  helm-depend                 - Update Helm dependencies"
-	@echo "  helm-install                - Install the RAG deployment (creates namespace, secrets, and deploys Helm chart)"
-	@echo "  helm-list-models            - List available models"
-	@echo "  helm-status                 - Check status of the deployment"
-	@echo "  helm-uninstall              - Uninstall the RAG deployment and clean up resources"
-	@echo "  helm-cleanup-eventing       - Manually clean up leftover Knative Eventing resources (Triggers, Brokers)"
-	@echo "  helm-cleanup-jobs           - Clean up leftover jobs from failed deployments"
-	@echo "  install-all                 - Install dependencies for all projects"
-	@echo "  install-shared-db           - Install dependencies for shared database"
-	@echo "  install                     - Install dependencies for self-service agent"
-	@echo "  install-asset-manager       - Install dependencies for asset manager"
-	@echo "  install-request-manager     - Install dependencies for request manager"
-	@echo "  install-agent-service       - Install dependencies for agent service"
-	@echo "  install-integration-dispatcher - Install dependencies for integration dispatcher"
-	@echo "  install-mcp-emp-info        - Install dependencies for employee info MCP server"
-	@echo "  install-mcp-snow            - Install dependencies for snow MCP server"
-	@echo "  lint                        - Run flake8 linting on entire codebase"
-	@echo "  push-all-images             - Push all container images to registry"
-	@echo "  push-agent-image            - Push the unified self-service agent container image to registry"
-	@echo "  push-asset-mgr-image        - [REMOVED] Now part of push-agent-image"
-	@echo "  push-request-mgr-image      - Push the request manager container image to registry"
-	@echo "  push-agent-service-image    - Push the agent service container image to registry"
-	@echo "  push-integration-dispatcher-image - Push the integration dispatcher container image to registry"
-	@echo "  push-db-migration-image     - [REMOVED] Now part of push-agent-image"
-	@echo "  push-mcp-emp-info-image     - Push the employee info MCP server container image to registry"
-	@echo "  push-mcp-snow-image         - Push the snow MCP server container image to registry"
-	@echo "  test-all                    - Run tests for all projects"
-	@echo "  test-shared-db              - Run tests for shared database"
-	@echo "  test                        - Run tests for self-service agent"
-	@echo "  test-asset-manager          - Run tests for asset manager"
-	@echo "  test-request-manager        - Run tests for request manager"
-	@echo "  test-agent-service          - Run tests for agent service"
-	@echo "  test-integration-dispatcher - Run tests for integration dispatcher"
-	@echo "  test-mcp-emp-info           - Run tests for employee info MCP server"
-	@echo "  test-mcp-snow               - Run tests for snow MCP server"
-	@echo "  test-short-integration      - Run short integration tests"
-	@echo "  version                     - Print the current VERSION"
+	@echo ""
+	@echo "Build Commands:"
+	@echo "  build-all-images                     - Build all container images (unified agent, request-manager, agent-service, integration-dispatcher, employee-info-mcp, snow-mcp)"
+	@echo "  build-agent-image                    - Build the unified self-service agent container image (includes asset-manager and db-migration functionality)"
+	@echo "  build-agent-service-image            - Build the agent service container image"
+	@echo "  build-integration-dispatcher-image   - Build the integration dispatcher container image"
+	@echo "  build-mcp-emp-info-image             - Build the employee info MCP server container image"
+	@echo "  build-mcp-snow-image                 - Build the snow MCP server container image"
+	@echo "  build-request-mgr-image              - Build the request manager container image"
+	@echo ""
+	@echo "Helm Commands:"
+	@echo "  helm-install                        - Install the RAG deployment (creates namespace, secrets, and deploys Helm chart)"
+	@echo "  helm-install-direct-http            - Install with direct HTTP communication (for development)"
+	@echo "  helm-install-mock-eventing          - Install with mock eventing service (for testing/CI)"
+	@echo "  helm-cleanup-eventing               - Manually clean up leftover Knative Eventing resources (Triggers, Brokers)"
+	@echo "  helm-cleanup-jobs                   - Clean up leftover jobs from failed deployments"
+	@echo "  helm-depend                         - Update Helm dependencies"
+	@echo "  helm-list-models                    - List available models"
+	@echo "  helm-status                         - Check status of the deployment"
+	@echo "  helm-uninstall                      - Uninstall the RAG deployment and clean up resources"
+	@echo ""
+	@echo "Install Commands:"
+	@echo "  install-all                         - Install dependencies for all projects"
+	@echo "  install                             - Install dependencies for self-service agent"
+	@echo "  install-agent-service               - Install dependencies for agent service"
+	@echo "  install-asset-manager               - Install dependencies for asset manager"
+	@echo "  install-integration-dispatcher      - Install dependencies for integration dispatcher"
+	@echo "  install-mcp-emp-info                - Install dependencies for employee info MCP server"
+	@echo "  install-mcp-snow                    - Install dependencies for snow MCP server"
+	@echo "  install-request-manager             - Install dependencies for request manager"
+	@echo "  install-shared-db                   - Install dependencies for shared database"
+	@echo ""
+	@echo "Push Commands:"
+	@echo "  push-all-images                     - Push all container images to registry"
+	@echo "  push-agent-image                    - Push the unified self-service agent container image to registry"
+	@echo "  push-agent-service-image            - Push the agent service container image to registry"
+	@echo "  push-integration-dispatcher-image   - Push the integration dispatcher container image to registry"
+	@echo "  push-mcp-emp-info-image             - Push the employee info MCP server container image to registry"
+	@echo "  push-mcp-snow-image                 - Push the snow MCP server container image to registry"
+	@echo "  push-request-mgr-image              - Push the request manager container image to registry"
+	@echo ""
+	@echo "Test Commands:"
+	@echo "  test-all                            - Run tests for all projects"
+	@echo "  test                                - Run tests for self-service agent"
+	@echo "  test-agent-service                  - Run tests for agent service"
+	@echo "  test-asset-manager                  - Run tests for asset manager"
+	@echo "  test-integration-dispatcher         - Run tests for integration dispatcher"
+	@echo "  test-mcp-emp-info                   - Run tests for employee info MCP server"
+	@echo "  test-mcp-snow                       - Run tests for snow MCP server"
+	@echo "  test-request-manager                - Run tests for request manager"
+	@echo "  test-shared-db                      - Run tests for shared database"
+	@echo "  test-short-integration              - Run short integration tests"
+	@echo ""
+	@echo "Utility Commands:"
+	@echo "  format                              - Run isort import sorting and Black formatting on entire codebase"
+	@echo "  lint                                - Run flake8 linting on entire codebase"
+	@echo "  version                             - Print the current VERSION"
 	@echo ""
 	@echo "Configuration options (set via environment variables or make arguments):"
-	@echo "  CONTAINER_TOOL           - Container build tool (default: podman)"
-	@echo "  REGISTRY                 - Container registry (default: quay.io/ecosystem-appeng)"
-	@echo "  VERSION                  - Image version tag (default: 0.0.2)"
-	@echo "  AGENT_IMG                - Full agent image name (default: \$${REGISTRY}/self-service-agent:\$${VERSION})"
-	@echo "  ASSET_MGR_IMG            - [REMOVED] Now uses unified AGENT_IMG"
-	@echo "  REQUEST_MGR_IMG          - Full request manager image name (default: \$${REGISTRY}/self-service-agent-request-manager:\$${VERSION})"
-	@echo "  AGENT_SERVICE_IMG        - Full agent service image name (default: \$${REGISTRY}/self-service-agent-service:\$${VERSION})"
-	@echo "  INTEGRATION_DISPATCHER_IMG - Full integration dispatcher image name (default: \$${REGISTRY}/self-service-agent-integration-dispatcher:\$${VERSION})"
-	@echo "  DB_MIGRATION_IMG         - [REMOVED] Now uses unified AGENT_IMG"
-	@echo "  MCP_EMP_INFO_IMG         - Full employee info MCP image name (default: \$${REGISTRY}/self-service-agent-employee-info-mcp:\$${VERSION})"
-	@echo "  MCP_SNOW_IMG             - Full snow MCP image name (default: \$${REGISTRY}/self-service-agent-snow-mcp:\$${VERSION})"
-	@echo "  NAMESPACE                - Target namespace (default: llama-stack-rag)"
-	@echo "  HF_TOKEN                 - Hugging Face Token (will prompt if not provided)"
-	@echo "  {SAFETY,LLM}             - Model id as defined in values (eg. llama-3-2-1b-instruct)"
-	@echo "  LLM_ID                   - Model ID for LLM configuration"
-	@echo "  {SAFETY,LLM}_URL         - Model URL"
-	@echo "  {SAFETY,LLM}_API_TOKEN   - Model API token for remote models"
-	@echo "  {SAFETY,LLM}_TOLERATION  - Model pod toleration"
-	@echo "  SLACK_BOT_TOKEN          - Slack Bot Token (xoxb-...) for Slack integration"
-	@echo "  SLACK_SIGNING_SECRET     - Slack Signing Secret for request verification"
-	@echo "  ENABLE_SLACK             - Set to 'true' to enable Slack integration and prompt for tokens"
 	@echo ""
-	@echo "Request Management Layer options:"
-	@echo "  REQUEST_MANAGEMENT       - Enable Request Management Layer (default: true)"
-	@echo "  KNATIVE_EVENTING         - Enable Knative Eventing (default: true)"
-	@echo "  SNOW_API_KEY             - ServiceNow integration API key"
-	@echo "  HR_API_KEY               - HR system integration API key"
+	@echo "  Core Configuration:"
+	@echo "    CONTAINER_TOOL                    - Container build tool (default: podman)"
+	@echo "    REGISTRY                          - Container registry (default: quay.io/ecosystem-appeng)"
+	@echo "    VERSION                           - Image version tag (default: 0.0.2)"
+	@echo "    NAMESPACE                         - Target namespace (default: llama-stack-rag)"
+	@echo ""
+	@echo "  Image Configuration:"
+	@echo "    AGENT_IMG                         - Full agent image name (default: \$${REGISTRY}/self-service-agent:\$${VERSION})"
+	@echo "    AGENT_SERVICE_IMG                 - Full agent service image name (default: \$${REGISTRY}/self-service-agent-service:\$${VERSION})"
+	@echo "    INTEGRATION_DISPATCHER_IMG        - Full integration dispatcher image name (default: \$${REGISTRY}/self-service-agent-integration-dispatcher:\$${VERSION})"
+	@echo "    MCP_EMP_INFO_IMG                  - Full employee info MCP image name (default: \$${REGISTRY}/self-service-agent-employee-info-mcp:\$${VERSION})"
+	@echo "    MCP_SNOW_IMG                      - Full snow MCP image name (default: \$${REGISTRY}/self-service-agent-snow-mcp:\$${VERSION})"
+	@echo "    REQUEST_MGR_IMG                   - Full request manager image name (default: \$${REGISTRY}/self-service-agent-request-manager:\$${VERSION})"
+	@echo ""
+	@echo "  Model Configuration:"
+	@echo "    HF_TOKEN                          - Hugging Face Token (will prompt if not provided)"
+	@echo "    LLM_ID                            - Model ID for LLM configuration"
+	@echo "    {SAFETY,LLM}                      - Model id as defined in values (eg. llama-3-2-1b-instruct)"
+	@echo "    {SAFETY,LLM}_URL                  - Model URL"
+	@echo "    {SAFETY,LLM}_API_TOKEN            - Model API token for remote models"
+	@echo "    {SAFETY,LLM}_TOLERATION           - Model pod toleration"
+	@echo ""
+	@echo "  Integration Configuration:"
+	@echo "    ENABLE_SLACK                      - Set to 'true' to enable Slack integration and prompt for tokens"
+	@echo "    HR_API_KEY                        - HR system integration API key"
+	@echo "    SLACK_BOT_TOKEN                   - Slack Bot Token (xoxb-...) for Slack integration"
+	@echo "    SLACK_SIGNING_SECRET              - Slack Signing Secret for request verification"
+	@echo "    SNOW_API_KEY                      - ServiceNow integration API key"
+	@echo ""
+	@echo "  Request Management Layer:"
+	@echo "    KNATIVE_EVENTING                  - Enable Knative Eventing (default: true)"
+	@echo "    REQUEST_MANAGEMENT                - Enable Request Management Layer (default: true)"
 
 # Build function: $(call build_image,IMAGE_NAME,DESCRIPTION,CONTAINERFILE_PATH,BUILD_CONTEXT)
 define build_image
@@ -196,9 +215,19 @@ define push_image
 endef
 
 define PRINT_SLACK_URL
-	@echo "--- Your Slack Event URL is: ---"
+	@echo "--- Your Integration Dispatcher URLs are: ---"
 	@sleep 10
-	@echo "  https://$$(kubectl get route $(MAIN_CHART_NAME)-integration-dispatcher -n $(NAMESPACE) -o jsonpath='{.spec.host}')/slack/events"
+	@ROUTE_HOST=$$(kubectl get route $(MAIN_CHART_NAME)-integration-dispatcher -n $(NAMESPACE) -o jsonpath='{.spec.host}'); \
+	echo "  Slack Webhook: https://$$ROUTE_HOST/slack/events"; \
+	echo "  Health: https://$$ROUTE_HOST/health"
+endef
+
+define PRINT_REQUEST_MANAGER_URL
+	@echo "--- Your Request Manager URLs are: ---"
+	@sleep 10
+	@ROUTE_HOST=$$(kubectl get route $(MAIN_CHART_NAME)-request-manager -n $(NAMESPACE) -o jsonpath='{.spec.host}'); \
+	echo "  API: https://$$ROUTE_HOST/api/v1/"; \
+	echo "  Health: https://$$ROUTE_HOST/health"
 endef
 
 # Build container images
@@ -399,7 +428,6 @@ test-short-integration:
 # Create namespace and deploy
 namespace:
 	@kubectl create namespace $(NAMESPACE) &> /dev/null && kubectl label namespace $(NAMESPACE) modelmesh-enabled=false ||:
-	@kubectl label namespace $(NAMESPACE) knative.openshift.io/part-of=openshift-serverless &> /dev/null ||:
 	@kubectl config set-context --current --namespace=$(NAMESPACE) &> /dev/null ||:
 
 .PHONY: helm-depend
@@ -411,17 +439,17 @@ helm-depend:
 helm-list-models: helm-depend
 	@helm template dummy-release helm --set llm-service._debugListModels=true | grep ^model:
 
-.PHONY: helm-install
-helm-install: namespace helm-depend
-	@$(eval PGVECTOR_ARGS := $(call helm_pgvector_args))
-	@$(eval LLM_SERVICE_ARGS := $(call helm_llm_service_args))
-	@$(eval LLAMA_STACK_ARGS := $(call helm_llama_stack_args))
-	@$(eval REQUEST_MANAGEMENT_ARGS := $(call helm_request_management_args))
+# Common function for helm installation with different eventing modes
+define helm_install_common
+	@$(eval PGVECTOR_ARGS := $(helm_pgvector_args))
+	@$(eval LLM_SERVICE_ARGS := $(helm_llm_service_args))
+	@$(eval LLAMA_STACK_ARGS := $(helm_llama_stack_args))
+	@$(eval REQUEST_MANAGEMENT_ARGS := $(helm_request_management_args))
 
 	@echo "Cleaning up any existing jobs..."
 	@kubectl delete job -l app.kubernetes.io/component=init -n $(NAMESPACE) --ignore-not-found || true
 	@kubectl delete job -l app.kubernetes.io/name=self-service-agent -n $(NAMESPACE) --ignore-not-found || true
-	@echo "Installing $(MAIN_CHART_NAME) helm chart"
+	@echo "Installing $(MAIN_CHART_NAME) helm chart $(1)"
 	@helm upgrade --install $(MAIN_CHART_NAME) helm -n $(NAMESPACE) \
 		--set image.repository=self-service-agent \
 		--set image.requestManager=self-service-agent-request-manager \
@@ -437,11 +465,34 @@ helm-install: namespace helm-depend
 		--set mcp-servers.mcp-servers.self-service-agent-employee-info.imageRepository=$(REGISTRY)/self-service-agent-employee-info-mcp \
 		--set mcp-servers.mcp-servers.self-service-agent-snow.imageRepository=$(REGISTRY)/self-service-agent-snow-mcp \
 		$(REQUEST_MANAGEMENT_ARGS) \
+		$(if $(filter-out "",$(2)),$(2),) \
 		$(EXTRA_HELM_ARGS)
-	@echo "Waiting for model services and llamastack to deploy. It may take around 10-15 minutes depending on the size of the model..."
-	@kubectl rollout status deploy/$(MAIN_CHART_NAME) -n $(NAMESPACE) --timeout 20m
-	@echo "$(MAIN_CHART_NAME) installed successfully"
+	@echo "Waiting for services to deploy $(1)..."
+	@eval $(3)
+	@echo "$(MAIN_CHART_NAME) $(1) installed successfully"
+	$(PRINT_REQUEST_MANAGER_URL)
 	$(if $(filter true,$(SLACK_ENABLED)),$(PRINT_SLACK_URL))
+endef
+
+# Install with full Knative eventing (production)
+.PHONY: helm-install
+helm-install: namespace helm-depend
+	$(call helm_install_common,"with full Knative eventing","",\
+		"kubectl rollout status deploy/$(MAIN_CHART_NAME) -n $(NAMESPACE) --timeout 20m")
+
+# Install with mock eventing service (for testing/CI)
+.PHONY: helm-install-mock-eventing
+helm-install-mock-eventing: namespace helm-depend
+	$(call helm_install_common,"with mock eventing service",\
+		--set requestManagement.knative.eventing.enabled=false --set requestManagement.knative.mockEventing.enabled=true --set requestManagement.kafka.enabled=false,\
+		"kubectl rollout status deploy/$(MAIN_CHART_NAME) -n $(NAMESPACE) --timeout 10m && kubectl rollout status deploy/$(MAIN_CHART_NAME)-mock-eventing -n $(NAMESPACE) --timeout 5m")
+
+# Install with direct HTTP communication (for development)
+.PHONY: helm-install-direct-http
+helm-install-direct-http: namespace helm-depend
+	$(call helm_install_common,"with direct HTTP communication",\
+		--set requestManagement.knative.eventing.enabled=false --set requestManagement.knative.mockEventing.enabled=false --set requestManagement.kafka.enabled=false,\
+		"kubectl rollout status deploy/$(MAIN_CHART_NAME) -n $(NAMESPACE) --timeout 10m")
 
 # Uninstall the deployment and clean up
 .PHONY: helm-uninstall

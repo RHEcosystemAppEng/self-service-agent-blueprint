@@ -3,9 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
-from shared_db.models import DeliveryStatus, UserIntegrationConfig
-
-from ..schemas import DeliveryRequest
+from shared_db.models import DeliveryRequest, DeliveryStatus, UserIntegrationConfig
 
 
 class IntegrationResult:

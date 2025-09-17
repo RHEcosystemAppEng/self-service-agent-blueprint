@@ -85,19 +85,6 @@ class IntegrationTemplateResponse(BaseModel):
         from_attributes = True
 
 
-class DeliveryRequest(BaseModel):
-    """Schema for delivery request from CloudEvent."""
-
-    request_id: str
-    session_id: str
-    user_id: str
-    subject: Optional[str] = None
-    content: str
-    template_variables: Dict[str, Any] = Field(default_factory=dict)
-    agent_id: Optional[str] = None
-    priority_override: Optional[int] = None
-
-
 class DeliveryLogResponse(BaseModel):
     """Schema for delivery log response."""
 
@@ -174,9 +161,4 @@ class HealthCheck(BaseModel):
     services: Dict[str, str]
 
 
-class ErrorResponse(BaseModel):
-    """Error response schema."""
-
-    error: str
-    error_code: str
-    timestamp: datetime
+# ErrorResponse is now imported from shared_db.models

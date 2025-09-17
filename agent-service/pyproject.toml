@@ -17,7 +17,8 @@ dependencies = [
     "python-multipart>=0.0.6",
     "python-json-logger>=2.0.7",
     "fire>=0.5.0",
-    "requests>=2.31.0"
+    "requests>=2.31.0",
+    "self-service-agent-shared-db",
 ]
 
 [project.optional-dependencies]
@@ -51,3 +52,6 @@ python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+[tool.uv.sources]
+self-service-agent-shared-db = { path = "../shared-db" }

@@ -4,13 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a self-service agent blueprint implementing a complete AI agent management system with LlamaStack integration, Knative eventing, and multi-channel support (Slack, API, CLI). The project consists of:
+This is a self-service agent blueprint implementing a complete AI agent management system with LlamaStack integration, flexible communication modes (Knative eventing, Mock eventing, Direct HTTP), and multi-channel support (Slack, API, CLI). The project consists of:
 
 - **agent-service/**: AI agent processing service that handles LlamaStack interactions
-- **request-manager/**: Request routing, session management, and CloudEvent processing
+- **request-manager/**: Request routing, session management, and unified communication processing
 - **integration-dispatcher/**: Multi-channel delivery (Slack, Email, etc.)
 - **asset-manager/**: Agent, knowledge base, and toolgroup registration
 - **mcp-servers/**: MCP (Model Context Protocol) servers for external tool integration
+- **mock-eventing-service/**: Lightweight mock service for testing without Knative infrastructure
 - **shared-db/**: Database models and Alembic migrations
 - **helm/**: Kubernetes Helm charts for OpenShift deployment
 - **test/**: Testing utilities and scripts
@@ -56,9 +57,23 @@ make push-all-images
 
 ### Helm Deployment
 
+The system supports three deployment modes:
+
 ```bash
-# Install with required environment variables
+# 1. Full Knative Eventing (default)
 make helm-install NAMESPACE=your-namespace \
+  LLM=llama-3-2-1b-instruct \
+  SLACK_SIGNING_SECRET="your-secret" \
+  SNOW_API_KEY="your-key"
+
+# 2. Mock Eventing (for testing without Knative)
+make helm-install-mock-eventing NAMESPACE=your-namespace \
+  LLM=llama-3-2-1b-instruct \
+  SLACK_SIGNING_SECRET="your-secret" \
+  SNOW_API_KEY="your-key"
+
+# 3. Direct HTTP (no eventing infrastructure)
+make helm-install-direct-http NAMESPACE=your-namespace \
   LLM=llama-3-2-1b-instruct \
   SLACK_SIGNING_SECRET="your-secret" \
   SNOW_API_KEY="your-key"
@@ -75,18 +90,34 @@ make helm-uninstall NAMESPACE=your-namespace
 ### Core Components
 
 1. **Agent Service**: Processes AI requests via LlamaStack, handles toolgroups and streaming responses
-2. **Request Manager**: Routes requests, manages sessions, handles CloudEvents and agent routing
+2. **Request Manager**: Routes requests, manages sessions, unified communication processing with strategy pattern
 3. **Integration Dispatcher**: Delivers responses to multiple channels (Slack, Email, etc.)
 4. **Asset Manager**: Registers agents, knowledge bases, and toolgroups with LlamaStack
 5. **MCP Servers**: External tool integration (employee-info, ServiceNow)
-6. **Shared Database**: PostgreSQL with Alembic migrations for session/request persistence
+6. **Mock Eventing Service**: Lightweight service that mimics Knative broker behavior for testing
+7. **Shared Database**: PostgreSQL with Alembic migrations for session/request persistence
 
-### Event-Driven Architecture
+### Communication Architecture
 
+The system supports three communication modes:
+
+#### **1. Full Knative Eventing (Default)**
 - **Knative Eventing**: CloudEvent routing via Kafka brokers and triggers
 - **Request Flow**: API → Request Manager → Agent Service → Integration Dispatcher
 - **Session Management**: Persistent conversation context across multiple interactions
 - **Agent Routing**: Dynamic routing between specialized agents (routing-agent → laptop-refresh)
+
+#### **2. Mock Eventing (Testing)**
+- **Mock Eventing Service**: Lightweight service that mimics Knative broker behavior
+- **Same Request Flow**: API → Request Manager → Agent Service → Integration Dispatcher
+- **No Knative Infrastructure**: Perfect for testing and CI/CD without full Knative setup
+- **Identical Behavior**: Same event-driven patterns with mock infrastructure
+
+#### **3. Direct HTTP (Simplified)**
+- **Direct HTTP Calls**: Services communicate directly via HTTP requests
+- **Unified Architecture**: Same core logic with different communication strategy
+- **No Eventing Infrastructure**: Minimal dependencies for simple deployments
+- **Strategy Pattern**: `CommunicationStrategy` abstraction ensures code consistency
 
 ### Project Structure
 
@@ -99,7 +130,10 @@ make helm-uninstall NAMESPACE=your-namespace
 ### Key Environment Variables
 
 - `LLAMA_STACK_URL`: LlamaStack service endpoint (default: http://llamastack:8321)
-- `BROKER_URL`: Knative broker endpoint for CloudEvents
+- `BROKER_URL`: Knative broker endpoint for CloudEvents (or mock eventing service URL)
+- `EVENTING_ENABLED`: Boolean flag to enable/disable eventing (true/false)
+- `AGENT_SERVICE_URL`: Direct HTTP URL to agent service (only when eventing disabled)
+- `INTEGRATION_DISPATCHER_URL`: Direct HTTP URL to integration dispatcher (only when eventing disabled)
 - `DATABASE_URL`: PostgreSQL connection string
 - `SLACK_SIGNING_SECRET`: Slack webhook verification
 - `SNOW_API_KEY`, `HR_API_KEY`: External service API keys
@@ -149,11 +183,29 @@ make test-all
 make helm-install NAMESPACE=dev
 ```
 
+## Documentation
+
+### Architecture Documentation
+- **`EVENTING_ALTERNATIVES.md`**: Comprehensive guide to deployment modes and their benefits
+- **`COMMUNICATION_MODE_SYNC.md`**: Details on the unified architecture and strategy pattern
+- **`REQUEST_MANAGEMENT.md`**: Request processing and session management details
+- **`AUTHENTICATION_GUIDE.md`**: Authentication and security configuration
+- **`SLACK_INTEGRATION_SETUP.md`**: Slack integration setup and configuration
+- **`EMAIL_INTEGRATION_SETUP.md`**: Email integration setup and configuration
+
+### Unified Architecture
+The system uses a **Strategy Pattern** to ensure code consistency across communication modes:
+- **`CommunicationStrategy`**: Abstract base class for communication mechanisms
+- **`EventingStrategy`**: Handles CloudEvent-based communication
+- **`DirectHttpStrategy`**: Handles direct HTTP communication
+- **`UnifiedRequestProcessor`**: Central request processing logic
+- **`UnifiedResponseHandler`**: Central response handling logic
+
 ## Dependencies
 
 ### Required Cluster Operators
-- **Strimzi Kafka Operator**: For Kafka clusters
-- **Knative Eventing**: For CloudEvent routing
+- **Strimzi Kafka Operator**: For Kafka clusters (only for full Knative eventing mode)
+- **Knative Eventing**: For CloudEvent routing (only for full Knative eventing mode)
 
 ### Optional (disabled by default)
 - **Cert-Manager**: Only needed for custom domain certificates (OpenShift Routes provide TLS)

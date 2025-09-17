@@ -1,7 +1,10 @@
 """Consolidated database models for all services."""
 
+from datetime import datetime, timezone
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
+from pydantic import BaseModel, Field
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -294,4 +297,74 @@ class IntegrationCredential(Base, TimestampMixin):
         UniqueConstraint(
             "integration_type", "credential_name", name="uq_integration_credential"
         ),
+    )
+
+
+# Shared Pydantic models for inter-service communication
+class AgentResponse(BaseModel):
+    """Shared model for agent responses across all services."""
+
+    request_id: str
+    session_id: str
+    user_id: str
+    agent_id: Optional[str]
+    content: str
+    response_type: str = Field(default="message")
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    processing_time_ms: Optional[int] = None
+    requires_followup: bool = Field(default=False)
+    followup_actions: List[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# Shared Pydantic models for inter-service communication
+class NormalizedRequest(BaseModel):
+    """Normalized internal request format used across all services."""
+
+    request_id: str = Field(..., description="Unique request identifier")
+    session_id: str = Field(..., description="Session identifier")
+    user_id: str = Field(..., min_length=1, max_length=255)
+    integration_type: IntegrationType
+    request_type: str = Field(..., max_length=100)
+    content: str = Field(..., min_length=1)
+
+    # Integration-specific context
+    integration_context: Dict[str, Any] = Field(default_factory=dict)
+    user_context: Dict[str, Any] = Field(default_factory=dict)
+
+    # Agent routing
+    target_agent_id: Optional[str] = Field(None, max_length=255)
+    requires_routing: bool = Field(default=True)
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    class Config:
+        """Pydantic config."""
+
+        use_enum_values = True
+
+
+class DeliveryRequest(BaseModel):
+    """Shared model for delivery requests across services."""
+
+    request_id: str
+    session_id: str
+    user_id: str
+    subject: Optional[str] = None
+    content: str
+    template_variables: Dict[str, Any] = Field(default_factory=dict)
+    agent_id: Optional[str] = None
+    priority_override: Optional[int] = None
+
+
+class ErrorResponse(BaseModel):
+    """Shared error response schema across all services."""
+
+    error: str = Field(..., description="Error message")
+    error_code: str = Field(..., description="Error code")
+    request_id: Optional[str] = Field(None, description="Request ID if available")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    details: Optional[Dict[str, Any]] = Field(
+        None, description="Additional error details"
     )

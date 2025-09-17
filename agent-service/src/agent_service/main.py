@@ -12,7 +12,9 @@ import structlog
 from cloudevents.http import CloudEvent, to_structured
 from fastapi import FastAPI, HTTPException, Request, status
 from llama_stack_client import LlamaStackClient
-from pydantic import BaseModel
+
+# BaseModel no longer needed since NormalizedRequest is imported from shared_db
+from shared_db.models import AgentResponse, NormalizedRequest
 
 from . import __version__
 
@@ -44,45 +46,20 @@ class AgentConfig:
     def __init__(self) -> None:
         self.llama_stack_url = os.getenv("LLAMA_STACK_URL", "http://llamastack:8321")
         self.broker_url = os.getenv("BROKER_URL")
-        if not self.broker_url:
+        self.eventing_enabled = os.getenv("EVENTING_ENABLED", "true").lower() == "true"
+
+        # If eventing is disabled, we don't need a broker URL
+        if self.eventing_enabled and not self.broker_url:
             raise ValueError(
-                "BROKER_URL environment variable is required but not set. "
-                "This should be configured by Helm deployment."
+                "BROKER_URL environment variable is required when eventing is enabled. "
+                "Set EVENTING_ENABLED=false to disable eventing or configure BROKER_URL."
             )
+
         self.default_agent_id = os.getenv("DEFAULT_AGENT_ID", "routing-agent")
         self.timeout = float(os.getenv("AGENT_TIMEOUT", "120"))
 
 
-class NormalizedRequest(BaseModel):
-    """Normalized request from CloudEvent."""
-
-    request_id: str
-    session_id: str
-    user_id: str
-    integration_type: str
-    request_type: str
-    content: str
-    integration_context: Dict[str, Any]
-    user_context: Dict[str, Any]
-    target_agent_id: Optional[str] = None
-    requires_routing: bool = True
-    created_at: datetime
-
-
-class AgentResponse(BaseModel):
-    """Agent response model."""
-
-    request_id: str
-    session_id: str
-    user_id: str  # Add user_id to track which user the response is for
-    agent_id: Optional[str]
-    content: str
-    response_type: str = "message"
-    metadata: Dict[str, Any] = {}
-    processing_time_ms: Optional[int] = None
-    requires_followup: bool = False
-    followup_actions: list[str] = []
-    created_at: datetime
+# NormalizedRequest is now imported from shared_db.models
 
 
 class AgentService:
@@ -690,6 +667,49 @@ async def list_agents() -> Dict[str, Any]:
         )
 
 
+@app.post("/process")
+async def handle_direct_request(request: Request) -> Dict[str, Any]:
+    """Handle direct HTTP requests (for non-eventing mode)."""
+    if not _agent_service:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Agent service not initialized",
+        )
+
+    try:
+        body = await request.body()
+        request_data = json.loads(body)
+
+        logger.info(
+            "Direct request received",
+            request_id=request_data.get("request_id"),
+            session_id=request_data.get("session_id"),
+            user_id=request_data.get("user_id"),
+        )
+
+        # Create a mock CloudEvent structure for processing
+        mock_headers = {
+            "ce-type": "com.self-service-agent.request.created",
+            "ce-id": request_data.get("request_id", "direct-request"),
+            "ce-source": "request-manager",
+        }
+
+        # Convert request data to CloudEvent format
+        mock_body = json.dumps(request_data).encode()
+
+        # Process using existing CloudEvent handler
+        result = await _handle_request_event(mock_headers, mock_body, _agent_service)
+
+        return result
+
+    except json.JSONDecodeError:
+        logger.error("Invalid JSON in direct request")
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+    except Exception as e:
+        logger.error("Error handling direct request", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 @app.post("/")
 async def handle_cloudevent(request: Request) -> Dict[str, Any]:
     """Handle incoming CloudEvents."""
@@ -726,20 +746,33 @@ async def _handle_request_event(
     try:
         event_data = json.loads(body)
 
-        # Parse normalized request
-        request = NormalizedRequest(
-            request_id=event_data["request_id"],
-            session_id=event_data["session_id"],
-            user_id=event_data["user_id"],
-            integration_type=event_data["integration_type"],
-            request_type=event_data["request_type"],
-            content=event_data["content"],
-            integration_context=event_data["integration_context"],
-            user_context=event_data["user_context"],
-            target_agent_id=event_data.get("target_agent_id"),
-            requires_routing=event_data.get("requires_routing", True),
-            created_at=datetime.fromisoformat(event_data["created_at"]),
-        )
+        # Parse normalized request with proper error handling
+        try:
+            request = NormalizedRequest(
+                request_id=event_data.get("request_id", "unknown"),
+                session_id=event_data.get("session_id", "unknown"),
+                user_id=event_data.get("user_id", "unknown"),
+                integration_type=event_data.get("integration_type", "cli"),
+                request_type=event_data.get("request_type", "general"),
+                content=event_data.get("content", ""),
+                integration_context=event_data.get("integration_context", {}),
+                user_context=event_data.get("user_context", {}),
+                target_agent_id=event_data.get("target_agent_id"),
+                requires_routing=event_data.get("requires_routing", True),
+                created_at=datetime.fromisoformat(
+                    event_data.get("created_at", datetime.now().isoformat())
+                ),
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to parse normalized request",
+                error=str(e),
+                event_data=event_data,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid request data: {str(e)}",
+            )
 
         # Process the request
         response = await agent_service.process_request(request)
@@ -756,10 +789,17 @@ async def _handle_request_event(
         )
 
         return {
-            "status": "processed",
-            "request_id": request.request_id,
+            "request_id": response.request_id,
+            "session_id": response.session_id,
+            "user_id": response.user_id,
             "agent_id": response.agent_id,
-            "response_published": success,
+            "content": response.content,
+            "response_type": response.response_type,
+            "metadata": response.metadata,
+            "processing_time_ms": response.processing_time_ms,
+            "requires_followup": response.requires_followup,
+            "followup_actions": response.followup_actions,
+            "created_at": response.created_at.isoformat(),
         }
 
     except Exception as e:

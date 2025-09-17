@@ -164,7 +164,7 @@ requestManagement:
   knative:
     enabled: true
     eventing:
-      enabled: true  # Keep broker and triggers for event-driven architecture
+      enabled: true  # Set to false to disable Knative eventing and use mock service
     broker:
       name: "self-service-agent-broker"
       # Centralized broker URL configuration
@@ -175,6 +175,22 @@ requestManagement:
         replicationFactor: 1
         retentionDuration: P7D
     
+    # Mock Eventing Service (for testing and CI when Knative eventing is disabled)
+    mockEventing:
+      enabled: false  # Set to true to use mock eventing service instead of Knative
+      image:
+        repository: "mock-eventing-service"
+        tag: "latest"
+        pullPolicy: "IfNotPresent"
+      logLevel: "INFO"
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "256Mi"
+          cpu: "200m"
+
     # KnativeKafka configuration
     kafka:
       enabled: true  # Set to true to enable KnativeKafka in your namespace
@@ -342,6 +358,13 @@ requestManagement:
       targetCPUUtilization: 70
       targetMemoryUtilization: 80
   
+  # Agent Configuration
+  agent:
+    # Default agent ID for routing (can be overridden)
+    defaultAgentId: "routing-agent"
+    # Agent response timeout in seconds
+    timeout: 120
+
   # Agent Service
   agentService:
     replicas: 1

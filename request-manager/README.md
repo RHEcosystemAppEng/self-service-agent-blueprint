@@ -194,8 +194,8 @@ make helm-install
 #### Agent Service
 - `LLAMA_STACK_URL`: Llama Stack service URL (default: http://llamastack:8321)
 - `BROKER_URL`: Knative Broker URL
-- `DEFAULT_AGENT_ID`: Default agent for routing (default: routing-agent)
-- `AGENT_TIMEOUT`: Agent response timeout in seconds (default: 120)
+- `DEFAULT_AGENT_ID`: Default agent for routing (configurable via Helm values, default: routing-agent)
+- `AGENT_TIMEOUT`: Agent response timeout in seconds (configurable via Helm values, default: 120)
 
 ## Monitoring
 

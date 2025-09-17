@@ -83,7 +83,15 @@ spec:
         - name: EXPECTED_MIGRATION_VERSION
           value: {{ $context.Values.database.expectedMigrationVersion | default "001" | quote }}
         - name: BROKER_URL
-          value: "{{ $context.Values.requestManagement.knative.broker.url }}/{{ $context.Release.Namespace }}/{{ $context.Values.requestManagement.knative.broker.name }}"
+          value: {{ if $context.Values.requestManagement.knative.eventing.enabled }}{{ printf "%s/%s/%s" $context.Values.requestManagement.knative.broker.url $context.Release.Namespace $context.Values.requestManagement.knative.broker.name | quote }}{{ else }}{{ printf "http://%s-mock-eventing.%s.svc.cluster.local:8080/%s/%s" (include "self-service-agent.fullname" $context) $context.Release.Namespace $context.Release.Namespace $context.Values.requestManagement.knative.broker.name | quote }}{{ end }}
+        - name: EVENTING_ENABLED
+          value: {{ $context.Values.requestManagement.knative.eventing.enabled | quote }}
+        {{- if not $context.Values.requestManagement.knative.eventing.enabled }}
+        - name: AGENT_SERVICE_URL
+          value: {{ printf "http://%s-agent-service.%s.svc.cluster.local:80" (include "self-service-agent.fullname" $context) $context.Release.Namespace | quote }}
+        - name: INTEGRATION_DISPATCHER_URL
+          value: {{ printf "http://%s-integration-dispatcher.%s.svc.cluster.local:80" (include "self-service-agent.fullname" $context) $context.Release.Namespace | quote }}
+        {{- end }}
         - name: PORT
           value: "8080"
         - name: HOST
@@ -93,9 +101,9 @@ spec:
         - name: LLAMA_STACK_URL
           value: {{ $context.Values.llama_stack_url | quote }}
         - name: DEFAULT_AGENT_ID
-          value: "routing-agent"
+          value: {{ if hasKey $context.Values "agent" }}{{ $context.Values.agent.defaultAgentId | default "routing-agent" | quote }}{{ else }}"routing-agent"{{ end }}
         - name: AGENT_TIMEOUT
-          value: "120"
+          value: {{ if hasKey $context.Values "agent" }}{{ $context.Values.agent.timeout | default "120" | quote }}{{ else }}"120"{{ end }}
         {{- end }}
         {{- if eq $serviceName "integration-dispatcher" }}
         # Integration-specific environment variables (optional - loaded from secrets)

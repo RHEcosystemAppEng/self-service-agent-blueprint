@@ -14,7 +14,6 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Union
 
-import httpx
 import jwt
 import structlog
 from cloudevents.http import CloudEvent
@@ -24,18 +23,20 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import InvalidTokenError
 from shared_db import get_enum_value
-from shared_db.models import ProcessedEvent, RequestLog, RequestSession
+from shared_db.models import ErrorResponse, ProcessedEvent, RequestLog, RequestSession
 from shared_db.session import get_database_manager, get_db_session
-from sqlalchemy import select, text, update
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import __version__
+from .communication_strategy import UnifiedRequestProcessor, get_communication_strategy
+from .direct_client import initialize_direct_clients
 from .events import EventTypes, get_event_publisher
 from .normalizer import RequestNormalizer
+from .response_handler import UnifiedResponseHandler
 from .schemas import (
     BaseRequest,
     CLIRequest,
-    ErrorResponse,
     HealthCheck,
     SessionCreate,
     SessionResponse,
@@ -91,6 +92,28 @@ async def lifespan(app: FastAPI):
         logger.error("Failed to verify database migration", error=str(e))
         raise
 
+    # Initialize direct clients if eventing is disabled
+    eventing_enabled = os.getenv("EVENTING_ENABLED", "true").lower() == "true"
+    if not eventing_enabled:
+        agent_service_url = os.getenv(
+            "AGENT_SERVICE_URL", "http://self-service-agent-agent-service:8080"
+        )
+        integration_dispatcher_url = os.getenv(
+            "INTEGRATION_DISPATCHER_URL",
+            "http://self-service-agent-integration-dispatcher:8080",
+        )
+        initialize_direct_clients(agent_service_url, integration_dispatcher_url)
+        logger.info("Initialized direct HTTP clients for non-eventing mode")
+
+    # Initialize unified processor
+    global unified_processor
+    communication_strategy = get_communication_strategy()
+    unified_processor = UnifiedRequestProcessor(communication_strategy)
+    logger.info(
+        "Initialized unified request processor",
+        strategy_type=type(communication_strategy).__name__,
+    )
+
     yield
 
     # Shutdown
@@ -102,6 +125,11 @@ async def lifespan(app: FastAPI):
     # Close event publisher
     event_publisher = get_event_publisher()
     await event_publisher.close()
+
+    # Close direct clients
+    from .direct_client import cleanup_direct_clients
+
+    await cleanup_direct_clients()
 
 
 # Create FastAPI application
@@ -124,6 +152,7 @@ app.add_middleware(
 # Initialize components
 normalizer = RequestNormalizer()
 security = HTTPBearer(auto_error=False)
+unified_processor: Optional[UnifiedRequestProcessor] = None
 
 # Service Mesh configuration
 SLACK_SIGNING_SECRET = os.getenv("SLACK_SIGNING_SECRET", "")
@@ -536,7 +565,9 @@ async def handle_slack_request(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid signature"
             )
 
-    return await _process_request(slack_request, db)
+    # Slack requires async processing due to 3-second timeout limit
+    # Use async processing with background delivery for direct HTTP mode
+    return await _process_request_async_with_delivery(slack_request, db)
 
 
 @app.post("/api/v1/requests/web")
@@ -564,7 +595,7 @@ async def handle_web_request(
             status_code=status.HTTP_403_FORBIDDEN, detail="User ID mismatch"
         )
 
-    return await _process_request(web_request, db)
+    return await _process_request_adaptive(web_request, db)
 
 
 @app.post("/api/v1/requests/cli")
@@ -592,7 +623,7 @@ async def handle_cli_request(
             status_code=status.HTTP_403_FORBIDDEN, detail="User ID mismatch"
         )
 
-    return await _process_request(cli_request, db)
+    return await _process_request_adaptive(cli_request, db)
 
 
 @app.post("/api/v1/requests/tool")
@@ -609,7 +640,7 @@ async def handle_tool_request(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key"
         )
 
-    return await _process_request(tool_request, db)
+    return await _process_request_adaptive(tool_request, db)
 
 
 @app.post("/api/v1/requests/generic")
@@ -618,7 +649,7 @@ async def handle_generic_request(
     db: AsyncSession = Depends(get_db_session),
 ) -> Dict[str, Any]:
     """Handle generic requests."""
-    return await _process_request(request, db)
+    return await _process_request_adaptive(request, db)
 
 
 @app.post("/api/v1/requests/generic/sync")
@@ -696,70 +727,48 @@ async def handle_cloudevent(
         )
 
 
+async def _process_request_adaptive(
+    request: Union[BaseRequest, SlackRequest, WebRequest, CLIRequest, ToolRequest],
+    db: AsyncSession,
+    timeout: int = 120,
+) -> Dict[str, Any]:
+    """Process a request using the appropriate method based on eventing configuration."""
+    if not unified_processor:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unified processor not initialized",
+        )
+
+    try:
+        # In direct HTTP mode, process synchronously
+        # In eventing mode, process asynchronously
+        eventing_enabled = os.getenv("EVENTING_ENABLED", "true").lower() == "true"
+
+        if eventing_enabled:
+            return await unified_processor.process_request_async(request, db)
+        else:
+            return await unified_processor.process_request_sync(request, db, timeout)
+    except Exception as e:
+        logger.error("Failed to process request", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process request",
+        )
+
+
 async def _process_request(
     request: Union[BaseRequest, SlackRequest, WebRequest, CLIRequest, ToolRequest],
     db: AsyncSession,
 ) -> Dict[str, Any]:
-    """Process an incoming request."""
-    session_manager = SessionManager(db)
-    event_publisher = get_event_publisher()
+    """Process an incoming request using unified processor."""
+    if not unified_processor:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unified processor not initialized",
+        )
 
     try:
-        # Find or create session
-        session = await session_manager.find_or_create_session(
-            user_id=request.user_id,
-            integration_type=request.integration_type,
-            channel_id=getattr(request, "channel_id", None),
-            thread_id=getattr(request, "thread_id", None),
-            integration_metadata=request.metadata,
-        )
-
-        # Normalize the request
-        normalized_request = normalizer.normalize_request(
-            request, session.session_id, session.current_agent_id
-        )
-
-        # Log the request
-        request_log = RequestLog(
-            request_id=normalized_request.request_id,
-            session_id=session.session_id,
-            request_type=request.request_type,
-            request_content=request.content,
-            normalized_request=normalized_request.model_dump(mode="json"),
-            agent_id=normalized_request.target_agent_id,
-        )
-
-        db.add(request_log)
-        await db.commit()
-
-        await session_manager.increment_request_count(
-            session.session_id, normalized_request.request_id
-        )
-
-        # Publish request event to broker
-        success = await event_publisher.publish_request_event(
-            normalized_request, EventTypes.REQUEST_CREATED
-        )
-
-        if not success:
-            logger.error("Failed to publish request event")
-            # Continue processing even if event publishing fails
-
-        logger.info(
-            "Request processed",
-            request_id=normalized_request.request_id,
-            session_id=session.session_id,
-            user_id=request.user_id,
-            integration_type=get_enum_value(request.integration_type),
-        )
-
-        return {
-            "request_id": normalized_request.request_id,
-            "session_id": session.session_id,
-            "status": "accepted",
-            "message": "Request has been queued for processing",
-        }
-
+        return await unified_processor.process_request_async(request, db)
     except Exception as e:
         logger.error("Failed to process request", error=str(e))
         raise HTTPException(
@@ -773,92 +782,43 @@ async def _process_request_sync(
     db: AsyncSession,
     timeout: int = 120,
 ) -> Dict[str, Any]:
-    """Process a request synchronously and wait for AI response."""
-    import asyncio
-
-    session_manager = SessionManager(db)
-    event_publisher = get_event_publisher()
+    """Process a request synchronously and wait for AI response using unified processor."""
+    if not unified_processor:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unified processor not initialized",
+        )
 
     try:
-        # Find or create session
-        session = await session_manager.find_or_create_session(
-            user_id=request.user_id,
-            integration_type=request.integration_type,
-            channel_id=getattr(request, "channel_id", None),
-            thread_id=getattr(request, "thread_id", None),
-            integration_metadata=request.metadata,
-        )
-
-        # Normalize the request
-        normalized_request = normalizer.normalize_request(
-            request, session.session_id, session.current_agent_id
-        )
-
-        # Log the request
-        request_log = RequestLog(
-            request_id=normalized_request.request_id,
-            session_id=session.session_id,
-            request_type=request.request_type,
-            request_content=request.content,
-            normalized_request=normalized_request.model_dump(mode="json"),
-            agent_id=normalized_request.target_agent_id,
-        )
-
-        db.add(request_log)
-        await db.commit()
-
-        await session_manager.increment_request_count(
-            session.session_id, normalized_request.request_id
-        )
-
-        # Publish request event to broker
-        success = await event_publisher.publish_request_event(
-            normalized_request, EventTypes.REQUEST_CREATED
-        )
-
-        if not success:
-            logger.error("Failed to publish request event")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to publish request event",
-            )
-
-        logger.info(
-            "Request processed, waiting for response",
-            request_id=normalized_request.request_id,
-            session_id=session.session_id,
-            user_id=request.user_id,
-            timeout=timeout,
-        )
-
-        # Wait for AI response with timeout
-        response_data = await _wait_for_response(
-            normalized_request.request_id, timeout, db
-        )
-
-        return {
-            "request_id": normalized_request.request_id,
-            "session_id": session.session_id,
-            "status": "completed",
-            "response": response_data,
-        }
-
-    except asyncio.TimeoutError:
-        logger.warning(
-            "Request timeout waiting for response",
-            request_id=(
-                normalized_request.request_id
-                if "normalized_request" in locals()
-                else "unknown"
-            ),
-            timeout=timeout,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_408_REQUEST_TIMEOUT,
-            detail=f"Request timed out after {timeout} seconds",
-        )
+        return await unified_processor.process_request_sync(request, db, timeout)
     except Exception as e:
         logger.error("Failed to process synchronous request", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process request",
+        )
+
+
+async def _process_request_async_with_delivery(
+    request: Union[BaseRequest, SlackRequest, WebRequest, CLIRequest, ToolRequest],
+    db: AsyncSession,
+    timeout: int = 120,
+) -> Dict[str, Any]:
+    """Process a request asynchronously with background delivery for direct HTTP mode."""
+    if not unified_processor:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unified processor not initialized",
+        )
+
+    try:
+        return await unified_processor.process_request_async_with_delivery(
+            request, db, timeout
+        )
+    except Exception as e:
+        logger.error(
+            "Failed to process request asynchronously with delivery", error=str(e)
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to process request",
@@ -934,7 +894,7 @@ async def _wait_for_response(
 async def _handle_agent_response_event(
     headers: Dict[str, str], body: bytes, db: AsyncSession
 ) -> Dict[str, Any]:
-    """Handle agent response CloudEvent."""
+    """Handle agent response CloudEvent using unified response handler."""
 
     event_id = headers.get("ce-id")
     event_type = headers.get("ce-type")
@@ -952,98 +912,33 @@ async def _handle_agent_response_event(
         if not all([request_id, session_id, content]):
             raise ValueError("Missing required fields in agent response")
 
-        # ✅ BUSINESS LOGIC DEDUPLICATION: Check if this request already has a response
-        # This is separate from event deduplication and handles business logic
-        stmt = select(RequestLog).where(
-            RequestLog.request_id == request_id,
-            RequestLog.response_content.is_not(None),  # Already has a response
-        )
-        result = await db.execute(stmt)
-        existing_response = result.scalar_one_or_none()
-
-        if existing_response:
-            logger.info(
-                "Request already has response - skipping business logic",
-                request_id=request_id,
-                session_id=session_id,
-                agent_id=agent_id,
-            )
-            # Still record the event as processed
-            await _record_processed_event(
-                db,
-                event_id,
-                event_type,
-                event_source,
-                request_id,
-                session_id,
-                "request-manager",
-                "skipped",
-                "request already has response",
-            )
-            return {
-                "status": "skipped",
-                "reason": "response already processed",
-                "request_id": request_id,
-            }
-
-        # Check if this is a routing response that should switch agents
-        session_manager = SessionManager(db)
-        routed_agent = await _detect_and_validate_agent_routing(content, agent_id)
-
-        if routed_agent:
-            # Update session to use the routed agent and clear LlamaStack session
-            # Agent-service will create a new LlamaStack session automatically via _get_or_create_session
-            await session_manager.update_session(
-                session_id,
-                agent_id=routed_agent,
-                llama_stack_session_id=None,  # Clear to let agent-service create new session
-            )
-            logger.info(
-                "Agent routing detected and validated - session updated with new agent",
-                session_id=session_id,
-                from_agent=agent_id,
-                to_agent=routed_agent,
-                routing_response=content.strip(),
-                llama_stack_session_cleared=True,
-            )
-
-            # Re-send the original user request to the newly routed agent
-            await _resend_original_request_to_routed_agent(
-                db, request_id, session_id, routed_agent
-            )
-
-        # Update request log with response
-        stmt = (
-            update(RequestLog)
-            .where(RequestLog.request_id == request_id)
-            .values(
-                response_content=content,
-                response_metadata=event_data.get("metadata", {}),
-                agent_id=agent_id,
-                processing_time_ms=event_data.get("processing_time_ms"),
-                completed_at=datetime.now(timezone.utc),
-                cloudevent_id=headers.get("ce-id"),
-                cloudevent_type=headers.get("ce-type"),
-            )
-        )
-
-        await db.execute(stmt)
-        await db.commit()
-
-        # Forward response to Integration Dispatcher for delivery to user
-        await _forward_response_to_integration_dispatcher(
-            event_data, routed_agent is not None
-        )
-
-        logger.info(
-            "Agent response received and forwarded",
+        # Use unified response handler
+        response_handler = UnifiedResponseHandler(db)
+        result = await response_handler.process_agent_response(
             request_id=request_id,
             session_id=session_id,
             agent_id=agent_id,
-            routed_to_agent=routed_agent,
+            content=content,
+            metadata=event_data.get("metadata", {}),
+            processing_time_ms=event_data.get("processing_time_ms"),
+            requires_followup=event_data.get("requires_followup", False),
+            followup_actions=event_data.get("followup_actions", []),
         )
 
-        # ✅ RECORD SUCCESSFUL EVENT PROCESSING
+        # Forward response to Integration Dispatcher for delivery to user
+        await _forward_response_to_integration_dispatcher(
+            event_data, result.get("routed_agent") is not None
+        )
+
+        logger.info(
+            "Agent response received and processed",
+            request_id=request_id,
+            session_id=session_id,
+            agent_id=agent_id,
+            status=result.get("status"),
+        )
+
+        # Record successful event processing
         await _record_processed_event(
             db,
             event_id,
@@ -1060,7 +955,7 @@ async def _handle_agent_response_event(
     except Exception as e:
         logger.error("Failed to handle agent response event", error=str(e))
 
-        # ✅ RECORD FAILED EVENT PROCESSING
+        # Record failed event processing
         await _record_processed_event(
             db,
             event_id,
@@ -1116,98 +1011,6 @@ if __name__ == "__main__":
         reload=os.getenv("RELOAD", "false").lower() == "true",
         log_level=os.getenv("LOG_LEVEL", "INFO").lower(),
     )
-
-
-async def _detect_and_validate_agent_routing(
-    content: str,
-    current_agent_id: str,
-    available_agents: Optional[Dict[str, str]] = None,
-) -> Optional[str]:
-    """Detect routing signals in agent responses.
-
-    Supports two routing signals:
-    1. task_complete_return_to_router - routes back to routing agent (from any agent)
-    2. ROUTE_TO: [agent-name] - routes to specific agent (from routing agent)
-    """
-
-    # Get available agents if not provided
-    if available_agents is None:
-        available_agents = await _get_available_agents()
-
-    agent_response = content.strip()
-
-    # Check for task completion signal first (from any agent)
-    if "task_complete_return_to_router" in agent_response:
-        logger.info(
-            "Task completion signal detected - routing back to router",
-            current_agent_id=current_agent_id,
-            response=agent_response,
-        )
-        return "routing-agent"
-
-    # Check for structured routing response (ROUTE_TO: agent-name)
-    # Look for ROUTE_TO: anywhere in the response, not just at the start
-    if "ROUTE_TO:" in agent_response:
-        # Extract the target agent from the ROUTE_TO: line
-        lines = agent_response.split("\n")
-        for line in lines:
-            if line.strip().startswith("ROUTE_TO:"):
-                target_agent = line.split(":", 1)[1].strip()
-                if target_agent in available_agents:
-                    logger.info(
-                        "Structured routing detected",
-                        routing_response=agent_response,
-                        target_agent_name=target_agent,
-                        target_agent_uuid=available_agents[target_agent],
-                        current_agent_id=current_agent_id,
-                    )
-                    return target_agent
-                else:
-                    logger.warning(
-                        "Invalid target agent in structured routing",
-                        routing_response=agent_response,
-                        target_agent=target_agent,
-                        available_agents=list(available_agents.keys()),
-                    )
-                break
-
-    logger.warning(
-        "No valid routing signal detected - ignoring",
-        routing_response=agent_response,
-        available_agents=list(available_agents.keys()),
-        current_agent_id=current_agent_id,
-    )
-
-    return None
-
-
-async def _get_available_agents() -> Dict[str, str]:
-    """Get list of available agents from agent-service."""
-    try:
-        # Get agent-service host from environment
-        agent_service_host = os.getenv("AGENT_SERVICE_HOST", "agent-service")
-        agent_service_port = os.getenv("AGENT_SERVICE_PORT", "8080")
-        base_url = f"http://{agent_service_host}:{agent_service_port}"
-
-        # Call agent-service API to get agents
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(f"{base_url}/agents")
-            response.raise_for_status()
-
-            data = response.json()
-            agents = data.get("agents", {})
-
-            logger.info(
-                "Retrieved available agents from agent-service",
-                count=len(agents),
-                agents=list(agents.keys()),
-            )
-            return agents
-
-    except Exception as e:
-        logger.error("Failed to get available agents from agent-service", error=str(e))
-        # Return empty dict - validation will fail gracefully
-        return {}
 
 
 async def _forward_response_to_integration_dispatcher(

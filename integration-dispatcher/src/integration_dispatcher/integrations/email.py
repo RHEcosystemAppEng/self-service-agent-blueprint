@@ -6,9 +6,8 @@ from email.mime.text import MIMEText
 from typing import Any, Dict
 
 import aiosmtplib
-from shared_db.models import DeliveryStatus, UserIntegrationConfig
+from shared_db.models import DeliveryRequest, DeliveryStatus, UserIntegrationConfig
 
-from ..schemas import DeliveryRequest
 from .base import BaseIntegrationHandler, IntegrationResult
 
 

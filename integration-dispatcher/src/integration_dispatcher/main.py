@@ -13,7 +13,9 @@ from fastapi.responses import JSONResponse
 from shared_db import get_enum_value
 from shared_db.models import (
     DeliveryLog,
+    DeliveryRequest,
     DeliveryStatus,
+    ErrorResponse,
     IntegrationType,
     ProcessedEvent,
     UserIntegrationConfig,
@@ -30,8 +32,6 @@ from .integrations.test import TestIntegrationHandler
 from .integrations.webhook import WebhookIntegrationHandler
 from .schemas import (
     DeliveryLogResponse,
-    DeliveryRequest,
-    ErrorResponse,
     HealthCheck,
     UserIntegrationConfigCreate,
     UserIntegrationConfigResponse,
@@ -656,6 +656,70 @@ async def handle_cloudevent(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to process CloudEvent",
         )
+
+
+@app.post("/deliver")
+async def handle_direct_delivery(
+    request: Request,
+    db: AsyncSession = Depends(get_db_session),
+) -> Dict[str, Any]:
+    """Handle direct delivery requests (for non-eventing mode)."""
+    try:
+        print("=== DELIVER ENDPOINT CALLED ===")
+        body = await request.body()
+        delivery_data = json.loads(body)
+        print(f"Delivery data: {delivery_data}")
+
+        logger.info(
+            "Direct delivery request received",
+            request_id=delivery_data.get("request_id"),
+            session_id=delivery_data.get("session_id"),
+            user_id=delivery_data.get("user_id"),
+        )
+
+        # Create delivery request from the payload using shared model
+        from shared_db.models import DeliveryRequest
+
+        delivery_request = DeliveryRequest(
+            request_id=delivery_data.get("request_id"),
+            session_id=delivery_data.get("session_id"),
+            user_id=delivery_data.get("user_id"),
+            agent_id=delivery_data.get("agent_id"),
+            subject=delivery_data.get("subject"),
+            content=delivery_data.get("content"),
+            template_variables=delivery_data.get("template_variables", {}),
+        )
+
+        # Dispatch to integrations
+        logger.info(
+            "About to dispatch delivery request",
+            request_id=delivery_request.request_id,
+            user_id=delivery_request.user_id,
+            agent_id=delivery_request.agent_id,
+        )
+
+        results = await dispatcher.dispatch(delivery_request, db)
+        print(f"Dispatch results: {results}")
+
+        logger.info(
+            "Dispatch completed",
+            request_id=delivery_request.request_id,
+            results_count=len(results) if results else 0,
+            results=results,
+        )
+
+        return {
+            "status": "success",
+            "request_id": delivery_request.request_id,
+            "deliveries": results,
+        }
+
+    except json.JSONDecodeError:
+        logger.error("Invalid JSON in direct delivery request")
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+    except Exception as e:
+        logger.error("Error handling direct delivery request", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 async def _handle_request_acknowledgment(

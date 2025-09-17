@@ -1,10 +1,15 @@
 """Pydantic schemas for request/response validation."""
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field, field_validator
-from shared_db.models import IntegrationType, SessionStatus
+from shared_db.models import (
+    AgentResponse,
+    IntegrationType,
+    NormalizedRequest,
+    SessionStatus,
+)
 
 
 class BaseRequest(BaseModel):
@@ -62,31 +67,7 @@ class ToolRequest(BaseRequest):
     tool_context: Dict[str, Any] = Field(default_factory=dict)
 
 
-class NormalizedRequest(BaseModel):
-    """Normalized internal request format."""
-
-    request_id: str = Field(..., description="Unique request identifier")
-    session_id: str = Field(..., description="Session identifier")
-    user_id: str = Field(..., min_length=1, max_length=255)
-    integration_type: IntegrationType
-    request_type: str = Field(..., max_length=100)
-    content: str = Field(..., min_length=1)
-
-    # Integration-specific context
-    integration_context: Dict[str, Any] = Field(default_factory=dict)
-    user_context: Dict[str, Any] = Field(default_factory=dict)
-
-    # Agent routing
-    target_agent_id: Optional[str] = Field(None, max_length=255)
-    requires_routing: bool = Field(default=True)
-
-    # Timestamps
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-    class Config:
-        """Pydantic config."""
-
-        use_enum_values = True
+# NormalizedRequest is now imported from shared_db.models
 
 
 class SessionCreate(BaseModel):
@@ -152,25 +133,6 @@ class SessionUpdate(BaseModel):
     user_context: Optional[Dict[str, Any]] = None
 
 
-class AgentResponse(BaseModel):
-    """Schema for agent responses."""
-
-    request_id: str
-    session_id: str
-    agent_id: Optional[str]
-    content: str
-    response_type: str = Field(default="message")
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-
-    # Processing info
-    processing_time_ms: Optional[int] = None
-    requires_followup: bool = Field(default=False)
-    followup_actions: List[str] = Field(default_factory=list)
-
-    # Timestamps
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
 class CloudEventRequest(BaseModel):
     """Schema for CloudEvent requests."""
 
@@ -207,13 +169,4 @@ class HealthCheck(BaseModel):
     services: Dict[str, str] = Field(default_factory=dict)
 
 
-class ErrorResponse(BaseModel):
-    """Error response schema."""
-
-    error: str = Field(..., description="Error message")
-    error_code: str = Field(..., description="Error code")
-    request_id: Optional[str] = Field(None, description="Request ID if available")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    details: Optional[Dict[str, Any]] = Field(
-        None, description="Additional error details"
-    )
+# ErrorResponse is now imported from shared_db.models

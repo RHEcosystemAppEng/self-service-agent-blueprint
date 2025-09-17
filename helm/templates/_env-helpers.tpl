@@ -44,7 +44,9 @@ Generate common environment variables for all services
 - name: EXPECTED_MIGRATION_VERSION
   value: {{ .Values.database.expectedMigrationVersion | default "001" | quote }}
 - name: BROKER_URL
-  value: {{ printf "%s/%s/%s" .Values.requestManagement.knative.broker.url .Release.Namespace .Values.requestManagement.knative.broker.name | quote }}
+  value: {{ if .Values.requestManagement.knative.eventing.enabled }}{{ printf "%s/%s/%s" .Values.requestManagement.knative.broker.url .Release.Namespace .Values.requestManagement.knative.broker.name | quote }}{{ else }}{{ printf "http://%s-mock-eventing.%s.svc.cluster.local:8080/%s/%s" (include "self-service-agent.fullname" .) .Release.Namespace .Release.Namespace .Values.requestManagement.knative.broker.name | quote }}{{ end }}
+- name: EVENTING_ENABLED
+  value: {{ .Values.requestManagement.knative.eventing.enabled | quote }}
 - name: PORT
   value: "8080"
 - name: HOST
@@ -113,9 +115,9 @@ Generate Agent Service specific environment variables
 - name: LLAMA_STACK_URL
   value: {{ .Values.llama_stack_url | default "http://llamastack:8321" | quote }}
 - name: DEFAULT_AGENT_ID
-  value: "routing-agent"
+  value: {{ if hasKey .Values "agent" }}{{ .Values.agent.defaultAgentId | default "routing-agent" | quote }}{{ else }}"routing-agent"{{ end }}
 - name: AGENT_TIMEOUT
-  value: "120"
+  value: {{ if hasKey .Values "agent" }}{{ .Values.agent.timeout | default "120" | quote }}{{ else }}"120"{{ end }}
 {{- end }}
 
 {{/*

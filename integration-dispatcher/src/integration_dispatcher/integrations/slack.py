@@ -3,11 +3,10 @@
 import os
 from typing import Any, Dict
 
-from shared_db.models import DeliveryStatus, UserIntegrationConfig
+from shared_db.models import DeliveryRequest, DeliveryStatus, UserIntegrationConfig
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
 
-from ..schemas import DeliveryRequest
 from .base import BaseIntegrationHandler, IntegrationResult
 
 

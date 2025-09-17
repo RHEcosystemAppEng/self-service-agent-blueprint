@@ -40,15 +40,19 @@ class EventConfig:
     """Configuration for event handling."""
 
     def __init__(self) -> None:
-        # Knative Broker endpoint - must be configured via environment variables
+        # Knative Broker endpoint - can be optional for fallback mode
         import os
 
         self.broker_url = os.getenv("BROKER_URL")
-        if not self.broker_url:
+        self.eventing_enabled = os.getenv("EVENTING_ENABLED", "true").lower() == "true"
+
+        # If eventing is disabled, we don't need a broker URL
+        if self.eventing_enabled and not self.broker_url:
             raise ValueError(
-                "BROKER_URL environment variable is required but not set. "
-                "This should be configured by Helm deployment."
+                "BROKER_URL environment variable is required when eventing is enabled. "
+                "Set EVENTING_ENABLED=false to disable eventing or configure BROKER_URL."
             )
+
         self.source = "request-manager"
         self.timeout = 30.0
 
@@ -72,6 +76,15 @@ class CloudEventPublisher:
         event_type: str = "com.self-service-agent.request.created",
     ) -> bool:
         """Publish a normalized request as a CloudEvent."""
+        # If eventing is disabled, return success without publishing
+        if not self.config.eventing_enabled:
+            logger.info(
+                "Eventing disabled - skipping event publication",
+                event_type=event_type,
+                request_id=normalized_request.request_id,
+            )
+            return True
+
         event_data = {
             "request_id": normalized_request.request_id,
             "session_id": normalized_request.session_id,
@@ -107,6 +120,15 @@ class CloudEventPublisher:
         event_type: str = "com.self-service-agent.response.created",
     ) -> bool:
         """Publish an agent response as a CloudEvent."""
+        # If eventing is disabled, return success without publishing
+        if not self.config.eventing_enabled:
+            logger.info(
+                "Eventing disabled - skipping event publication",
+                event_type=event_type,
+                request_id=agent_response.request_id,
+            )
+            return True
+
         event_data = {
             "request_id": agent_response.request_id,
             "session_id": agent_response.session_id,
@@ -142,6 +164,15 @@ class CloudEventPublisher:
         event_data: Dict[str, Any],
     ) -> bool:
         """Publish a session-related event."""
+        # If eventing is disabled, return success without publishing
+        if not self.config.eventing_enabled:
+            logger.info(
+                "Eventing disabled - skipping event publication",
+                event_type=event_type,
+                session_id=session_id,
+            )
+            return True
+
         event = CloudEvent(
             {
                 "specversion": "1.0",
