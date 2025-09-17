@@ -127,6 +127,11 @@ snow/
 - `MCP_TRANSPORT`: Transport protocol (default: "sse")
 - `SELF_SERVICE_AGENT_SNOW_SERVER_SERVICE_PORT_HTTP`: HTTP port (default: 8001)
 - `MCP_HOST`: Host address (default: "0.0.0.0")
+- `SERVICENOW_INSTANCE_URL`: ServiceNow instance URL (e.g., "https://dev295439.service-now.com/")
+- `SERVICENOW_USERNAME`: ServiceNow username for authentication
+- `SERVICENOW_AUTH_TYPE`: Authentication type (e.g., "basic")
+- `SERVICENOW_PASSWORD`: ServiceNow password (sensitive - store as secret)
+- `USE_REAL_SERVICENOW`: if set to "true" will attempt to call the APIs of `SERVICENOW_INSTANCE_URL` (default: false)
 
 ## Error Handling
 
