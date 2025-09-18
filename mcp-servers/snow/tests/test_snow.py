@@ -27,20 +27,22 @@ def test_open_laptop_refresh_ticket_success():
     assert "INC" in result  # Ticket number format
 
 
-def test_open_laptop_refresh_ticket_default_model():
-    """Test ticket creation with default model."""
+def test_open_laptop_refresh_ticket_required_model():
+    """Test ticket creation with required preferred model."""
     employee_id = "1002"
     employee_name = "Jane Smith"
     business_justification = "Hardware failure requiring replacement"
+    preferred_model = "Dell Latitude 5520"
 
     result = open_laptop_refresh_ticket(
         employee_id=employee_id,
         employee_name=employee_name,
         business_justification=business_justification,
+        preferred_model=preferred_model,
     )
 
-    # Check that result contains default model
-    assert "Standard Business Laptop" in result
+    # Check that result contains the specified model
+    assert preferred_model in result
 
 
 def test_open_laptop_refresh_ticket_empty_employee_id():
@@ -50,6 +52,7 @@ def test_open_laptop_refresh_ticket_empty_employee_id():
             employee_id="",
             employee_name="John Doe",
             business_justification="Need new laptop",
+            preferred_model="MacBook Pro",
         )
 
 
@@ -60,6 +63,7 @@ def test_open_laptop_refresh_ticket_empty_employee_name():
             employee_id="1001",
             employee_name="",
             business_justification="Need new laptop",
+            preferred_model="MacBook Pro",
         )
 
 
@@ -67,5 +71,19 @@ def test_open_laptop_refresh_ticket_empty_justification():
     """Test error handling for empty business justification."""
     with pytest.raises(ValueError, match="Business justification cannot be empty"):
         open_laptop_refresh_ticket(
-            employee_id="1001", employee_name="John Doe", business_justification=""
+            employee_id="1001",
+            employee_name="John Doe",
+            business_justification="",
+            preferred_model="MacBook Pro",
+        )
+
+
+def test_open_laptop_refresh_ticket_empty_preferred_model():
+    """Test error handling for empty preferred model."""
+    with pytest.raises(ValueError, match="Preferred model cannot be empty"):
+        open_laptop_refresh_ticket(
+            employee_id="1001",
+            employee_name="John Doe",
+            business_justification="Need new laptop",
+            preferred_model="",
         )

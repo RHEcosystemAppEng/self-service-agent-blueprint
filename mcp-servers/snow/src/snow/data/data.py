@@ -17,7 +17,7 @@ def create_laptop_refresh_ticket(
     employee_id: str,
     employee_name: str,
     business_justification: str,
-    preferred_model: str = None,
+    preferred_model: str,
 ):
     """Create a mock laptop refresh ticket and return ticket details."""
     ticket_number = generate_ticket_number()

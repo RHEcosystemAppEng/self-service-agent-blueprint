@@ -10,7 +10,7 @@ A FastMCP server that provides tools for creating ServiceNow laptop refresh tick
 
 ## Tools
 
-### `open_laptop_refresh_ticket(employee_id: str, employee_name: str, business_justification: str, preferred_model: str = None)`
+### `open_laptop_refresh_ticket(employee_id: str, employee_name: str, business_justification: str, preferred_model: str)`
 
 Creates a ServiceNow laptop refresh ticket for an employee.
 
@@ -18,7 +18,7 @@ Creates a ServiceNow laptop refresh ticket for an employee.
 - `employee_id` (string): The unique identifier for the employee (e.g., '1001')
 - `employee_name` (string): The full name of the employee
 - `business_justification` (string): Business reason for the laptop refresh request
-- `preferred_model` (string, optional): Preferred laptop model (defaults to "Standard Business Laptop")
+- `preferred_model` (string): Preferred laptop model (required)
 
 **Returns:**
 - Ticket number and details
@@ -137,7 +137,7 @@ snow/
 
 The server validates all required parameters and returns meaningful error messages:
 
-- Empty employee ID, name, or business justification will raise `ValueError`
+- Empty employee ID, name, business justification, or preferred model will raise `ValueError`
 - All successful ticket creations return formatted ticket details
 - Health check endpoint available at `/health`
 

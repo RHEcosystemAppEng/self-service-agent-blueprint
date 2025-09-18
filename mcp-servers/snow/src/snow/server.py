@@ -111,7 +111,7 @@ def open_laptop_refresh_ticket(
     employee_id: str,
     employee_name: str,
     business_justification: str,
-    preferred_model: str = None,
+    preferred_model: str,
 ) -> str:
     """Open a ServiceNow laptop refresh ticket for an employee.
 
@@ -119,7 +119,7 @@ def open_laptop_refresh_ticket(
         employee_id: The unique identifier for the employee (e.g., '1001')
         employee_name: The full name of the employee
         business_justification: Business reason for the laptop refresh request
-        preferred_model: Optional preferred laptop model
+        preferred_model: Preferred laptop model
 
     Returns:
         A formatted string containing the ticket details
@@ -132,6 +132,9 @@ def open_laptop_refresh_ticket(
 
     if not business_justification:
         raise ValueError("Business justification cannot be empty")
+
+    if not preferred_model:
+        raise ValueError("Preferred model cannot be empty")
 
     # Try real ServiceNow first if configured, otherwise use mock
     if _should_use_real_servicenow():
