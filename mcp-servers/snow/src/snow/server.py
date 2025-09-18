@@ -119,7 +119,7 @@ def open_laptop_refresh_ticket(
         employee_id: The unique identifier for the employee (e.g., '1001')
         employee_name: The full name of the employee
         business_justification: Business reason for the laptop refresh request
-        preferred_model: Optional preferred laptop model (defaults to standard business laptop)
+        preferred_model: Optional preferred laptop model
 
     Returns:
         A formatted string containing the ticket details
@@ -133,14 +133,11 @@ def open_laptop_refresh_ticket(
     if not business_justification:
         raise ValueError("Business justification cannot be empty")
 
-    # Determine preferred model or use default
-    model = preferred_model or "lenovo_think_pad_p_16_gen_2"
-
     # Try real ServiceNow first if configured, otherwise use mock
     if _should_use_real_servicenow():
         try:
             logging.info(f"Using real ServiceNow API for employee {employee_id}")
-            return _create_real_servicenow_ticket(employee_id, model)
+            return _create_real_servicenow_ticket(employee_id, preferred_model)
         except Exception as e:
             logging.warning(f"ServiceNow API failed, falling back to mock: {e}")
             # Fall through to mock implementation
@@ -148,7 +145,7 @@ def open_laptop_refresh_ticket(
     # Use mock implementation
     logging.info(f"Using mock ServiceNow implementation for employee {employee_id}")
     return _create_mock_ticket(
-        employee_id, employee_name, business_justification, model
+        employee_id, employee_name, business_justification, preferred_model
     )
 
 
