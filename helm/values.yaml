@@ -140,7 +140,7 @@ mcp-servers:
       uri: http://self-service-agent-snow:8000/sse/
       imageTag: 0.0.2
       env:
-        SERVICENOW_INSTANCE_URL: "https://dev295439.service-now.com/"
+SERVICENOW_INSTANCE_URL: "yyy"
         SERVICENOW_USERNAME: "svc_self_service_agent_mcp"
         SERVICENOW_AUTH_TYPE: "basic"
         SERVICENOW_PASSWORD: "xxx"  # TODO move to secrets
