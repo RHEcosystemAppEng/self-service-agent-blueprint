@@ -99,13 +99,19 @@ class StateMachine:
         settings = self.config.get("settings", {})
         return settings.get("empty_response_retry_count", 3)
 
-    def _format_text(self, text: str, state_data: dict) -> str:
+    def _format_text(
+        self, text: str, state_data: dict, authoritative_user_id: str = None
+    ) -> str:
         """Format text by replacing placeholders with state data."""
         import re
 
         try:
             # Add special computed values
             format_data = dict(state_data)
+
+            # Add authoritative_user_id if provided
+            if authoritative_user_id:
+                format_data["authoritative_user_id"] = authoritative_user_id
 
             # Add last_user_message placeholder
             messages = state_data.get("messages", [])
@@ -171,12 +177,12 @@ class StateMachine:
             return text
 
     def process_llm_processor_state(
-        self, state: dict, state_config: dict, agent
+        self, state: dict, state_config: dict, agent, authoritative_user_id: str = None
     ) -> dict:
         """Process llm_processor type states - completely generic and configuration-driven."""
 
         # Step 1: Determine the prompt to use
-        prompt = self._get_prompt_for_state(state, state_config)
+        prompt = self._get_prompt_for_state(state, state_config, authoritative_user_id)
 
         # Step 2: Prepare messages and send to LLM with retry logic for empty responses
         # Check if state config wants to use conversation history
@@ -219,8 +225,12 @@ class StateMachine:
         temperature = state_config.get(
             "temperature"
         )  # Get temperature from state config
+
         response = agent.create_response_with_retry(
-            messages_to_send, self._get_retry_count(), temperature=temperature
+            messages_to_send,
+            self._get_retry_count(),
+            temperature=temperature,
+            authoritative_user_id=authoritative_user_id,
         )
 
         # Step 3: Store response data as configured
@@ -231,13 +241,15 @@ class StateMachine:
 
         # Step 5: Analyze response and determine next state
         next_state = self._analyze_response_and_transition(
-            state, state_config, response
+            state, state_config, response, authoritative_user_id
         )
         state["current_state"] = next_state
 
         return state
 
-    def _get_prompt_for_state(self, state: dict, state_config: dict) -> str:
+    def _get_prompt_for_state(
+        self, state: dict, state_config: dict, authoritative_user_id: str = None
+    ) -> str:
         """Get the appropriate prompt based on conditional logic or default."""
 
         # Check for conditional prompts
@@ -252,17 +264,17 @@ class StateMachine:
                 # Check if condition is met
                 if self._evaluate_condition(state, condition_config):
                     prompt_text = condition_config.get("prompt", "")
-                    return self._format_text(prompt_text, state)
+                    return self._format_text(prompt_text, state, authoritative_user_id)
 
             # If no conditions matched, use default
             for condition_config in conditional_prompts:
                 if condition_config.get("condition") == "default":
                     prompt_text = condition_config.get("prompt", "")
-                    return self._format_text(prompt_text, state)
+                    return self._format_text(prompt_text, state, authoritative_user_id)
 
         # Fallback to simple prompt
         prompt_text = state_config.get("prompt", "")
-        return self._format_text(prompt_text, state)
+        return self._format_text(prompt_text, state, authoritative_user_id)
 
     def _evaluate_condition(self, state: dict, condition_config: dict) -> bool:
         """Evaluate whether a condition is met based on state data."""
@@ -321,21 +333,31 @@ class StateMachine:
                 state[key] = {"response": response}
 
     def _analyze_response_and_transition(
-        self, state: dict, state_config: dict, response: str
+        self,
+        state: dict,
+        state_config: dict,
+        response: str,
+        authoritative_user_id: str = None,
     ) -> str:
         """Analyze LLM response and determine next state transition."""
 
         # Check for response analysis configuration
         response_analysis = state_config.get("response_analysis")
         if response_analysis:
-            return self._process_response_analysis(state, response_analysis, response)
+            return self._process_response_analysis(
+                state, response_analysis, response, authoritative_user_id
+            )
 
         # Fallback to simple transitions
         transitions = state_config.get("transitions", {})
         return transitions.get("success", "end")
 
     def _process_response_analysis(
-        self, state: dict, analysis_config: dict, response: str
+        self,
+        state: dict,
+        analysis_config: dict,
+        response: str,
+        authoritative_user_id: str = None,
     ) -> str:
         """Process response analysis with conditions and actions."""
         response_lower = response.lower()
@@ -361,7 +383,9 @@ class StateMachine:
 
             # Execute actions for this condition - completely generic
             actions = condition.get("actions", [])
-            next_state = self._execute_actions(state, actions, response, response_lower)
+            next_state = self._execute_actions(
+                state, actions, response, response_lower, authoritative_user_id
+            )
 
             if next_state:
                 return next_state
@@ -370,7 +394,12 @@ class StateMachine:
         return analysis_config.get("default_transition", "end")
 
     def _execute_actions(
-        self, state: dict, actions: list, response: str, response_lower: str
+        self,
+        state: dict,
+        actions: list,
+        response: str,
+        response_lower: str,
+        authoritative_user_id: str = None,
     ) -> str:
         """Execute a list of actions completely generically based on configuration."""
         next_state = None
@@ -389,7 +418,9 @@ class StateMachine:
                 ):
                     correction_message = action.get("correction_message", "")
                     if correction_message:
-                        formatted_message = self._format_text(correction_message, state)
+                        formatted_message = self._format_text(
+                            correction_message, state, authoritative_user_id
+                        )
                         state["messages"].append(AIMessage(content=formatted_message))
 
             elif action_type == "extract_data":
@@ -422,7 +453,9 @@ class StateMachine:
                 # Add a message to the conversation
                 message_content = action.get("message", "")
                 if message_content:
-                    formatted_message = self._format_text(message_content, state)
+                    formatted_message = self._format_text(
+                        message_content, state, authoritative_user_id
+                    )
                     state["messages"].append(AIMessage(content=formatted_message))
 
             elif action_type == "set_field":
@@ -504,6 +537,13 @@ class StateMachine:
             else:
                 state[field_name] = default_value
 
+        # Add initial user message if configured
+        initial_user_message = settings.get("initial_user_message")
+        if initial_user_message and "messages" in state:
+            from langchain_core.messages import HumanMessage
+
+            state["messages"].append(HumanMessage(content=initial_user_message))
+
         return state
 
     def reset_state_for_new_conversation(self) -> dict:
@@ -561,7 +601,7 @@ class StateMachine:
         return state
 
     def process_intent_classifier_state(
-        self, state: dict, state_config: dict, agent
+        self, state: dict, state_config: dict, agent, authoritative_user_id: str = None
     ) -> dict:
         """Process intent_classifier type states."""
         messages = state["messages"]
@@ -575,15 +615,21 @@ class StateMachine:
 
         # Use LLM to classify intent
         intent_prompt = self._format_text(
-            state_config.get("intent_prompt", ""), {**state, "user_input": user_input}
+            state_config.get("intent_prompt", ""),
+            {**state, "user_input": user_input},
+            authoritative_user_id,
         )
         intent_messages = [{"role": "user", "content": intent_prompt}]
         temperature = state_config.get(
             "temperature"
         )  # Get temperature from state config
+
         intent_response = (
             agent.create_response_with_retry(
-                intent_messages, self._get_retry_count(), temperature=temperature
+                intent_messages,
+                self._get_retry_count(),
+                temperature=temperature,
+                authoritative_user_id=authoritative_user_id,
             )
             .strip()
             .upper()
@@ -596,14 +642,18 @@ class StateMachine:
                 # Handle response
                 if "response" in action:
                     response = self._format_text(
-                        action["response"], {**state, "user_input": user_input}
+                        action["response"],
+                        {**state, "user_input": user_input},
+                        authoritative_user_id,
                     )
                     state["messages"].append(AIMessage(content=response))
 
                 # Handle LLM prompt
                 if "prompt" in action:
                     prompt = self._format_text(
-                        action["prompt"], {**state, "user_input": user_input}
+                        action["prompt"],
+                        {**state, "user_input": user_input},
+                        authoritative_user_id,
                     )
                     messages_to_send = [{"role": "user", "content": prompt}]
                     # Use state temperature for intent action prompts for consistency
@@ -614,6 +664,7 @@ class StateMachine:
                         messages_to_send,
                         self._get_retry_count(),
                         temperature=action_temperature,
+                        authoritative_user_id=authoritative_user_id,
                     )
                     state["messages"].append(AIMessage(content=response))
 
@@ -622,7 +673,9 @@ class StateMachine:
                     for key, value in action["data_storage"].items():
                         # Format the value to substitute placeholders like {user_input}
                         formatted_value = self._format_text(
-                            str(value), {**state, "user_input": user_input}
+                            str(value),
+                            {**state, "user_input": user_input},
+                            authoritative_user_id,
                         )
                         state[key] = formatted_value
 
@@ -637,7 +690,7 @@ class StateMachine:
         return state
 
     def process_llm_validator_state(
-        self, state: dict, state_config: dict, agent
+        self, state: dict, state_config: dict, agent, authoritative_user_id: str = None
     ) -> dict:
         """Process llm_validator type states (like laptop selection validation)."""
         messages = state["messages"]
@@ -653,7 +706,9 @@ class StateMachine:
         format_state = dict(state)
         format_state["user_input"] = user_input
         validation_prompt = self._format_text(
-            state_config.get("validation_prompt", ""), format_state
+            state_config.get("validation_prompt", ""),
+            format_state,
+            authoritative_user_id,
         )
 
         # Build conversation context
@@ -666,14 +721,19 @@ class StateMachine:
 
         messages_to_send.append({"role": "system", "content": validation_prompt})
         temperature = state_config.get("temperature", 0.3)  # Default for validation
+
         response = agent.create_response_with_retry(
-            messages_to_send, self._get_retry_count(), temperature=temperature
+            messages_to_send,
+            self._get_retry_count(),
+            temperature=temperature,
+            authoritative_user_id=authoritative_user_id,
         )
 
         # Use LLM to determine if validation passed
         success_validation_prompt = self._format_text(
             state_config.get("success_validation_prompt", ""),
             {"llm_response": response},
+            authoritative_user_id,
         )
         validation_messages = [{"role": "user", "content": success_validation_prompt}]
         validation_response = (
@@ -681,6 +741,7 @@ class StateMachine:
                 validation_messages,
                 self._get_retry_count(),
                 temperature=0.1,  # Very deterministic for validation classification
+                authoritative_user_id=authoritative_user_id,
             )
             .strip()
             .upper()
@@ -708,7 +769,9 @@ class StateMachine:
         state["current_state"] = "end"
         return state
 
-    def process_state(self, state: dict, agent) -> dict:
+    def process_state(
+        self, state: dict, agent, authoritative_user_id: str = None
+    ) -> dict:
         """Process the current state based on its configuration."""
         current_state_name = state.get("current_state", "")
 
@@ -727,11 +790,17 @@ class StateMachine:
         state_type = state_config.get("type", "")
 
         if state_type == "llm_processor":
-            return self.process_llm_processor_state(state, state_config, agent)
+            return self.process_llm_processor_state(
+                state, state_config, agent, authoritative_user_id
+            )
         elif state_type == "intent_classifier":
-            return self.process_intent_classifier_state(state, state_config, agent)
+            return self.process_intent_classifier_state(
+                state, state_config, agent, authoritative_user_id
+            )
         elif state_type == "llm_validator":
-            return self.process_llm_validator_state(state, state_config, agent)
+            return self.process_llm_validator_state(
+                state, state_config, agent, authoritative_user_id
+            )
         elif state_type == "terminal":
             return self.process_terminal_state(state, state_config)
         else:
@@ -751,6 +820,7 @@ class ConversationSession:
         agent,
         thread_id: str = None,
         checkpoint_db_path: str = None,
+        authoritative_user_id: str = None,
     ):
         """
         Initialize a new conversation session with persistent checkpoint storage.
@@ -759,11 +829,13 @@ class ConversationSession:
             agent: Agent instance to use for this session (config includes state machine path)
             thread_id: Thread identifier for conversation persistence (defaults to generated ID)
             checkpoint_db_path: Path to SQLite checkpoint database (defaults to memory)
+            authoritative_user_id: Optional authoritative user ID for the user
         """
         import uuid
 
         self.thread_id = thread_id or str(uuid.uuid4())
         self.agent = agent
+        self.authoritative_user_id = authoritative_user_id
 
         # Get state machine config path from agent configuration
         lg_config_path = agent.config.get(
@@ -822,7 +894,9 @@ class ConversationSession:
         )
 
         # Use session agent
-        return self.state_machine.process_state(state, self.agent)
+        return self.state_machine.process_state(
+            state, self.agent, self.authoritative_user_id
+        )
 
     def _route_next_step(self, state: dict) -> str:
         """Route to the next step based on current state."""

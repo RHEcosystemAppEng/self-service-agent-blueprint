@@ -7,7 +7,7 @@ ServiceNow laptop refresh tickets.
 import logging
 import os
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 from snow.data.data import create_laptop_refresh_ticket
 from snow.servicenow.client import ServiceNowClient
 from snow.servicenow.models import OpenServiceNowLaptopRefreshRequestParams
@@ -68,6 +68,7 @@ def _create_mock_ticket(
     employee_name: str,
     business_justification: str,
     preferred_model: str,
+    authoritative_user_id: str,
 ) -> str:
     """Create a mock ticket using the existing mock implementation."""
     ticket_data = create_laptop_refresh_ticket(
@@ -94,8 +95,9 @@ def _create_mock_ticket(
     Your laptop refresh request has been submitted and will be processed by the IT Hardware Team.
     You will receive updates via email as the ticket progresses.
     """
+
     logging.info(
-        f"created service now ticket - employee_id: {employee_id}, ticket_number: {ticket_data['ticket_number']}"
+        f"created service now ticket - authoritative_user_id: {authoritative_user_id}, employee_id: {employee_id}, ticket_number: {ticket_data['ticket_number']}"
     )
     return ticket_details
 
@@ -111,7 +113,8 @@ def open_laptop_refresh_ticket(
     employee_id: str,
     employee_name: str,
     business_justification: str,
-    preferred_model: str,
+    ctx: Context,
+    preferred_model: str = None,
 ) -> str:
     """Open a ServiceNow laptop refresh ticket for an employee.
 
@@ -136,19 +139,43 @@ def open_laptop_refresh_ticket(
     if not preferred_model:
         raise ValueError("Preferred model cannot be empty")
 
+    # Extract authoritative user ID from request headers via Context
+    authoritative_user_id = None
+    try:
+        request_context = ctx.request_context
+        if hasattr(request_context, "request") and request_context.request:
+            request = request_context.request
+            if hasattr(request, "headers"):
+                headers = request.headers
+
+                authoritative_user_id = headers.get(
+                    "AUTHORITATIVE_USER_ID"
+                ) or headers.get("authoritative_user_id")
+    except Exception as e:
+        logging.debug(f"Error extracting headers from request context: {e}")
+        authoritative_user_id = None
+
     # Try real ServiceNow first if configured, otherwise use mock
     if _should_use_real_servicenow():
         try:
-            logging.info(f"Using real ServiceNow API for employee {employee_id}")
+            logging.info(
+                f"Using real ServiceNow API - authoritative_user_id: {authoritative_user_id}, employee_id: {employee_id}"
+            )
             return _create_real_servicenow_ticket(employee_id, preferred_model)
         except Exception as e:
             logging.warning(f"ServiceNow API failed, falling back to mock: {e}")
             # Fall through to mock implementation
 
     # Use mock implementation
-    logging.info(f"Using mock ServiceNow implementation for employee {employee_id}")
+    logging.info(
+        f"Using mock ServiceNow implementation - authoritative_user_id: {authoritative_user_id}, employee_id: {employee_id}"
+    )
     return _create_mock_ticket(
-        employee_id, employee_name, business_justification, preferred_model
+        employee_id,
+        employee_name,
+        business_justification,
+        preferred_model,
+        authoritative_user_id,
     )
 
 

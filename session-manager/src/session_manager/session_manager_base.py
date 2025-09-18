@@ -75,7 +75,11 @@ class SessionManagerBase(ABC):
         # Generate session name and create session
         session_name = self._generate_session_name(user_id)
         session = self._create_session_for_agent(
-            routing_agent, self.ROUTING_AGENT_NAME, user_id, session_name=session_name
+            routing_agent,
+            self.ROUTING_AGENT_NAME,
+            user_id,
+            session_name=session_name,
+            authoritative_user_id=user_email,
         )
 
         # Store session metadata for future resumption (if metadata storage is enabled)
@@ -114,7 +118,9 @@ class SessionManagerBase(ABC):
         """Update the current session fields with new session data."""
         pass
 
-    def _create_specialist_session(self, agent_name: str, user_id: str) -> tuple:
+    def _create_specialist_session(
+        self, agent_name: str, user_id: str, user_email: str = None
+    ) -> tuple:
         """Create a new session for a specialist agent."""
         # Get the specialist agent
         agent = self._get_agent_for_routing(agent_name)
@@ -126,7 +132,11 @@ class SessionManagerBase(ABC):
 
         # Create session using implementation-specific method
         session = self._create_session_for_agent(
-            agent, agent_name, user_id, session_name=session_name
+            agent,
+            agent_name,
+            user_id,
+            session_name=session_name,
+            authoritative_user_id=user_email,
         )
 
         # Store session metadata for future resumption (if metadata storage is enabled)
@@ -145,12 +155,16 @@ class SessionManagerBase(ABC):
         """Update the current session to use the specialist agent session."""
         self._update_session_fields(current_session, session_data)
 
-    def _route_to_specialist(self, user_id, agent_name, text, current_session):
+    def _route_to_specialist(
+        self, user_id, agent_name, text, current_session, user_email: str = None
+    ):
         """Routes the conversation to a specialist agent."""
         logger.debug(f"Routing to agent: {agent_name}")
 
         # Create a new session for the specialist agent
-        session_data, error = self._create_specialist_session(agent_name, user_id)
+        session_data, error = self._create_specialist_session(
+            agent_name, user_id, user_email
+        )
         if error:
             return error
 
@@ -224,7 +238,9 @@ class SessionManagerBase(ABC):
             and signal != self.ROUTING_AGENT_NAME
             and self._is_routing_session(current_session)
         ):
-            return self._route_to_specialist(user_id, signal, text, current_session)
+            return self._route_to_specialist(
+                user_id, signal, text, current_session, user_email
+            )
 
         return agent_response
 

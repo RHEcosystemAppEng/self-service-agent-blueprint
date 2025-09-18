@@ -106,6 +106,7 @@ class SessionManagerResponses(SessionManagerBase):
         user_id: str,
         session_name: str = None,
         resume_thread_id: str = None,
+        authoritative_user_id: str = None,
     ):
         """Create a new session for the given agent."""
         # Use provided thread_id for resumption or generate a new one
@@ -122,7 +123,10 @@ class SessionManagerResponses(SessionManagerBase):
             )
 
         return ConversationSession(
-            agent, session_thread_id, str(self.checkpoint_db_path)
+            agent,
+            session_thread_id,
+            str(self.checkpoint_db_path),
+            authoritative_user_id=authoritative_user_id,
         )
 
     def _build_session_data(

@@ -74,6 +74,7 @@ def _evaluate_conversations(
     results_dir: str = "results/conversation_results",
     output_dir: str = "results/deep_eval_results",
     context_dir: Optional[str] = None,
+    no_employee_id: bool = False,
 ) -> int:
     """
     Main evaluation function that processes conversation files and generates assessment reports.
@@ -127,7 +128,7 @@ def _evaluate_conversations(
 
     print(f"Found {len(json_files)} conversation files to evaluate")
 
-    metrics = get_metrics(custom_model)
+    metrics = get_metrics(custom_model, no_employee_id=no_employee_id)
 
     # Initialize tracking for evaluation results and success metrics
     all_results = []
@@ -145,7 +146,29 @@ def _evaluate_conversations(
 
             # Load single conversation
             with open(file_path, "r", encoding="utf-8") as f:
-                conversation_data = json.load(f)
+                file_data = json.load(f)
+
+            # Expected format: object with metadata and conversation
+            if not isinstance(file_data, dict) or "conversation" not in file_data:
+                logger.error(
+                    f"Invalid conversation format in {filename} - expected object with metadata and conversation"
+                )
+                continue
+
+            conversation_data = file_data["conversation"]
+            authoritative_user_id = file_data.get("metadata", {}).get(
+                "authoritative_user_id"
+            )
+
+            if not authoritative_user_id:
+                logger.error(
+                    f"No authoritative_user_id found in metadata for {filename}"
+                )
+                continue
+
+            logger.info(
+                f"Processing {filename} with authoritative_user_id: {authoritative_user_id}"
+            )
 
             # Convert to turns
             turns = _convert_to_turns(conversation_data)
@@ -167,10 +190,16 @@ def _evaluate_conversations(
                     f"Using {len(context_for_file)} context item(s) for {filename}"
                 )
 
+            # Set chatbot role based on no_employee_id flag
+            if no_employee_id:
+                chatbot_role = "You are an IT Support Agent specializing in hardware replacement. Your task is to determine if the authenticated user's laptop is eligible for replacement based on the company policy and the specific context of their request. If the user is not eligible they are allowed to request a replacement anyway, but they should be warned that it may not be accepted"
+            else:
+                chatbot_role = "You are an IT Support Agent specializing in hardware replacement. Your task is to determine if an employee's laptop is eligible for replacement based on the company policy and the specific context of their request. If the user is not eligible they are allowed to request a replacement anyway, but they should be warned that it may not be accepted"
+
             test_case = ConversationalTestCase(
                 turns=turns,
                 context=test_case_context,
-                chatbot_role="You are an IT Support Agent specializing in hardware replacement. Your task is to determine if an employee's laptop is eligible for replacement based on the company policy and the specific context of their request. If the user is not eligible they are allowed to request a replacement anyway, but they should be warned that it may not be accepted",
+                chatbot_role=chatbot_role,
             )
 
             # Execute evaluation with suppressed output for cleaner reporting
@@ -383,6 +412,12 @@ def _parse_arguments() -> argparse.Namespace:
         help="Directory containing context files (matched by conversation filename). Note: 'conversations_config/default_context/' and 'conversations_config/conversation_context/' directories are automatically used if they exist.",
     )
 
+    parser.add_argument(
+        "--no-employee-id",
+        action="store_true",
+        help="Exclude employee ID-related checks in evaluation metrics",
+    )
+
     return parser.parse_args()
 
 
@@ -424,6 +459,7 @@ if __name__ == "__main__":
         results_dir=args.results_dir,
         output_dir=args.output_dir,
         context_dir=args.context_dir,
+        no_employee_id=args.no_employee_id,
     )
 
     # Print token usage summary using shared function

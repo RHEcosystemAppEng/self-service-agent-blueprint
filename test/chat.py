@@ -72,13 +72,22 @@ def main(use_responses=False, session_name=None):
     else:
         user_id = str(uuid.uuid4())  # user ID for CLI sessions
 
+    # Get authoritative user ID from environment variable if provided
+    authoritative_user_id = os.environ.get("AUTHORITATIVE_USER_ID")
+    if authoritative_user_id:
+        logger.info(
+            f"Using authoritative user ID from environment: {authoritative_user_id}"
+        )
+
     print("CLI Chat - Type 'quit' to exit, 'reset' to clear session")
 
     # Only send initial greeting for new sessions, not when resuming
     if not (use_responses and session_name):
         # Initial greeting for new sessions
         kickoff_message = "please introduce yourself and tell me how you can help"
-        agent_response = session_manager.handle_user_message(user_id, kickoff_message)
+        agent_response = session_manager.handle_user_message(
+            user_id, kickoff_message, authoritative_user_id
+        )
         print(f"agent: {agent_response} {AGENT_MESSAGE_TERMINATOR}")
     else:
         logger.info("Resuming conversation - ready for your input.")
@@ -89,7 +98,9 @@ def main(use_responses=False, session_name=None):
             if message.lower() in ["quit", "exit", "q"]:
                 break
             elif message.lower() == "**tokens**":
-                agent_response = session_manager.handle_user_message(user_id, message)
+                agent_response = session_manager.handle_user_message(
+                    user_id, message, authoritative_user_id
+                )
                 print(agent_response)
                 print("TOKEN_SUMMARY_END")
                 sys.stdout.flush()
@@ -103,7 +114,9 @@ def main(use_responses=False, session_name=None):
 
             if message.strip():
                 # Use SessionManager to handle the message (same as Slack service)
-                agent_response = session_manager.handle_user_message(user_id, message)
+                agent_response = session_manager.handle_user_message(
+                    user_id, message, authoritative_user_id
+                )
                 print(f"agent: {agent_response} {AGENT_MESSAGE_TERMINATOR}")
 
         except KeyboardInterrupt:

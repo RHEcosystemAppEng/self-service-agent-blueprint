@@ -523,6 +523,11 @@ def _parse_arguments() -> argparse.Namespace:
         default="chat.py",
         help="Name of the test script to execute (default: chat.py)",
     )
+    parser.add_argument(
+        "--no-employee-id",
+        action="store_true",
+        help="Exclude employee ID-related checks in evaluation metrics",
+    )
     return parser.parse_args()
 
 
@@ -796,6 +801,7 @@ def run_evaluation_pipeline(
     timeout: int = 600,
     max_turns: int = 20,
     test_script: str = "chat.py",
+    no_employee_id: bool = False,
 ) -> int:
     """
     Run the complete evaluation pipeline.
@@ -828,6 +834,8 @@ def run_evaluation_pipeline(
     # Step 1: Run conversation flows
     logger.info("📋 Step 1/3: Running predefined conversation flows...")
     run_conversations_args = ["--test-script", test_script]
+    if no_employee_id:
+        run_conversations_args.append("--no-employee-id")
     if not run_script(
         "run_conversations.py", args=run_conversations_args, timeout=timeout
     ):
@@ -859,7 +867,10 @@ def run_evaluation_pipeline(
 
     # Step 3: Run deepeval evaluation
     logger.info("📊 Step 3/3: Running deepeval evaluation...")
-    if not run_script("deep_eval.py", timeout=timeout):
+    deep_eval_args = []
+    if no_employee_id:
+        deep_eval_args.append("--no-employee-id")
+    if not run_script("deep_eval.py", args=deep_eval_args, timeout=timeout):
         failed_steps.append("deep_eval.py")
         logger.error("❌ Step 3 failed")
     else:
@@ -928,6 +939,7 @@ def main() -> int:
                 timeout=args.timeout,
                 max_turns=args.max_turns,
                 test_script=args.test_script,
+                no_employee_id=args.no_employee_id,
             )
     except KeyboardInterrupt:
         logger.warning("⚠️  Pipeline interrupted by user")
