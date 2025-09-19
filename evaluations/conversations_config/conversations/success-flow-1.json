@@ -1,22 +1,28 @@
-[
-    {
-        "role": "user",
-        "content": "refresh"
+{
+    "metadata": {
+        "authoritative_user_id": "alice.johnson@company.com",
+        "description": "Successful laptop refresh flow"
     },
-    {
-        "role": "user",
-        "content": "1001"
-    },
-    {
-        "role": "user",
-        "content": "I would like to see the options"
-    },
-    {
-        "role": "user", 
-        "content": "3"
-    },
-    {
-        "role": "user",
-        "content": "proceed"
-    }
-]
+    "conversation": [
+        {
+            "role": "user",
+            "content": "refresh"
+        },
+        {
+            "role": "user",
+            "content": "1001"
+        },
+        {
+            "role": "user",
+            "content": "I would like to see the options"
+        },
+        {
+            "role": "user",
+            "content": "3"
+        },
+        {
+            "role": "user",
+            "content": "proceed"
+        }
+    ]
+}

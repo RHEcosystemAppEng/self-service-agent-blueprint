@@ -262,3 +262,8 @@ MOCK_EMPLOYEE_DATA = {
         },
     },
 }
+
+# Email to employee ID mapping for O(1) lookup performance
+EMAIL_TO_EMPLOYEE_ID = {
+    emp_data["email"].lower(): emp_id for emp_id, emp_data in MOCK_EMPLOYEE_DATA.items()
+}

@@ -40,7 +40,7 @@ class Agent:
         self.openai_client = self._create_openai_client()
         self.system_message = system_message or self._get_default_system_message()
 
-        # Build tools once during initialization
+        # Build tools once during initialization (without authoritative_user_id)
         mcp_servers = self.config.get("mcp_servers", [])
         self.tools = self._get_mcp_tools_to_use(mcp_servers)
 
@@ -128,7 +128,9 @@ class Agent:
             )
             return None
 
-    def _get_mcp_tools_to_use(self, requested_servers: list = None) -> list:
+    def _get_mcp_tools_to_use(
+        self, requested_servers: list = None, authoritative_user_id: str = None
+    ) -> list:
         """Get complete tools array for LlamaStack responses API."""
         tools_to_use = []
 
@@ -180,6 +182,12 @@ class Agent:
                         "server_url": server_url,
                         "require_approval": "never",
                     }
+
+                    # Add headers if authoritative_user_id is provided
+                    if authoritative_user_id:
+                        mcp_tool["headers"] = {
+                            "AUTHORITATIVE_USER_ID": authoritative_user_id
+                        }
                     tools_to_use.append(mcp_tool)
 
                 except Exception as e:
@@ -192,7 +200,12 @@ class Agent:
         return tools_to_use
 
     def create_response_with_retry(
-        self, messages: list, max_retries: int = 3, temperature: float = None
+        self,
+        messages: list,
+        max_retries: int = 3,
+        temperature: float = None,
+        additional_system_messages: list = None,
+        authoritative_user_id: str = None,
     ) -> str:
         """Create a response with retry logic for empty responses and errors."""
         response = None
@@ -200,7 +213,12 @@ class Agent:
 
         for attempt in range(max_retries + 1):  # +1 for initial attempt plus retries
             try:
-                response = self.create_response(messages, temperature=temperature)
+                response = self.create_response(
+                    messages,
+                    temperature=temperature,
+                    additional_system_messages=additional_system_messages,
+                    authoritative_user_id=authoritative_user_id,
+                )
 
                 # Check if response is empty or contains error
                 if response and response.strip():
@@ -291,35 +309,54 @@ class Agent:
             logger.warning(f"Error while checking response errors: {e}")
             return f"Error checking failed: {e}"
 
-    def create_response(self, messages: list, temperature: float = None) -> str:
-        """Create a response using LlamaStack responses API."""
+    def create_response(
+        self,
+        messages: list,
+        temperature: float = None,
+        additional_system_messages: list = None,
+        authoritative_user_id: str = None,
+    ) -> str:
+        """Create a response using LlamaStack responses API.
+
+        Args:
+            messages: List of user/assistant messages
+            temperature: Optional temperature override
+            additional_system_messages: Optional list of additional system messages to include
+            authoritative_user_id: Optional authoritative user ID to pass via X-LlamaStack-Provider-Data header to MCP servers
+        """
         try:
-            messages_with_system = [
-                {"role": "system", "content": self.system_message}
-            ] + messages
+            # Start with the main system message
+            messages_with_system = [{"role": "system", "content": self.system_message}]
 
-            logger.debug(f"Using model: {self.model}")
-            logger.debug(f"Using tools for responses API: {self.tools}")
+            # Add any additional system messages
+            if additional_system_messages:
+                for sys_msg in additional_system_messages:
+                    messages_with_system.append({"role": "system", "content": sys_msg})
 
-            logger.debug(
-                f"Calling LlamaStack with {len(messages_with_system)} messages"
-            )
+            # Add the conversation messages
+            messages_with_system.extend(messages)
 
             # Override temperature if provided
             response_config = dict(self.default_response_config)
             if temperature is not None:
                 response_config["temperature"] = temperature
-                logger.debug(f"Using custom temperature: {temperature}")
+
+            # Rebuild tools with headers if authoritative_user_id is provided
+            if authoritative_user_id:
+                mcp_servers = self.config.get("mcp_servers", [])
+                tools_to_use = self._get_mcp_tools_to_use(
+                    mcp_servers, authoritative_user_id
+                )
+            else:
+                tools_to_use = self.tools
 
             # Use the existing LlamaStack client for response creation
             response = self.llama_client.responses.create(
                 input=messages_with_system,
                 model=self.model,
                 **response_config,
-                tools=self.tools,
+                tools=tools_to_use,
             )
-
-            logger.debug(f"Received response from LlamaStack: {type(response)}")
 
             # Import token counting if available
             try:

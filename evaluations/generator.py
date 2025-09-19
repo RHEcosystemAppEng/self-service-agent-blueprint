@@ -33,6 +33,7 @@ import json
 import logging
 import os
 import random
+from pathlib import Path
 from typing import List
 
 from deepeval.dataset import ConversationalGolden
@@ -52,6 +53,22 @@ client = None
 total_app_tokens = {"input": 0, "output": 0, "total": 0, "calls": 0}
 
 random.seed()
+
+
+def _load_random_authoritative_user_id() -> str:
+    """Load and return a random user ID from the conversations_config/authoritative_user_ids file."""
+    user_ids_file = Path("conversations_config/authoritative_user_ids")
+
+    if not user_ids_file.exists():
+        raise FileNotFoundError(f"Required file not found: {user_ids_file}")
+
+    with open(user_ids_file, "r") as f:
+        user_ids = [line.strip() for line in f if line.strip()]
+
+    if not user_ids:
+        raise ValueError(f"No user IDs found in {user_ids_file}")
+
+    return random.choice(user_ids)
 
 
 def _parse_arguments() -> argparse.Namespace:
@@ -125,35 +142,42 @@ async def _model_callback(input: str, turns: List[Turn], thread_id: str) -> Turn
 
 
 def _convert_test_case_to_conversation_format(
-    test_case: ConversationalTestCase,
-) -> List[dict]:
+    test_case: ConversationalTestCase, authoritative_user_id: str
+) -> dict:
     """
     Convert a ConversationalTestCase to the conversation results format
 
     Args:
         test_case: ConversationalTestCase from deepeval
+        authoritative_user_id: The authoritative user ID for this conversation
 
     Returns:
-        List of conversation turns in the format used by success-flow-1.json
+        Dictionary with metadata and conversation turns in the new format
     """
-    conversation = []
+    conversation_turns = []
 
     # Extract turns from the test case
     if hasattr(test_case, "turns") and test_case.turns:
         for turn in test_case.turns:
-            conversation.append({"role": turn.role, "content": turn.content})
+            conversation_turns.append({"role": turn.role, "content": turn.content})
 
-    return conversation
+    return {
+        "metadata": {
+            "authoritative_user_id": authoritative_user_id,
+            "description": "Generated conversation from deepeval simulation",
+        },
+        "conversation": conversation_turns,
+    }
 
 
 def _save_conversation_to_file(
-    conversation: List[dict], base_filename: str = "generated_conversation"
+    conversation: dict, base_filename: str = "generated_conversation"
 ) -> str:
     """
     Save conversation to a uniquely named file in results/conversation_results
 
     Args:
-        conversation: List of conversation turns
+        conversation: Dictionary with metadata and conversation turns
         base_filename: Base name for the file (will have timestamp added)
 
     Returns:
@@ -181,8 +205,8 @@ if __name__ == "__main__":
     # Parse command line arguments
     args = _parse_arguments()
 
-    # Initialize the OpenShift client with the test script parameter
-    client = OpenShiftChatClient(test_script=args.test_script)
+    # OpenShift client will be created per conversation with different user IDs
+    client = None
 
     # Get API configuration from environment variables
     api_key, api_endpoint, model_name = get_api_configuration()
@@ -226,6 +250,17 @@ if __name__ == "__main__":
             )
 
             try:
+                # Get a new authoritative user ID for this conversation
+                conversation_user_id = _load_random_authoritative_user_id()
+                logger.info(
+                    f"Conversation {conversation_number} using authoritative user ID: {conversation_user_id}"
+                )
+
+                # Create a new OpenShift client for this conversation with unique user ID
+                client = OpenShiftChatClient(
+                    conversation_user_id, test_script=args.test_script
+                )
+
                 # Create a single conversation golden for this iteration
                 conversation_golden = _create_conversation_golden(conversation_number)
 
@@ -284,8 +319,12 @@ if __name__ == "__main__":
                     print(test_case)
 
                     # Convert to conversation format and save
-                    conversation = _convert_test_case_to_conversation_format(test_case)
-                    if conversation:  # Only save if we have actual conversation turns
+                    conversation = _convert_test_case_to_conversation_format(
+                        test_case, conversation_user_id
+                    )
+                    if conversation.get(
+                        "conversation"
+                    ):  # Only save if we have actual conversation turns
                         base_filename = f"generated_flow_{test_case_number}"
                         saved_file = _save_conversation_to_file(
                             conversation, base_filename
@@ -321,13 +360,8 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Error during simulation: {e}", exc_info=True)
     finally:
-        # Always close the session
-        logger.info("Closing OpenShift client session...")
-        try:
-            client.close_session()
-            logger.info("OpenShift client session closed successfully")
-        except Exception as e:
-            logger.error(f"Error closing session: {e}", exc_info=True)
+        # Client sessions are closed per conversation, no global cleanup needed
+        logger.info("All conversations completed")
 
         # Final token summary even if there were errors
         from helpers.token_counter import print_token_summary

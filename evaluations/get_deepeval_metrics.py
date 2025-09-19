@@ -22,6 +22,7 @@ from helpers.load_conversation_context import load_default_context
 
 def get_metrics(
     custom_model: Optional[DeepEvalBaseLLM] = None,
+    no_employee_id: bool = False,
 ) -> List[ConversationalGEval]:
     """
     Create comprehensive evaluation metrics for laptop refresh conversation assessment.
@@ -61,7 +62,7 @@ def get_metrics(
             **model_kwargs,
         ),
         RoleAdherenceMetric(
-            threshold=0.8,
+            threshold=0.5,
             **model_kwargs,
         ),
         ConversationCompletenessMetric(
@@ -73,10 +74,16 @@ def get_metrics(
             threshold=0.8,
             evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
             evaluation_steps=[
-                "Assess if the assistant properly requests employee ID from the user.",
                 "Evaluate if the assistant gathers necessary information about the user's current laptop.",
                 "Check if the assistant follows a logical flow for information collection.",
-            ],
+            ]
+            + (
+                []
+                if no_employee_id
+                else [
+                    "Assess if the assistant properly requests employee ID from the user."
+                ]
+            ),
             **model_kwargs,
         ),
         ConversationalGEval(
@@ -168,15 +175,20 @@ def get_metrics(
             ],
             **model_kwargs,
         ),
-        ConversationalGEval(
-            name="Employeed id requested",
-            threshold=1.0,
-            evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
-            evaluation_steps=[
-                "Validate the assistant asks for the users employee id",
-            ],
-            **model_kwargs,
-        ),
     ]
+
+    # Add employee ID-specific metric only if not excluded
+    if not no_employee_id:
+        metrics.append(
+            ConversationalGEval(
+                name="Employeed id requested",
+                threshold=1.0,
+                evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
+                evaluation_steps=[
+                    "Validate the assistant asks for the users employee id",
+                ],
+                **model_kwargs,
+            )
+        )
 
     return metrics

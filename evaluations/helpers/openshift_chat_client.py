@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
+import os
 import subprocess
 import time
 from typing import Dict, List
@@ -15,6 +16,7 @@ class OpenShiftChatClient:
 
     def __init__(
         self,
+        authoritative_user_id: str,
         deployment_name: str = "deploy/self-service-agent",
         test_script: str = "chat.py",
     ):
@@ -22,11 +24,13 @@ class OpenShiftChatClient:
         Initialize the OpenShift chat client.
 
         Args:
+            authoritative_user_id: Required user ID to set as AUTHORITATIVE_USER_ID environment variable
             deployment_name: Name of the OpenShift deployment to connect to
             test_script: Name of the test script to execute (default: "chat.py")
         """
         self.deployment_name = deployment_name
         self.test_script = test_script
+        self.authoritative_user_id = authoritative_user_id
         self.process = None
         self.session_active = False
         self.session_output = []  # Capture all output for token parsing
@@ -53,6 +57,14 @@ class OpenShiftChatClient:
             Exception: If there are other issues starting the session
         """
         try:
+            # Build environment variables string
+            env_vars = f"AGENT_MESSAGE_TERMINATOR={AGENT_MESSAGE_TERMINATOR}"
+            env_vars += f" AUTHORITATIVE_USER_ID={self.authoritative_user_id}"
+
+            # Set PYTHONPATH if TEST_MODE is enabled
+            if os.environ.get("TEST_MODE"):
+                env_vars += " PYTHONPATH=/opt/app-root/asset-manager/src:/opt/app-root/slack-service/src:/opt/app-root/session-manager/src:"
+
             cmd = [
                 "oc",
                 "exec",
@@ -61,7 +73,7 @@ class OpenShiftChatClient:
                 "--",
                 "bash",
                 "-c",
-                f"AGENT_MESSAGE_TERMINATOR={AGENT_MESSAGE_TERMINATOR} /app/.venv/bin/python {'/app/test/' + self.test_script if not self.test_script.startswith('/') else self.test_script}",
+                f"{env_vars} /app/.venv/bin/python {'/app/test/' + self.test_script if not self.test_script.startswith('/') else self.test_script}",
             ]
             self.process = subprocess.Popen(
                 cmd,

@@ -1,46 +1,52 @@
-[
-  {
-    "role": "assistant",
-    "content": "Hello! I'm a routing agent, and I'm here to help you get connected with the right person who can assist with your request. I can help with a limited set of issues, specifically with refreshing a laptop or updating your email address. How can I assist you today?"
+{
+  "metadata": {
+    "authoritative_user_id": "1001",
+    "description": "Known good laptop refresh flow test case"
   },
-  {
-    "role": "user",
-    "content": "refresh"
-  },
-  {
-    "role": "assistant",
-    "content": "To assist you with your laptop refresh request, I need to retrieve some information about your current laptop. Could you please provide me with your 4-digit employee ID?"
-  },
-  {
-    "role": "user",
-    "content": "1001"
-  },
-  {
-    "role": "assistant",
-    "content": "Based on the laptop refresh policy, your laptop is over 3 years old and eligible for a replacement.\nHere is a summary of your laptop details:\n- Name: Alice Johnson\n- Employee ID: 1001\n- Location: EMEA\n- Laptop Model: Latitude 7420\n- Laptop Serial Number: DL7420001\n- Laptop Purchase Date: 2020-01-15\nYou are eligible to request a new laptop. Would you like to proceed to the next step, which is reviewing the available laptop options?"
-  },
-  {
-    "role": "user",
-    "content": "yes"
-  },
-  {
-    "role": "assistant",
-    "content": "Here are the available laptop options for your location (EMEA):\n1. Apple MacBook Air M2:\n* Target User: General Office\n* Cost: €1,299\n* Operating System: macOS\n* Display Size: 13.6 inches\n* Display Resolution: 2560 x 1664\n* Graphics Card: Apple M2 GPU\n* Minimum Storage: 256 GB SSD\n* Weight: 2.7 lbs\n* Ports: 2 x Thunderbolt/USB 4, MagSafe\n* Minimum Processor: Apple M2\n* Minimum Memory: 8 GB\n* Dimensions: 11.97 x 8.46 x 0.44 inches\n2. Apple MacBook Pro 16 M3 Max:\n* Target User: Developers\n* Cost: €3,299\n* Operating System: macOS\n* Display Size: 16.2 inches\n* Display Resolution: 3456 x 2234\n* Graphics Card: Apple M3 Max GPU\n* Minimum Storage: 1 TB SSD\n* Weight: 4.8 lbs\n* Ports: 3 x Thunderbolt 4, HDMI, SDXC, MagSafe\n* Minimum Processor: Apple M3 Max\n* Minimum Memory: 36 GB\n* Dimensions: 14.01 x 9.77 x 0.66 inches\n3. Lenovo ThinkPad T14s Gen 5 AMD:\n* Target User: General Office\n* Cost: €1,380\n* Operating System: Windows 11 Pro\n* Display Size: 14 inches\n* Display Resolution: 1920 x 1200\n* Graphics Card: Integrated AMD Radeon\n* Minimum Storage: 512 GB SSD\n* Weight: 2.8 lbs\n* Ports: 2 x USB-C, 2 x USB-A, HDMI, Audio Jack\n* Minimum Processor: AMD Ryzen 7 PRO 7840U\n* Minimum Memory: 16 GB\n* Dimensions: 12.4 x 8.7 x 0.6 inches\n4. Lenovo ThinkPad P16 Gen 2:\n* Target User: Engineers\n* Cost: €2,650\n* Operating System: Red Hat Linux\n* Display Size: 16 inches\n* Display Resolution: 2560 x 1600\n* Graphics Card: NVIDIA RTX A2000\n* Minimum Storage: 1 TB SSD\n* Weight: 6.5 lbs\n* Ports: 2 x USB-C, 2 x USB-A, HDMI, Ethernet, Audio Jack\n* Minimum Processor: Intel Core i7-13700HX\n* Minimum Memory: 32 GB\n* Dimensions: 14.3 x 10.5 x 1.2 inches\nPlease select one of the above options. Remember to consider your job role and requirements when making your selection."
-  },
-  {
-    "role": "user",
-    "content": "3"
-  },
-  {
-    "role": "assistant",
-    "content": "You have selected the ThinkPad T14s Gen 5 AMD. Would you like to proceed with creating a Service Now ticket for a laptop refresh with this selected option?"
-  },
-  {
-    "role": "user",
-    "content": "proceed"
-  },
-  {
-    "role": "assistant",
-    "content": "Perfect! I have created a Service Now ticket for your laptop refresh request. Your ticket number is INC12345. You will receive an email confirmation shortly with next steps."
-  }
-]
+  "conversation": [
+    {
+      "role": "assistant",
+      "content": "Hello! I'm a routing agent, and I'm here to help you get connected with the right person who can assist with your request. I can help with a limited set of issues, specifically with refreshing a laptop or updating your email address. How can I assist you today?"
+    },
+    {
+      "role": "user",
+      "content": "refresh"
+    },
+    {
+      "role": "assistant",
+      "content": "To assist you with your laptop refresh request, I need to retrieve some information about your current laptop. Could you please provide me with your 4-digit employee ID?"
+    },
+    {
+      "role": "user",
+      "content": "1001"
+    },
+    {
+      "role": "assistant",
+      "content": "Based on the laptop refresh policy, your laptop is over 3 years old and eligible for a replacement.\nHere is a summary of your laptop details:\n- Name: Alice Johnson\n- Employee ID: 1001\n- Location: EMEA\n- Laptop Model: Latitude 7420\n- Laptop Serial Number: DL7420001\n- Laptop Purchase Date: 2020-01-15\nYou are eligible to request a new laptop. Would you like to proceed to the next step, which is reviewing the available laptop options?"
+    },
+    {
+      "role": "user",
+      "content": "yes"
+    },
+    {
+      "role": "assistant",
+      "content": "Here are the available laptop options for your location (EMEA):\n1. Apple MacBook Air M2:\n* Target User: General Office\n* Cost: €1,299\n* Operating System: macOS\n* Display Size: 13.6 inches\n* Display Resolution: 2560 x 1664\n* Graphics Card: Apple M2 GPU\n* Minimum Storage: 256 GB SSD\n* Weight: 2.7 lbs\n* Ports: 2 x Thunderbolt/USB 4, MagSafe\n* Minimum Processor: Apple M2\n* Minimum Memory: 8 GB\n* Dimensions: 11.97 x 8.46 x 0.44 inches\n2. Apple MacBook Pro 16 M3 Max:\n* Target User: Developers\n* Cost: €3,299\n* Operating System: macOS\n* Display Size: 16.2 inches\n* Display Resolution: 3456 x 2234\n* Graphics Card: Apple M3 Max GPU\n* Minimum Storage: 1 TB SSD\n* Weight: 4.8 lbs\n* Ports: 3 x Thunderbolt 4, HDMI, SDXC, MagSafe\n* Minimum Processor: Apple M3 Max\n* Minimum Memory: 36 GB\n* Dimensions: 14.01 x 9.77 x 0.66 inches\n3. Lenovo ThinkPad T14s Gen 5 AMD:\n* Target User: General Office\n* Cost: €1,380\n* Operating System: Windows 11 Pro\n* Display Size: 14 inches\n* Display Resolution: 1920 x 1200\n* Graphics Card: Integrated AMD Radeon\n* Minimum Storage: 512 GB SSD\n* Weight: 2.8 lbs\n* Ports: 2 x USB-C, 2 x USB-A, HDMI, Audio Jack\n* Minimum Processor: AMD Ryzen 7 PRO 7840U\n* Minimum Memory: 16 GB\n* Dimensions: 12.4 x 8.7 x 0.6 inches\n4. Lenovo ThinkPad P16 Gen 2:\n* Target User: Engineers\n* Cost: €2,650\n* Operating System: Red Hat Linux\n* Display Size: 16 inches\n* Display Resolution: 2560 x 1600\n* Graphics Card: NVIDIA RTX A2000\n* Minimum Storage: 1 TB SSD\n* Weight: 6.5 lbs\n* Ports: 2 x USB-C, 2 x USB-A, HDMI, Ethernet, Audio Jack\n* Minimum Processor: Intel Core i7-13700HX\n* Minimum Memory: 32 GB\n* Dimensions: 14.3 x 10.5 x 1.2 inches\nPlease select one of the above options. Remember to consider your job role and requirements when making your selection."
+    },
+    {
+      "role": "user",
+      "content": "3"
+    },
+    {
+      "role": "assistant",
+      "content": "You have selected the ThinkPad T14s Gen 5 AMD. Would you like to proceed with creating a Service Now ticket for a laptop refresh with this selected option?"
+    },
+    {
+      "role": "user",
+      "content": "proceed"
+    },
+    {
+      "role": "assistant",
+      "content": "Perfect! I have created a Service Now ticket for your laptop refresh request. Your ticket number is INC12345. You will receive an email confirmation shortly with next steps."
+    }
+  ]
+}

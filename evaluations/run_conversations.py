@@ -16,6 +16,11 @@ def _parse_arguments() -> argparse.Namespace:
         default="chat.py",
         help="Name of the test script to execute (default: chat.py)",
     )
+    parser.add_argument(
+        "--no-employee-id",
+        action="store_true",
+        help="Use alternative conversation files from no-employee-id subdirectory",
+    )
     return parser.parse_args()
 
 
@@ -24,5 +29,7 @@ if __name__ == "__main__":
 
     tester = ConversationFlowTester(test_script=args.test_script)
     tester.run_flows(
-        "conversations_config/conversations", "results/conversation_results"
+        "conversations_config/conversations",
+        "results/conversation_results",
+        no_employee_id=args.no_employee_id,
     )
