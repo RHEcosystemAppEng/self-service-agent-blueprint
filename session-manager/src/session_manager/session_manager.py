@@ -87,7 +87,12 @@ class SessionManager(SessionManagerBase):
         return self.agents.get(agent_name)
 
     def _create_session_for_agent(
-        self, agent, agent_name: str, user_id: str, session_name: str = None, **kwargs
+        self,
+        agent,
+        agent_name: str,
+        user_id: str,
+        session_name: str = None,
+        resume_thread_id: str = None,
     ):
         """Create a new session for the given agent."""
         if not session_name:

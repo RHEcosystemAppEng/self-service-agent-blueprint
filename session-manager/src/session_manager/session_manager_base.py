@@ -97,7 +97,12 @@ class SessionManagerBase(ABC):
 
     @abstractmethod
     def _create_session_for_agent(
-        self, agent, agent_name: str, user_id: str, session_name: str = None, **kwargs
+        self,
+        agent,
+        agent_name: str,
+        user_id: str,
+        session_name: str = None,
+        resume_thread_id: str = None,
     ):
         """Create a new session for the given agent."""
         pass
@@ -114,7 +119,9 @@ class SessionManagerBase(ABC):
         """Update the current session fields with new session data."""
         pass
 
-    def _create_specialist_session(self, agent_name: str, user_id: str) -> tuple:
+    def _create_specialist_session(
+        self, agent_name: str, user_id: str, resume_thread_id: str = None
+    ) -> tuple:
         """Create a new session for a specialist agent."""
         # Get the specialist agent
         agent = self._get_agent_for_routing(agent_name)
@@ -126,7 +133,11 @@ class SessionManagerBase(ABC):
 
         # Create session using implementation-specific method
         session = self._create_session_for_agent(
-            agent, agent_name, user_id, session_name=session_name
+            agent,
+            agent_name,
+            user_id,
+            session_name=session_name,
+            resume_thread_id=resume_thread_id,
         )
 
         # Store session metadata for future resumption (if metadata storage is enabled)
@@ -149,8 +160,13 @@ class SessionManagerBase(ABC):
         """Routes the conversation to a specialist agent."""
         logger.debug(f"Routing to agent: {agent_name}")
 
+        # Get resume_thread_id from current session if available
+        resume_thread_id = current_session.get("resume_thread_id")
+
         # Create a new session for the specialist agent
-        session_data, error = self._create_specialist_session(agent_name, user_id)
+        session_data, error = self._create_specialist_session(
+            agent_name, user_id, resume_thread_id
+        )
         if error:
             return error
 

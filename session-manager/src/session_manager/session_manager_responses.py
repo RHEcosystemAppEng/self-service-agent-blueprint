@@ -78,6 +78,7 @@ class SessionManagerResponses(SessionManagerBase):
             "conversation_session": session,
             "session_name": session_name,
             "email": user_email,
+            "resume_thread_id": getattr(session, "thread_id", None),
         }
 
     def _send_message_to_current_session(self, current_session, text: str) -> str:
@@ -133,6 +134,7 @@ class SessionManagerResponses(SessionManagerBase):
             "agent_name": agent_name,
             "conversation_session": session,
             "session_name": session_name,
+            "resume_thread_id": getattr(session, "thread_id", None),
         }
 
     def _create_initial_session(self, user_id: str, user_email: str = None):
