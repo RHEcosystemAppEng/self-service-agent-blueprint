@@ -8,7 +8,7 @@ output_shields: []
 max_infer_iters: 25
 model-no-used: appeng-ai-quickstarts-vertexai/vertex_ai/gemini-2.5-flash
 enable_session_persistence: true
-lg_state_machine_config: "config/lg-prompts/lg-prompt-small.yaml"
+lg_state_machine_config: "config/lg-prompts/lg-prompt-big.yaml"
 sampling_params:
   strategy:
     type: "top_p"
