@@ -62,6 +62,14 @@ jobs:
           LLM_URL: ${{ vars.LLM_URL_EVAL }}
           LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL }}
 
+      - name: Run responses evaluations
+        shell: bash
+        run: |
+          make test-short-resp-integration
+        env:
+          LLM_URL: ${{ vars.LLM_URL_EVAL }}
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL }}
+
       - name: Inspect Cluster - Self-Service Agent
         if: failure()
         uses: ./.github/actions/inspect
