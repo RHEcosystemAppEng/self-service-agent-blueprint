@@ -103,6 +103,7 @@ help:
 	@echo "  test-mcp-emp-info           - Run tests for employee info MCP server"
 	@echo "  test-mcp-snow               - Run tests for snow MCP server"
 	@echo "  test-short-integration      - Run short integration tests"
+	@echo "  test-short-resp-integration - Run short responses integration tests (no employee ID)"
 	@echo "  version                     - Print the current VERSION"
 	@echo ""
 	@echo "Configuration options (set via environment variables or make arguments):"
@@ -270,6 +271,12 @@ test-short-integration:
 	@echo "Running short integration test..."
 	uv --directory evaluations run evaluate.py -n 1
 	@echo "short integrations tests completed successfully!"
+
+.PHONY: test-short-resp-integration
+test-short-resp-integration:
+	@echo "Running short responses integration test..."
+	uv --directory evaluations run evaluate.py -n 1 --no-employee-id --test-script="chat-responses.py"
+	@echo "short responses integrations tests completed successfully!"
 
 # Create namespace and deploy
 namespace:
