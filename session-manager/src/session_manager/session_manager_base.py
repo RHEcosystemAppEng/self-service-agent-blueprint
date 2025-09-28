@@ -4,6 +4,8 @@ import uuid
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+from tracing_config.auto_tracing import run as auto_tracing_run
+
 logger = logging.getLogger(__name__)
 
 
@@ -21,6 +23,8 @@ class SessionManagerBase(ABC):
         Args:
             agent_manager: An agent manager instance (AgentManager or ResponsesAgentManager).
         """
+
+        auto_tracing_run()
         self.agent_manager = agent_manager
         self.agents = agent_manager.agents()
         self.user_sessions = {}

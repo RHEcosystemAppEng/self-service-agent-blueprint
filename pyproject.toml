@@ -59,6 +59,8 @@ dependencies = [
     "gunicorn>=23.0.0",
     "slack_sdk>=3.36.0",
     "slack-bolt>=1.18.0",
+    "opentelemetry-exporter-otlp-proto-http==1.37.0",
+    "opentelemetry-instrumentation-httpx>=0.58b0",
     "self-service-agent-shared-clients",
     "self-service-agent-shared-models",
     "asset-manager",
@@ -93,6 +95,11 @@ python_functions = ["test_*"]
 self-service-agent-shared-clients = { path = "shared-clients" }
 self-service-agent-shared-models = { path = "shared-models" }
 asset-manager = { path = "asset-manager" }
+
+[tool.uv.workspace]
+members = [
+    "tracing-config",
+]
 
 [dependency-groups]
 dev = [
