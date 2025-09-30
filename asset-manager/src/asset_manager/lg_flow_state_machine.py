@@ -226,11 +226,21 @@ class StateMachine:
             "temperature"
         )  # Get temperature from state config
 
+        # Get allowed_tools from state config (optional)
+        allowed_tools = state_config.get("allowed_tools")
+
+        # Build kwargs for create_response_with_retry
+        response_kwargs = {
+            "temperature": temperature,
+            "authoritative_user_id": authoritative_user_id,
+        }
+        if allowed_tools is not None:
+            response_kwargs["allowed_tools"] = allowed_tools
+
         response = agent.create_response_with_retry(
             messages_to_send,
             self._get_retry_count(),
-            temperature=temperature,
-            authoritative_user_id=authoritative_user_id,
+            **response_kwargs,
         )
 
         # Step 3: Store response data as configured
@@ -624,12 +634,22 @@ class StateMachine:
             "temperature"
         )  # Get temperature from state config
 
+        # Get allowed_tools from state config (optional)
+        allowed_tools = state_config.get("allowed_tools")
+
+        # Build kwargs for create_response_with_retry
+        response_kwargs = {
+            "temperature": temperature,
+            "authoritative_user_id": authoritative_user_id,
+        }
+        if allowed_tools is not None:
+            response_kwargs["allowed_tools"] = allowed_tools
+
         intent_response = (
             agent.create_response_with_retry(
                 intent_messages,
                 self._get_retry_count(),
-                temperature=temperature,
-                authoritative_user_id=authoritative_user_id,
+                **response_kwargs,
             )
             .strip()
             .upper()
@@ -660,11 +680,21 @@ class StateMachine:
                     action_temperature = state_config.get(
                         "temperature", 0.6
                     )  # Fallback to 0.6
+                    # Use action-level allowed_tools if specified, otherwise use state-level
+                    action_allowed_tools = action.get("allowed_tools", allowed_tools)
+
+                    # Build kwargs for create_response_with_retry
+                    action_response_kwargs = {
+                        "temperature": action_temperature,
+                        "authoritative_user_id": authoritative_user_id,
+                    }
+                    if action_allowed_tools is not None:
+                        action_response_kwargs["allowed_tools"] = action_allowed_tools
+
                     response = agent.create_response_with_retry(
                         messages_to_send,
                         self._get_retry_count(),
-                        temperature=action_temperature,
-                        authoritative_user_id=authoritative_user_id,
+                        **action_response_kwargs,
                     )
                     state["messages"].append(AIMessage(content=response))
 
@@ -722,11 +752,21 @@ class StateMachine:
         messages_to_send.append({"role": "system", "content": validation_prompt})
         temperature = state_config.get("temperature", 0.3)  # Default for validation
 
+        # Get allowed_tools from state config (optional)
+        allowed_tools = state_config.get("allowed_tools")
+
+        # Build kwargs for create_response_with_retry
+        response_kwargs = {
+            "temperature": temperature,
+            "authoritative_user_id": authoritative_user_id,
+        }
+        if allowed_tools is not None:
+            response_kwargs["allowed_tools"] = allowed_tools
+
         response = agent.create_response_with_retry(
             messages_to_send,
             self._get_retry_count(),
-            temperature=temperature,
-            authoritative_user_id=authoritative_user_id,
+            **response_kwargs,
         )
 
         # Use LLM to determine if validation passed
@@ -736,12 +776,20 @@ class StateMachine:
             authoritative_user_id,
         )
         validation_messages = [{"role": "user", "content": success_validation_prompt}]
+
+        # Build kwargs for validation response
+        validation_kwargs = {
+            "temperature": 0.1,  # Very deterministic for validation classification
+            "authoritative_user_id": authoritative_user_id,
+        }
+        if allowed_tools is not None:
+            validation_kwargs["allowed_tools"] = allowed_tools
+
         validation_response = (
             agent.create_response_with_retry(
                 validation_messages,
                 self._get_retry_count(),
-                temperature=0.1,  # Very deterministic for validation classification
-                authoritative_user_id=authoritative_user_id,
+                **validation_kwargs,
             )
             .strip()
             .upper()

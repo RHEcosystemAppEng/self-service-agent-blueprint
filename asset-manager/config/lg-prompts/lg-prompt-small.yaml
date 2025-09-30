@@ -64,8 +64,9 @@ states:
   lookup_employee:
     type: "llm_processor"
     temperature: 0.3  # Factual lookup, should be consistent
+    allowed_tools: [ "get_employee_laptop_info" ]
     prompt: |
-      You are a helpful laptop refresh assistant. Look up the laptop information for the authenticated user by using the get_employee_laptop_info tool with "0000" as the employee_identifier parameter. Provide their current laptop details including: name, region, purchase date, laptop age, model, and serial number.
+      You are a helpful laptop refresh assistant. CRITICAL: look up the laptop information for the authenticated user by using the get_employee_laptop_info tool with "0000" as the employee_identifier parameter. Provide their current laptop details including: name, region, purchase date, laptop age, model, and serial number.
       If the user is not found, explain that their information was not found in the database.
     transitions:
       success: "classify_lookup_result"
@@ -76,6 +77,7 @@ states:
   classify_lookup_result:
     type: "llm_processor"
     temperature: 0.1  # Very deterministic classification
+    allowed_tools: [ "" ]
     prompt: |
       Analyze this employee lookup response: "{employee_info.response}"
       
@@ -134,6 +136,7 @@ states:
   classify_eligibility_result:
     type: "llm_processor"
     temperature: 0.1  # Very deterministic classification
+    allowed_tools: [ "" ]
     prompt: |
       This is the summary of the user's eligibility: "{laptop_eligibility.response}"
       
@@ -180,6 +183,7 @@ states:
   waiting_general_input:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic intent classification
+    allowed_tools: [ "" ]
     intent_prompt: |
       Analyze the user's message and determine their intent. The user said: "{user_input}"
       
@@ -211,6 +215,7 @@ states:
   proceed_confirmation:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic yes/no classification
+    allowed_tools: [ "" ]
     intent_prompt: |
       The user was asked if they want to proceed with reviewing laptop options. They responded: "{user_input}"
       
@@ -266,6 +271,7 @@ states:
   waiting_laptop_selection:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic selection validation
+    allowed_tools: [ "" ]
     intent_prompt: |
       The user said: "{user_input}"
       
@@ -308,6 +314,7 @@ states:
   waiting_ticket_confirmation:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic yes/no classification
+    allowed_tools: [ "" ]
     intent_prompt: |
       The user was asked if they want to create a ServiceNow ticket for their laptop refresh request. They responded: "{user_input}"
       
@@ -319,6 +326,7 @@ states:
       Respond with only the classification: YES, NO, or UNCLEAR
     intent_actions:
       "YES":
+        allowed_tools: [ "open_laptop_refresh_ticket" ]
         prompt: |
           You have the employee information: {employee_info.response}
           Selected Laptop details: {selected_laptop_details}

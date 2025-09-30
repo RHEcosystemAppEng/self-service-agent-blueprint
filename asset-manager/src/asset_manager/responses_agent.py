@@ -129,7 +129,10 @@ class Agent:
             return None
 
     def _get_mcp_tools_to_use(
-        self, requested_servers: list = None, authoritative_user_id: str = None
+        self,
+        requested_servers: list = None,
+        authoritative_user_id: str = None,
+        allowed_tools: list = None,
     ) -> list:
         """Get complete tools array for LlamaStack responses API."""
         tools_to_use = []
@@ -188,6 +191,11 @@ class Agent:
                         mcp_tool["headers"] = {
                             "AUTHORITATIVE_USER_ID": authoritative_user_id
                         }
+
+                    # Add allowed_tools if specified
+                    if allowed_tools:
+                        mcp_tool["allowed_tools"] = allowed_tools
+
                     tools_to_use.append(mcp_tool)
 
                 except Exception as e:
@@ -206,6 +214,7 @@ class Agent:
         temperature: float = None,
         additional_system_messages: list = None,
         authoritative_user_id: str = None,
+        allowed_tools: list = None,
     ) -> str:
         """Create a response with retry logic for empty responses and errors."""
         response = None
@@ -218,6 +227,7 @@ class Agent:
                     temperature=temperature,
                     additional_system_messages=additional_system_messages,
                     authoritative_user_id=authoritative_user_id,
+                    allowed_tools=allowed_tools,
                 )
 
                 # Check if response is empty or contains error
@@ -315,6 +325,7 @@ class Agent:
         temperature: float = None,
         additional_system_messages: list = None,
         authoritative_user_id: str = None,
+        allowed_tools: list = None,
     ) -> str:
         """Create a response using LlamaStack responses API.
 
@@ -323,6 +334,7 @@ class Agent:
             temperature: Optional temperature override
             additional_system_messages: Optional list of additional system messages to include
             authoritative_user_id: Optional authoritative user ID to pass via X-LlamaStack-Provider-Data header to MCP servers
+            allowed_tools: Optional list of tool names/types to restrict available tools (e.g., ['file_search', 'employee-info'])
         """
         try:
             # Start with the main system message
@@ -341,11 +353,11 @@ class Agent:
             if temperature is not None:
                 response_config["temperature"] = temperature
 
-            # Rebuild tools with headers if authoritative_user_id is provided
-            if authoritative_user_id:
+            # Rebuild tools if authoritative_user_id or allowed_tools is provided
+            if authoritative_user_id or allowed_tools:
                 mcp_servers = self.config.get("mcp_servers", [])
                 tools_to_use = self._get_mcp_tools_to_use(
-                    mcp_servers, authoritative_user_id
+                    mcp_servers, authoritative_user_id, allowed_tools
                 )
             else:
                 tools_to_use = self.tools
