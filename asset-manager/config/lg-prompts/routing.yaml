@@ -7,32 +7,11 @@ settings:
   terminator_env_var: "AGENT_MESSAGE_TERMINATOR"
   agent_name: "routing-agent"
   terminal_state: "end"
-  waiting_state_prefix: "waiting_"
   empty_response_retry_count: 3
 
 # State structure definition
 state_schema:
-  # Required system fields
-  system_fields:
-    messages:
-      type: "list"
-      description: "Conversation message history"
-      default: []
-    current_state:
-      type: "string"
-      description: "Current state machine state"
-      default: null  # Will be set to initial_state
-
-  # Business logic fields
-  business_fields:
-    user_intent:
-      type: "string"
-      description: "Identified user intent for routing"
-      default: null
-    routing_decision:
-      type: "string"
-      description: "Final routing decision"
-      default: null
+  business_fields: {}  # No business fields needed - routing is handled via message responses
 
 # State definitions
 states:
@@ -85,12 +64,6 @@ states:
         - name: "laptop_refresh"
           trigger_phrases: ["LAPTOP_REFRESH"]
           actions:
-            - type: "set_field"
-              field_name: "user_intent"
-              value: "laptop_refresh"
-            - type: "set_field"
-              field_name: "routing_decision"
-              value: "laptop-refresh"
             - type: "add_message"
               message: "laptop-refresh"
             - type: "transition"
@@ -98,12 +71,6 @@ states:
         - name: "email_change"
           trigger_phrases: ["EMAIL_CHANGE"]
           actions:
-            - type: "set_field"
-              field_name: "user_intent"
-              value: "email_change"
-            - type: "set_field"
-              field_name: "routing_decision"
-              value: "EMAIL_CHANGE_AGENT"
             - type: "add_message"
               message: "EMAIL_CHANGE_AGENT"
             - type: "transition"
@@ -111,9 +78,6 @@ states:
         - name: "other_request"
           trigger_phrases: ["OTHER"]
           actions:
-            - type: "set_field"
-              field_name: "user_intent"
-              value: "other"
             - type: "transition"
               target: "handle_other_request"
       default_transition: "handle_other_request"
@@ -139,11 +103,11 @@ states:
   waiting_clarification:
     type: "waiting"
     transitions:
-      user_input: "classify_user_intent"
+      user_input: "end"  # End conversation instead of looping back
 
   # End state
   end:
     type: "terminal"
     reset_behavior:
       reset_state: "greet_and_identify_need"
-      clear_data: ["messages", "user_intent", "routing_decision", "current_state"]
+      clear_data: ["messages", "current_state"]

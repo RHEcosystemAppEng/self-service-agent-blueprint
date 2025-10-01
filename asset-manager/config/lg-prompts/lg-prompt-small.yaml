@@ -7,23 +7,11 @@ settings:
   terminator_env_var: "AGENT_MESSAGE_TERMINATOR"
   agent_name: "laptop-refresh"
   terminal_state: "end"
-  waiting_state_prefix: "waiting_"
   empty_response_retry_count: 3
 
 # State structure definition - completely configurable
 state_schema:
-  # Required system fields
-  system_fields:
-    messages:
-      type: "list"
-      description: "Conversation message history"
-      default: []
-    current_state:
-      type: "string"
-      description: "Current state machine state"
-      default: null  # Will be set to initial_state
-  
-  # Business logic fields - customize for your domain
+  # Business logic fields
   business_fields:
     employee_info:
       type: "dict"
@@ -80,12 +68,12 @@ states:
     allowed_tools: [ "" ]
     prompt: |
       Analyze this employee lookup response: "{employee_info.response}"
-      
+
       Classify the result as SUCCESS, NOT_FOUND, or ERROR:
       - SUCCESS: if employee information was found (contains details like name, region, laptop model, etc.)
       - NOT_FOUND: if the employee ID was not found in the database
       - ERROR: if there was a system error or unclear response
-      
+
       Respond with only the classification: SUCCESS, NOT_FOUND, or ERROR
     response_analysis:
       conditions:
@@ -139,11 +127,11 @@ states:
     allowed_tools: [ "" ]
     prompt: |
       This is the summary of the user's eligibility: "{laptop_eligibility.response}"
-      
+
       If the response says the user is eligible for a laptop replacement, respond: ELIGIBLE
       If the response says the user is not eligible, respond: NOT
       If unclear, respond: UNCLEAR
-      
+
       Respond with only one word: ELIGIBLE, NOT, or UNCLEAR
     response_analysis:
       conditions:
@@ -156,7 +144,7 @@ states:
             - type: "add_message"
               message: "{laptop_eligibility.response}"
             - type: "transition"
-              target: "proceed_confirmation"
+              target: "waiting_proceed_confirmation"
         - name: "not_eligible"
           trigger_phrases: ["NOT"]
           actions:
@@ -166,7 +154,7 @@ states:
             - type: "add_message"
               message: "{laptop_eligibility.response}"
             - type: "transition"
-              target: "waiting_general_input"
+              target: "waiting_ineligible_user_input"
         - name: "unclear"
           trigger_phrases: ["UNCLEAR"]
           actions:
@@ -179,21 +167,27 @@ states:
               target: "end"
       default_transition: "end"
 
-  # State 3: Waiting for General Input (Ineligible Users)
-  waiting_general_input:
+  # State 3: Waiting for Ineligible User Input
+  waiting_ineligible_user_input:
+    type: "waiting"
+    transitions:
+      user_input: "classify_ineligible_user_intent"
+
+  # State 3a: Classify Ineligible User Intent
+  classify_ineligible_user_intent:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic intent classification
     allowed_tools: [ "" ]
     intent_prompt: |
       Analyze the user's message and determine their intent. The user said: "{user_input}"
-      
+
       Context: This user is NOT currently eligible for a laptop replacement under standard policy.
-      
+
       Classify the user's intent as one of the following:
       1. FAREWELL - User wants to end the conversation (goodbye, bye, thanks, etc.)
       2. PROCEED_ANYWAY - User wants to see laptop options despite being ineligible (proceed, show options, I want to see, etc.)
       3. GENERAL_QUESTION - User has questions about policy or general assistance
-      
+
       Respond with only the classification: FAREWELL, PROCEED_ANYWAY, or GENERAL_QUESTION
     intent_actions:
       FAREWELL:
@@ -207,23 +201,29 @@ states:
       GENERAL_QUESTION:
         prompt: |
           Previously retrieved information on laptop eligibility: {laptop_eligibility.response}
- 
-          The user said '{user_input}'. This user is NOT currently eligible for a laptop replacement under standard policy but is allowed to proceed anyway as long as they undertand that the request may be rejected or require additional approval. Provide a helpful response about laptop refresh policies or general assistance. If they're asking about their eligibility again, remind them they are not currently eligible and when they will become eligible.
-        next_state: "waiting_general_input"
 
-  # State 4: Proceed Confirmation
+          The user said '{user_input}'. This user is NOT currently eligible for a laptop replacement under standard policy but is allowed to proceed anyway as long as they undertand that the request may be rejected or require additional approval. Provide a helpful response about laptop refresh policies or general assistance. If they're asking about their eligibility again, remind them they are not currently eligible and when they will become eligible.
+        next_state: "waiting_ineligible_user_input"
+
+  # State 4: Waiting for Proceed Confirmation
+  waiting_proceed_confirmation:
+    type: "waiting"
+    transitions:
+      user_input: "proceed_confirmation"
+
+  # State 4a: Proceed Confirmation
   proceed_confirmation:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic yes/no classification
     allowed_tools: [ "" ]
     intent_prompt: |
       The user was asked if they want to proceed with reviewing laptop options. They responded: "{user_input}"
-      
+
       Classify their response as one of the following:
       1. YES - User wants to proceed (yes, sure, okay, proceed, continue, etc.)
       2. NO - User does not want to proceed or wants to end conversation (no, cancel, stop, bye, etc.)
       3. UNCLEAR - Response is ambiguous or unclear
-      
+
       Respond with only the classification: YES, NO, or UNCLEAR
     intent_actions:
       "YES":
@@ -237,7 +237,7 @@ states:
           user_wants_to_proceed: false
       "UNCLEAR":
         response: "Please let me know if you'd like to proceed with reviewing the available laptop options (yes/no)."
-        next_state: "proceed_confirmation"
+        next_state: "waiting_proceed_confirmation"
 
   # State 5: Select Laptop
   select_laptop:
@@ -249,13 +249,13 @@ states:
         check_phrases: ["NOT"]
         prompt: |
           Previously retrieved information on laptop eligibility: {laptop_eligibility.response}
-         
+
           The user wants to see laptop options based on\n {employee_info.response}\n even though they are not currently eligible under standard policy. Search the laptop refresh knowledge base and present them with all available laptop models based on their region. CRITICAL Include detailed specifications for each option and ask them to choose one specific laptop. CRITICAL only show them the numbered list of laptops for their region. CRITICAL do not show any laptops that are not listed for their region
-          
+
           IMPORTANT: Include a warning that they are not currently eligible under standard policy and any request would require special approval and justification.
-          
+
           Ask them to choose one specific laptop if they wish to proceed with a special request.
-          
+
           Only use information from the knowledge base - don't add external details.
       - condition: "default"
         prompt: |
@@ -269,17 +269,23 @@ states:
 
   # State 6: Waiting for Laptop Selection
   waiting_laptop_selection:
+    type: "waiting"
+    transitions:
+      user_input: "classify_laptop_selection"
+
+  # State 6a: Classify Laptop Selection
+  classify_laptop_selection:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic selection validation
     allowed_tools: [ "" ]
     intent_prompt: |
       The user said: "{user_input}"
-      
+
       Based on the laptop options "{laptop_options.response}", determine if they made a valid laptop selection:
       - VALID_SELECTION: User mentioned a specific laptop model, number, or clear selection
       - INVALID_SELECTION: User's choice is clearly invalid or nonsensical
       - UNCLEAR: User's response is unclear or doesn't contain a laptop selection
-      
+
       Respond with only: VALID_SELECTION, INVALID_SELECTION, or UNCLEAR
     intent_actions:
       "VALID_SELECTION":
@@ -293,7 +299,7 @@ states:
         response: "Please specify which laptop model you'd like to select from the options I provided."
         next_state: "waiting_laptop_selection"
 
-  # State 6a: Confirm Laptop Selection with Full Details
+  # State 6b: Confirm Laptop Selection with Full Details
   confirm_laptop_selection:
     type: "llm_processor"
     temperature: 0.2  # Mix of factual lookup + conversational confirmation
@@ -312,17 +318,23 @@ states:
 
   # State 7: Waiting for Ticket Confirmation
   waiting_ticket_confirmation:
+    type: "waiting"
+    transitions:
+      user_input: "classify_ticket_confirmation"
+
+  # State 7a: Classify Ticket Confirmation
+  classify_ticket_confirmation:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic yes/no classification
     allowed_tools: [ "" ]
     intent_prompt: |
       The user was asked if they want to create a ServiceNow ticket for their laptop refresh request. They responded: "{user_input}"
-      
+
       Classify their response as one of the following:
       1. YES - User wants to create the ticket (yes, proceed, create, sure, okay, etc.)
       2. NO - User does not want to create the ticket (no, cancel, stop, etc.)
       3. UNCLEAR - Response is ambiguous or unclear
-      
+
       Respond with only the classification: YES, NO, or UNCLEAR
     intent_actions:
       "YES":

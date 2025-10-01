@@ -13,8 +13,9 @@ import yaml
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
+from langgraph.types import Command
 
-# Import SqliteSaver - assume it's available with minimal fallback for development
+# Import SqliteSaver - will be replace by more persistent state storage
 try:
     from langgraph_checkpoint_sqlite import SqliteSaver
 except ImportError:
@@ -33,24 +34,13 @@ def create_agent_state_class(state_schema: dict):
     # Collect all field definitions
     fields = {}
 
-    # Add system fields
-    system_fields = state_schema.get("system_fields", {})
-    for field_name, field_config in system_fields.items():
-        field_type = field_config.get("type", "string")
+    # Add required system fields automatically (no need to define in YAML)
+    fields["messages"] = Annotated[List[BaseMessage], add_messages]
+    fields["current_state"] = str
 
-        if field_name == "messages":
-            # Special handling for messages field (required for LangGraph)
-            fields["messages"] = Annotated[List[BaseMessage], add_messages]
-        elif field_type == "string":
-            fields[field_name] = str
-        elif field_type == "list":
-            fields[field_name] = List[Dict]
-        elif field_type == "dict":
-            fields[field_name] = Dict
-        elif field_type == "boolean":
-            fields[field_name] = bool
-        else:
-            fields[field_name] = str  # Default to string
+    # Handle case where state_schema is None or empty
+    if not state_schema:
+        state_schema = {}
 
     # Add business fields
     business_fields = state_schema.get("business_fields", {})
@@ -67,6 +57,11 @@ def create_agent_state_class(state_schema: dict):
             fields[field_name] = Optional[bool]
         else:
             fields[field_name] = Optional[str]  # Default to optional string
+
+    # Add internal tracking fields for waiting node logic
+    fields["_last_processed_human_count"] = Optional[int]
+    fields["_consumed_this_invoke"] = Optional[bool]
+    fields["_last_waiting_node"] = Optional[str]  # Track last waiting node for resume
 
     # Create the TypedDict class dynamically
     return TypedDict("AgentState", fields)
@@ -178,8 +173,12 @@ class StateMachine:
 
     def process_llm_processor_state(
         self, state: dict, state_config: dict, agent, authoritative_user_id: str = None
-    ) -> dict:
-        """Process llm_processor type states - completely generic and configuration-driven."""
+    ) -> tuple[dict, str]:
+        """Process llm_processor type states - completely generic and configuration-driven.
+
+        Returns:
+            tuple: (updated_state, next_state_name)
+        """
 
         # Step 1: Determine the prompt to use
         prompt = self._get_prompt_for_state(state, state_config, authoritative_user_id)
@@ -253,9 +252,8 @@ class StateMachine:
         next_state = self._analyze_response_and_transition(
             state, state_config, response, authoritative_user_id
         )
-        state["current_state"] = next_state
 
-        return state
+        return state, next_state
 
     def _get_prompt_for_state(
         self, state: dict, state_config: dict, authoritative_user_id: str = None
@@ -495,18 +493,10 @@ class StateMachine:
         return state_name == terminal_state
 
     def is_waiting_state(self, state_name: str) -> bool:
-        """Check if the given state is a waiting state."""
-        settings = self.config.get("settings", {})
-        waiting_prefix = settings.get("waiting_state_prefix", "waiting_")
-        return state_name.startswith(waiting_prefix)
-
-    def remove_waiting_prefix(self, state_name: str) -> str:
-        """Remove the waiting prefix from a state name."""
-        settings = self.config.get("settings", {})
-        waiting_prefix = settings.get("waiting_state_prefix", "waiting_")
-        if state_name.startswith(waiting_prefix):
-            return state_name.replace(waiting_prefix, "", 1)
-        return state_name
+        """Check if the given state is a waiting state by looking up its type."""
+        states = self.config.get("states", {})
+        state_config = states.get(state_name, {})
+        return state_config.get("type") == "waiting"
 
     def create_initial_state(self) -> dict:
         """Create initial state with default field values from configuration."""
@@ -517,19 +507,9 @@ class StateMachine:
         # Create state with default values from schema
         state = {}
 
-        # Add system fields
-        system_fields = state_schema.get("system_fields", {})
-        for field_name, field_config in system_fields.items():
-            default_value = field_config.get("default")
-            if field_name == "current_state":
-                state[field_name] = initial_state_name
-            elif default_value == "null" or default_value is None:
-                if field_config.get("type") == "list":
-                    state[field_name] = []
-                else:
-                    state[field_name] = None
-            else:
-                state[field_name] = default_value
+        # Add required system fields automatically
+        state["messages"] = []
+        state["current_state"] = initial_state_name
 
         # Add business fields
         business_fields = state_schema.get("business_fields", {})
@@ -553,6 +533,8 @@ class StateMachine:
             from langchain_core.messages import HumanMessage
 
             state["messages"].append(HumanMessage(content=initial_user_message))
+            # Mark this kickoff message as already processed so waiting nodes don't consume it
+            state["_last_processed_human_count"] = 1
 
         return state
 
@@ -563,17 +545,17 @@ class StateMachine:
         settings = self.config.get("settings", {})
         state_schema = self.config.get("state_schema", {})
 
-        # Get reset state name
+        # Get reset state name - defaults to initial_state if not specified
         reset_state = reset_behavior.get(
             "reset_state",
-            f"{settings.get('waiting_state_prefix', 'waiting_')}{settings.get('initial_state', 'collect_employee_id')}",
+            settings.get("initial_state", "collect_employee_id"),
         )
 
         # Get fields to clear from reset behavior or use all fields
         fields_to_clear = reset_behavior.get("clear_data", [])
         if not fields_to_clear:
-            # If no specific fields listed, clear all fields
-            all_fields = list(state_schema.get("system_fields", {}).keys()) + list(
+            # If no specific fields listed, clear required system fields + all business fields
+            all_fields = ["messages", "current_state"] + list(
                 state_schema.get("business_fields", {}).keys()
             )
             fields_to_clear = all_fields
@@ -581,17 +563,11 @@ class StateMachine:
         # Create new state using schema defaults
         state = {}
 
-        # Reset system fields
-        system_fields = state_schema.get("system_fields", {})
-        for field_name in fields_to_clear:
-            if field_name in system_fields:
-                field_config = system_fields[field_name]
-                if field_name == "current_state":
-                    state[field_name] = reset_state
-                elif field_config.get("type") == "list":
-                    state[field_name] = []
-                else:
-                    state[field_name] = None
+        # Handle required system fields
+        if "messages" in fields_to_clear:
+            state["messages"] = []
+        if "current_state" in fields_to_clear:
+            state["current_state"] = reset_state
 
         # Reset business fields
         business_fields = state_schema.get("business_fields", {})
@@ -612,14 +588,26 @@ class StateMachine:
 
     def process_intent_classifier_state(
         self, state: dict, state_config: dict, agent, authoritative_user_id: str = None
-    ) -> dict:
-        """Process intent_classifier type states."""
+    ) -> tuple[dict, str]:
+        """Process intent_classifier type states.
+
+        NOTE: Intent classifiers should always be preceded by a waiting state in the YAML.
+        They expect a HumanMessage to classify. If no message exists, this is a configuration error.
+
+        Returns:
+            tuple: (updated_state, next_state_name)
+        """
         messages = state["messages"]
         last_message = messages[-1] if messages else None
 
         if not last_message or not isinstance(last_message, HumanMessage):
-            state["current_state"] = f"waiting_{state['current_state']}"
-            return state
+            # This shouldn't happen with proper YAML configuration
+            # Intent classifiers should always have a waiting state before them
+            logger.error(
+                f"Intent classifier '{state.get('current_state')}' reached without user input. "
+                "Check YAML configuration - intent_classifiers need a preceding waiting state."
+            )
+            return state, "end"
 
         user_input = last_message.content.strip()
 
@@ -709,20 +697,22 @@ class StateMachine:
                         )
                         state[key] = formatted_value
 
-                # Handle state transition
-                if "next_state" in action:
-                    state["current_state"] = action["next_state"]
+                # Return with next state
+                next_state = action.get("next_state", "end")
+                return state, next_state
 
-                return state
-
-        # Default fallback if no intent matched
-        state["current_state"] = f"waiting_{state['current_state']}"
-        return state
+        # Default fallback if no intent matched - this shouldn't happen
+        logger.warning(f"No intent matched for state {state.get('current_state')}")
+        return state, "end"
 
     def process_llm_validator_state(
         self, state: dict, state_config: dict, agent, authoritative_user_id: str = None
-    ) -> dict:
-        """Process llm_validator type states (like laptop selection validation)."""
+    ) -> tuple[dict, str]:
+        """Process llm_validator type states (like laptop selection validation).
+
+        Returns:
+            tuple: (updated_state, next_state_name)
+        """
         messages = state["messages"]
         last_message = messages[-1] if messages else None
 
@@ -803,37 +793,36 @@ class StateMachine:
 
         transitions = state_config.get("transitions", {})
         if "VALID" in validation_response:
-            state["current_state"] = transitions.get("valid", "end")
+            next_state = transitions.get("valid", "end")
         else:
-            state["current_state"] = transitions.get(
-                "invalid", "waiting_laptop_selection"
-            )
+            next_state = transitions.get("invalid", "waiting_laptop_selection")
 
         state["messages"].append(AIMessage(content=response))
-        return state
+        return state, next_state
 
-    def process_terminal_state(self, state: dict, state_config: dict) -> dict:
-        """Process terminal type states."""
-        state["current_state"] = "end"
-        return state
+    def process_terminal_state(
+        self, state: dict, state_config: dict
+    ) -> tuple[dict, str]:
+        """Process terminal type states.
+
+        Returns:
+            tuple: (updated_state, next_state_name) - always returns "end"
+        """
+        return state, "end"
 
     def process_state(
         self, state: dict, agent, authoritative_user_id: str = None
-    ) -> dict:
-        """Process the current state based on its configuration."""
+    ) -> tuple[dict, str]:
+        """Process the current state based on its configuration.
+
+        Returns:
+            tuple: (updated_state, next_state_name)
+        """
         current_state_name = state.get("current_state", "")
-
-        # Handle waiting states by removing "waiting_" prefix
-        if current_state_name.startswith("waiting_"):
-            base_state_name = current_state_name.replace("waiting_", "")
-            if base_state_name in self.config["states"]:
-                current_state_name = base_state_name
-
         state_config = self.config["states"].get(current_state_name)
         if not state_config:
             logger.error(f"Unknown state: {current_state_name}")
-            state["current_state"] = "end"
-            return state
+            return state, "end"
 
         state_type = state_config.get("type", "")
 
@@ -853,8 +842,7 @@ class StateMachine:
             return self.process_terminal_state(state, state_config)
         else:
             logger.error(f"Unknown state type: {state_type}")
-            state["current_state"] = "end"
-            return state
+            return state, "end"
 
 
 class ConversationSession:
@@ -912,57 +900,117 @@ class ConversationSession:
         self.thread_config = {"configurable": {"thread_id": self.thread_id}}
 
     def _create_graph(self):
-        """Create the LangGraph workflow for this session with checkpoint persistence."""
+        """Create the LangGraph workflow with one node per YAML state."""
         # Use the dynamic AgentState from the state machine
         workflow = StateGraph(self.state_machine.AgentState)
 
-        # Add single dispatcher node
-        workflow.add_node("dispatcher", self._dispatcher)
-
-        # Set entry point
-        workflow.set_entry_point("dispatcher")
-
-        # Add conditional routing from dispatcher
-        workflow.add_conditional_edges(
-            "dispatcher",
-            self._route_next_step,
-            {
-                "dispatcher": "dispatcher",
-                END: END,
-            },
-        )
-
-        # Compile with checkpointer for persistence
-        return workflow.compile(checkpointer=self.checkpointer, debug=False)
-
-    def _dispatcher(self, state: dict) -> dict:
-        """Dispatcher that processes states using this session's state machine."""
-        logger.info(
-            f"Thread {self.thread_id} dispatcher called with current_state: {state.get('current_state')}"
-        )
-
-        # Use session agent
-        return self.state_machine.process_state(
-            state, self.agent, self.authoritative_user_id
-        )
-
-    def _route_next_step(self, state: dict) -> str:
-        """Route to the next step based on current state."""
+        # Get all states from configuration
+        states_config = self.state_machine.config.get("states", {})
         settings = self.state_machine.config.get("settings", {})
-        current_state = state.get(
-            "current_state", settings.get("initial_state", "collect_employee_id")
-        )
+        initial_state = settings.get("initial_state", "collect_employee_id")
 
-        # Terminal state
-        if self.state_machine.is_terminal_state(current_state):
-            return END
+        # Add a node for each state in the YAML configuration
+        node_names = []
+        for state_name, state_config in states_config.items():
+            state_type = state_config.get("type", "")
+            node_names.append(state_name)
 
-        # Waiting states end (wait for user input)
-        if self.state_machine.is_waiting_state(current_state):
-            return END
+            # Create node function with closure to capture state_name
+            def make_node_func(name, stype):
+                def node_func(state: dict):
+                    """Node function that returns Command for routing (or state for terminal nodes)."""
+                    logger.info(
+                        f"Thread {self.thread_id} processing node: {name}, type: {stype}"
+                    )
 
-        # All other states continue to dispatcher
-        return "dispatcher"
+                    # Update current_state to track where we are (for logging/debugging)
+                    state["current_state"] = name
+
+                    # Terminal states just return state - explicit edge to END handles routing
+                    if stype == "terminal":
+                        return state
+
+                    # Waiting states check if there's a new HUMAN message to consume
+                    if stype == "waiting":
+                        # Get the target from transitions
+                        transitions = states_config[name].get("transitions", {})
+                        next_node = transitions.get("user_input", "end")
+
+                        # Check if there's a new HumanMessage by counting them
+                        messages = state.get("messages", [])
+                        human_count = sum(
+                            1 for msg in messages if isinstance(msg, HumanMessage)
+                        )
+
+                        # Track GLOBALLY which human message number was last processed
+                        # Use checkpointed value to persist across invokes
+                        last_processed_global = state.get(
+                            "_last_processed_human_count", 0
+                        )
+
+                        # Also check if we've already consumed a message in THIS invoke
+                        # This flag gets set when the FIRST waiting node in an invoke consumes a message
+                        consumed_this_invoke = state.get("_consumed_this_invoke", False)
+
+                        if (
+                            human_count > last_processed_global
+                            and not consumed_this_invoke
+                        ):
+                            # New human message AND not yet consumed in this invoke - consume it
+                            state["_last_processed_human_count"] = human_count
+                            state["_consumed_this_invoke"] = (
+                                True  # Mark as consumed for this invoke
+                            )
+                            state["_last_waiting_node"] = (
+                                None  # Clear since we're moving on
+                            )
+                            return Command(goto=next_node, update=state)
+
+                        # Already consumed in this invoke, or no new message - pause execution
+                        # Store this waiting node as the resume point
+                        state["_last_waiting_node"] = name
+                        return state
+                    else:
+                        # Process the state and get next node
+                        updated_state, next_node = self.state_machine.process_state(
+                            state, self.agent, self.authoritative_user_id
+                        )
+                        # Return Command with routing information
+                        return Command(goto=next_node, update=updated_state)
+
+                return node_func
+
+            workflow.add_node(state_name, make_node_func(state_name, state_type))
+
+        # Add a resume dispatcher node that routes to the correct starting point
+        def resume_dispatcher(state: dict):
+            """Dispatcher that resumes from last waiting node or starts from initial state"""
+            last_waiting_node = state.get("_last_waiting_node")
+
+            if last_waiting_node and last_waiting_node in node_names:
+                # Resume from last waiting node
+                return Command(goto=last_waiting_node, update=state)
+            else:
+                # New conversation - start from initial state
+                return Command(goto=initial_state, update=state)
+
+        workflow.add_node("__resume_dispatcher__", resume_dispatcher)
+
+        logger.info(f"Created {len(node_names)} nodes: {', '.join(node_names)}")
+
+        # Set entry point to resume dispatcher
+        workflow.set_entry_point("__resume_dispatcher__")
+
+        # No need for explicit edges - nodes return Command(goto=X) which handles routing
+        # The only explicit edge needed is for terminal states
+        for state_name, state_config in states_config.items():
+            state_type = state_config.get("type", "")
+            if state_type == "terminal":
+                # Terminal states always go to END
+                workflow.add_edge(state_name, END)
+
+        # Compile with checkpointer only
+        return workflow.compile(checkpointer=self.checkpointer, debug=False)
 
     def get_initial_response(self) -> str:
         """Get the initial response from the agent by checking conversation history."""
@@ -1028,28 +1076,33 @@ class ConversationSession:
             if not current_state.values:
                 # First message - initialize with empty state and let the graph handle initialization
                 initial_state = self.state_machine.create_initial_state()
+
+                # Check for initial_user_message override in settings
+                settings = self.state_machine.config.get("settings", {})
+                initial_user_message = settings.get("initial_user_message")
+
+                # Use override message if configured, otherwise use the passed message
+                message_to_use = initial_user_message if initial_user_message else message
+
                 # Add the user message to initial state
-                initial_state["messages"].append(HumanMessage(content=message))
+                initial_state["messages"].append(HumanMessage(content=message_to_use))
+
+                # Only mark as consumed if initial_state is NOT a waiting state
+                # Waiting states need to consume the first message themselves
+                initial_state_name = settings.get("initial_state", "")
+                if not self.state_machine.is_waiting_state(initial_state_name):
+                    # Mark this kickoff message as already processed so waiting nodes don't consume it
+                    initial_state["_last_processed_human_count"] = 1
+
                 result = self.app.invoke(initial_state, config=self.thread_config)
             else:
                 # Existing conversation - add user message and continue
-                # Create input with just the new user message
-                user_input = {"messages": [HumanMessage(content=message)]}
+                # Add the user message and reset the consumed flag for this new invoke
+                user_input = {
+                    "messages": [HumanMessage(content=message)],
+                    "_consumed_this_invoke": False,  # Reset flag so first waiting node can consume
+                }
 
-                # Get current state values
-                current_values = current_state.values
-                current_state_name = current_values.get("current_state")
-
-                # Handle waiting states
-                if self.state_machine.is_waiting_state(current_state_name):
-                    states_config = self.state_machine.config.get("states", {})
-                    if current_state_name in states_config:
-                        state_config = states_config[current_state_name]
-                        transitions = state_config.get("transitions", {})
-                        next_state = transitions.get("user_input", current_state_name)
-                        user_input["current_state"] = next_state
-
-                # Invoke with the new message
                 result = self.app.invoke(user_input, config=self.thread_config)
 
             # Extract agent response
@@ -1065,17 +1118,39 @@ class ConversationSession:
             if result and self.state_machine.is_terminal_state(
                 result.get("current_state")
             ):
-                # Reset the thread for a new conversation
-                reset_state = self.state_machine.reset_state_for_new_conversation()
-                self.app.update_state(self.thread_config, reset_state)
-                if agent_response:
-                    agent_response += (
-                        "\n\n[Conversation completed! Starting new conversation...]"
-                    )
+                # Check if the end state has reset_behavior configured
+                end_state_config = self.state_machine.config.get("states", {}).get(
+                    "end", {}
+                )
+                reset_behavior = end_state_config.get("reset_behavior")
+
+                if reset_behavior:
+                    # Reset behavior is configured - reset the conversation
+                    reset_state = self.state_machine.reset_state_for_new_conversation()
+
+                    # Don't include current_state in the update - it will cause validation errors
+                    # Remove it and let the graph naturally go back to the entry point
+                    reset_state_without_current = {
+                        k: v for k, v in reset_state.items() if k != "current_state"
+                    }
+
+                    # Update the state to clear the data (but don't set current_state)
+                    if reset_state_without_current:
+                        self.app.update_state(
+                            self.thread_config, reset_state_without_current
+                        )
+
+                    if agent_response:
+                        agent_response += (
+                            "\n\n[Conversation completed! Starting new conversation...]"
+                        )
+                    else:
+                        agent_response = (
+                            "Conversation completed! Starting new conversation..."
+                        )
                 else:
-                    agent_response = (
-                        "Conversation completed! Starting new conversation..."
-                    )
+                    # No reset behavior - just return the response as-is
+                    pass
 
             return (
                 agent_response if agent_response else "No response received from agent"

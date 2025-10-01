@@ -3,37 +3,17 @@
 
 # Global settings
 settings:
-  initial_state: "handle_interaction"
+  initial_state: "waiting_for_interaction"
   initial_user_message: "I need help with laptop refresh"
   terminator_env_var: "AGENT_MESSAGE_TERMINATOR"
   agent_name: "laptop-refresh"
   terminal_state: "end"
-  waiting_state_prefix: "waiting_"
   empty_response_retry_count: 3
 
 # State structure definition
 state_schema:
-  # Required system fields
-  system_fields:
-    messages:
-      type: "list"
-      description: "Conversation message history"
-      default: []
-    current_state:
-      type: "string"
-      description: "Current state machine state"
-      default: null  # Will be set to initial_state
-  
-  # Business logic fields - simplified for single agent approach
-  business_fields:
-    conversation_active:
-      type: "boolean"
-      description: "Whether the conversation is still active"
-      default: true
-    task_complete:
-      type: "boolean"
-      description: "Whether the laptop refresh task is complete"
-      default: false
+  # Note: System fields (messages, current_state) are automatically added by the framework
+  business_fields: {}  # No business fields needed - single comprehensive prompt handles all logic
 
 # State definitions
 states:
@@ -94,7 +74,7 @@ states:
       Laptop Warranty Expiry Date: gg
       Laptop Warranty: hh
 
-      Your laptop, a XXXXXXXX 7420, was purchased on 20XX-XX-XX and is currently A years and B months old. The company's laptop refresh policy states that standard laptops will be refreshed every 3 years from the date of issuance. Since your laptop is older than Y years, you are eligible for a laptop refresh. Would you like to proceed with reviewing the available laptop options for your location?
+      Your laptop, a XXXXXXXX, was purchased on 20XX-XX-XX and is currently A years and B months old. The company's laptop refresh policy states that standard laptops will be refreshed every Y years from the date of issuance. Since your laptop is older than Y years, you are eligible for a laptop refresh. Would you like to proceed with reviewing the available laptop options for your location?
 
       **User:** Yes, I'd like to review the available laptop options.
 
@@ -124,9 +104,6 @@ states:
         - name: "task_complete"
           trigger_phrases: ["task_complete_return_to_router"]
           actions:
-            - type: "set_field"
-              field_name: "task_complete"
-              value: true
             - type: "transition"
               target: "end"
       default_transition: "waiting_for_interaction"
@@ -138,4 +115,4 @@ states:
     type: "terminal"
     reset_behavior:
       reset_state: "handle_interaction"  # Start fresh for next conversation
-      clear_data: ["messages", "conversation_active", "task_complete", "current_state"]
+      clear_data: ["messages", "current_state"]
