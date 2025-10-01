@@ -1082,7 +1082,9 @@ class ConversationSession:
                 initial_user_message = settings.get("initial_user_message")
 
                 # Use override message if configured, otherwise use the passed message
-                message_to_use = initial_user_message if initial_user_message else message
+                message_to_use = (
+                    initial_user_message if initial_user_message else message
+                )
 
                 # Add the user message to initial state
                 initial_state["messages"].append(HumanMessage(content=message_to_use))
