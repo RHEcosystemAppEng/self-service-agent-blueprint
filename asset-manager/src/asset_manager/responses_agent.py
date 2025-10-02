@@ -215,6 +215,9 @@ class Agent:
         additional_system_messages: list = None,
         authoritative_user_id: str = None,
         allowed_tools: list = None,
+        skip_all_tools: bool = False,
+        skip_mcp_servers_only: bool = False,
+        current_state_name: str = None,
     ) -> str:
         """Create a response with retry logic for empty responses and errors."""
         response = None
@@ -228,6 +231,9 @@ class Agent:
                     additional_system_messages=additional_system_messages,
                     authoritative_user_id=authoritative_user_id,
                     allowed_tools=allowed_tools,
+                    skip_all_tools=skip_all_tools,
+                    skip_mcp_servers_only=skip_mcp_servers_only,
+                    current_state_name=current_state_name,
                 )
 
                 # Check if response is empty or contains error
@@ -319,6 +325,52 @@ class Agent:
             logger.warning(f"Error while checking response errors: {e}")
             return f"Error checking failed: {e}"
 
+    def _print_empty_response_debug_info(
+        self,
+        response,
+        current_state_name: str,
+        skip_all_tools: bool,
+        skip_mcp_servers_only: bool,
+        tools_to_use: list,
+    ) -> None:
+        """Print detailed debug information for empty responses.
+
+        Only prints if SHOW_EMPTY_RESPONSE_INFO environment variable is set.
+        """
+        if not os.environ.get("SHOW_EMPTY_RESPONSE_INFO"):
+            return
+
+        print("=" * 80)
+        print("EMPTY RESPONSE DETECTED - NO VALID CONTENT FOUND")
+        print("=" * 80)
+        if current_state_name:
+            print(f"Current State (from YAML): {current_state_name}")
+        print(f"Response ID: {getattr(response, 'id', 'N/A')}")
+        print(f"Response status: {getattr(response, 'status', 'N/A')}")
+        print(f"Response model: {getattr(response, 'model', 'N/A')}")
+        print(f"Skip ALL tools: {skip_all_tools}")
+        print(f"Skip MCP servers only: {skip_mcp_servers_only}")
+        print(f"Tools count: {len(tools_to_use) if tools_to_use else 0}")
+        print(
+            f"Has output_text: {hasattr(response, 'output_text')}, value: '{getattr(response, 'output_text', 'N/A')}'"
+        )
+        if hasattr(response, "output") and response.output:
+            print(f"Output array length: {len(response.output)}")
+            for idx, item in enumerate(response.output):
+                print(f"  Output[{idx}]: type={getattr(item, 'type', 'N/A')}")
+                if hasattr(item, "content"):
+                    print(
+                        f"    content length: {len(item.content) if item.content else 0}"
+                    )
+                    if item.content:
+                        for cidx, citem in enumerate(item.content):
+                            print(
+                                f"      content[{cidx}]: type={getattr(citem, 'type', 'N/A')}, text='{getattr(citem, 'text', 'N/A')}'"
+                            )
+        if hasattr(response, "text"):
+            print(f"Response.text: {response.text}")
+        print("=" * 80)
+
     def create_response(
         self,
         messages: list,
@@ -326,6 +378,9 @@ class Agent:
         additional_system_messages: list = None,
         authoritative_user_id: str = None,
         allowed_tools: list = None,
+        skip_all_tools: bool = False,
+        skip_mcp_servers_only: bool = False,
+        current_state_name: str = None,
     ) -> str:
         """Create a response using LlamaStack responses API.
 
@@ -335,6 +390,9 @@ class Agent:
             additional_system_messages: Optional list of additional system messages to include
             authoritative_user_id: Optional authoritative user ID to pass via X-LlamaStack-Provider-Data header to MCP servers
             allowed_tools: Optional list of tool names/types to restrict available tools (e.g., ['file_search', 'employee-info'])
+            skip_all_tools: If True, skip all tools (MCP servers and knowledge base)
+            skip_mcp_servers_only: If True, skip only MCP servers (keep knowledge base tools)
+            current_state_name: Optional name of the current state from the state machine YAML
         """
         try:
             # Start with the main system message
@@ -353,8 +411,18 @@ class Agent:
             if temperature is not None:
                 response_config["temperature"] = temperature
 
-            # Rebuild tools if authoritative_user_id or allowed_tools is provided
-            if authoritative_user_id or allowed_tools:
+            # Rebuild tools if any tool filtering is requested
+            if skip_all_tools:
+                # Skip all tools (no MCP servers, no knowledge base tools)
+                tools_to_use = []
+            elif skip_mcp_servers_only:
+                # Skip MCP servers but keep knowledge base tools
+                # Pass None/empty list for mcp_servers to exclude them
+                tools_to_use = self._get_mcp_tools_to_use(
+                    None, authoritative_user_id, allowed_tools
+                )
+            elif authoritative_user_id or allowed_tools:
+                # Include MCP servers and knowledge base tools
                 mcp_servers = self.config.get("mcp_servers", [])
                 tools_to_use = self._get_mcp_tools_to_use(
                     mcp_servers, authoritative_user_id, allowed_tools
@@ -363,12 +431,20 @@ class Agent:
                 tools_to_use = self.tools
 
             # Use the existing LlamaStack client for response creation
-            response = self.llama_client.responses.create(
-                input=messages_with_system,
-                model=self.model,
-                **response_config,
-                tools=tools_to_use,
-            )
+            # Only pass tools if tools_to_use is not empty
+            if tools_to_use:
+                response = self.llama_client.responses.create(
+                    input=messages_with_system,
+                    model=self.model,
+                    **response_config,
+                    tools=tools_to_use,
+                )
+            else:
+                response = self.llama_client.responses.create(
+                    input=messages_with_system,
+                    model=self.model,
+                    **response_config,
+                )
 
             # Import token counting if available
             try:
@@ -388,60 +464,53 @@ class Agent:
 
             # Extract content from LlamaStack responses API format
             try:
-                if hasattr(response, "output_text"):
-                    content = response.output_text
-                    logger.debug(f"Extracted output_text: {content}")
-                    if not content or content.strip() == "":
-                        logger.warning("Empty response detected from output_text")
-                        return ""  # Return empty to trigger retry logic
-                    return content
-                elif hasattr(response, "output") and response.output:
-                    output_message = response.output[0]
-                    if hasattr(output_message, "content") and output_message.content:
-                        content_item = output_message.content[0]
-                        if hasattr(content_item, "text"):
-                            content = content_item.text
-                            logger.debug(f"Extracted text content: {content}")
-                            if not content or content.strip() == "":
-                                logger.warning(
-                                    "Empty response detected from content.text"
-                                )
-                                return ""  # Return empty to trigger retry logic
-                            return content
+                # Try output_text first (most common case)
+                if (
+                    hasattr(response, "output_text")
+                    and response.output_text
+                    and response.output_text.strip()
+                ):
+                    return response.output_text
 
+                # Try to find message in output array (handles MCP tool discovery responses)
+                if hasattr(response, "output") and response.output:
+                    for output_item in response.output:
+                        if (
+                            hasattr(output_item, "type")
+                            and output_item.type == "message"
+                        ):
+                            if hasattr(output_item, "content") and output_item.content:
+                                for content_item in output_item.content:
+                                    if hasattr(content_item, "text"):
+                                        content = content_item.text
+                                        if content and content.strip():
+                                            return content
+                            # Found message but it was empty, break to check fallbacks
+                            break
+
+                # Try other fallback fields
                 if hasattr(response, "completion_message") and hasattr(
                     response.completion_message, "content"
                 ):
                     content = response.completion_message.content
-                    logger.debug(f"Response content (completion_message): {content}")
-                    return content
-                elif hasattr(response, "content"):
+                    if isinstance(content, str) and content.strip():
+                        return content
+
+                if hasattr(response, "content"):
                     content = response.content
-                    logger.debug(f"Response content (direct): {content}")
-                    return content
-                elif hasattr(response, "output_text"):
-                    content = response.output_text
-                    logger.debug(f"Response content (output_text): {content}")
-                    return content
-                elif hasattr(response, "output"):
-                    content = response.output
-                    logger.debug(f"Response content (output): {content}")
-                    return content
-                elif hasattr(response, "text"):
-                    content = response.text
-                    logger.debug(f"Response content (text): {content}")
-                    return content
-                else:
-                    print(
-                        f"Could not extract content from response. Response attributes: {dir(response)}"
-                    )
-                    logger.warning(
-                        f"Could not extract content from response. Response attributes: {dir(response)}"
-                    )
-                    logger.warning(
-                        "Could not extract content from response, returning fallback message"
-                    )
-                    return ""  # Return empty to trigger retry logic
+                    if isinstance(content, str) and content.strip():
+                        return content
+
+                # No valid content found - print detailed debug info
+                self._print_empty_response_debug_info(
+                    response,
+                    current_state_name,
+                    skip_all_tools,
+                    skip_mcp_servers_only,
+                    tools_to_use,
+                )
+                logger.warning("No valid content found in response")
+                return ""  # Return empty to trigger retry logic
 
             except Exception as e:
                 logger.error(f"Error extracting content from response: {e}")

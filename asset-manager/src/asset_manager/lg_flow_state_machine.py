@@ -94,6 +94,74 @@ class StateMachine:
         settings = self.config.get("settings", {})
         return settings.get("empty_response_retry_count", 3)
 
+    def _is_config_disabled(self, config_value) -> bool:
+        """Check if a config value represents 'disabled' (no/No/NO or False).
+
+        Args:
+            config_value: The value from YAML config (can be bool, str, or other)
+
+        Returns:
+            True if the value represents disabled (False boolean or "no" string)
+        """
+        return (isinstance(config_value, bool) and not config_value) or (
+            isinstance(config_value, str) and config_value.lower() == "no"
+        )
+
+    def _build_response_kwargs(
+        self,
+        state: dict,
+        state_config: dict,
+        temperature: float,
+        authoritative_user_id: str,
+        allowed_tools: list = None,
+        action_config: dict = None,
+    ) -> dict:
+        """Build kwargs for create_response_with_retry.
+
+        Args:
+            state: Current state dictionary
+            state_config: State configuration from YAML
+            temperature: Temperature setting
+            authoritative_user_id: User ID for authorization
+            allowed_tools: Optional list of allowed tools
+            action_config: Optional action config (for intent actions), falls back to state_config
+
+        Returns:
+            Dictionary of kwargs for create_response_with_retry
+        """
+        # Check if uses_tools/uses_mcp_tools are disabled (with state-level fallback for actions)
+        if action_config:
+            skip_all_tools = self._is_config_disabled(
+                action_config.get("uses_tools", state_config.get("uses_tools", "yes"))
+            )
+            skip_mcp_servers_only = self._is_config_disabled(
+                action_config.get(
+                    "uses_mcp_tools", state_config.get("uses_mcp_tools", "yes")
+                )
+            )
+        else:
+            skip_all_tools = self._is_config_disabled(
+                state_config.get("uses_tools", "yes")
+            )
+            skip_mcp_servers_only = self._is_config_disabled(
+                state_config.get("uses_mcp_tools", "yes")
+            )
+
+        # Build kwargs
+        response_kwargs = {
+            "temperature": temperature,
+            "authoritative_user_id": authoritative_user_id,
+            "skip_all_tools": skip_all_tools,
+            "skip_mcp_servers_only": skip_mcp_servers_only,
+            "current_state_name": state.get("current_state"),
+        }
+
+        # Add allowed_tools if specified
+        if allowed_tools is not None:
+            response_kwargs["allowed_tools"] = allowed_tools
+
+        return response_kwargs
+
     def _format_text(
         self, text: str, state_data: dict, authoritative_user_id: str = None
     ) -> str:
@@ -221,20 +289,13 @@ class StateMachine:
                 "Using traditional approach - sending prompt as single user message"
             )
 
-        temperature = state_config.get(
-            "temperature"
-        )  # Get temperature from state config
-
-        # Get allowed_tools from state config (optional)
+        temperature = state_config.get("temperature")
         allowed_tools = state_config.get("allowed_tools")
 
         # Build kwargs for create_response_with_retry
-        response_kwargs = {
-            "temperature": temperature,
-            "authoritative_user_id": authoritative_user_id,
-        }
-        if allowed_tools is not None:
-            response_kwargs["allowed_tools"] = allowed_tools
+        response_kwargs = self._build_response_kwargs(
+            state, state_config, temperature, authoritative_user_id, allowed_tools
+        )
 
         response = agent.create_response_with_retry(
             messages_to_send,
@@ -618,20 +679,13 @@ class StateMachine:
             authoritative_user_id,
         )
         intent_messages = [{"role": "user", "content": intent_prompt}]
-        temperature = state_config.get(
-            "temperature"
-        )  # Get temperature from state config
-
-        # Get allowed_tools from state config (optional)
+        temperature = state_config.get("temperature")
         allowed_tools = state_config.get("allowed_tools")
 
         # Build kwargs for create_response_with_retry
-        response_kwargs = {
-            "temperature": temperature,
-            "authoritative_user_id": authoritative_user_id,
-        }
-        if allowed_tools is not None:
-            response_kwargs["allowed_tools"] = allowed_tools
+        response_kwargs = self._build_response_kwargs(
+            state, state_config, temperature, authoritative_user_id, allowed_tools
+        )
 
         intent_response = (
             agent.create_response_with_retry(
@@ -665,19 +719,19 @@ class StateMachine:
                     )
                     messages_to_send = [{"role": "user", "content": prompt}]
                     # Use state temperature for intent action prompts for consistency
-                    action_temperature = state_config.get(
-                        "temperature", 0.6
-                    )  # Fallback to 0.6
+                    action_temperature = state_config.get("temperature", 0.6)
                     # Use action-level allowed_tools if specified, otherwise use state-level
                     action_allowed_tools = action.get("allowed_tools", allowed_tools)
 
-                    # Build kwargs for create_response_with_retry
-                    action_response_kwargs = {
-                        "temperature": action_temperature,
-                        "authoritative_user_id": authoritative_user_id,
-                    }
-                    if action_allowed_tools is not None:
-                        action_response_kwargs["allowed_tools"] = action_allowed_tools
+                    # Build kwargs for create_response_with_retry (with action-level config)
+                    action_response_kwargs = self._build_response_kwargs(
+                        state,
+                        state_config,
+                        action_temperature,
+                        authoritative_user_id,
+                        action_allowed_tools,
+                        action_config=action,
+                    )
 
                     response = agent.create_response_with_retry(
                         messages_to_send,
@@ -741,17 +795,12 @@ class StateMachine:
 
         messages_to_send.append({"role": "system", "content": validation_prompt})
         temperature = state_config.get("temperature", 0.3)  # Default for validation
-
-        # Get allowed_tools from state config (optional)
         allowed_tools = state_config.get("allowed_tools")
 
         # Build kwargs for create_response_with_retry
-        response_kwargs = {
-            "temperature": temperature,
-            "authoritative_user_id": authoritative_user_id,
-        }
-        if allowed_tools is not None:
-            response_kwargs["allowed_tools"] = allowed_tools
+        response_kwargs = self._build_response_kwargs(
+            state, state_config, temperature, authoritative_user_id, allowed_tools
+        )
 
         response = agent.create_response_with_retry(
             messages_to_send,
@@ -768,12 +817,9 @@ class StateMachine:
         validation_messages = [{"role": "user", "content": success_validation_prompt}]
 
         # Build kwargs for validation response
-        validation_kwargs = {
-            "temperature": 0.1,  # Very deterministic for validation classification
-            "authoritative_user_id": authoritative_user_id,
-        }
-        if allowed_tools is not None:
-            validation_kwargs["allowed_tools"] = allowed_tools
+        validation_kwargs = self._build_response_kwargs(
+            state, state_config, 0.1, authoritative_user_id, allowed_tools
+        )
 
         validation_response = (
             agent.create_response_with_retry(

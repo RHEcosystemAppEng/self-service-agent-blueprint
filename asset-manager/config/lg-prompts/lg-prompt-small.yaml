@@ -65,8 +65,9 @@ states:
   classify_lookup_result:
     type: "llm_processor"
     temperature: 0.1  # Very deterministic classification
-    allowed_tools: [ "" ]
+    uses_tools: "No"
     prompt: |
+      Think step by step and use no tools
       Analyze this employee lookup response: "{employee_info.response}"
 
       Classify the result as SUCCESS, NOT_FOUND, or ERROR:
@@ -102,6 +103,7 @@ states:
   check_eligibility:
     type: "llm_processor"
     temperature: 0.4  # Mix of factual lookup + conversational response
+    uses_mcp_tools: "No"
     prompt: |
       You have the employee information: {employee_info.response}
 
@@ -124,8 +126,9 @@ states:
   classify_eligibility_result:
     type: "llm_processor"
     temperature: 0.1  # Very deterministic classification
-    allowed_tools: [ "" ]
+    uses_tools: "No"
     prompt: |
+      Think step by step and use not tools
       This is the summary of the user's eligibility: "{laptop_eligibility.response}"
 
       If the response says the user is eligible for a laptop replacement, respond: ELIGIBLE
@@ -177,7 +180,7 @@ states:
   classify_ineligible_user_intent:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic intent classification
-    allowed_tools: [ "" ]
+    uses_tools: "No"
     intent_prompt: |
       Analyze the user's message and determine their intent. The user said: "{user_input}"
 
@@ -215,7 +218,7 @@ states:
   proceed_confirmation:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic yes/no classification
-    allowed_tools: [ "" ]
+    uses_tools: "No"
     intent_prompt: |
       The user was asked if they want to proceed with reviewing laptop options. They responded: "{user_input}"
 
@@ -243,6 +246,7 @@ states:
   select_laptop:
     type: "llm_processor"
     temperature: 0.2  # Mix of factual info + conversational presentation
+    uses_mcp_tools: "No"
     conditional_prompts:
       - condition: "user_is_ineligible"
         check_field: "eligibility_status"
@@ -277,7 +281,7 @@ states:
   classify_laptop_selection:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic selection validation
-    allowed_tools: [ "" ]
+    uses_tools: "No"
     intent_prompt: |
       The user said: "{user_input}"
 
@@ -303,6 +307,7 @@ states:
   confirm_laptop_selection:
     type: "llm_processor"
     temperature: 0.2  # Mix of factual lookup + conversational confirmation
+    uses_tools: "No"
     prompt: |
       The user selected: "{selected_laptop}"
 
@@ -326,7 +331,7 @@ states:
   classify_ticket_confirmation:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic yes/no classification
-    allowed_tools: [ "" ]
+    uses_tools: "No"
     intent_prompt: |
       The user was asked if they want to create a ServiceNow ticket for their laptop refresh request. They responded: "{user_input}"
 
@@ -338,6 +343,7 @@ states:
       Respond with only the classification: YES, NO, or UNCLEAR
     intent_actions:
       "YES":
+        uses_tools: "Yes"
         allowed_tools: [ "open_laptop_refresh_ticket" ]
         prompt: |
           You have the employee information: {employee_info.response}
