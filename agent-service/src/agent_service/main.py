@@ -14,6 +14,7 @@ from shared_clients.stream_processor import LlamaStackStreamProcessor
 from shared_models import (
     AgentMapping,
     CloudEventBuilder,
+    CloudEventHandler,
     EventTypes,
     configure_logging,
     create_agent_mapping,
@@ -33,7 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import __version__
 from .schemas import SessionCreate, SessionResponse, SessionUpdate
-from .session_manager import SessionManager
+from .session_manager import BaseSessionManager, ResponsesSessionManager
 
 # Configure structured logging
 logger = configure_logging("agent-service")
@@ -105,7 +106,7 @@ class AgentService:
             # Build initial agent name to ID mapping
             await self._build_agent_mapping()
         except Exception as e:
-            logger.error("Failed to connect to Llama Stack", error=str(e))
+            logger.error("Failed to connect to Llama Stack", exc_info=e)
             raise
 
     def _is_reset_command(self, content: str) -> bool:
@@ -126,14 +127,14 @@ class AgentService:
             db_manager = get_database_manager()
 
             async with db_manager.get_session() as db:
-                session_manager = SessionManager(db)
+                session_manager = BaseSessionManager(db)
 
                 # Clear the session by setting it to INACTIVE
                 await session_manager.update_session(
                     request.session_id,
                     status=SessionStatus.INACTIVE,
                     agent_id=None,
-                    llama_stack_session_id=None,
+                    conversation_thread_id=None,
                 )
 
                 logger.info(
@@ -302,29 +303,24 @@ class AgentService:
 
                 db_manager = get_database_manager()
                 async with db_manager.get_session() as db_session:
-                    session_manager = SessionManager(db_session)
+                    session_manager = BaseSessionManager(db_session)
 
-                    # Convert agent name to UUID before updating session
+                    # Get the routed agent UUID for validation
                     routed_agent_uuid = self.agent_mapping.convert_to_uuid(routed_agent)
-                    if not routed_agent_uuid:
-                        logger.error(
-                            "Failed to convert routed agent name to UUID",
-                            agent_name=routed_agent,
-                            request_id=request.request_id,
-                        )
-                        return agent_response
 
                     # Mark this as a fresh agent transition for introductory response
                     conversation_context = {
                         "agent_transition": True,
                         "previous_agent": agent_response.agent_id,
-                        "new_agent": routed_agent_uuid,
+                        "new_agent": routed_agent,  # Store agent name for consistency
+                        "agent_uuid": routed_agent_uuid,  # Store UUID for validation
+                        "session_type": "llamastack_agent",
                         "transition_timestamp": datetime.now(timezone.utc).isoformat(),
                     }
 
                     updated_session = await session_manager.update_session(
                         session_id=request.session_id,
-                        agent_id=routed_agent_uuid,  # Use agent UUID
+                        agent_id=routed_agent,  # Store agent name directly
                         conversation_context=conversation_context,
                     )
 
@@ -332,7 +328,6 @@ class AgentService:
                         "Updated session with routed agent",
                         session_id=request.session_id,
                         agent_name=routed_agent,
-                        agent_uuid=routed_agent_uuid,
                         update_successful=updated_session is not None,
                         request_id=request.request_id,
                     )
@@ -395,7 +390,16 @@ class AgentService:
             if not skip_routing:
                 await self._publish_processing_event(request)
 
-            # Determine which agent to use
+            # Check if responses mode is requested
+            if getattr(request, "use_responses", False):
+                logger.info(
+                    "Responses mode requested, delegating to responses session manager",
+                    request_id=request.request_id,
+                    session_id=request.session_id,
+                )
+                return await self._handle_responses_mode_request(request)
+
+            # Determine which agent to use for traditional agent mode
             agent_id = await self._determine_agent(request)
             logger.info(
                 "Agent determined for request",
@@ -583,7 +587,7 @@ class AgentService:
 
             db_manager = get_database_manager()
             async with db_manager.get_session() as db_session:
-                session_manager = SessionManager(db_session)
+                session_manager = BaseSessionManager(db_session)
                 session = await session_manager.get_session(request.session_id)
 
                 # Debug logging to understand what's happening
@@ -711,35 +715,51 @@ class AgentService:
         # Get database session for persistent storage
         db_manager = get_database_manager()
         async with db_manager.get_session() as db:
-            session_manager = SessionManager(db)
+            session_manager = BaseSessionManager(db)
 
             # Try to get existing session from database
             existing_session = await session_manager.get_session(
                 request_manager_session_id
             )
 
-            if existing_session and existing_session.llama_stack_session_id:
-                # Verify the session still exists in LlamaStack
-                try:
-                    self.client.agents.session.retrieve(
-                        agent_id=agent_id,
-                        session_id=existing_session.llama_stack_session_id,
+            if existing_session and existing_session.conversation_thread_id:
+                # Check if agent UUID has changed (agent was recreated)
+                stored_uuid = None
+                if existing_session.conversation_context:
+                    stored_uuid = existing_session.conversation_context.get(
+                        "agent_uuid"
                     )
-                    logger.info(
-                        "Reusing existing LlamaStack session from database",
-                        request_manager_session_id=request_manager_session_id,
-                        agent_id=agent_id,
-                        llama_stack_session_id=existing_session.llama_stack_session_id,
-                    )
-                    return existing_session.llama_stack_session_id
-                except Exception as e:
+
+                if stored_uuid and stored_uuid != agent_id:
                     logger.warning(
-                        "Database session no longer valid in LlamaStack, will create new one",
+                        "Agent UUID has changed, agent was likely recreated",
                         request_manager_session_id=request_manager_session_id,
-                        agent_id=agent_id,
-                        session_id=existing_session.llama_stack_session_id,
-                        error=str(e),
+                        stored_uuid=stored_uuid,
+                        current_uuid=agent_id,
+                        agent_name=existing_session.current_agent_id,
                     )
+                else:
+                    # Verify the session still exists in LlamaStack
+                    try:
+                        self.client.agents.session.retrieve(
+                            agent_id=agent_id,
+                            session_id=existing_session.conversation_thread_id,
+                        )
+                        logger.info(
+                            "Reusing existing LlamaStack session from database",
+                            request_manager_session_id=request_manager_session_id,
+                            agent_id=agent_id,
+                            llama_stack_session_id=existing_session.conversation_thread_id,
+                        )
+                        return existing_session.conversation_thread_id
+                    except Exception as e:
+                        logger.warning(
+                            "Database session no longer valid in LlamaStack, will create new one",
+                            request_manager_session_id=request_manager_session_id,
+                            agent_id=agent_id,
+                            session_id=existing_session.conversation_thread_id,
+                            error=str(e),
+                        )
 
         try:
             # Create new session
@@ -752,11 +772,22 @@ class AgentService:
 
             # Store the LlamaStack session ID in the database
             async with db_manager.get_session() as db:
-                session_manager = SessionManager(db)
+                session_manager = BaseSessionManager(db)
+                # Get agent name for consistent storage
+                agent_name = self.agent_mapping.get_name(agent_id) or agent_id
+
+                # Store both agent name and UUID for validation
+                conversation_context = {
+                    "agent_name": agent_name,
+                    "agent_uuid": agent_id,
+                    "session_type": "llamastack_agent",
+                }
+
                 await session_manager.update_session(
                     session_id=request_manager_session_id,
-                    agent_id=agent_id,
-                    llama_stack_session_id=llama_stack_session_id,
+                    agent_id=agent_name,  # Store agent name for readability
+                    conversation_thread_id=llama_stack_session_id,
+                    conversation_context=conversation_context,  # Store UUID for validation
                 )
 
             logger.info(
@@ -769,7 +800,7 @@ class AgentService:
             return llama_stack_session_id
 
         except Exception as e:
-            logger.error("Failed to create agent session", error=str(e))
+            logger.error("Failed to create agent session", exc_info=e)
             raise
 
     async def publish_response(self, response: AgentResponse) -> bool:
@@ -855,57 +886,78 @@ class AgentService:
             return True
 
         except Exception as e:
-            logger.error("Failed to publish response event", error=str(e))
+            logger.error("Failed to publish response event", exc_info=e)
             return False
 
     async def _update_request_log(self, response: AgentResponse) -> None:
         """Update RequestLog in database with response content."""
+        await _update_request_log_unified(
+            request_id=response.request_id,
+            response_content=response.content,
+            agent_id=response.agent_id,
+            response_metadata=response.metadata,
+            processing_time_ms=response.processing_time_ms,
+            db=None,  # Will create its own database session
+        )
+
+    async def _handle_responses_mode_request(
+        self, request: NormalizedRequest
+    ) -> AgentResponse:
+        """Handle responses mode requests using LangGraph session manager."""
         try:
-            logger.debug("Starting RequestLog update", request_id=response.request_id)
-            from shared_models.models import RequestLog
-            from sqlalchemy import update
+            from shared_models import get_database_manager
 
+            # Get database session for responses session manager
             db_manager = get_database_manager()
-            logger.debug("Got database manager", request_id=response.request_id)
+
             async with db_manager.get_session() as db:
-                logger.debug("Got database session", request_id=response.request_id)
-                # Update the RequestLog with response content
-                stmt = (
-                    update(RequestLog)
-                    .where(RequestLog.request_id == response.request_id)
-                    .values(
-                        response_content=response.content,
-                        response_metadata=response.metadata,
-                        agent_id=response.agent_id,
-                        processing_time_ms=response.processing_time_ms,
-                        completed_at=datetime.now(timezone.utc),
-                    )
-                )
-                logger.info(
-                    "Executing update statement", request_id=response.request_id
-                )
-                await db.execute(stmt)
-                await db.commit()
-                logger.info(
-                    "Database commit successful", request_id=response.request_id
+                # Create responses session manager
+                session_manager = ResponsesSessionManager(
+                    db_session=db,
+                    user_id=request.user_id,
                 )
 
-                logger.info(
-                    "RequestLog updated with response",
-                    request_id=response.request_id,
-                    agent_id=response.agent_id,
-                    content_length=len(response.content),
+                # Process the message using responses mode
+                response_content = await session_manager.handle_responses_message(
+                    text=request.content,
+                    request_manager_session_id=request.session_id,
+                )
+
+                # Return response in AgentResponse format
+                return AgentResponse(
+                    request_id=request.request_id,
+                    session_id=request.session_id,
+                    user_id=request.user_id,
+                    agent_id=session_manager.current_agent_name or "responses",
+                    content=response_content,
+                    response_type="message",
+                    metadata={},
+                    processing_time_ms=0,  # TODO: Calculate actual processing time
+                    requires_followup=False,
+                    followup_actions=[],
+                    created_at=datetime.now(timezone.utc),
                 )
 
         except Exception as e:
             logger.error(
-                "Failed to update RequestLog",
-                request_id=response.request_id,
+                "Failed to handle responses mode request",
                 error=str(e),
-                error_type=type(e).__name__,
+                request_id=request.request_id,
+                session_id=request.session_id,
             )
-            # Don't raise the exception - we still want to publish the event
-            # even if database update fails
+            return AgentResponse(
+                request_id=request.request_id,
+                session_id=request.session_id,
+                user_id=request.user_id,
+                agent_id="system",
+                content=f"Failed to process responses mode request: {str(e)}",
+                response_type="error",
+                metadata={},
+                processing_time_ms=0,
+                requires_followup=False,
+                followup_actions=[],
+                created_at=datetime.now(timezone.utc),
+            )
 
     async def _publish_processing_event(self, request: NormalizedRequest) -> bool:
         """Publish processing started event for user notification."""
@@ -963,7 +1015,7 @@ class AgentService:
             return True
 
         except Exception as e:
-            logger.error("Failed to publish processing event", error=str(e))
+            logger.error("Failed to publish processing event", exc_info=e)
             return False
 
     async def _log_agent_config(self, agent_id: str) -> None:
@@ -1015,7 +1067,7 @@ class AgentService:
             # Get database session for session management
             db_manager = get_database_manager()
             async with db_manager.get_session() as db:
-                session_manager = SessionManager(db)
+                session_manager = BaseSessionManager(db)
                 await session_manager.increment_request_count(session_id, request_id)
 
                 logger.debug(
@@ -1048,7 +1100,7 @@ async def _agent_service_startup():
         await _agent_service.initialize()
         logger.info("Agent Service initialized")
     except Exception as e:
-        logger.error("Failed to initialize Agent Service", error=str(e))
+        logger.error("Failed to initialize Agent Service", exc_info=e)
         raise
 
 
@@ -1108,7 +1160,7 @@ async def list_agents() -> Dict[str, Any]:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
-        logger.error("Failed to get agent list", error=str(e))
+        logger.error("Failed to get agent list", exc_info=e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve agent list",
@@ -1137,18 +1189,7 @@ async def handle_direct_request(request: Request, stream: bool = False):
         )
 
         # Create a normalized request for processing
-        from shared_models.models import NormalizedRequest
-
-        normalized_request = NormalizedRequest(
-            request_id=request_data.get("request_id"),
-            session_id=request_data.get("session_id"),
-            user_id=request_data.get("user_id"),
-            content=request_data.get("content", ""),
-            integration_type=request_data.get("integration_type", "CLI"),
-            request_type=request_data.get("request_type", "message"),
-            target_agent_id=request_data.get("target_agent_id"),
-            metadata=request_data.get("metadata", {}),
-        )
+        normalized_request = _create_normalized_request_from_data(request_data)
 
         if stream:
             # Return streaming response
@@ -1179,7 +1220,7 @@ async def handle_direct_request(request: Request, stream: bool = False):
                     )
 
                 except Exception as e:
-                    logger.error("Error in streaming response", error=str(e))
+                    logger.error("Error in streaming response", exc_info=e)
                     yield LlamaStackStreamProcessor.create_sse_error_event(str(e))
 
             return LlamaStackStreamProcessor.create_sse_response(generate_stream())
@@ -1194,7 +1235,7 @@ async def handle_direct_request(request: Request, stream: bool = False):
         logger.error("Invalid JSON in direct request")
         raise HTTPException(status_code=400, detail="Invalid JSON")
     except Exception as e:
-        logger.error("Error handling direct request", error=str(e))
+        logger.error("Error handling direct request", exc_info=e)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -1224,6 +1265,12 @@ async def handle_cloudevent(request: Request) -> Dict[str, Any]:
         if event_type == EventTypes.REQUEST_CREATED:
             return await _handle_request_event_from_data(event_data, _agent_service)
 
+        # Handle responses mode events
+        if event_type == EventTypes.RESPONSES_REQUEST_CREATED:
+            return await _handle_responses_request_event_from_data(
+                event_data, _agent_service
+            )
+
         # Handle database update events
         if event_type == EventTypes.DATABASE_UPDATE_REQUESTED:
             return await _handle_database_update_event_from_data(
@@ -1238,11 +1285,33 @@ async def handle_cloudevent(request: Request) -> Dict[str, Any]:
         )
 
     except Exception as e:
-        logger.error("Failed to handle CloudEvent", error=str(e))
+        logger.error("Failed to handle CloudEvent", exc_info=e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to process CloudEvent",
         )
+
+
+def _create_normalized_request_from_data(
+    request_data: Dict[str, Any],
+) -> NormalizedRequest:
+    """Create a NormalizedRequest from request data with proper defaults."""
+    return NormalizedRequest(
+        request_id=request_data.get("request_id", "unknown"),
+        session_id=request_data.get("session_id", "unknown"),
+        user_id=request_data.get("user_id", "unknown"),
+        integration_type=request_data.get("integration_type", "CLI"),
+        request_type=request_data.get("request_type", "general"),
+        content=request_data.get("content", ""),
+        integration_context=request_data.get("integration_context", {}),
+        user_context=request_data.get("user_context", {}),
+        target_agent_id=request_data.get("target_agent_id"),
+        requires_routing=request_data.get("requires_routing", True),
+        use_responses=request_data.get("use_responses", False),
+        created_at=datetime.fromisoformat(
+            request_data.get("created_at", datetime.now().isoformat())
+        ),
+    )
 
 
 async def _handle_request_event_from_data(
@@ -1250,36 +1319,12 @@ async def _handle_request_event_from_data(
 ) -> Dict[str, Any]:
     """Handle request CloudEvent using pre-parsed event data."""
     try:
-        # Extract the actual request data from the CloudEvent data field
-        request_data = event_data.get("data", {})
-
-        logger.debug(
-            "Processing request event data",
-            request_data_keys=(
-                list(request_data.keys())
-                if isinstance(request_data, dict)
-                else "not_dict"
-            ),
-            request_data_preview=str(request_data)[:200] if request_data else "empty",
-        )
+        # Extract event data using common utility
+        request_data = CloudEventHandler.extract_event_data(event_data)
 
         # Parse normalized request with proper error handling
         try:
-            request = NormalizedRequest(
-                request_id=request_data.get("request_id", "unknown"),
-                session_id=request_data.get("session_id", "unknown"),
-                user_id=request_data.get("user_id", "unknown"),
-                integration_type=request_data.get("integration_type", "CLI"),
-                request_type=request_data.get("request_type", "general"),
-                content=request_data.get("content", ""),
-                integration_context=request_data.get("integration_context", {}),
-                user_context=request_data.get("user_context", {}),
-                target_agent_id=request_data.get("target_agent_id"),
-                requires_routing=request_data.get("requires_routing", True),
-                created_at=datetime.fromisoformat(
-                    request_data.get("created_at", datetime.now().isoformat())
-                ),
-            )
+            request = _create_normalized_request_from_data(request_data)
 
             logger.debug(
                 "Created NormalizedRequest",
@@ -1340,8 +1385,83 @@ async def _handle_request_event_from_data(
         }
 
     except Exception as e:
-        logger.error("Failed to handle request event", error=str(e))
+        logger.error("Failed to handle request event", exc_info=e)
         raise
+
+
+async def _handle_responses_request_event_from_data(
+    event_data: Dict[str, Any], agent_service: AgentService
+) -> Dict[str, Any]:
+    """Handle responses request CloudEvent using pre-parsed event data."""
+    try:
+        # Extract event data using common utility
+        request_data = CloudEventHandler.extract_event_data(event_data)
+
+        # Extract required fields
+        request_manager_session_id = request_data.get("request_manager_session_id")
+        user_id = request_data.get("user_id")
+        message = request_data.get("message")
+        user_email = request_data.get("user_email")
+        session_name = request_data.get("session_name")
+
+        if not all([request_manager_session_id, user_id, message]):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing required fields: request_manager_session_id, user_id, message",
+            )
+
+        # Get database session
+        db_manager = get_database_manager()
+
+        async with db_manager.get_session() as db:
+            # Create responses session manager
+            session_manager = ResponsesSessionManager(
+                db_session=db,
+                user_id=user_id,
+                user_email=user_email,
+            )
+
+            # Process the message using responses mode
+            response_content = await session_manager.handle_responses_message(
+                text=message,
+                request_manager_session_id=request_manager_session_id,
+                session_name=session_name,
+            )
+
+            # Get current agent name for response metadata
+            current_agent_name = session_manager.current_agent_name or "responses"
+            current_thread_id = session_manager.get_current_thread_id()
+
+            # Clean up the session manager
+            await session_manager.close()
+
+        # Return response in the expected format
+        return {
+            "status": "success",
+            "response": {
+                "content": response_content,
+                "agent_id": current_agent_name,
+                "metadata": {
+                    "agent_name": current_agent_name,
+                    "session_type": "responses_api",
+                    "thread_id": current_thread_id,
+                },
+                "processing_time_ms": 0,  # TODO: Calculate actual processing time
+                "requires_followup": False,
+                "followup_actions": [],
+            },
+            "request_manager_session_id": request_manager_session_id,
+            "user_id": user_id,
+            "current_agent": current_agent_name,
+            "thread_id": current_thread_id,
+        }
+
+    except Exception as e:
+        logger.error("Failed to handle responses request event", exc_info=e)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to process responses request event",
+        )
 
 
 async def _handle_database_update_event_from_data(
@@ -1384,7 +1504,7 @@ async def _handle_database_update_event_from_data(
         }
 
     except Exception as e:
-        logger.error("Failed to handle database update event", error=str(e))
+        logger.error("Failed to handle database update event", exc_info=e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to process database update event",
@@ -1400,13 +1520,13 @@ async def create_session(
     db: AsyncSession = Depends(get_db_session_dependency),
 ) -> SessionResponse:
     """Create a new session."""
-    session_manager = SessionManager(db)
+    session_manager = BaseSessionManager(db)
 
     try:
         session = await session_manager.create_session(session_data)
         return session
     except Exception as e:
-        logger.error("Failed to create session", error=str(e))
+        logger.error("Failed to create session", exc_info=e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create session",
@@ -1419,7 +1539,7 @@ async def get_session(
     db: AsyncSession = Depends(get_db_session_dependency),
 ) -> SessionResponse:
     """Get session information."""
-    session_manager = SessionManager(db)
+    session_manager = BaseSessionManager(db)
 
     session = await session_manager.get_session(session_id)
     if not session:
@@ -1438,7 +1558,7 @@ async def update_session(
     db: AsyncSession = Depends(get_db_session_dependency),
 ) -> SessionResponse:
     """Update session information."""
-    session_manager = SessionManager(db)
+    session_manager = BaseSessionManager(db)
 
     # Check if session exists
     existing_session = await session_manager.get_session(session_id)
@@ -1452,7 +1572,7 @@ async def update_session(
     updated_session = await session_manager.update_session(
         session_id=session_id,
         agent_id=session_update.current_agent_id,
-        llama_stack_session_id=session_update.llama_stack_session_id,
+        conversation_thread_id=session_update.conversation_thread_id,
         status=session_update.status,
         conversation_context=session_update.conversation_context,
         user_context=session_update.user_context,
@@ -1474,17 +1594,71 @@ async def increment_request_count(
     db: AsyncSession = Depends(get_db_session_dependency),
 ) -> Dict[str, str]:
     """Increment the request count for a session."""
-    session_manager = SessionManager(db)
+    session_manager = BaseSessionManager(db)
 
     try:
         await session_manager.increment_request_count(session_id, request_id)
         return {"status": "success", "message": "Request count incremented"}
     except Exception as e:
-        logger.error("Failed to increment request count", error=str(e))
+        logger.error("Failed to increment request count", exc_info=e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to increment request count",
         )
+
+
+async def _update_request_log_unified(
+    request_id: str,
+    response_content: str,
+    agent_id: str,
+    response_metadata: dict = None,
+    processing_time_ms: int = None,
+    db: AsyncSession = None,
+) -> None:
+    """Update RequestLog for any API type."""
+    try:
+        from shared_models.models import RequestLog
+        from sqlalchemy import update
+
+        # Update the RequestLog with response content
+        stmt = (
+            update(RequestLog)
+            .where(RequestLog.request_id == request_id)
+            .values(
+                response_content=response_content,
+                response_metadata=response_metadata or {},
+                agent_id=agent_id,
+                processing_time_ms=processing_time_ms,
+                completed_at=datetime.now(timezone.utc),
+            )
+        )
+
+        if db:
+            await db.execute(stmt)
+            await db.commit()
+        else:
+            # For backward compatibility with existing code that doesn't pass db
+            from shared_models import get_database_manager
+
+            db_manager = get_database_manager()
+            async with db_manager.get_session() as session:
+                await session.execute(stmt)
+                await session.commit()
+
+        logger.info(
+            "RequestLog updated",
+            request_id=request_id,
+            agent_id=agent_id,
+            content_length=len(response_content),
+        )
+
+    except Exception as e:
+        logger.error(
+            "Failed to update RequestLog",
+            request_id=request_id,
+            error=str(e),
+        )
+        # Don't raise exception - RequestLog update failure shouldn't stop response
 
 
 if __name__ == "__main__":

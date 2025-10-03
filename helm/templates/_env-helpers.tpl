@@ -40,7 +40,7 @@ Generate common environment variables for all services
 {{- define "self-service-agent.commonEnvVars" -}}
 {{/* Application Configuration */}}
 - name: LOG_LEVEL
-  value: "INFO"
+  value: {{ .Values.logLevel | default "INFO" | quote }}
 - name: SQL_DEBUG
   value: "false"
 - name: EXPECTED_MIGRATION_VERSION

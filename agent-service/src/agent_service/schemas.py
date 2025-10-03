@@ -36,7 +36,7 @@ class SessionUpdate(BaseModel):
     """Schema for updating session information."""
 
     current_agent_id: Optional[str] = None
-    llama_stack_session_id: Optional[str] = None
+    conversation_thread_id: Optional[str] = None
     status: Optional[SessionStatus] = None
     conversation_context: Optional[Dict[str, Any]] = None
     user_context: Optional[Dict[str, Any]] = None
@@ -50,7 +50,7 @@ class SessionResponse(BaseModel):
     integration_type: IntegrationType
     status: SessionStatus
     current_agent_id: Optional[str]
-    llama_stack_session_id: Optional[str]
+    conversation_thread_id: Optional[str]
 
     # Context
     conversation_context: Dict[str, Any]

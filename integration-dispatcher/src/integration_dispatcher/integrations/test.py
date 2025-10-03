@@ -3,12 +3,12 @@
 import os
 from typing import Any, Dict
 
-import structlog
+from shared_models import configure_logging
 from shared_models.models import DeliveryRequest, DeliveryStatus, UserIntegrationConfig
 
 from .base import BaseIntegrationHandler, IntegrationResult
 
-logger = structlog.get_logger()
+logger = configure_logging("integration-dispatcher")
 
 
 class TestIntegrationHandler(BaseIntegrationHandler):
@@ -69,9 +69,6 @@ class TestIntegrationHandler(BaseIntegrationHandler):
 
     async def health_check(self) -> bool:
         """Test integration health check - configurable via environment."""
-        import structlog
-
-        logger = structlog.get_logger()
         # Only log if enabled to reduce noise
         if self.enabled:
             logger.info(

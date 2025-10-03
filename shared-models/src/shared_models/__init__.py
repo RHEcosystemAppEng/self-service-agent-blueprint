@@ -12,6 +12,8 @@ from .agent_types import (
 
 # Export CloudEvent utilities
 from .cloudevent_utils import (
+    CloudEventHandler,
+    RequestLogService,
     create_cloudevent_response,
     parse_cloudevent_from_request,
     validate_cloudevent_headers,
@@ -103,6 +105,8 @@ __all__ = [
     "create_cloudevent_response",
     "get_enum_value",
     "generate_fallback_user_id",
+    "CloudEventHandler",
+    "RequestLogService",
     "DatabaseConfig",
     "DatabaseHealthChecker",
     "DatabaseManager",

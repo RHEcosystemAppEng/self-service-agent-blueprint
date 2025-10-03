@@ -9,6 +9,41 @@ def load_yaml(file_path) -> dict:
         return yaml.safe_load(file)
 
 
+def resolve_asset_manager_path(relative_path: str) -> Path:
+    """
+    Resolve a path relative to the asset-manager root, trying multiple possible locations.
+
+    This function handles the path resolution issues that occur when running in containers
+    where the asset-manager directory structure may be different from development.
+
+    Args:
+        relative_path: Path relative to asset-manager root (e.g., "config", "config/lg-prompts/routing.yaml")
+
+    Returns:
+        Path: Resolved absolute path to the requested file/directory
+
+    Raises:
+        FileNotFoundError: If the path cannot be found in any of the possible locations
+    """
+    # Try multiple possible asset-manager root locations
+    possible_roots = [
+        Path(__file__).parent.parent.parent,  # Original path: asset-manager/
+        Path("/app/asset-manager"),  # Container path
+        Path("."),  # Current directory (fallback)
+    ]
+
+    for root in possible_roots:
+        full_path = root / relative_path
+        if full_path.exists():
+            return full_path
+
+    # If no path found, raise error with helpful message
+    tried_paths = [str(root / relative_path) for root in possible_roots]
+    raise FileNotFoundError(
+        f"Could not find '{relative_path}' in any of the expected locations: {tried_paths}"
+    )
+
+
 def load_config_from_path(path: Path) -> dict:
     config = {}
     # Load main config.yaml first to ensure base settings are loaded

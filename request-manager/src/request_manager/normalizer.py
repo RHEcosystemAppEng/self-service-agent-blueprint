@@ -42,6 +42,7 @@ class RequestNormalizer:
             "content": request.content,
             "created_at": datetime.now(timezone.utc),
             "target_agent_id": target_agent_id,
+            "use_responses": getattr(request, "use_responses", False),
         }
 
         # Handle integration-specific normalization

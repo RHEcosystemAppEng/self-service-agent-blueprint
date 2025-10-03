@@ -14,13 +14,13 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import InvalidTokenError
 from shared_models import (
+    CloudEventHandler,
     CloudEventSender,
     EventTypes,
     configure_logging,
     create_cloudevent_response,
     create_health_check_endpoint,
     create_shared_lifespan,
-    generate_fallback_user_id,
     get_db_session_dependency,
     parse_cloudevent_from_request,
     verify_slack_signature,
@@ -481,6 +481,11 @@ async def handle_cloudevent(
             # Use the already parsed event data from shared utility
             return await _handle_agent_response_event_from_data(event_data, db)
 
+        # Handle responses mode response events
+        if event_type == EventTypes.RESPONSES_RESPONSE_READY:
+            # Use the already parsed event data from shared utility
+            return await _handle_responses_response_event_from_data(event_data, db)
+
         logger.warning("Unhandled CloudEvent type", event_type=event_type)
         return await create_cloudevent_response(
             status="ignored",
@@ -514,8 +519,8 @@ async def _process_request_adaptive(
         )
 
     try:
-        # Always process synchronously for user-facing endpoints
-        # The internal sync processing handles both HTTP and eventing modes appropriately
+        # Use unified processor for all requests (both agent and responses mode)
+        # The internal processing handles both HTTP and eventing modes appropriately
         return await unified_processor.process_request_sync(request, db, timeout)
     except Exception as e:
         logger.error("Failed to process request", error=str(e))
@@ -530,32 +535,17 @@ async def _handle_agent_response_event_from_data(
 ) -> Dict[str, Any]:
     """Handle agent response CloudEvent using unified response handler with pre-parsed data."""
 
-    event_id = event_data.get("id")
-    event_type = event_data.get("type")
-    event_source = event_data.get("source")
+    # Extract event metadata using common utility
+    event_id, event_type, event_source = CloudEventHandler.get_event_metadata(
+        event_data
+    )
 
     try:
-        # Extract the actual event data from the CloudEvent data field
-        response_data = event_data.get("data", {})
-
-        # Extract response information
-        request_id = response_data.get("request_id")
-        session_id = response_data.get("session_id")
-        agent_id = response_data.get("agent_id")
-        content = response_data.get("content")
-        user_id = response_data.get("user_id")
-
-        if not all([request_id, session_id, content]):
-            raise ValueError("Missing required fields in agent response")
-
-        # Handle missing user_id gracefully
-        if not user_id:
-            logger.warning(
-                "Missing user_id in agent response event, using fallback",
-                request_id=request_id,
-                session_id=session_id,
-            )
-            user_id = generate_fallback_user_id(request_id)
+        # Extract response data using common utility
+        response_data = CloudEventHandler.extract_event_data(event_data)
+        request_id, session_id, agent_id, content, user_id = (
+            CloudEventHandler.extract_response_data(response_data)
+        )
 
         # Use unified response handler
         response_handler = UnifiedResponseHandler(db)
@@ -605,7 +595,9 @@ async def _handle_agent_response_event_from_data(
         )
 
         # Record successful event processing
-        await _record_processed_event(
+        from .database_utils import record_processed_event
+
+        await record_processed_event(
             db,
             event_id,
             event_type,
@@ -622,7 +614,119 @@ async def _handle_agent_response_event_from_data(
         logger.error("Failed to handle agent response event", error=str(e))
 
         # Record failed event processing
-        await _record_processed_event(
+        from .database_utils import record_processed_event
+
+        await record_processed_event(
+            db,
+            event_id,
+            event_type,
+            event_source,
+            response_data.get("request_id") if "response_data" in locals() else None,
+            response_data.get("session_id") if "response_data" in locals() else None,
+            "request-manager",
+            "error",
+            str(e),
+        )
+        raise
+
+
+async def _handle_responses_response_event_from_data(
+    event_data: Dict[str, Any], db: AsyncSession
+) -> Dict[str, Any]:
+    """Handle responses response CloudEvent using unified response handler with pre-parsed data."""
+
+    # Extract event metadata using common utility
+    event_id, event_type, event_source = CloudEventHandler.get_event_metadata(
+        event_data
+    )
+
+    try:
+        # Extract response data using common utility
+        response_data = CloudEventHandler.extract_event_data(event_data)
+        request_id, session_id, agent_id, content, user_id = (
+            CloudEventHandler.extract_response_data(response_data)
+        )
+
+        # Use unified response handler
+        response_handler = UnifiedResponseHandler(db)
+        result = await response_handler.process_agent_response(
+            request_id=request_id,
+            session_id=session_id,
+            user_id=user_id,
+            agent_id=agent_id,
+            content=content,
+            metadata=event_data.get("metadata", {}),
+            processing_time_ms=event_data.get("processing_time_ms"),
+            requires_followup=event_data.get("requires_followup", False),
+            followup_actions=event_data.get("followup_actions", []),
+        )
+
+        # Resolve any waiting response futures for this request
+        from .communication_strategy import _response_futures_registry
+
+        if request_id in _response_futures_registry:
+            future = _response_futures_registry.pop(request_id)
+            if not future.done():
+                future.set_result(response_data)
+                logger.info(
+                    "Resolved waiting response future",
+                    request_id=request_id,
+                    session_id=session_id,
+                )
+
+        # Forward to Integration Dispatcher if not a duplicate
+        if result.get("status") == "completed":
+            await _forward_response_to_integration_dispatcher(
+                db,
+                request_id,
+                session_id,
+                user_id,
+                agent_id,
+                content,
+                result.get("metadata", {}),
+                event_data.get("processing_time_ms"),
+                event_data.get("requires_followup", False),
+                event_data.get("followup_actions", []),
+            )
+        else:
+            logger.info(
+                "Skipping Integration Dispatcher forwarding for duplicate responses response",
+                request_id=request_id,
+                status=result.get("status"),
+                reason=result.get("reason"),
+            )
+
+        logger.info(
+            "Responses response received and processed",
+            request_id=request_id,
+            session_id=session_id,
+            agent_id=agent_id,
+            status=result.get("status"),
+        )
+
+        # Record successful event processing
+        from .database_utils import record_processed_event
+
+        await record_processed_event(
+            db,
+            event_id,
+            event_type,
+            event_source,
+            request_id,
+            session_id,
+            "request-manager",
+            "success",
+        )
+
+        return {"status": "processed", "request_id": request_id}
+
+    except Exception as e:
+        logger.error("Failed to handle responses response event", error=str(e))
+
+        # Record failed event processing
+        from .database_utils import record_processed_event
+
+        await record_processed_event(
             db,
             event_id,
             event_type,
@@ -753,57 +857,3 @@ async def _forward_response_to_integration_dispatcher(
             session_id=event_data.get("session_id"),
         )
         return False
-
-
-async def _record_processed_event(
-    db: AsyncSession,
-    event_id: str,
-    event_type: str,
-    event_source: str,
-    request_id: Optional[str],
-    session_id: Optional[str],
-    processed_by: str,
-    processing_result: str,
-    error_message: Optional[str] = None,
-) -> None:
-    """Record that an event has been processed to prevent duplicate processing."""
-    if not event_id:
-        logger.warning("Cannot record processed event without event_id")
-        return
-
-    try:
-        processed_event = ProcessedEvent(
-            event_id=event_id,
-            event_type=event_type,
-            event_source=event_source,
-            request_id=request_id,
-            session_id=session_id,
-            processed_by=processed_by,
-            processing_result=processing_result,
-            error_message=error_message,
-        )
-
-        db.add(processed_event)
-        await db.commit()
-
-        logger.debug(
-            "Recorded processed event",
-            event_id=event_id,
-            event_type=event_type,
-            processing_result=processing_result,
-        )
-
-    except Exception as e:
-        # Handle unique constraint violations gracefully (event already recorded)
-        if "duplicate key value violates unique constraint" in str(e):
-            logger.debug(
-                "Event already recorded in processed_events table",
-                event_id=event_id,
-                processing_result=processing_result,
-            )
-        else:
-            logger.error(
-                "Failed to record processed event",
-                event_id=event_id,
-                error=str(e),
-            )

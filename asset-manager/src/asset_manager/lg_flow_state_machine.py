@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Annotated, Dict, List, Optional, TypedDict
 
 import yaml
+from asset_manager.util import resolve_asset_manager_path
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
@@ -878,11 +879,13 @@ class ConversationSession:
             "lg_state_machine_config", "config/lg-prompts/chat-lg-state.yaml"
         )
 
-        # Convert to absolute path relative to this script's location
+        # Convert to absolute path using centralized path resolution
         if not Path(lg_config_path).is_absolute():
-            # Path relative to asset-manager root (parent of src/asset_manager)
-            asset_manager_root = Path(__file__).parent.parent.parent
-            self.config_path = asset_manager_root / lg_config_path
+            try:
+                self.config_path = resolve_asset_manager_path(lg_config_path)
+            except FileNotFoundError as e:
+                logger.error(f"ConversationSession config not found: {e}")
+                raise
         else:
             self.config_path = Path(lg_config_path)
 

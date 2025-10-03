@@ -3,12 +3,12 @@
 import os
 from typing import Any, Dict, List, Optional
 
-import structlog
+from shared_models import configure_logging
 from shared_models.models import IntegrationDefaultConfig, IntegrationType
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = structlog.get_logger()
+logger = configure_logging("integration-dispatcher")
 
 
 class IntegrationDefaultsService:

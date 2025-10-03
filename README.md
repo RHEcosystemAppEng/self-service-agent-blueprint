@@ -38,6 +38,10 @@ This is a complete AI agent management system implementing a self-service agent 
 - **SMS**: SMS notifications and interactions
 - **Webhook**: Generic webhook integrations
 
+### Conversation Modes
+- **Agent Mode**: Traditional LlamaStack-based agent interactions with routing (default)
+- **Responses Mode**: LangGraph-based state machine conversations with persistent thread management (enabled with `use_responses: true` on any endpoint)
+
 ### Flexible Communication Modes
 - **Development Mode**: Direct HTTP communication for local development
 - **Testing Mode**: Mock eventing service for CI/CD testing

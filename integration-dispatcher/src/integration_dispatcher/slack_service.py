@@ -8,16 +8,20 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import httpx
-import structlog
 from cloudevents.http import CloudEvent, to_structured
 from shared_clients import AgentServiceClient
 from shared_clients.service_client import RequestManagerClient
 from shared_clients.stream_processor import LlamaStackStreamProcessor
-from shared_models import CloudEventBuilder, EventTypes, verify_slack_signature
+from shared_models import (
+    CloudEventBuilder,
+    EventTypes,
+    configure_logging,
+    verify_slack_signature,
+)
 
 from .slack_schemas import SlackInteractionPayload, SlackSlashCommand
 
-logger = structlog.get_logger()
+logger = configure_logging("integration-dispatcher")
 
 
 class SlackService:

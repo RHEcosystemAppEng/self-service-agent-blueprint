@@ -227,6 +227,59 @@ curl -X POST https://your-request-manager/api/v1/requests/generic \
   }'
 ```
 
+### Responses Mode Support
+
+**All endpoints support responses mode** when `use_responses: true` is included in the request body. This enables LangGraph state machine for conversation management.
+
+**Supported Endpoints**:
+- `/api/v1/requests/slack` - Slack integration with responses mode
+- `/api/v1/requests/web` - Web interface with responses mode  
+- `/api/v1/requests/cli` - CLI tool with responses mode
+- `/api/v1/requests/tool` - Tool integration with responses mode
+- `/api/v1/requests/generic` - Generic requests with responses mode
+
+**Request Body** (add to any endpoint):
+```json
+{
+  "user_id": "string",
+  "content": "string",
+  "use_responses": true,
+  "request_manager_session_id": "string" (optional),
+  "user_email": "string" (optional),
+  "session_name": "string" (optional),
+  "metadata": {} (optional)
+}
+```
+
+**Response** (Responses Mode):
+```json
+{
+  "status": "success",
+  "request_id": "string",
+  "session_id": "string",
+  "response": {
+    "content": "string",
+    "agent_id": "string",
+    "conversation_thread_id": "string",
+    "metadata": {}
+  }
+}
+```
+
+**Example** (Web endpoint with responses mode):
+```bash
+curl -X POST https://your-request-manager/api/v1/requests/web \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-token" \
+  -d '{
+    "user_id": "user123",
+    "content": "I need help with my laptop",
+    "use_responses": true,
+    "user_email": "user@example.com",
+    "session_name": "Laptop Support Session"
+  }'
+```
+
 ### POST /api/v1/requests/slack
 
 Handle Slack integration requests with signature verification.

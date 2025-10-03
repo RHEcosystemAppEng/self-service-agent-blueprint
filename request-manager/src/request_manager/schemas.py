@@ -19,6 +19,10 @@ class BaseRequest(BaseModel):
     content: str = Field(..., min_length=1)
     request_type: str = Field(default="message", max_length=100)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    use_responses: bool = Field(
+        default=False,
+        description="Enable responses API mode (LangGraph-based conversations)",
+    )
 
     @field_validator("integration_type", mode="before")
     @classmethod

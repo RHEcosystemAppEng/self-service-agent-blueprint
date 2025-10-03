@@ -5,18 +5,17 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-import structlog
 from agent_service.schemas import SessionResponse
 from fastapi import HTTPException, status
 from shared_clients import get_agent_client, get_integration_dispatcher_client
 from shared_clients.stream_processor import LlamaStackStreamProcessor
-from shared_models import CloudEventSender, get_enum_value
+from shared_models import CloudEventSender, configure_logging, get_enum_value
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .normalizer import RequestNormalizer
 from .schemas import AgentResponse, NormalizedRequest
 
-logger = structlog.get_logger()
+logger = configure_logging("request-manager")
 
 # Global registry for response futures (event-driven approach)
 _response_futures_registry = {}
@@ -51,15 +50,121 @@ def resolve_response_future(request_id: str, response_data: Dict[str, Any]) -> N
         )
 
 
+async def create_or_get_session_shared(
+    request, db: AsyncSession
+) -> Optional[SessionResponse]:
+    """Shared session management logic for all communication strategies.
+
+    This function handles the common pattern of:
+    1. Looking for existing active sessions for the user
+    2. Reusing existing sessions if found (updating timestamp)
+    3. Creating new sessions if none found
+
+    Args:
+        request: The request object containing user_id, integration_type, etc.
+        db: Database session for queries and updates
+
+    Returns:
+        SessionResponse object for the session (existing or newly created)
+    """
+    import uuid
+
+    from agent_service.schemas import SessionResponse
+    from shared_models.models import RequestSession, SessionStatus
+    from sqlalchemy import select
+
+    # Try to find existing active session
+    stmt = (
+        select(RequestSession)
+        .where(
+            RequestSession.user_id == request.user_id,
+            RequestSession.integration_type == request.integration_type,
+            RequestSession.status == SessionStatus.ACTIVE.value,
+        )
+        .order_by(RequestSession.last_request_at.desc())
+    )
+
+    result = await db.execute(stmt)
+    existing_sessions = result.scalars().all()
+
+    if existing_sessions:
+        # Use the most recent session (first in the ordered list)
+        existing_session = existing_sessions[0]
+
+        # If we found multiple sessions, clean up the old ones
+        if len(existing_sessions) > 1:
+            logger.warning(
+                "Multiple active sessions found for user, cleaning up old sessions",
+                user_id=request.user_id,
+                integration_type=request.integration_type,
+                session_count=len(existing_sessions),
+                selected_session_id=existing_session.session_id,
+                all_session_ids=[s.session_id for s in existing_sessions],
+            )
+
+            # Use the cleanup utility function
+            from .database_utils import cleanup_old_sessions
+
+            deactivated_count = await cleanup_old_sessions(
+                db=db,
+                user_id=request.user_id,
+                integration_type=request.integration_type,
+                keep_recent_count=1,  # Keep only the most recent session
+                max_age_hours=24,  # Deactivate sessions older than 24 hours
+            )
+
+            logger.info(
+                "Session cleanup completed",
+                user_id=request.user_id,
+                deactivated_count=deactivated_count,
+            )
+
+        # Update activity timestamp
+        existing_session.last_request_at = datetime.now(timezone.utc)
+        await db.commit()
+        logger.info(
+            "Reusing existing session",
+            session_id=existing_session.session_id,
+            current_agent_id=existing_session.current_agent_id,
+            user_id=request.user_id,
+        )
+        return SessionResponse.model_validate(existing_session)
+
+    # Create new session
+    session = RequestSession(
+        session_id=str(uuid.uuid4()),
+        user_id=request.user_id,
+        integration_type=request.integration_type,
+        channel_id=getattr(request, "channel_id", None),
+        thread_id=getattr(request, "thread_id", None),
+        integration_metadata=request.metadata,
+        status=SessionStatus.ACTIVE.value,
+    )
+
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+
+    logger.info(
+        "Created new session",
+        session_id=session.session_id,
+        user_id=request.user_id,
+    )
+    return SessionResponse.model_validate(session)
+
+
 class CommunicationStrategy(ABC):
     """Abstract base class for communication strategies."""
 
-    @abstractmethod
     async def create_or_get_session(
         self, request, db: AsyncSession
     ) -> Optional[SessionResponse]:
-        """Create or get session using the appropriate method for this strategy."""
-        pass
+        """Create or get session using shared session management logic.
+
+        This method is implemented in the base class since all communication
+        strategies use identical session management logic.
+        """
+        return await create_or_get_session_shared(request, db)
 
     @abstractmethod
     async def send_request(self, normalized_request: NormalizedRequest) -> bool:
@@ -84,53 +189,6 @@ class EventingStrategy(CommunicationStrategy):
             float(x)
             for x in os.getenv("POLL_INTERVALS", "0.5,1.0,2.0,3.0,5.0").split(",")
         ]
-
-    async def create_or_get_session(
-        self, request, db: AsyncSession
-    ) -> Optional[SessionResponse]:
-        """Create or get session using direct database access for eventing mode."""
-        import uuid
-
-        from agent_service.schemas import SessionResponse
-        from shared_models.models import RequestSession, SessionStatus
-        from sqlalchemy import select
-
-        # Try to find existing active session
-        stmt = (
-            select(RequestSession)
-            .where(
-                RequestSession.user_id == request.user_id,
-                RequestSession.integration_type == request.integration_type,
-                RequestSession.status == SessionStatus.ACTIVE.value,
-            )
-            .order_by(RequestSession.last_request_at.desc())
-        )
-
-        result = await db.execute(stmt)
-        existing_session = result.scalar_one_or_none()
-
-        if existing_session:
-            # Update activity timestamp
-            existing_session.last_request_at = datetime.now(timezone.utc)
-            await db.commit()
-            return SessionResponse.from_orm(existing_session)
-
-        # Create new session
-        session = RequestSession(
-            session_id=str(uuid.uuid4()),
-            user_id=request.user_id,
-            integration_type=request.integration_type,
-            channel_id=getattr(request, "channel_id", None),
-            thread_id=getattr(request, "thread_id", None),
-            integration_metadata=request.metadata,
-            status=SessionStatus.ACTIVE.value,
-        )
-
-        db.add(session)
-        await db.commit()
-        await db.refresh(session)
-
-        return SessionResponse.from_orm(session)
 
     async def send_request(self, normalized_request: NormalizedRequest) -> bool:
         """Send request via CloudEvent."""
@@ -171,6 +229,46 @@ class EventingStrategy(CommunicationStrategy):
             "Response delivered via eventing",
             request_id=agent_response.request_id,
             session_id=agent_response.session_id,
+        )
+        return True
+
+    async def send_responses_request(self, request_data: Dict[str, Any]) -> bool:
+        """Send responses request via CloudEvent."""
+        success = await self.event_sender.send_responses_request_event(
+            request_data,
+            request_data.get("request_id"),
+            request_data.get("user_id"),
+            request_data.get("request_manager_session_id"),
+        )
+
+        if not success:
+            logger.error("Failed to publish responses request event")
+            return False
+
+        logger.info(
+            "Responses request sent via eventing",
+            request_id=request_data.get("request_id"),
+            session_id=request_data.get("request_manager_session_id"),
+        )
+        return True
+
+    async def deliver_responses_response(self, response_data: Dict[str, Any]) -> bool:
+        """Deliver responses response via CloudEvent."""
+        success = await self.event_sender.send_responses_response_event(
+            response_data,
+            response_data.get("request_id"),
+            response_data.get("agent_id"),
+            response_data.get("session_id"),
+        )
+
+        if not success:
+            logger.error("Failed to publish responses response event")
+            return False
+
+        logger.info(
+            "Responses response delivered via eventing",
+            request_id=response_data.get("request_id"),
+            session_id=response_data.get("session_id"),
         )
         return True
 
@@ -249,31 +347,6 @@ class DirectHttpStrategy(CommunicationStrategy):
     def __init__(self):
         self.agent_client = get_agent_client()
         self.integration_client = get_integration_dispatcher_client()
-
-    async def create_or_get_session(
-        self, request, db: AsyncSession
-    ) -> Optional[SessionResponse]:
-        """Create or get session using agent service client."""
-        if not self.agent_client:
-            logger.error("Agent client not initialized")
-            return None
-
-        session_data = {
-            "user_id": request.user_id,
-            "integration_type": request.integration_type,
-            "channel_id": getattr(request, "channel_id", None),
-            "thread_id": getattr(request, "thread_id", None),
-            "integration_metadata": request.metadata,
-        }
-
-        session = await self.agent_client.create_session(session_data)
-        if not session:
-            logger.error(
-                "Agent service failed to create session", user_id=request.user_id
-            )
-            raise Exception("Failed to create session via agent service")
-
-        return SessionResponse.from_orm(session)
 
     async def send_request(self, normalized_request: NormalizedRequest) -> bool:
         """
@@ -739,44 +812,15 @@ class UnifiedRequestProcessor:
         self, normalized_request: NormalizedRequest, db: AsyncSession
     ) -> None:
         """Create initial RequestLog entry for tracking."""
-        try:
-            from shared_models.models import RequestLog
+        from .database_utils import create_request_log_entry_unified
 
-            # Create initial RequestLog entry with correct field names
-            request_log = RequestLog(
-                request_id=normalized_request.request_id,
-                session_id=normalized_request.session_id,
-                request_type=normalized_request.request_type,
-                request_content=normalized_request.content,
-                normalized_request={
-                    "user_id": normalized_request.user_id,
-                    "integration_type": normalized_request.integration_type,
-                    "content": normalized_request.content,
-                    "request_type": normalized_request.request_type,
-                    "integration_context": normalized_request.integration_context,
-                },
-                agent_id=None,  # Will be set by Agent Service
-                processing_time_ms=None,  # Will be set by Agent Service
-                response_content=None,  # Will be set by Agent Service
-                response_metadata=None,  # Will be set by Agent Service
-                cloudevent_id=None,  # Will be set when CloudEvent is sent
-                cloudevent_type=None,  # Will be set when CloudEvent is sent
-                completed_at=None,  # Will be set by Agent Service
-            )
-
-            db.add(request_log)
-            await db.commit()
-
-            logger.debug(
-                "RequestLog entry created",
-                request_id=normalized_request.request_id,
-                session_id=normalized_request.session_id,
-            )
-
-        except Exception as e:
-            logger.warning(
-                "Failed to create RequestLog entry",
-                request_id=normalized_request.request_id,
-                error=str(e),
-            )
-            # Don't raise exception - RequestLog creation failure shouldn't stop request processing
+        await create_request_log_entry_unified(
+            request_id=normalized_request.request_id,
+            session_id=normalized_request.session_id,
+            user_id=normalized_request.user_id,
+            content=normalized_request.content,
+            request_type=normalized_request.request_type,
+            integration_type=normalized_request.integration_type,
+            integration_context=normalized_request.integration_context,
+            db=db,
+        )

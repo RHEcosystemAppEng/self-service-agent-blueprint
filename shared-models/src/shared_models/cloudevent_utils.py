@@ -151,3 +151,195 @@ async def create_cloudevent_response(
         response["details"] = details
 
     return response
+
+
+class CloudEventHandler:
+    """Common utilities for CloudEvents handling."""
+
+    @staticmethod
+    def extract_event_data(event_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract and validate event data with common logging.
+
+        Args:
+            event_data: Raw CloudEvent data dictionary
+
+        Returns:
+            Extracted request/response data from the event
+        """
+        request_data = event_data.get("data", {})
+
+        logger.debug(
+            "Processing event data",
+            request_data_keys=(
+                list(request_data.keys())
+                if isinstance(request_data, dict)
+                else "not_dict"
+            ),
+            request_data_preview=str(request_data)[:200] if request_data else "empty",
+        )
+
+        return request_data
+
+    @staticmethod
+    def extract_response_data(response_data: Dict[str, Any]) -> tuple:
+        """Extract and validate response data from CloudEvents.
+
+        Args:
+            response_data: Response data from CloudEvent
+
+        Returns:
+            Tuple of (request_id, session_id, agent_id, content, user_id)
+
+        Raises:
+            ValueError: If required fields are missing
+        """
+        from .utils import generate_fallback_user_id
+
+        request_id = response_data.get("request_id")
+        session_id = response_data.get("session_id")
+        agent_id = response_data.get("agent_id")
+        content = response_data.get("content")
+        user_id = response_data.get("user_id")
+
+        if not all([request_id, session_id, content]):
+            raise ValueError("Missing required fields in response")
+
+        # Handle missing user_id gracefully
+        if not user_id:
+            logger.warning(
+                "Missing user_id in response event, using fallback",
+                request_id=request_id,
+                session_id=session_id,
+            )
+            user_id = generate_fallback_user_id(request_id)
+
+        return request_id, session_id, agent_id, content, user_id
+
+    @staticmethod
+    def extract_request_data(request_data: Dict[str, Any]) -> tuple:
+        """Extract and validate request data from CloudEvents.
+
+        Args:
+            request_data: Request data from CloudEvent
+
+        Returns:
+            Tuple of (request_id, user_id, message, session_id)
+
+        Raises:
+            ValueError: If required fields are missing
+        """
+        request_id = request_data.get("request_id")
+        user_id = request_data.get("user_id")
+        message = request_data.get("message")
+        session_id = request_data.get("request_manager_session_id")
+
+        if not all([request_id, user_id, message]):
+            raise ValueError("Missing required fields: request_id, user_id, message")
+
+        return request_id, user_id, message, session_id
+
+    @staticmethod
+    def get_event_metadata(event_data: Dict[str, Any]) -> tuple:
+        """Extract common event metadata.
+
+        Args:
+            event_data: Raw CloudEvent data dictionary
+
+        Returns:
+            Tuple of (event_id, event_type, event_source)
+        """
+        event_id = event_data.get("id")
+        event_type = event_data.get("type")
+        event_source = event_data.get("source")
+
+        return event_id, event_type, event_source
+
+
+class RequestLogService:
+    """Common utilities for request log operations."""
+
+    @staticmethod
+    async def create_log_entry(
+        request_id: str,
+        session_id: str,
+        user_id: str,
+        content: str,
+        request_type: str,
+        integration_type: str,
+        db: Any,  # AsyncSession
+        integration_context: Dict[str, Any] = None,
+        **kwargs,
+    ) -> None:
+        """Create a unified request log entry.
+
+        Args:
+            request_id: Unique request identifier
+            session_id: Session identifier
+            user_id: User identifier
+            content: Request content/message
+            request_type: Type of request (e.g., "responses_api", "agent_api")
+            integration_type: Integration type (e.g., "CLI", "Slack")
+            db: Database session
+            integration_context: Additional integration context
+            **kwargs: Additional fields for the log entry
+        """
+        from .models import RequestLog
+
+        integration_context = integration_context or {}
+
+        log_entry = RequestLog(
+            request_id=request_id,
+            session_id=session_id,
+            user_id=user_id,
+            content=content,
+            request_type=request_type,
+            integration_type=integration_type,
+            integration_context=integration_context,
+            created_at=datetime.now(timezone.utc),
+            **kwargs,
+        )
+
+        db.add(log_entry)
+        await db.commit()
+
+    @staticmethod
+    async def update_log_entry(
+        request_id: str,
+        response_content: str,
+        agent_id: str,
+        processing_time_ms: int,
+        db: Any,  # AsyncSession
+        response_metadata: Dict[str, Any] = None,
+        **kwargs,
+    ) -> None:
+        """Update a request log entry with response information.
+
+        Args:
+            request_id: Unique request identifier
+            response_content: Agent response content
+            agent_id: Agent that processed the request
+            processing_time_ms: Processing time in milliseconds
+            db: Database session
+            response_metadata: Additional response metadata
+            **kwargs: Additional fields for the log entry
+        """
+        from sqlalchemy import update
+
+        from .models import RequestLog
+
+        response_metadata = response_metadata or {}
+
+        stmt = (
+            update(RequestLog)
+            .where(RequestLog.request_id == request_id)
+            .values(
+                response_content=response_content,
+                agent_id=agent_id,
+                processing_time_ms=processing_time_ms,
+                response_metadata=response_metadata,
+                **kwargs,
+            )
+        )
+
+        await db.execute(stmt)
+        await db.commit()

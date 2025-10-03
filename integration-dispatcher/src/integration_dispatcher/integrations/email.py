@@ -6,9 +6,12 @@ from email.mime.text import MIMEText
 from typing import Any, Dict
 
 import aiosmtplib
+from shared_models import configure_logging
 from shared_models.models import DeliveryRequest, DeliveryStatus, UserIntegrationConfig
 
 from .base import BaseIntegrationHandler, IntegrationResult
+
+logger = configure_logging("integration-dispatcher")
 
 
 class EmailIntegrationHandler(BaseIntegrationHandler):
@@ -139,10 +142,6 @@ class EmailIntegrationHandler(BaseIntegrationHandler):
 
     async def health_check(self) -> bool:
         """Check SMTP connectivity without sending emails."""
-        import structlog
-
-        logger = structlog.get_logger()
-
         # Return False if no SMTP configuration is provided
         if not self.smtp_username or not self.smtp_password:
             logger.debug(

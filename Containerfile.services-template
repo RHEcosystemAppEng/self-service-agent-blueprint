@@ -18,6 +18,9 @@ COPY shared-models ./shared-models/
 # Copy shared clients package
 COPY shared-clients ./shared-clients/
 
+# Copy asset-manager (needed by agent-service for LangGraph components)
+COPY asset-manager ./asset-manager/
+
 # Copy agent-service (needed by request-manager and integration-dispatcher)
 COPY agent-service ./agent-service/
 
@@ -39,6 +42,9 @@ COPY --from=builder /app/shared-models /app/shared-models
 
 # Copy shared clients package
 COPY --from=builder /app/shared-clients /app/shared-clients
+
+# Copy asset-manager (needed by agent-service for LangGraph components)
+COPY --from=builder /app/asset-manager /app/asset-manager
 
 # Copy agent-service (needed by request-manager and integration-dispatcher)
 COPY --from=builder /app/agent-service /app/agent-service

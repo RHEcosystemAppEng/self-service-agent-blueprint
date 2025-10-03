@@ -160,11 +160,11 @@ class AgentServiceClient(ServiceClient):
 class RequestManagerClient(ServiceClient):
     """Client for communicating with the Request Manager."""
 
-    def __init__(self, base_url: Optional[str] = None, timeout: float = 30.0):
+    def __init__(self, base_url: Optional[str] = None, **kwargs):
         url = base_url or os.getenv(
             "REQUEST_MANAGER_URL", "http://self-service-agent-request-manager:80"
         )
-        super().__init__(url, timeout)
+        super().__init__(url, **kwargs)
 
     async def send_slack_request(
         self, request_data: Dict[str, Any]
@@ -206,12 +206,12 @@ class RequestManagerClient(ServiceClient):
 class IntegrationDispatcherClient(ServiceClient):
     """Client for communicating with the Integration Dispatcher."""
 
-    def __init__(self, base_url: Optional[str] = None, timeout: float = 30.0):
+    def __init__(self, base_url: Optional[str] = None, **kwargs):
         url = base_url or os.getenv(
             "INTEGRATION_DISPATCHER_URL",
             "http://self-service-agent-integration-dispatcher:8080",
         )
-        super().__init__(url, timeout)
+        super().__init__(url, **kwargs)
 
     async def deliver_response(self, delivery_data) -> bool:
         """Deliver a response to the integration dispatcher."""
@@ -260,12 +260,14 @@ def initialize_service_clients(
     """Initialize the global service client instances."""
     global _agent_client, _request_manager_client, _integration_dispatcher_client
 
-    _agent_client = AgentServiceClient(agent_service_url, agent_timeout)
+    _agent_client = AgentServiceClient(
+        base_url=agent_service_url, timeout=agent_timeout
+    )
     _request_manager_client = RequestManagerClient(
-        request_manager_url, integration_timeout
+        base_url=request_manager_url, timeout=integration_timeout
     )
     _integration_dispatcher_client = IntegrationDispatcherClient(
-        integration_dispatcher_url, integration_timeout
+        base_url=integration_dispatcher_url, timeout=integration_timeout
     )
 
     logger.debug("Initialized service clients")

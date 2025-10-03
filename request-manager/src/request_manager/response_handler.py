@@ -2,10 +2,10 @@
 
 from typing import Any, Dict, Optional
 
-import structlog
+from shared_models import configure_logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = structlog.get_logger()
+logger = configure_logging("request-manager")
 
 
 class UnifiedResponseHandler:

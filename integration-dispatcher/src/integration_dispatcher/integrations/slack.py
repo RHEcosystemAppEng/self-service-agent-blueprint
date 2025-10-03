@@ -3,14 +3,14 @@
 import os
 from typing import Any, Dict
 
-import structlog
+from shared_models import configure_logging
 from shared_models.models import DeliveryRequest, DeliveryStatus, UserIntegrationConfig
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
 
 from .base import BaseIntegrationHandler, IntegrationResult
 
-logger = structlog.get_logger()
+logger = configure_logging("integration-dispatcher")
 
 
 class SlackIntegrationHandler(BaseIntegrationHandler):

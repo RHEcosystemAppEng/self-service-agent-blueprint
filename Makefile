@@ -110,6 +110,7 @@ help:
 	@echo "  helm-list-models                    - List available models"
 	@echo "  helm-status                         - Check status of the deployment"
 	@echo "  helm-uninstall                      - Uninstall the RAG deployment and clean up resources"
+	@echo "  verify-triggers                     - Verify all expected Knative triggers are deployed"
 	@echo ""
 	@echo "Install Commands:"
 	@echo "  install-all                         - Install dependencies for all projects"
@@ -122,7 +123,18 @@ help:
 	@echo "  install-request-manager             - Install dependencies for request manager"
 	@echo "  install-shared-models               - Install dependencies for shared models"
 	@echo "  install-shared-clients              - Install dependencies for shared clients"
-	@echo "  reinstall                           - Force reinstall local dependencies with latest code"
+	@echo ""
+	@echo "Reinstall Commands:"
+	@echo "  reinstall-all                       - Force reinstall dependencies for all projects (uv sync --reinstall)"
+	@echo "  reinstall                           - Force reinstall self-service agent dependencies (uv sync --reinstall)"
+	@echo "  reinstall-agent-service             - Force reinstall agent service dependencies"
+	@echo "  reinstall-asset-manager             - Force reinstall asset manager dependencies"
+	@echo "  reinstall-integration-dispatcher    - Force reinstall integration dispatcher dependencies"
+	@echo "  reinstall-mcp-emp-info              - Force reinstall employee info MCP dependencies"
+	@echo "  reinstall-mcp-snow                  - Force reinstall snow MCP dependencies"
+	@echo "  reinstall-request-manager           - Force reinstall request manager dependencies"
+	@echo "  reinstall-shared-models             - Force reinstall shared models dependencies"
+	@echo "  reinstall-shared-clients            - Force reinstall shared clients dependencies"
 	@echo ""
 	@echo "Push Commands:"
 	@echo "  push-all-images                     - Push all container images to registry"
@@ -153,6 +165,7 @@ help:
 	@echo "  test-short-integration              - Run short integration tests"
 	@echo "  test-short-integration-request-mgr  - Run short integration tests with Request Manager"
 	@echo "  test-short-resp-integration		 - Run short responses integration tests (no employee ID)"
+	@echo "  test-short-resp-integration-request-mgr - Run short responses integration tests with Request Manager (no employee ID)"
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  format                              - Run isort import sorting and Black formatting on entire codebase"
@@ -414,23 +427,62 @@ install:
 
 .PHONY: reinstall
 reinstall:
-	@echo "Force reinstalling local dependencies with latest code..."
-	@echo "Reinstalling shared-clients..."
-	uv pip uninstall self-service-agent-shared-clients || true
-	uv pip install --reinstall -e ./shared-clients --python $(PYTHON_VERSION)
-	@echo "Reinstalling shared-models..."
-	uv pip uninstall self-service-agent-shared-models || true
-	uv pip install --reinstall -e ./shared-models --python $(PYTHON_VERSION)
-	@echo "Reinstalling agent-service..."
-	uv pip uninstall self-service-agent-agent-service || true
-	uv pip install --reinstall -e ./agent-service --python $(PYTHON_VERSION)
-	@echo "Reinstalling request-manager..."
-	uv pip uninstall self-service-agent-request-manager || true
-	uv pip install --reinstall -e ./request-manager --python $(PYTHON_VERSION)
-	@echo "Reinstalling integration-dispatcher..."
-	uv pip uninstall self-service-agent-integration-dispatcher || true
-	uv pip install --reinstall -e ./integration-dispatcher --python $(PYTHON_VERSION)
-	@echo "Local dependencies reinstalled with latest code!"
+	@echo "Force reinstalling all dependencies with latest code..."
+	@echo "Reinstalling all dependencies with uv sync..."
+	uv sync --reinstall
+	@echo "All dependencies reinstalled with latest code!"
+
+.PHONY: reinstall-all
+reinstall-all: reinstall-shared-models reinstall-shared-clients reinstall reinstall-asset-manager reinstall-request-manager reinstall-agent-service reinstall-integration-dispatcher reinstall-mcp-emp-info reinstall-mcp-snow
+	@echo "All project dependencies reinstalled successfully!"
+
+.PHONY: reinstall-asset-manager
+reinstall-asset-manager:
+	@echo "Force reinstalling asset manager dependencies..."
+	cd asset-manager && uv sync --reinstall
+	@echo "Asset manager dependencies reinstalled successfully!"
+
+.PHONY: reinstall-request-manager
+reinstall-request-manager:
+	@echo "Force reinstalling request manager dependencies..."
+	cd request-manager && uv sync --reinstall
+	@echo "Request manager dependencies reinstalled successfully!"
+
+.PHONY: reinstall-agent-service
+reinstall-agent-service:
+	@echo "Force reinstalling agent service dependencies..."
+	cd agent-service && uv sync --reinstall
+	@echo "Agent service dependencies reinstalled successfully!"
+
+.PHONY: reinstall-integration-dispatcher
+reinstall-integration-dispatcher:
+	@echo "Force reinstalling integration dispatcher dependencies..."
+	cd integration-dispatcher && uv sync --reinstall
+	@echo "Integration dispatcher dependencies reinstalled successfully!"
+
+.PHONY: reinstall-mcp-emp-info
+reinstall-mcp-emp-info:
+	@echo "Force reinstalling employee info MCP dependencies..."
+	cd mcp-servers/employee-info && uv sync --reinstall
+	@echo "Employee info MCP dependencies reinstalled successfully!"
+
+.PHONY: reinstall-mcp-snow
+reinstall-mcp-snow:
+	@echo "Force reinstalling snow MCP dependencies..."
+	cd mcp-servers/snow && uv sync --reinstall
+	@echo "Snow MCP dependencies reinstalled successfully!"
+
+.PHONY: reinstall-shared-models
+reinstall-shared-models:
+	@echo "Force reinstalling shared models dependencies..."
+	cd shared-models && uv sync --reinstall
+	@echo "Shared models dependencies reinstalled successfully!"
+
+.PHONY: reinstall-shared-clients
+reinstall-shared-clients:
+	@echo "Force reinstalling shared clients dependencies..."
+	cd shared-clients && uv sync --reinstall
+	@echo "Shared clients dependencies reinstalled successfully!"
 
 .PHONY: install-asset-manager
 install-asset-manager:
@@ -698,7 +750,7 @@ test-short-integration:
 .PHONY: test-short-resp-integration
 test-short-resp-integration:
 	@echo "Running short responses integration test..."
-	uv --directory evaluations run evaluate.py -n 1 --no-employee-id --test-script="chat-responses.py"
+	uv --directory evaluations run evaluate.py -n 1 --no-employee-id --test-script chat-responses.py
 	@echo "short responses integrations tests completed successfully!"
 
 .PHONY: test-short-integration-request-mgr
@@ -706,6 +758,12 @@ test-short-integration-request-mgr:
 	@echo "Running short integration test with Request Manager..."
 	uv --directory evaluations run evaluate.py -n 1 --test-script chat-request-mgr.py
 	@echo "short integrations tests with Request Manager completed successfully!"
+
+.PHONY: test-short-resp-integration-request-mgr
+test-short-resp-integration-request-mgr:
+	@echo "Running short responses integration test with Request Manager..."
+	uv --directory evaluations run evaluate.py -n 1 --no-employee-id --test-script chat-responses-request-mgr.py
+	@echo "short responses integrations tests with Request Manager completed successfully!"
 
 # Create namespace and deploy
 namespace:
@@ -785,9 +843,72 @@ helm-install-test: namespace helm-depend
 # Install with full Knative eventing (production mode)
 .PHONY: helm-install-prod
 helm-install-prod: namespace helm-depend
-	$(call helm_install_common,"with full Knative eventing - production",\
+	@echo "Installing with retry logic for triggers..."
+	@for i in 1 2 3; do \
+		echo "Attempt $$i of 3..."; \
+		if $(MAKE) _helm-install-prod-single; then \
+			echo "Installation successful, verifying triggers..."; \
+			EXPECTED_TRIGGERS=10; \
+			ACTUAL_TRIGGERS=$$(kubectl get triggers -n $(NAMESPACE) --no-headers 2>/dev/null | wc -l); \
+			if [ "$$ACTUAL_TRIGGERS" -eq "$$EXPECTED_TRIGGERS" ]; then \
+				echo "✅ All $$EXPECTED_TRIGGERS triggers deployed successfully"; \
+				exit 0; \
+			else \
+				echo "❌ Only $$ACTUAL_TRIGGERS out of $$EXPECTED_TRIGGERS triggers deployed"; \
+				if [ $$i -lt 3 ]; then \
+					echo "Attempt $$i failed, waiting 30s before retry..."; \
+					sleep 30; \
+				fi; \
+			fi; \
+		else \
+			echo "Installation failed on attempt $$i"; \
+			if [ $$i -lt 3 ]; then \
+				echo "Waiting 30s before retry..."; \
+				sleep 30; \
+			fi; \
+		fi; \
+	done; \
+	echo "❌ Failed to deploy all triggers after 3 attempts"; \
+	exit 1
+
+# Single installation attempt for production
+.PHONY: _helm-install-prod-single
+_helm-install-prod-single:
+	@$(call helm_install_common,"with full Knative eventing - production",\
 		--set requestManagement.knative.eventing.enabled=true,\
 		false)
+
+# Verify all expected Knative triggers are deployed
+.PHONY: verify-triggers
+verify-triggers:
+	@echo "Verifying all triggers are deployed..."
+	@EXPECTED_TRIGGERS=10; \
+	ACTUAL_TRIGGERS=$$(kubectl get triggers -n $(NAMESPACE) --no-headers 2>/dev/null | wc -l); \
+	if [ "$$ACTUAL_TRIGGERS" -eq "$$EXPECTED_TRIGGERS" ]; then \
+		echo "✅ All $$EXPECTED_TRIGGERS triggers deployed successfully"; \
+		kubectl get triggers -n $(NAMESPACE) --no-headers | awk '{print "  - " $$1}'; \
+	else \
+		echo "❌ Only $$ACTUAL_TRIGGERS out of $$EXPECTED_TRIGGERS triggers deployed"; \
+		echo ""; \
+		echo "Deployed triggers:"; \
+		kubectl get triggers -n $(NAMESPACE) --no-headers 2>/dev/null | awk '{print "  ✅ " $$1}' || echo "  (none)"; \
+		echo ""; \
+		echo "Expected triggers:"; \
+		echo "  ✅ self-service-agent-request-created-trigger"; \
+		echo "  ✅ self-service-agent-agent-response-trigger"; \
+		echo "  ✅ self-service-agent-routing-trigger"; \
+		echo "  ✅ self-service-agent-agent-response-to-request-manager-trigger"; \
+		echo "  ✅ self-service-agent-request-notification-trigger"; \
+		echo "  ✅ self-service-agent-processing-notification-trigger"; \
+		echo "  ❌ self-service-agent-database-update-trigger"; \
+		echo "  ❌ self-service-agent-responses-request-trigger"; \
+		echo "  ❌ self-service-agent-responses-response-to-request-manager-trigger"; \
+		echo "  ❌ self-service-agent-responses-response-to-integration-dispatcher-trigger"; \
+		echo ""; \
+		echo "To fix missing triggers, run:"; \
+		echo "  make helm-install-prod"; \
+		exit 1; \
+	fi
 
 # Uninstall the deployment and clean up
 .PHONY: helm-uninstall

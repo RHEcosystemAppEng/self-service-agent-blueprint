@@ -81,7 +81,9 @@ class RequestSession(Base, TimestampMixin):
 
     # Agent tracking
     current_agent_id = Column(String(255))  # Currently assigned agent
-    llama_stack_session_id = Column(String(255))  # LlamaStack session ID
+    conversation_thread_id = Column(
+        String(255)
+    )  # LangGraph conversation thread ID or LlamaStack session ID
 
     # Session metadata
     integration_metadata = Column(JSON, default=dict)
@@ -356,6 +358,10 @@ class NormalizedRequest(BaseModel):
     # Agent routing
     target_agent_id: Optional[str] = Field(None, max_length=255)
     requires_routing: bool = Field(default=True)
+    use_responses: bool = Field(
+        default=False,
+        description="Enable responses API mode (LangGraph-based conversations)",
+    )
 
     # Timestamps
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -63,7 +63,6 @@ dependencies = [
     "opentelemetry-instrumentation-httpx>=0.58b0",
     "self-service-agent-shared-clients",
     "self-service-agent-shared-models",
-    "asset-manager",
 ]
 
 [project.optional-dependencies]
@@ -94,7 +93,6 @@ python_functions = ["test_*"]
 [tool.uv.sources]
 self-service-agent-shared-clients = { path = "shared-clients" }
 self-service-agent-shared-models = { path = "shared-models" }
-asset-manager = { path = "asset-manager" }
 
 [tool.uv.workspace]
 members = [

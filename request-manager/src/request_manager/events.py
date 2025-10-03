@@ -7,14 +7,13 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import httpx
-import structlog
 from cloudevents.http import CloudEvent, to_structured
 from cloudevents.http.event import CloudEvent as CloudEventType
-from shared_models import EventTypes, get_enum_value
+from shared_models import EventTypes, configure_logging, get_enum_value
 
 from .schemas import AgentResponse, NormalizedRequest
 
-logger = structlog.get_logger()
+logger = configure_logging("request-manager")
 
 
 def is_transient_error(error: Exception) -> bool:

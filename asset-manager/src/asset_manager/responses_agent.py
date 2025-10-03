@@ -1,9 +1,8 @@
 import logging
 import os
-from pathlib import Path
 
 import yaml
-from asset_manager.util import load_config_from_path
+from asset_manager.util import load_config_from_path, resolve_asset_manager_path
 from llama_stack_client import LlamaStackClient
 
 logger = logging.getLogger(__name__)
@@ -475,8 +474,14 @@ class ResponsesAgentManager:
     def __init__(self):
         self.agents_dict = {}
 
-        # Load the configuration from the path relative to this file
-        config_path = Path(__file__).parent.parent.parent / "config"
+        # Load the configuration using centralized path resolution
+        try:
+            config_path = resolve_asset_manager_path("config")
+            logger.info(f"ResponsesAgentManager found config at: {config_path}")
+        except FileNotFoundError as e:
+            logger.error(f"ResponsesAgentManager config not found: {e}")
+            raise
+
         agent_configs = load_config_from_path(config_path)
 
         # Load global configuration (config.yaml)

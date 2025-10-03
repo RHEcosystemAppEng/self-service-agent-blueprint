@@ -3,10 +3,9 @@
 import os
 from typing import Optional
 
-import structlog
-from shared_models import AgentMapping
+from shared_models import AgentMapping, configure_logging
 
-logger = structlog.get_logger()
+logger = configure_logging("agent-service")
 
 
 async def detect_and_validate_agent_routing(

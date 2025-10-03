@@ -21,6 +21,10 @@ class EventTypes:
     # Response events
     AGENT_RESPONSE_READY = "com.self-service-agent.agent.response-ready"
 
+    # Responses mode events (LangGraph)
+    RESPONSES_REQUEST_CREATED = "com.self-service-agent.responses.request.created"
+    RESPONSES_RESPONSE_READY = "com.self-service-agent.responses.response.ready"
+
     # Database update events
     DATABASE_UPDATE_REQUESTED = "com.self-service-agent.request.database-update"
 
@@ -86,6 +90,55 @@ class CloudEventBuilder:
 
         return CloudEvent(attributes, response_data)
 
+    def create_responses_request_event(
+        self,
+        request_data: Dict[str, Any],
+        request_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> CloudEvent:
+        """Create a responses request created event."""
+        event_id = request_id or str(uuid.uuid4())
+
+        attributes = {
+            **self.base_attributes,
+            "type": EventTypes.RESPONSES_REQUEST_CREATED,
+            "id": event_id,
+            "time": datetime.now(timezone.utc).isoformat(),
+        }
+
+        # Add optional attributes
+        if user_id:
+            attributes["userid"] = user_id
+        if session_id:
+            attributes["sessionid"] = session_id
+
+        return CloudEvent(attributes, request_data)
+
+    def create_responses_response_event(
+        self,
+        response_data: Dict[str, Any],
+        request_id: str,
+        agent_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> CloudEvent:
+        """Create a responses response ready event."""
+        attributes = {
+            **self.base_attributes,
+            "type": EventTypes.RESPONSES_RESPONSE_READY,
+            "id": str(uuid.uuid4()),
+            "time": datetime.now(timezone.utc).isoformat(),
+            "requestid": request_id,
+        }
+
+        # Add optional attributes
+        if agent_id:
+            attributes["agentid"] = agent_id
+        if session_id:
+            attributes["sessionid"] = session_id
+
+        return CloudEvent(attributes, response_data)
+
 
 class CloudEventValidator:
     """Validator for CloudEvent processing."""
@@ -106,6 +159,28 @@ class CloudEventValidator:
         """Validate an agent response ready event."""
         required_attributes = ["type", "id", "time", "source", "requestid"]
         required_type = EventTypes.AGENT_RESPONSE_READY
+
+        return (
+            all(attr in event for attr in required_attributes)
+            and event["type"] == required_type
+        )
+
+    @staticmethod
+    def validate_responses_request_event(event: CloudEvent) -> bool:
+        """Validate a responses request created event."""
+        required_attributes = ["type", "id", "time", "source"]
+        required_type = EventTypes.RESPONSES_REQUEST_CREATED
+
+        return (
+            all(attr in event for attr in required_attributes)
+            and event["type"] == required_type
+        )
+
+    @staticmethod
+    def validate_responses_response_event(event: CloudEvent) -> bool:
+        """Validate a responses response ready event."""
+        required_attributes = ["type", "id", "time", "source", "requestid"]
+        required_type = EventTypes.RESPONSES_RESPONSE_READY
 
         return (
             all(attr in event for attr in required_attributes)
@@ -144,6 +219,44 @@ class CloudEventProcessor:
 
         logger.info(
             "Processing response event",
+            event_id=event["id"],
+            request_id=event["requestid"],
+            agent_id=event.get("agentid"),
+        )
+
+        return event.data
+
+    def process_responses_request_event(
+        self, event: CloudEvent
+    ) -> Optional[Dict[str, Any]]:
+        """Process a responses request created event."""
+        if not self.validator.validate_responses_request_event(event):
+            logger.error(
+                "Invalid responses request event", event_type=event.get("type")
+            )
+            return None
+
+        logger.info(
+            "Processing responses request event",
+            event_id=event["id"],
+            user_id=event.get("userid"),
+            session_id=event.get("sessionid"),
+        )
+
+        return event.data
+
+    def process_responses_response_event(
+        self, event: CloudEvent
+    ) -> Optional[Dict[str, Any]]:
+        """Process a responses response ready event."""
+        if not self.validator.validate_responses_response_event(event):
+            logger.error(
+                "Invalid responses response event", event_type=event.get("type")
+            )
+            return None
+
+        logger.info(
+            "Processing responses response event",
             event_id=event["id"],
             request_id=event["requestid"],
             agent_id=event.get("agentid"),
@@ -192,6 +305,40 @@ class CloudEventSender:
             return await self._send_event(event)
         except Exception as e:
             logger.error("Failed to send response event", error=str(e))
+            return False
+
+    async def send_responses_request_event(
+        self,
+        request_data: Dict[str, Any],
+        request_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> bool:
+        """Send a responses request created event."""
+        try:
+            event = self.builder.create_responses_request_event(
+                request_data, request_id, user_id, session_id
+            )
+            return await self._send_event(event)
+        except Exception as e:
+            logger.error("Failed to send responses request event", error=str(e))
+            return False
+
+    async def send_responses_response_event(
+        self,
+        response_data: Dict[str, Any],
+        request_id: str,
+        agent_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> bool:
+        """Send a responses response ready event."""
+        try:
+            event = self.builder.create_responses_response_event(
+                response_data, request_id, agent_id, session_id
+            )
+            return await self._send_event(event)
+        except Exception as e:
+            logger.error("Failed to send responses response event", error=str(e))
             return False
 
     async def _send_event(self, event: CloudEvent) -> bool:
@@ -269,6 +416,34 @@ def create_response_event(
     """Create a standardized response event."""
     builder = CloudEventBuilder(source)
     return builder.create_response_event(
+        response_data, request_id, agent_id, session_id
+    )
+
+
+def create_responses_request_event(
+    source: str,
+    request_data: Dict[str, Any],
+    request_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+) -> CloudEvent:
+    """Create a standardized responses request event."""
+    builder = CloudEventBuilder(source)
+    return builder.create_responses_request_event(
+        request_data, request_id, user_id, session_id
+    )
+
+
+def create_responses_response_event(
+    source: str,
+    response_data: Dict[str, Any],
+    request_id: str,
+    agent_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+) -> CloudEvent:
+    """Create a standardized responses response event."""
+    builder = CloudEventBuilder(source)
+    return builder.create_responses_response_event(
         response_data, request_id, agent_id, session_id
     )
 
