@@ -8,7 +8,7 @@ import logging
 import os
 
 from mcp.server.fastmcp import Context, FastMCP
-from snow.data.data import create_laptop_refresh_ticket
+from snow.data.data import create_laptop_refresh_ticket, get_mock_laptop_info
 from snow.servicenow.client import ServiceNowClient
 from snow.servicenow.models import OpenServiceNowLaptopRefreshRequestParams
 from starlette.responses import JSONResponse
@@ -101,6 +101,24 @@ def _create_mock_ticket(
     )
     return ticket_details
 
+def _get_real_servicenow_laptop_info(employee_email: str) -> str:
+    """Get laptop information from real ServiceNow API."""
+    try:
+        client = ServiceNowClient()
+
+        laptop_info = client.get_employee_laptop_info(employee_email)
+        if laptop_info:
+            return laptop_info
+        else:
+            return f"Error: Failed to retrieve laptop info for {employee_email} from ServiceNow"
+    except Exception as e:
+        error_msg = f"Error getting laptop info from ServiceNow: {str(e)}"
+        logging.error(error_msg)
+        raise  # Re-raise to allow fallback handling
+
+def _get_mock_laptop_info(employee_email: str) -> str:
+    """Get laptop information from mock data."""
+    return get_mock_laptop_info(employee_email)
 
 @mcp.custom_route("/health", methods=["GET"])
 async def health(request):
@@ -177,6 +195,56 @@ def open_laptop_refresh_ticket(
         preferred_model,
         authoritative_user_id,
     )
+
+
+@mcp.tool()
+def get_employee_laptop_info(
+    employee_email: str,
+    ctx: Context,
+) -> str:
+    """Get laptop information for an employee by their email address.
+
+    Args:
+        employee_email: The email address of the employee
+
+    Returns:
+        A formatted string containing the employee's laptop information
+    """
+    if not employee_email:
+        raise ValueError("Employee email cannot be empty")
+
+    # Extract authoritative user ID from request headers via Context
+    authoritative_user_id = None
+    try:
+        request_context = ctx.request_context
+        if hasattr(request_context, "request") and request_context.request:
+            request = request_context.request
+            if hasattr(request, "headers"):
+                headers = request.headers
+
+                authoritative_user_id = headers.get(
+                    "AUTHORITATIVE_USER_ID"
+                ) or headers.get("authoritative_user_id")
+    except Exception as e:
+        logging.debug(f"Error extracting headers from request context: {e}")
+        authoritative_user_id = None
+
+    # Try real ServiceNow first if configured, otherwise use mock
+    if _should_use_real_servicenow():
+        try:
+            logging.info(
+                f"Using real ServiceNow API for laptop info - authoritative_user_id: {authoritative_user_id}, employee_email: {employee_email}"
+            )
+            return _get_real_servicenow_laptop_info(employee_email)
+        except Exception as e:
+            logging.warning(f"ServiceNow API failed for laptop info, falling back to mock: {e}")
+            # Fall through to mock implementation
+
+    # Use mock implementation
+    logging.info(
+        f"Using mock laptop info implementation - authoritative_user_id: {authoritative_user_id}, employee_email: {employee_email}"
+    )
+    return _get_mock_laptop_info(employee_email)
 
 
 def main() -> None:
