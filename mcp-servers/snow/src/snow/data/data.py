@@ -113,7 +113,7 @@ Laptop 1:
   Purchase Date: 2023-04-18
   Warranty Expiry: 2026-04-18
   Warranty Status: Active
-"""
+""",
     }
 
     if employee_email in laptop_info_data:

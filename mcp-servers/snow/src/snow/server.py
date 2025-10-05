@@ -101,6 +101,7 @@ def _create_mock_ticket(
     )
     return ticket_details
 
+
 def _get_real_servicenow_laptop_info(employee_email: str) -> str:
     """Get laptop information from real ServiceNow API."""
     try:
@@ -116,9 +117,11 @@ def _get_real_servicenow_laptop_info(employee_email: str) -> str:
         logging.error(error_msg)
         raise  # Re-raise to allow fallback handling
 
+
 def _get_mock_laptop_info(employee_email: str) -> str:
     """Get laptop information from mock data."""
     return get_mock_laptop_info(employee_email)
+
 
 @mcp.custom_route("/health", methods=["GET"])
 async def health(request):
@@ -237,7 +240,9 @@ def get_employee_laptop_info(
             )
             return _get_real_servicenow_laptop_info(employee_email)
         except Exception as e:
-            logging.warning(f"ServiceNow API failed for laptop info, falling back to mock: {e}")
+            logging.warning(
+                f"ServiceNow API failed for laptop info, falling back to mock: {e}"
+            )
             # Fall through to mock implementation
 
     # Use mock implementation
