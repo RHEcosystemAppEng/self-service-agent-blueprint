@@ -19,6 +19,7 @@ class OpenShiftChatClient:
         authoritative_user_id: str,
         deployment_name: str = "deploy/self-service-agent",
         test_script: str = "chat.py",
+        reset_conversation: bool = False,
     ):
         """
         Initialize the OpenShift chat client.
@@ -27,10 +28,12 @@ class OpenShiftChatClient:
             authoritative_user_id: Required user ID to set as AUTHORITATIVE_USER_ID environment variable
             deployment_name: Name of the OpenShift deployment to connect to
             test_script: Name of the test script to execute (default: "chat.py")
+            reset_conversation: If True, send "reset" message after initialization
         """
         self.deployment_name = deployment_name
         self.test_script = test_script
         self.authoritative_user_id = authoritative_user_id
+        self.reset_conversation = reset_conversation
         self.process = None
         self.session_active = False
         self.session_output = []  # Capture all output for token parsing
@@ -99,6 +102,7 @@ class OpenShiftChatClient:
 
         Reads the initial message sent by the agent when the session starts.
         This is typically a greeting or instructions for the user.
+        If reset_conversation is True, sends "reset" message after initialization.
 
         Returns:
             The agent's initialization message as a string
@@ -111,6 +115,21 @@ class OpenShiftChatClient:
 
         agent_message = self._read_full_agent_message()
         logger.debug(f"Agent initialization: {agent_message[:100]}...")
+
+        # Send reset message if requested
+        if self.reset_conversation:
+            logger.info("Sending reset message to start fresh conversation")
+            reset_response = self.send_message("reset")
+            logger.info(f"Reset response: {reset_response[:100] if reset_response else 'empty'}...")
+
+            # After reset, ask for introduction
+            logger.info("Requesting agent introduction after reset")
+            intro_response = self.send_message("please introduce yourself and tell me how you can help")
+            logger.info(f"Introduction response: {intro_response[:100] if intro_response else 'empty'}...")
+
+            # Return the introduction response instead of the original initialization
+            return intro_response
+
         return agent_message
 
     def send_message(self, message: str, timeout: int = 30) -> str:
@@ -171,9 +190,11 @@ class OpenShiftChatClient:
         response_parts: List[str] = []
         start_time = time.time()
         agent_started = False
+        lines_read = 0
 
         while time.time() - start_time < timeout:
             if self.process.poll() is not None:
+                logger.debug("Process terminated while reading message")
                 break
 
             try:
@@ -183,6 +204,7 @@ class OpenShiftChatClient:
                     continue
 
                 s = line.strip()
+                lines_read += 1
 
                 # Capture all output for potential token parsing
                 self.session_output.append(s)
@@ -196,12 +218,14 @@ class OpenShiftChatClient:
                         continue
                     agent_started = True
                     s = s[start_idx + len("agent:") :].strip()
+                    logger.debug(f"Agent message started, read {lines_read} lines to get here")
 
                 end_idx = s.find(AGENT_MESSAGE_TERMINATOR)
                 if end_idx != -1:
                     part = s[:end_idx].strip()
                     if part:
                         response_parts.append(part)
+                    logger.debug(f"Agent message completed after {lines_read} total lines")
                     break
                 else:
                     if s:
@@ -211,6 +235,9 @@ class OpenShiftChatClient:
                 logger.debug(f"Read error: {e}")
                 time.sleep(0.1)
                 continue
+
+        if time.time() - start_time >= timeout:
+            logger.warning(f"Timeout reading agent message after {timeout}s, read {lines_read} lines, agent_started={agent_started}")
 
         return "\n".join(response_parts).strip()
 

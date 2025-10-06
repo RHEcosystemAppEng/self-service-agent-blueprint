@@ -15,14 +15,18 @@ logger = logging.getLogger(__name__)
 class ConversationFlowTester:
     """Test runner for conversation flows"""
 
-    def __init__(self, test_script: str = "chat.py") -> None:
+    def __init__(
+        self, test_script: str = "chat.py", reset_conversation: bool = False
+    ) -> None:
         """
         Initialize the ConversationFlowTester.
 
         Args:
             test_script: Name of the test script to execute (default: "chat.py")
+            reset_conversation: If True, send 'reset' message at the start of each conversation
         """
         self.test_script = test_script
+        self.reset_conversation = reset_conversation
         self.conversation_history = []
         self.total_app_tokens = {"input": 0, "output": 0, "total": 0, "calls": 0}
 
@@ -47,7 +51,9 @@ class ConversationFlowTester:
 
         # Create a new client for this flow with the specific authoritative_user_id
         client = OpenShiftChatClient(
-            authoritative_user_id, test_script=self.test_script
+            authoritative_user_id,
+            test_script=self.test_script,
+            reset_conversation=self.reset_conversation,
         )
 
         try:

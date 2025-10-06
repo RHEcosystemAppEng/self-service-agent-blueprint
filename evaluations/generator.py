@@ -95,6 +95,11 @@ def _parse_arguments() -> argparse.Namespace:
         default="chat.py",
         help="Name of the test script to execute (default: chat.py)",
     )
+    parser.add_argument(
+        "--reset-conversation",
+        action="store_true",
+        help="Send 'reset' message at the start of each conversation",
+    )
     return parser.parse_args()
 
 
@@ -258,7 +263,9 @@ if __name__ == "__main__":
 
                 # Create a new OpenShift client for this conversation with unique user ID
                 client = OpenShiftChatClient(
-                    conversation_user_id, test_script=args.test_script
+                    conversation_user_id,
+                    test_script=args.test_script,
+                    reset_conversation=args.reset_conversation,
                 )
 
                 # Create a single conversation golden for this iteration

@@ -528,6 +528,11 @@ def _parse_arguments() -> argparse.Namespace:
         action="store_true",
         help="Exclude employee ID-related checks in evaluation metrics",
     )
+    parser.add_argument(
+        "--reset-conversation",
+        action="store_true",
+        help="Send 'reset' message at the start of each conversation",
+    )
     return parser.parse_args()
 
 
@@ -802,6 +807,7 @@ def run_evaluation_pipeline(
     max_turns: int = 20,
     test_script: str = "chat.py",
     no_employee_id: bool = False,
+    reset_conversation: bool = False,
 ) -> int:
     """
     Run the complete evaluation pipeline.
@@ -817,6 +823,8 @@ def run_evaluation_pipeline(
         timeout: Timeout in seconds for each script execution
         max_turns: Maximum number of turns per conversation in generator.py
         test_script: Name of the test script to execute
+        no_employee_id: Exclude employee ID-related checks in evaluation metrics
+        reset_conversation: Send 'reset' message at the start of each conversation
 
     Returns:
         Exit code (0 for success, 1 for any failures)
@@ -836,6 +844,8 @@ def run_evaluation_pipeline(
     run_conversations_args = ["--test-script", test_script]
     if no_employee_id:
         run_conversations_args.append("--no-employee-id")
+    if reset_conversation:
+        run_conversations_args.append("--reset-conversation")
     if not run_script(
         "run_conversations.py", args=run_conversations_args, timeout=timeout
     ):
@@ -857,6 +867,8 @@ def run_evaluation_pipeline(
         "--test-script",
         test_script,
     ]
+    if reset_conversation:
+        generator_args.append("--reset-conversation")
     if not run_script("generator.py", args=generator_args, timeout=timeout):
         failed_steps.append("generator.py")
         logger.error("❌ Step 2 failed - continuing with remaining steps")
@@ -940,6 +952,7 @@ def main() -> int:
                 max_turns=args.max_turns,
                 test_script=args.test_script,
                 no_employee_id=args.no_employee_id,
+                reset_conversation=args.reset_conversation,
             )
     except KeyboardInterrupt:
         logger.warning("⚠️  Pipeline interrupted by user")

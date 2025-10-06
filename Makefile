@@ -762,7 +762,7 @@ test-short-integration-request-mgr:
 .PHONY: test-short-resp-integration-request-mgr
 test-short-resp-integration-request-mgr:
 	@echo "Running short responses integration test with Request Manager..."
-	uv --directory evaluations run evaluate.py -n 1 --no-employee-id --test-script chat-responses-request-mgr.py
+	uv --directory evaluations run evaluate.py -n 1 --no-employee-id --test-script chat-responses-request-mgr.py --reset-conversation
 	@echo "short responses integrations tests with Request Manager completed successfully!"
 
 # Create namespace and deploy

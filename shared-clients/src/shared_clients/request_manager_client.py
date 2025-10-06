@@ -330,11 +330,6 @@ class CLIChatClient(RequestManagerClient):
                 if message.lower() in ["quit", "exit"]:
                     break
 
-                if message.lower() == "reset":
-                    await self.reset_session()
-                    print("Session reset")
-                    continue
-
                 agent_response = await self.send_message(message, debug=debug)
                 print(f"agent: {agent_response}")
                 print(AGENT_MESSAGE_TERMINATOR)
