@@ -120,12 +120,18 @@ class OpenShiftChatClient:
         if self.reset_conversation:
             logger.info("Sending reset message to start fresh conversation")
             reset_response = self.send_message("reset")
-            logger.info(f"Reset response: {reset_response[:100] if reset_response else 'empty'}...")
+            logger.info(
+                f"Reset response: {reset_response[:100] if reset_response else 'empty'}..."
+            )
 
             # After reset, ask for introduction
             logger.info("Requesting agent introduction after reset")
-            intro_response = self.send_message("please introduce yourself and tell me how you can help")
-            logger.info(f"Introduction response: {intro_response[:100] if intro_response else 'empty'}...")
+            intro_response = self.send_message(
+                "please introduce yourself and tell me how you can help"
+            )
+            logger.info(
+                f"Introduction response: {intro_response[:100] if intro_response else 'empty'}..."
+            )
 
             # Return the introduction response instead of the original initialization
             return intro_response
@@ -218,14 +224,18 @@ class OpenShiftChatClient:
                         continue
                     agent_started = True
                     s = s[start_idx + len("agent:") :].strip()
-                    logger.debug(f"Agent message started, read {lines_read} lines to get here")
+                    logger.debug(
+                        f"Agent message started, read {lines_read} lines to get here"
+                    )
 
                 end_idx = s.find(AGENT_MESSAGE_TERMINATOR)
                 if end_idx != -1:
                     part = s[:end_idx].strip()
                     if part:
                         response_parts.append(part)
-                    logger.debug(f"Agent message completed after {lines_read} total lines")
+                    logger.debug(
+                        f"Agent message completed after {lines_read} total lines"
+                    )
                     break
                 else:
                     if s:
@@ -237,7 +247,9 @@ class OpenShiftChatClient:
                 continue
 
         if time.time() - start_time >= timeout:
-            logger.warning(f"Timeout reading agent message after {timeout}s, read {lines_read} lines, agent_started={agent_started}")
+            logger.warning(
+                f"Timeout reading agent message after {timeout}s, read {lines_read} lines, agent_started={agent_started}"
+            )
 
         return "\n".join(response_parts).strip()
 
