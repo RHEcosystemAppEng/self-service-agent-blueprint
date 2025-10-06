@@ -58,7 +58,7 @@ jobs:
           make sync-evaluations
 
       - name: Run evaluations
-        continue-on-error: true
+        if: always()
         shell: bash
         run: |
           make test-short-integration
@@ -67,7 +67,7 @@ jobs:
           LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL }}
 
       - name: Run evaluations (Request Manager)
-        continue-on-error: true
+        if: always()
         shell: bash
         run: |
           make test-short-integration-request-mgr
@@ -76,7 +76,7 @@ jobs:
           LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL }}
 
       - name: Run responses evaluations
-        continue-on-error: true
+        if: always()
         shell: bash
         run: |
           make test-short-resp-integration
