@@ -159,22 +159,24 @@ slack:
 
 mcp-servers:
   mcp-servers:
-    self-service-agent-employee-info:
-      deploy: true
-      imageRepository: quay.io/ecosystem-appeng/self-service-agent-employee-info-mcp
-      uri: http://self-service-agent-employee-info:8000/sse/
-      imageTag: 0.0.2
-
     self-service-agent-snow:
       deploy: true
       imageRepository: quay.io/ecosystem-appeng/self-service-agent-snow-mcp
+      pullPolicy: Always
       uri: http://self-service-agent-snow:8000/sse/
       imageTag: 0.0.2
+      envFromSecret:
+        SERVICENOW_INSTANCE_URL:
+          name: self-service-agent-servicenow-credentials
+          key: servicenow-instance-url
+        SERVICENOW_USERNAME:
+          name: self-service-agent-servicenow-credentials
+          key: servicenow-username
+        SERVICENOW_PASSWORD:
+          name: self-service-agent-servicenow-credentials
+          key: servicenow-password
       env:
-        SERVICENOW_INSTANCE_URL: "yyy"
-        SERVICENOW_USERNAME: "svc_self_service_agent_mcp"
         SERVICENOW_AUTH_TYPE: "basic"
-        SERVICENOW_PASSWORD: "xxx"  # TODO move to secrets
         USE_REAL_SERVICENOW: "false"
 
     mcp-weather:

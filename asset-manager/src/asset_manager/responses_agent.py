@@ -388,7 +388,7 @@ class Agent:
             temperature: Optional temperature override
             additional_system_messages: Optional list of additional system messages to include
             authoritative_user_id: Optional authoritative user ID to pass via X-LlamaStack-Provider-Data header to MCP servers
-            allowed_tools: Optional list of tool names/types to restrict available tools (e.g., ['file_search', 'employee-info'])
+            allowed_tools: Optional list of tool names/types to restrict available tools (e.g., ['file_search'])
             skip_all_tools: If True, skip all tools (MCP servers and knowledge base)
             skip_mcp_servers_only: If True, skip only MCP servers (keep knowledge base tools)
             current_state_name: Optional name of the current state from the state machine YAML

@@ -15,5 +15,5 @@ sampling_params:
     temperature: 0.7
     top_p: 0.95
   max_tokens: 2000
-mcp_servers: ["employee-info", "snow"]
+mcp_servers: ["snow"]
 knowledge_bases: ["laptop-refresh"]

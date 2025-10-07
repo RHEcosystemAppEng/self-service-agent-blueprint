@@ -14,7 +14,6 @@ AGENT_IMG ?= $(REGISTRY)/self-service-agent:$(VERSION)
 REQUEST_MGR_IMG ?= $(REGISTRY)/self-service-agent-request-manager:$(VERSION)
 AGENT_SERVICE_IMG ?= $(REGISTRY)/self-service-agent-service:$(VERSION)
 INTEGRATION_DISPATCHER_IMG ?= $(REGISTRY)/self-service-agent-integration-dispatcher:$(VERSION)
-MCP_EMP_INFO_IMG ?= $(REGISTRY)/self-service-agent-employee-info-mcp:$(VERSION)
 MCP_SNOW_IMG ?= $(REGISTRY)/self-service-agent-snow-mcp:$(VERSION)
 MOCK_EVENTING_IMG ?= $(REGISTRY)/self-service-agent-mock-eventing:$(VERSION)
 
@@ -48,6 +47,24 @@ endif
 
 # Check if Slack should be enabled
 SLACK_ENABLED := $(if $(and $(SLACK_BOT_TOKEN),$(SLACK_SIGNING_SECRET)),true,false)
+
+# ServiceNow Configuration
+# Can be set either way:
+#   1. Environment variable (required for passwords with $ or other special chars):
+#      export SERVICENOW_PASSWORD='P@ssw0rd$r123'
+#      make helm-install-dev ...
+#   2. Make argument (for simple passwords without special chars):
+#      make helm-install-dev SERVICENOW_PASSWORD=simple123 ...
+SERVICENOW_INSTANCE_URL ?=
+SERVICENOW_USERNAME ?=
+SERVICENOW_PASSWORD ?=
+SERVICENOW_AUTH_TYPE ?= basic
+USE_REAL_SERVICENOW ?= false
+
+# Export to shell so kubectl can access them
+export SERVICENOW_INSTANCE_URL
+export SERVICENOW_USERNAME
+export SERVICENOW_PASSWORD
 
 helm_pgvector_args = \
     --set pgvector.secret.user=$(POSTGRES_USER) \
@@ -95,7 +112,6 @@ help:
 	@echo "  build-agent-image                    - Build the unified self-service agent container image (checks lockfiles first)"
 	@echo "  build-agent-service-image            - Build the agent service container image (checks lockfiles first)"
 	@echo "  build-integration-dispatcher-image   - Build the integration dispatcher container image (checks lockfiles first)"
-	@echo "  build-mcp-emp-info-image             - Build the employee info MCP server container image (checks lockfiles first)"
 	@echo "  build-mcp-snow-image                 - Build the snow MCP server container image (checks lockfiles first)"
 	@echo "  build-mock-eventing-image            - Build the mock eventing service container image (checks lockfiles first)"
 	@echo "  build-request-mgr-image              - Build the request manager container image (checks lockfiles first)"
@@ -118,7 +134,6 @@ help:
 	@echo "  install-agent-service               - Install dependencies for agent service"
 	@echo "  install-asset-manager               - Install dependencies for asset manager"
 	@echo "  install-integration-dispatcher      - Install dependencies for integration dispatcher"
-	@echo "  install-mcp-emp-info                - Install dependencies for employee info MCP server"
 	@echo "  install-mcp-snow                    - Install dependencies for snow MCP server"
 	@echo "  install-request-manager             - Install dependencies for request manager"
 	@echo "  install-shared-models               - Install dependencies for shared models"
@@ -130,7 +145,6 @@ help:
 	@echo "  reinstall-agent-service             - Force reinstall agent service dependencies"
 	@echo "  reinstall-asset-manager             - Force reinstall asset manager dependencies"
 	@echo "  reinstall-integration-dispatcher    - Force reinstall integration dispatcher dependencies"
-	@echo "  reinstall-mcp-emp-info              - Force reinstall employee info MCP dependencies"
 	@echo "  reinstall-mcp-snow                  - Force reinstall snow MCP dependencies"
 	@echo "  reinstall-request-manager           - Force reinstall request manager dependencies"
 	@echo "  reinstall-shared-models             - Force reinstall shared models dependencies"
@@ -141,7 +155,6 @@ help:
 	@echo "  push-agent-image                    - Push the unified self-service agent container image to registry"
 	@echo "  push-agent-service-image            - Push the agent service container image to registry"
 	@echo "  push-integration-dispatcher-image   - Push the integration dispatcher container image to registry"
-	@echo "  push-mcp-emp-info-image             - Push the employee info MCP server container image to registry"
 	@echo "  push-mcp-snow-image                 - Push the snow MCP server container image to registry"
 	@echo "  push-mock-eventing-image            - Push the mock eventing service container image to registry"
 	@echo "  push-request-mgr-image              - Push the request manager container image to registry"
@@ -158,7 +171,6 @@ help:
 	@echo "  test-agent-service                  - Run tests for agent service"
 	@echo "  test-asset-manager                  - Run tests for asset manager"
 	@echo "  test-integration-dispatcher         - Run tests for integration dispatcher"
-	@echo "  test-mcp-emp-info                   - Run tests for employee info MCP server"
 	@echo "  test-mcp-snow                       - Run tests for snow MCP server"
 	@echo "  test-request-manager                - Run tests for request manager"
 	@echo "  test-shared-models                  - Run tests for shared models"
@@ -184,7 +196,6 @@ help:
 	@echo "    AGENT_IMG                         - Full agent image name (default: \$${REGISTRY}/self-service-agent:\$${VERSION})"
 	@echo "    AGENT_SERVICE_IMG                 - Full agent service image name (default: \$${REGISTRY}/self-service-agent-service:\$${VERSION})"
 	@echo "    INTEGRATION_DISPATCHER_IMG        - Full integration dispatcher image name (default: \$${REGISTRY}/self-service-agent-integration-dispatcher:\$${VERSION})"
-	@echo "    MCP_EMP_INFO_IMG                  - Full employee info MCP image name (default: \$${REGISTRY}/self-service-agent-employee-info-mcp:\$${VERSION})"
 	@echo "    MCP_SNOW_IMG                      - Full snow MCP image name (default: \$${REGISTRY}/self-service-agent-snow-mcp:\$${VERSION})"
 	@echo "    REQUEST_MGR_IMG                   - Full request manager image name (default: \$${REGISTRY}/self-service-agent-request-manager:\$${VERSION})"
 	@echo ""
@@ -201,7 +212,20 @@ help:
 	@echo "    HR_API_KEY                        - HR system integration API key"
 	@echo "    SLACK_BOT_TOKEN                   - Slack Bot Token (xoxb-...) for Slack integration"
 	@echo "    SLACK_SIGNING_SECRET              - Slack Signing Secret for request verification"
-	@echo "    SNOW_API_KEY                      - ServiceNow integration API key"
+	@echo ""
+	@echo "  ServiceNow Configuration:"
+	@echo "    SERVICENOW_INSTANCE_URL           - ServiceNow instance URL (e.g., https://dev12345.service-now.com)"
+	@echo "    SERVICENOW_USERNAME               - ServiceNow username for authentication"
+	@echo "    SERVICENOW_PASSWORD               - ServiceNow password"
+	@echo "    SERVICENOW_AUTH_TYPE              - ServiceNow auth type (default: basic)"
+	@echo "    USE_REAL_SERVICENOW               - Use real ServiceNow API vs mock data (default: false)"
+	@echo ""
+	@echo "  Note: Passwords with special characters like \$$ must be set via environment variable:"
+	@echo "    export SERVICENOW_PASSWORD='P@ssw0rd\$$r123'  # Required for special chars"
+	@echo "    make helm-install-dev NAMESPACE=my-ns USE_REAL_SERVICENOW=true"
+	@echo ""
+	@echo "  Simple passwords can use either method:"
+	@echo "    make helm-install-dev SERVICENOW_PASSWORD=simple123  # No special chars"
 	@echo ""
 	@echo "  Request Management Layer:"
 	@echo "    KNATIVE_EVENTING                  - Enable Knative Eventing (default: true)"
@@ -290,7 +314,7 @@ endef
 
 # Build container images
 .PHONY: build-all-images
-build-all-images: build-agent-image build-request-mgr-image build-agent-service-image build-integration-dispatcher-image build-mcp-emp-info-image build-mcp-snow-image build-mock-eventing-image
+build-all-images: build-agent-image build-request-mgr-image build-agent-service-image build-integration-dispatcher-image build-mcp-snow-image build-mock-eventing-image
 	@echo "All container images built successfully!"
 
 .PHONY: build-agent-image
@@ -310,11 +334,6 @@ build-agent-service-image: check-lockfile-agent-service check-lockfile-shared-mo
 build-integration-dispatcher-image: check-lockfile-integration-dispatcher check-lockfile-shared-models check-lockfile-shared-clients
 	$(call build_template_image,$(INTEGRATION_DISPATCHER_IMG),integration dispatcher image,integration-dispatcher,integration_dispatcher.main,.)
 
-
-.PHONY: build-mcp-emp-info-image
-build-mcp-emp-info-image: check-lockfile-mcp-emp-info
-	$(call build_mcp_image,$(MCP_EMP_INFO_IMG),employee info MCP image,mcp-servers/employee-info,employee_info.server)
-
 .PHONY: build-mcp-snow-image
 build-mcp-snow-image: check-lockfile-mcp-snow
 	$(call build_mcp_image,$(MCP_SNOW_IMG),snow MCP image,mcp-servers/snow,snow.server)
@@ -331,7 +350,7 @@ build-mock-eventing-image: check-lockfile-mock-eventing check-lockfile-shared-mo
 
 # Push container images
 .PHONY: push-all-images
-push-all-images: push-agent-image push-request-mgr-image push-agent-service-image push-integration-dispatcher-image push-mcp-emp-info-image push-mcp-snow-image push-mock-eventing-image
+push-all-images: push-agent-image push-request-mgr-image push-agent-service-image push-integration-dispatcher-image push-mcp-snow-image push-mock-eventing-image
 	@echo "All container images pushed successfully!"
 
 .PHONY: push-agent-image
@@ -351,10 +370,6 @@ push-agent-service-image:
 push-integration-dispatcher-image:
 	$(call push_image,$(INTEGRATION_DISPATCHER_IMG) $(PUSH_EXTRA_AGRS),integration dispatcher image)
 
-
-.PHONY: push-mcp-emp-info-image
-push-mcp-emp-info-image:
-	$(call push_image,$(MCP_EMP_INFO_IMG) $(PUSH_EXTRA_AGRS),employee info MCP image)
 
 .PHONY: push-mcp-snow-image
 push-mcp-snow-image:
@@ -404,7 +419,7 @@ format:
 
 # Install dependencies
 .PHONY: install-all
-install-all: install-shared-models install-shared-clients install install-asset-manager install-request-manager install-agent-service install-integration-dispatcher install-mcp-emp-info install-mcp-snow install-mock-eventing
+install-all: install-shared-models install-shared-clients install install-asset-manager install-request-manager install-agent-service install-integration-dispatcher install-mcp-snow install-mock-eventing
 	@echo "All dependencies installed successfully!"
 
 .PHONY: install-shared-models
@@ -433,7 +448,7 @@ reinstall:
 	@echo "All dependencies reinstalled with latest code!"
 
 .PHONY: reinstall-all
-reinstall-all: reinstall-shared-models reinstall-shared-clients reinstall reinstall-asset-manager reinstall-request-manager reinstall-agent-service reinstall-integration-dispatcher reinstall-mcp-emp-info reinstall-mcp-snow
+reinstall-all: reinstall-shared-models reinstall-shared-clients reinstall reinstall-asset-manager reinstall-request-manager reinstall-agent-service reinstall-integration-dispatcher reinstall-mcp-snow
 	@echo "All project dependencies reinstalled successfully!"
 
 .PHONY: reinstall-asset-manager
@@ -459,12 +474,6 @@ reinstall-integration-dispatcher:
 	@echo "Force reinstalling integration dispatcher dependencies..."
 	cd integration-dispatcher && uv sync --reinstall
 	@echo "Integration dispatcher dependencies reinstalled successfully!"
-
-.PHONY: reinstall-mcp-emp-info
-reinstall-mcp-emp-info:
-	@echo "Force reinstalling employee info MCP dependencies..."
-	cd mcp-servers/employee-info && uv sync --reinstall
-	@echo "Employee info MCP dependencies reinstalled successfully!"
 
 .PHONY: reinstall-mcp-snow
 reinstall-mcp-snow:
@@ -508,12 +517,6 @@ install-integration-dispatcher:
 	cd integration-dispatcher && uv sync
 	@echo "Integration dispatcher dependencies installed successfully!"
 
-.PHONY: install-mcp-emp-info
-install-mcp-emp-info:
-	@echo "Installing employee info MCP dependencies..."
-	cd mcp-servers/employee-info && uv sync
-	@echo "Employee info MCP dependencies installed successfully!"
-
 .PHONY: install-mcp-snow
 install-mcp-snow:
 	@echo "Installing snow MCP dependencies..."
@@ -528,7 +531,7 @@ install-mock-eventing:
 
 # Test code
 .PHONY: test-all
-test-all: test-shared-models test-shared-clients test test-asset-manager test-request-manager test-agent-service test-integration-dispatcher test-mcp-emp-info test-mcp-snow
+test-all: test-shared-models test-shared-clients test test-asset-manager test-request-manager test-agent-service test-integration-dispatcher test-mcp-snow
 	@echo "All tests completed successfully!"
 
 # Lockfile management
@@ -578,8 +581,6 @@ check-lockfiles:
 	@echo
 	$(call check_lockfile,integration-dispatcher)
 	@echo
-	$(call check_lockfile,mcp-servers/employee-info)
-	@echo
 	$(call check_lockfile,mcp-servers/snow)
 	@echo
 	$(call check_lockfile,mock-eventing-service)
@@ -606,8 +607,6 @@ update-lockfiles:
 	@echo
 	$(call update_lockfile,integration-dispatcher)
 	@echo
-	$(call update_lockfile,mcp-servers/employee-info)
-	@echo
 	$(call update_lockfile,mcp-servers/snow)
 	@echo
 	$(call update_lockfile,mock-eventing-service)
@@ -617,7 +616,7 @@ update-lockfiles:
 	@echo "🎉 All lockfiles updated successfully!"
 
 # Individual service lockfile targets
-.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-emp-info check-lockfile-mcp-snow check-lockfile-mock-eventing check-lockfile-asset-manager
+.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-snow check-lockfile-mock-eventing check-lockfile-asset-manager
 check-lockfile-root:
 	@echo "📦 Checking root project..."
 	@if uv lock --check; then \
@@ -641,9 +640,6 @@ check-lockfile-request-manager:
 check-lockfile-integration-dispatcher:
 	$(call check_lockfile,integration-dispatcher)
 
-check-lockfile-mcp-emp-info:
-	$(call check_lockfile,mcp-servers/employee-info)
-
 check-lockfile-mcp-snow:
 	$(call check_lockfile,mcp-servers/snow)
 
@@ -653,7 +649,7 @@ check-lockfile-mock-eventing:
 check-lockfile-asset-manager:
 	$(call check_lockfile,asset-manager)
 
-.PHONY: update-lockfile-shared-models update-lockfile-shared-clients update-lockfile-agent-service update-lockfile-request-manager update-lockfile-integration-dispatcher update-lockfile-mcp-emp-info update-lockfile-mcp-snow update-lockfile-mock-eventing update-lockfile-asset-manager
+.PHONY: update-lockfile-shared-models update-lockfile-shared-clients update-lockfile-agent-service update-lockfile-request-manager update-lockfile-integration-dispatcher update-lockfile-mcp-snow update-lockfile-mock-eventing update-lockfile-asset-manager
 update-lockfile-shared-models:
 	$(call update_lockfile,shared-models)
 
@@ -668,9 +664,6 @@ update-lockfile-request-manager:
 
 update-lockfile-integration-dispatcher:
 	$(call update_lockfile,integration-dispatcher)
-
-update-lockfile-mcp-emp-info:
-	$(call update_lockfile,mcp-servers/employee-info)
 
 update-lockfile-mcp-snow:
 	$(call update_lockfile,mcp-servers/snow)
@@ -722,12 +715,6 @@ test-integration-dispatcher:
 	@echo "Running integration dispatcher tests..."
 	cd integration-dispatcher && uv run python -m pytest tests/ || echo "No tests found for integration dispatcher"
 	@echo "Integration dispatcher tests completed successfully!"
-
-.PHONY: test-mcp-emp-info
-test-mcp-emp-info:
-	@echo "Running employee info MCP tests..."
-	cd mcp-servers/employee-info && uv run python -m pytest tests/
-	@echo "Employee info MCP tests completed successfully!"
 
 .PHONY: test-mcp-snow
 test-mcp-snow:
@@ -787,6 +774,15 @@ define helm_install_common
 	@$(eval REQUEST_MANAGEMENT_ARGS := $(helm_request_management_args))
 	@$(eval LOG_LEVEL_ARGS := $(if $(LOG_LEVEL),--set logLevel=$(LOG_LEVEL),))
 
+	@echo "Creating ServiceNow credentials secret..."
+	@if [ -n "$$SERVICENOW_PASSWORD" ] || [ -n "$$SERVICENOW_USERNAME" ] || [ -n "$$SERVICENOW_INSTANCE_URL" ]; then \
+		kubectl create secret generic $(MAIN_CHART_NAME)-servicenow-credentials \
+			--from-literal=servicenow-instance-url="$${SERVICENOW_INSTANCE_URL:-}" \
+			--from-literal=servicenow-username="$${SERVICENOW_USERNAME:-}" \
+			--from-literal=servicenow-password="$${SERVICENOW_PASSWORD:-}" \
+			-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
+	fi
+
 	@echo "Cleaning up any existing jobs..."
 	@kubectl delete job -l app.kubernetes.io/component=init -n $(NAMESPACE) --ignore-not-found || true
 	@kubectl delete job -l app.kubernetes.io/name=self-service-agent -n $(NAMESPACE) --ignore-not-found || true
@@ -803,10 +799,10 @@ define helm_install_common
 		--set requestManagement.integrations.slack.enabled=$(SLACK_ENABLED) \
 		$(if $(filter true,$(SLACK_ENABLED)),--set security.slack.signingSecret=$(SLACK_SIGNING_SECRET) --set security.slack.botToken=$(SLACK_BOT_TOKEN),) \
 		--set image.registry=$(REGISTRY) \
-		--set mcp-servers.mcp-servers.self-service-agent-employee-info.imageRepository=$(REGISTRY)/self-service-agent-employee-info-mcp \
-		--set mcp-servers.mcp-servers.self-service-agent-employee-info.imageTag=$(VERSION) \
 		--set mcp-servers.mcp-servers.self-service-agent-snow.imageRepository=$(REGISTRY)/self-service-agent-snow-mcp \
 		--set mcp-servers.mcp-servers.self-service-agent-snow.imageTag=$(VERSION) \
+		--set-string mcp-servers.mcp-servers.self-service-agent-snow.env.SERVICENOW_AUTH_TYPE="$(SERVICENOW_AUTH_TYPE)" \
+		--set-string mcp-servers.mcp-servers.self-service-agent-snow.env.USE_REAL_SERVICENOW="$(USE_REAL_SERVICENOW)" \
 		$(REQUEST_MANAGEMENT_ARGS) \
 		$(LOG_LEVEL_ARGS) \
 		$(if $(filter-out "",$(2)),$(2),) \

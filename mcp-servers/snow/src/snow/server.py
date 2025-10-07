@@ -8,7 +8,11 @@ import logging
 import os
 
 from mcp.server.fastmcp import Context, FastMCP
-from snow.data.data import create_laptop_refresh_ticket, get_mock_laptop_info
+from snow.data.data import (
+    create_laptop_refresh_ticket,
+    find_employee_by_id_or_email,
+    format_laptop_info,
+)
 from snow.servicenow.client import ServiceNowClient
 from snow.servicenow.models import OpenServiceNowLaptopRefreshRequestParams
 from starlette.responses import JSONResponse
@@ -102,25 +106,88 @@ def _create_mock_ticket(
     return ticket_details
 
 
-def _get_real_servicenow_laptop_info(employee_email: str) -> str:
-    """Get laptop information from real ServiceNow API."""
+def _extract_authoritative_user_id(ctx: Context) -> str:
+    """Extract authoritative user ID from request context headers.
+
+    Args:
+        ctx: Request context containing headers
+
+    Returns:
+        Authoritative user ID if found, None otherwise
+    """
+    try:
+        request_context = ctx.request_context
+        if hasattr(request_context, "request") and request_context.request:
+            request = request_context.request
+            if hasattr(request, "headers"):
+                headers = request.headers
+                return headers.get("AUTHORITATIVE_USER_ID") or headers.get(
+                    "authoritative_user_id"
+                )
+    except Exception as e:
+        logging.debug(f"Error extracting headers from request context: {e}")
+
+    return None
+
+
+def _get_real_servicenow_laptop_info(
+    employee_identifier: str, include_employee_id: bool = True
+) -> str:
+    """Get laptop information from real ServiceNow API.
+
+    Note: ServiceNow API currently only supports email-based lookups.
+    If an employee ID is provided, this will likely fail.
+
+    Args:
+        employee_identifier: Employee email address or ID (used for lookup)
+        include_employee_id: Whether to include Employee ID in output
+
+    Returns:
+        Formatted laptop information string
+    """
     try:
         client = ServiceNowClient()
 
-        laptop_info = client.get_employee_laptop_info(employee_email)
+        laptop_info = client.get_employee_laptop_info(employee_identifier)
         if laptop_info:
+            # Remove Employee ID line from response if not needed
+            if not include_employee_id and "Employee ID:" in laptop_info:
+                lines = laptop_info.split("\n")
+                filtered_lines = [
+                    line
+                    for line in lines
+                    if not line.strip().startswith("Employee ID:")
+                ]
+                laptop_info = "\n".join(filtered_lines)
             return laptop_info
         else:
-            return f"Error: Failed to retrieve laptop info for {employee_email} from ServiceNow"
+            return f"Error: Failed to retrieve laptop info for {employee_identifier} from ServiceNow"
     except Exception as e:
         error_msg = f"Error getting laptop info from ServiceNow: {str(e)}"
         logging.error(error_msg)
         raise  # Re-raise to allow fallback handling
 
 
-def _get_mock_laptop_info(employee_email: str) -> str:
-    """Get laptop information from mock data."""
-    return get_mock_laptop_info(employee_email)
+def _get_mock_laptop_info(
+    employee_identifier: str, include_employee_id: bool = True
+) -> str:
+    """Get laptop information from mock data.
+
+    Supports lookup by both employee ID (e.g., '1001') and email address
+    (e.g., 'alice.johnson@company.com').
+
+    Args:
+        employee_identifier: Employee ID or email address (used for lookup)
+        include_employee_id: Whether to include Employee ID in output
+
+    Returns:
+        Formatted laptop information string
+    """
+    # Supports both employee ID and email lookups (O(1) performance)
+    employee_data = find_employee_by_id_or_email(employee_identifier)
+
+    # Format the output
+    return format_laptop_info(employee_data, include_employee_id=include_employee_id)
 
 
 @mcp.custom_route("/health", methods=["GET"])
@@ -160,21 +227,8 @@ def open_laptop_refresh_ticket(
     if not preferred_model:
         raise ValueError("Preferred model cannot be empty")
 
-    # Extract authoritative user ID from request headers via Context
-    authoritative_user_id = None
-    try:
-        request_context = ctx.request_context
-        if hasattr(request_context, "request") and request_context.request:
-            request = request_context.request
-            if hasattr(request, "headers"):
-                headers = request.headers
-
-                authoritative_user_id = headers.get(
-                    "AUTHORITATIVE_USER_ID"
-                ) or headers.get("authoritative_user_id")
-    except Exception as e:
-        logging.debug(f"Error extracting headers from request context: {e}")
-        authoritative_user_id = None
+    # Extract authoritative user ID from request headers - CENTRALIZED HANDLING
+    authoritative_user_id = _extract_authoritative_user_id(ctx)
 
     # Try real ServiceNow first if configured, otherwise use mock
     if _should_use_real_servicenow():
@@ -202,43 +256,71 @@ def open_laptop_refresh_ticket(
 
 @mcp.tool()
 def get_employee_laptop_info(
-    employee_email: str,
+    employee_identifier: str,
     ctx: Context,
 ) -> str:
-    """Get laptop information for an employee by their email address.
+    """Get laptop information for an employee by their ID or email address.
+
+    This function retrieves and returns detailed information about an employee's laptop,
+    including personal details, hardware specifications, purchase information, calculated
+    age, and warranty status.
+
+    Lookup Support:
+    - Mock data: Supports BOTH employee ID and email address lookups
+    - Real ServiceNow API: Only supports email address lookups (ServiceNow API limitation)
+
+    If an AUTHORITATIVE_USER_ID header is present, it takes precedence over the provided
+    employee_identifier parameter, and the employee ID will be excluded from the output.
 
     Args:
-        employee_email: The email address of the employee
+        employee_identifier: The employee identifier - either employee ID (e.g., '1001')
+                           or email address (e.g., 'alice.johnson@company.com')
+                           Note: Employee ID only works with mock data, not real ServiceNow API
 
     Returns:
-        A formatted string containing the employee's laptop information
+        A formatted multi-line string containing the following information:
+        - Employee Name: Full name of the employee
+        - Employee ID: The employee's unique identifier (excluded when using AUTHORITATIVE_USER_ID)
+        - Employee Location: Geographic region (EMEA, LATAM, APAC, etc.)
+        - Laptop Model: Brand and model of the laptop
+        - Laptop Serial Number: Unique serial number
+        - Laptop Purchase Date: Date when laptop was purchased (YYYY-MM-DD format)
+        - Laptop Age: Calculated age in years and months from purchase date to current date
+        - Laptop Warranty Expiry Date: When the warranty expires (YYYY-MM-DD format)
+        - Laptop Warranty: Current warranty status (Active/Expired)
+
+    Raises:
+        ValueError: If employee_identifier is empty or not found in the database
+
+    Examples:
+        >>> get_employee_laptop_info("1001", ctx)
+        # Returns laptop info for employee ID 1001
+
+        >>> get_employee_laptop_info("alice.johnson@company.com", ctx)
+        # Returns the same information as above
     """
-    if not employee_email:
-        raise ValueError("Employee email cannot be empty")
+    if not employee_identifier:
+        raise ValueError("Employee identifier cannot be empty")
 
-    # Extract authoritative user ID from request headers via Context
-    authoritative_user_id = None
-    try:
-        request_context = ctx.request_context
-        if hasattr(request_context, "request") and request_context.request:
-            request = request_context.request
-            if hasattr(request, "headers"):
-                headers = request.headers
+    # Extract authoritative user ID from request headers - CENTRALIZED HANDLING
+    authoritative_user_id = _extract_authoritative_user_id(ctx)
 
-                authoritative_user_id = headers.get(
-                    "AUTHORITATIVE_USER_ID"
-                ) or headers.get("authoritative_user_id")
-    except Exception as e:
-        logging.debug(f"Error extracting headers from request context: {e}")
-        authoritative_user_id = None
+    # Determine lookup identifier and whether to include employee ID in output
+    # If authoritative user is set, it takes precedence and employee ID is excluded
+    lookup_identifier = (
+        authoritative_user_id if authoritative_user_id else employee_identifier
+    )
+    include_employee_id = authoritative_user_id is None
 
     # Try real ServiceNow first if configured, otherwise use mock
     if _should_use_real_servicenow():
         try:
             logging.info(
-                f"Using real ServiceNow API for laptop info - authoritative_user_id: {authoritative_user_id}, employee_email: {employee_email}"
+                f"Using real ServiceNow API for laptop info - authoritative_user_id: {authoritative_user_id}, employee_identifier: {employee_identifier}, lookup_used: {lookup_identifier}"
             )
-            return _get_real_servicenow_laptop_info(employee_email)
+            return _get_real_servicenow_laptop_info(
+                lookup_identifier, include_employee_id
+            )
         except Exception as e:
             logging.warning(
                 f"ServiceNow API failed for laptop info, falling back to mock: {e}"
@@ -247,9 +329,18 @@ def get_employee_laptop_info(
 
     # Use mock implementation
     logging.info(
-        f"Using mock laptop info implementation - authoritative_user_id: {authoritative_user_id}, employee_email: {employee_email}"
+        f"Using mock laptop info implementation - authoritative_user_id: {authoritative_user_id}, employee_identifier: {employee_identifier}, lookup_used: {lookup_identifier}"
     )
-    return _get_mock_laptop_info(employee_email)
+
+    # Get employee data to log the actual employee_id being looked up
+    employee_data = find_employee_by_id_or_email(lookup_identifier)
+    result = _get_mock_laptop_info(lookup_identifier, include_employee_id)
+
+    logging.info(
+        f"returning laptop info for employee - authoritative_user_id: {authoritative_user_id}, employee_id: {employee_data.get('employee_id')}, lookup_used: {lookup_identifier}"
+    )
+
+    return result
 
 
 def main() -> None:

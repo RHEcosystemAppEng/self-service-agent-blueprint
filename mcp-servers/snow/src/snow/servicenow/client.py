@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any, Dict
 
 import requests
+from snow.data.data import _calculate_laptop_age
 
 from .auth import AuthManager
 from .models import (
@@ -201,6 +202,7 @@ class ServiceNowClient:
             "sysparm_query": f"email={email}",
             "sysparm_limit": "1",
             "sysparm_display_value": "true",
+            "sysparm_fields": "sys_id,name,email,user_name,location,active",
         }
 
         try:
@@ -250,6 +252,7 @@ class ServiceNowClient:
         params = {
             "sysparm_query": f"assigned_to={user_sys_id}",
             "sysparm_display_value": "true",
+            "sysparm_fields": "sys_id,name,asset_tag,serial_number,model_id,assigned_to,purchase_date,warranty_expiration,install_status,operational_status",
         }
 
         try:
@@ -280,21 +283,25 @@ class ServiceNowClient:
             logger.error(f"Failed to get computers for user sys_id: {e}")
             return {"success": False, "message": f"Failed to get computers: {str(e)}"}
 
-    def get_employee_laptop_info(self, employee_email: str) -> str:
+    def get_employee_laptop_info(self, employee_identifier: str) -> str:
         """
         Orchestrates fetching user and their assigned computer details from ServiceNow.
 
+        Note: This method currently only supports email-based lookups via the ServiceNow API.
+        If an employee ID is provided instead of an email, the lookup will fail.
+
         Args:
-            employee_email: The email address of the employee.
+            employee_identifier: The email address or employee ID of the employee.
+                               Currently only email addresses are supported by ServiceNow API.
 
         Returns:
             Formatted string containing employee and laptop information, or error message.
         """
-        if not employee_email:
-            return "Error: Employee email is required"
+        if not employee_identifier:
+            return "Error: Employee identifier is required"
 
-        # Step 1: Get user data
-        user_result = self.get_user_by_email(employee_email)
+        # Step 1: Get user data (currently only supports email lookup)
+        user_result = self.get_user_by_email(employee_identifier)
         if not user_result["success"]:
             return f"Error: {user_result['message']}"
 
@@ -313,7 +320,7 @@ class ServiceNowClient:
         if not computers_data:
             return f"User {user_data.get('name')} found, but no laptops are assigned to them in ServiceNow."
 
-        # Step 3: Format response for multiple laptops
+        # Step 3: Format response using first laptop only (matching mock data format)
         try:
             # Handle nested objects safely for user data
             location_value = "N/A"
@@ -324,61 +331,73 @@ class ServiceNowClient:
             elif user_data.get("location"):
                 location_value = str(user_data.get("location"))
 
-            # Start building response with user info
-            laptop_info = f"""Employee Name: {user_data.get("name", "N/A")}
-Employee ID: {user_data.get("sys_id", "N/A")}
-Employee Location: {location_value}
-Total Laptops: {len(computers_data)}
+            # Convert location to uppercase
+            if location_value and location_value != "N/A":
+                location_value = location_value.upper()
 
-"""
+            # Get first laptop only
+            computer_data = computers_data[0]
 
-            # Add information for each laptop
-            for i, computer_data in enumerate(computers_data, 1):
-                # Handle nested objects safely for each computer
-                model_value = "N/A"
-                if isinstance(computer_data.get("model_id"), dict):
-                    model_value = computer_data.get("model_id", {}).get(
-                        "display_value", "N/A"
-                    )
-                elif computer_data.get("model_id"):
-                    model_value = str(computer_data.get("model_id"))
+            # Handle nested objects safely for laptop model
+            model_value = "N/A"
+            if isinstance(computer_data.get("model_id"), dict):
+                model_value = computer_data.get("model_id", {}).get(
+                    "display_value", "N/A"
+                )
+            elif computer_data.get("model_id"):
+                model_value = str(computer_data.get("model_id"))
 
-                # Calculate warranty status for this laptop
-                warranty_expiry = computer_data.get("warranty_expiration", "N/A")
-                warranty_status = "Unknown"
-                if warranty_expiry and warranty_expiry != "N/A":
+            # Get purchase date and normalize format to YYYY-MM-DD
+            purchase_date = computer_data.get(
+                "purchase_date", computer_data.get("assigned", "N/A")
+            )
+            normalized_purchase_date = purchase_date
+            if purchase_date and purchase_date != "N/A":
+                # Try to normalize date format
+                for date_format in ["%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"]:
                     try:
-                        # Try multiple date formats
-                        for date_format in ["%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"]:
-                            try:
-                                expiry_date = datetime.strptime(
-                                    warranty_expiry, date_format
-                                )
-                                current_date = datetime.now()
-                                warranty_status = (
-                                    "Active"
-                                    if expiry_date > current_date
-                                    else "Expired"
-                                )
-                                break
-                            except ValueError:
-                                continue
-                    except Exception as e:
-                        logger.warning(
-                            f"Could not parse warranty expiry date '{warranty_expiry}': {e}"
+                        parsed_date = datetime.strptime(purchase_date, date_format)
+                        normalized_purchase_date = parsed_date.strftime("%Y-%m-%d")
+                        break
+                    except ValueError:
+                        continue
+
+            # Calculate laptop age
+            laptop_age = _calculate_laptop_age(normalized_purchase_date)
+
+            # Get warranty expiry and normalize format to YYYY-MM-DD
+            warranty_expiry = computer_data.get("warranty_expiration", "N/A")
+            normalized_warranty_expiry = warranty_expiry
+            warranty_status = "Unknown"
+
+            if warranty_expiry and warranty_expiry != "N/A":
+                # Try to normalize date format and calculate warranty status
+                for date_format in ["%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"]:
+                    try:
+                        expiry_date = datetime.strptime(warranty_expiry, date_format)
+                        normalized_warranty_expiry = expiry_date.strftime("%Y-%m-%d")
+                        current_date = datetime.now()
+                        warranty_status = (
+                            "Active" if expiry_date > current_date else "Expired"
                         )
-                        warranty_status = "Unknown"
+                        break
+                    except ValueError:
+                        continue
 
-                laptop_info += f"""Laptop {i}:
-  Model: {model_value}
-  Serial Number: {computer_data.get("serial_number", "N/A")}
-  Purchase Date: {computer_data.get("purchase_date", computer_data.get("assigned", "N/A"))}
-  Warranty Expiry: {warranty_expiry}
-  Warranty Status: {warranty_status}
+            # Format output to match mock data format exactly
+            laptop_info = f"""
+    Employee Name: {user_data.get("name", "N/A")}
+    Employee ID: {user_data.get("sys_id", "N/A")}
+    Employee Location: {location_value}
+    Laptop Model: {model_value}
+    Laptop Serial Number: {computer_data.get("serial_number", "N/A")}
+    Laptop Purchase Date: {normalized_purchase_date}
+    Laptop Age: {laptop_age}
+    Laptop Warranty Expiry Date: {normalized_warranty_expiry}
+    Laptop Warranty: {warranty_status}
+    """
 
-"""
-
-            return laptop_info.strip()
+            return laptop_info
 
         except Exception as e:
             logger.error(f"Error formatting laptop info: {e}")

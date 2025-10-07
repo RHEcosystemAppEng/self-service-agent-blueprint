@@ -48,6 +48,22 @@ spec:
             - name: http
               containerPort: {{ $server.servicePort | default 8000 }}
               protocol: TCP
+          env:
+            {{- if $server.envFromSecret }}
+            {{- range $envName, $secretKeyRef := $server.envFromSecret }}
+            - name: {{ $envName }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretKeyRef.name }}
+                  key: {{ $secretKeyRef.key }}
+            {{- end }}
+            {{- end }}
+            {{- with $server.env }}
+            {{- range $envKey, $envValue := . }}
+            - name: {{ $envKey }}
+              value: {{ $envValue | quote }}
+            {{- end }}
+            {{- end }}
           {{- with $server.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
