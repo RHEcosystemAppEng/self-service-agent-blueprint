@@ -85,6 +85,7 @@ jobs:
           LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL }}
 
       - name: Run responses evaluations (Request Manager)
+        if: always()
         shell: bash
         run: |
           make test-short-resp-integration-request-mgr
