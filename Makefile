@@ -774,13 +774,19 @@ define helm_install_common
 	@$(eval REQUEST_MANAGEMENT_ARGS := $(helm_request_management_args))
 	@$(eval LOG_LEVEL_ARGS := $(if $(LOG_LEVEL),--set logLevel=$(LOG_LEVEL),))
 
-	@echo "Creating ServiceNow credentials secret..."
-	@if [ -n "$$SERVICENOW_PASSWORD" ] || [ -n "$$SERVICENOW_USERNAME" ] || [ -n "$$SERVICENOW_INSTANCE_URL" ]; then \
-		kubectl create secret generic $(MAIN_CHART_NAME)-servicenow-credentials \
-			--from-literal=servicenow-instance-url="$${SERVICENOW_INSTANCE_URL:-}" \
-			--from-literal=servicenow-username="$${SERVICENOW_USERNAME:-}" \
-			--from-literal=servicenow-password="$${SERVICENOW_PASSWORD:-}" \
-			-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
+	@if [ "$(USE_REAL_SERVICENOW)" = "true" ]; then \
+		echo "Creating ServiceNow credentials secret..."; \
+		if [ -n "$$SERVICENOW_PASSWORD" ] || [ -n "$$SERVICENOW_USERNAME" ] || [ -n "$$SERVICENOW_INSTANCE_URL" ]; then \
+			kubectl create secret generic $(MAIN_CHART_NAME)-servicenow-credentials \
+				--from-literal=servicenow-instance-url="$${SERVICENOW_INSTANCE_URL:-}" \
+				--from-literal=servicenow-username="$${SERVICENOW_USERNAME:-}" \
+				--from-literal=servicenow-password="$${SERVICENOW_PASSWORD:-}" \
+				-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
+		else \
+			echo "⚠️  WARNING: USE_REAL_SERVICENOW=true but ServiceNow credentials not provided"; \
+		fi; \
+	else \
+		echo "Skipping ServiceNow credentials secret (USE_REAL_SERVICENOW=false)"; \
 	fi
 
 	@echo "Cleaning up any existing jobs..."
@@ -803,6 +809,7 @@ define helm_install_common
 		--set mcp-servers.mcp-servers.self-service-agent-snow.imageTag=$(VERSION) \
 		--set-string mcp-servers.mcp-servers.self-service-agent-snow.env.SERVICENOW_AUTH_TYPE="$(SERVICENOW_AUTH_TYPE)" \
 		--set-string mcp-servers.mcp-servers.self-service-agent-snow.env.USE_REAL_SERVICENOW="$(USE_REAL_SERVICENOW)" \
+		$(if $(filter true,$(USE_REAL_SERVICENOW)),--set-json 'mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret={"SERVICENOW_INSTANCE_URL":{"name":"$(MAIN_CHART_NAME)-servicenow-credentials","key":"servicenow-instance-url"},"SERVICENOW_USERNAME":{"name":"$(MAIN_CHART_NAME)-servicenow-credentials","key":"servicenow-username"},"SERVICENOW_PASSWORD":{"name":"$(MAIN_CHART_NAME)-servicenow-credentials","key":"servicenow-password"}}',) \
 		$(REQUEST_MANAGEMENT_ARGS) \
 		$(LOG_LEVEL_ARGS) \
 		$(if $(filter-out "",$(2)),$(2),) \
