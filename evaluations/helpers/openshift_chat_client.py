@@ -177,7 +177,7 @@ class OpenShiftChatClient:
             return response
 
         except Exception as e:
-            logger.error(f"Error sending message: {e}")
+            logger.error(f"Error sending message: {e}, message: {message}")
             return ""
 
     def _read_full_agent_message(self, timeout: int = 30) -> str:
