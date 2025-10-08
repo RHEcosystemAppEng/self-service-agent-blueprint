@@ -809,7 +809,7 @@ define helm_install_common
 		--set mcp-servers.mcp-servers.self-service-agent-snow.imageTag=$(VERSION) \
 		--set-string mcp-servers.mcp-servers.self-service-agent-snow.env.SERVICENOW_AUTH_TYPE="$(SERVICENOW_AUTH_TYPE)" \
 		--set-string mcp-servers.mcp-servers.self-service-agent-snow.env.USE_REAL_SERVICENOW="$(USE_REAL_SERVICENOW)" \
-		$(if $(filter true,$(USE_REAL_SERVICENOW)),--set-json 'mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret={"SERVICENOW_INSTANCE_URL":{"name":"$(MAIN_CHART_NAME)-servicenow-credentials","key":"servicenow-instance-url"},"SERVICENOW_USERNAME":{"name":"$(MAIN_CHART_NAME)-servicenow-credentials","key":"servicenow-username"},"SERVICENOW_PASSWORD":{"name":"$(MAIN_CHART_NAME)-servicenow-credentials","key":"servicenow-password"}}',) \
+		$(if $(filter true,$(USE_REAL_SERVICENOW)),--set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_INSTANCE_URL.name=$(MAIN_CHART_NAME)-servicenow-credentials --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_INSTANCE_URL.key=servicenow-instance-url --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_USERNAME.name=$(MAIN_CHART_NAME)-servicenow-credentials --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_USERNAME.key=servicenow-username --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_PASSWORD.name=$(MAIN_CHART_NAME)-servicenow-credentials --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_PASSWORD.key=servicenow-password,) \
 		$(REQUEST_MANAGEMENT_ARGS) \
 		$(LOG_LEVEL_ARGS) \
 		$(if $(filter-out "",$(2)),$(2),) \
@@ -936,6 +936,8 @@ helm-uninstall:
 
 	@echo "Step 4: Final cleanup of namespace $(NAMESPACE)..."
 	@$(MAKE) helm-cleanup-jobs
+	@echo "Removing ServiceNow credentials secret from $(NAMESPACE)"
+	@kubectl delete secret $(MAIN_CHART_NAME)-servicenow-credentials -n $(NAMESPACE) --ignore-not-found || true
 	@echo "Removing pgvector and init job PVCs from $(NAMESPACE)"
 	@kubectl get pvc -n $(NAMESPACE) -o custom-columns=NAME:.metadata.name | grep -E '^(pg.*-data|self-service-agent-init-status)' | xargs -I {} kubectl delete pvc -n $(NAMESPACE) {} ||:
 	@echo "Deleting remaining pods in namespace $(NAMESPACE)"
