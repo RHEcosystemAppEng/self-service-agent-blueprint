@@ -20,9 +20,11 @@ COPY shared-models/pyproject.toml ./shared-models/
 
 # Copy test directory (needed for root package build)
 COPY test/ ./test
+# Copy tracing-config: this is a UV sub-project
+COPY tracing-config/ ./tracing-config
 
 # Install dependencies
-RUN uv sync --frozen --no-cache
+RUN uv sync --all-packages --frozen --no-cache
 
 # Copy all remaining source code
 COPY agent-service/ ./agent-service
@@ -44,12 +46,13 @@ COPY --from=builder /app/asset-manager /app/asset-manager
 COPY --from=builder /app/shared-clients /app/shared-clients
 COPY --from=builder /app/shared-models /app/shared-models
 COPY --from=builder /app/session-manager /app/session-manager
+COPY --from=builder /app/tracing-config /app/tracing-config
 COPY --from=builder /app/scripts /app/scripts
 COPY --from=builder /app/test /app/test
 
 # Set up environment
 ENV PATH="/app/.venv/bin:$PATH"
-ENV PYTHONPATH="/app/agent-service/src:/app/asset-manager/src:/app/shared-clients/src:/app/shared-models/src:/app/session-manager/src:$PYTHONPATH"
+ENV PYTHONPATH="/app/agent-service/src:/app/asset-manager/src:/app/shared-clients/src:/app/shared-models/src:/app/session-manager/src:/app/tracing-config/src:$PYTHONPATH"
 
 # Drop privileges
 USER 1001
