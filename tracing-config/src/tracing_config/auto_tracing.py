@@ -10,7 +10,7 @@ from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapProp
 
 
 def run():
-    otel_exporter_endpoint = os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"]
+    otel_exporter_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
     if not otel_exporter_endpoint:
         return
 
