@@ -144,7 +144,7 @@ def get_metrics(
             threshold=1.0,
             evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
             evaluation_steps=[
-                "Check that the first three characters of the ticket number for the laptop request are INC"
+                "Check that the first three characters of the ticket number for the laptop request are REQ"
             ],
             **model_kwargs,
         ),

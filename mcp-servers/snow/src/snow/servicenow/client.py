@@ -132,7 +132,8 @@ class ServiceNowClient:
         )
         url = f"{self.config.instance_url}/api/sn_sc/servicecatalog/items/{laptop_refresh_id}/order_now"
 
-        # Prepare request body
+        # Prepare request body with proper structure for order_now endpoint
+        # ServiceNow expects variables as a nested object under "variables" key
         body = {
             "sysparm_quantity": 1,
             "variables": {
@@ -143,15 +144,29 @@ class ServiceNowClient:
 
         # Make the API request
         headers = self.auth_manager.get_headers()
+        headers["Content-Type"] = "application/json"
+        headers["Accept"] = "application/json"
+
+        # Debug logging - log the request being sent
+        logger.info(f"Sending request to: {url}")
+        logger.info(f"Request body: {body}")
 
         try:
             response = requests.post(
                 url, headers=headers, json=body, timeout=self.config.timeout
             )
+
+            # Debug logging - log the response
+            logger.info(f"Response status: {response.status_code}")
+            logger.info(f"Response body: {response.text}")
+
             response.raise_for_status()
 
             # Process the response
             result = response.json()
+
+            # Log the complete response for debugging
+            logger.info(f"Full ServiceNow response: {result}")
 
             return {
                 "success": True,

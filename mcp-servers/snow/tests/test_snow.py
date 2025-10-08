@@ -10,14 +10,14 @@ def test_open_laptop_refresh_ticket_success():
     employee_id = "1001"
     employee_name = "John Doe"
     business_justification = "Current laptop is outdated and affecting productivity"
-    preferred_model = "MacBook Pro"
+    servicenow_laptop_code = "apple_mac_book_pro_14_m_3_pro"
     ctx = Context()
 
     result = open_laptop_refresh_ticket(
         employee_id=employee_id,
         employee_name=employee_name,
         business_justification=business_justification,
-        preferred_model=preferred_model,
+        servicenow_laptop_code=servicenow_laptop_code,
         ctx=ctx,
     )
 
@@ -26,28 +26,28 @@ def test_open_laptop_refresh_ticket_success():
     assert employee_id in result
     assert employee_name in result
     assert business_justification in result
-    assert preferred_model in result
-    assert "INC" in result  # Ticket number format
+    assert servicenow_laptop_code in result
+    assert "REQ" in result  # Ticket number format
 
 
 def test_open_laptop_refresh_ticket_required_model():
-    """Test ticket creation with required preferred model."""
+    """Test ticket creation with required ServiceNow laptop code."""
     employee_id = "1002"
     employee_name = "Jane Smith"
     business_justification = "Hardware failure requiring replacement"
-    preferred_model = "Dell Latitude 5520"
+    servicenow_laptop_code = "lenovo_think_pad_t_14_gen_5_intel"
     ctx = Context()
 
     result = open_laptop_refresh_ticket(
         employee_id=employee_id,
         employee_name=employee_name,
         business_justification=business_justification,
-        preferred_model=preferred_model,
+        servicenow_laptop_code=servicenow_laptop_code,
         ctx=ctx,
     )
 
     # Check that result contains the specified model
-    assert preferred_model in result
+    assert servicenow_laptop_code in result
 
 
 def test_open_laptop_refresh_ticket_empty_employee_id():
@@ -58,7 +58,7 @@ def test_open_laptop_refresh_ticket_empty_employee_id():
             employee_id="",
             employee_name="John Doe",
             business_justification="Need new laptop",
-            preferred_model="MacBook Pro",
+            servicenow_laptop_code="apple_mac_book_air_m_3",
             ctx=ctx,
         )
 
@@ -71,7 +71,7 @@ def test_open_laptop_refresh_ticket_empty_employee_name():
             employee_id="1001",
             employee_name="",
             business_justification="Need new laptop",
-            preferred_model="MacBook Pro",
+            servicenow_laptop_code="apple_mac_book_air_m_3",
             ctx=ctx,
         )
 
@@ -84,19 +84,19 @@ def test_open_laptop_refresh_ticket_empty_justification():
             employee_id="1001",
             employee_name="John Doe",
             business_justification="",
-            preferred_model="MacBook Pro",
+            servicenow_laptop_code="apple_mac_book_air_m_3",
             ctx=ctx,
         )
 
 
-def test_open_laptop_refresh_ticket_empty_preferred_model():
-    """Test error handling for empty preferred model."""
+def test_open_laptop_refresh_ticket_empty_servicenow_code():
+    """Test error handling for empty ServiceNow laptop code."""
     ctx = Context()
-    with pytest.raises(ValueError, match="Preferred model cannot be empty"):
+    with pytest.raises(ValueError, match="ServiceNow laptop code cannot be empty"):
         open_laptop_refresh_ticket(
             employee_id="1001",
             employee_name="John Doe",
             business_justification="Need new laptop",
-            preferred_model="",
+            servicenow_laptop_code="",
             ctx=ctx,
         )

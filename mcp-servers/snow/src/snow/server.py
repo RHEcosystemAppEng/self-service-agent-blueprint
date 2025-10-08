@@ -37,8 +37,22 @@ def _create_real_servicenow_ticket(employee_id: str, preferred_model: str) -> st
     """Create a real ServiceNow ticket using the API."""
     try:
         client = ServiceNowClient()
+
+        # Look up user sys_id if employee_id looks like an email
+        user_sys_id = employee_id
+        if "@" in employee_id:
+            logging.info(f"Looking up sys_id for email: {employee_id}")
+            user_result = client.get_user_by_email(employee_id)
+            if user_result.get("success") and user_result.get("user"):
+                user_sys_id = user_result["user"].get("sys_id", employee_id)
+                logging.info(f"Found sys_id: {user_sys_id}")
+            else:
+                logging.warning(
+                    f"Could not find user for email {employee_id}, using as-is"
+                )
+
         params = OpenServiceNowLaptopRefreshRequestParams(
-            who_is_this_request_for=employee_id,
+            who_is_this_request_for=user_sys_id,
             laptop_choices=preferred_model,
         )
 
@@ -201,8 +215,8 @@ def open_laptop_refresh_ticket(
     employee_id: str,
     employee_name: str,
     business_justification: str,
+    servicenow_laptop_code: str,
     ctx: Context,
-    preferred_model: str = None,
 ) -> str:
     """Open a ServiceNow laptop refresh ticket for an employee.
 
@@ -210,7 +224,12 @@ def open_laptop_refresh_ticket(
         employee_id: The unique identifier for the employee (e.g., '1001')
         employee_name: The full name of the employee
         business_justification: Business reason for the laptop refresh request
-        preferred_model: Preferred laptop model
+        servicenow_laptop_code: ServiceNow laptop choice code from the catalog item.
+                               Examples: 'apple_mac_book_air_m_3', 'lenovo_think_pad_p_16_gen_2',
+                               'lenovo_think_pad_t_14_s_gen_5_amd'
+                               IMPORTANT: This must be the exact ServiceNow Code from the knowledge base,
+                               NOT the human-readable model name.
+        ctx: Request context
 
     Returns:
         A formatted string containing the ticket details
@@ -224,32 +243,39 @@ def open_laptop_refresh_ticket(
     if not business_justification:
         raise ValueError("Business justification cannot be empty")
 
-    if not preferred_model:
-        raise ValueError("Preferred model cannot be empty")
+    if not servicenow_laptop_code:
+        raise ValueError(
+            "ServiceNow laptop code cannot be empty. Must be a valid ServiceNow laptop choice code like 'apple_mac_book_air_m_3'."
+        )
 
     # Extract authoritative user ID from request headers - CENTRALIZED HANDLING
     authoritative_user_id = _extract_authoritative_user_id(ctx)
+
+    # Use authoritative_user_id if available, otherwise fall back to employee_id
+    user_identifier = authoritative_user_id if authoritative_user_id else employee_id
 
     # Try real ServiceNow first if configured, otherwise use mock
     if _should_use_real_servicenow():
         try:
             logging.info(
-                f"Using real ServiceNow API - authoritative_user_id: {authoritative_user_id}, employee_id: {employee_id}"
+                f"Using real ServiceNow API - authoritative_user_id: {authoritative_user_id}, employee_id: {employee_id}, using: {user_identifier}, laptop_code: {servicenow_laptop_code}"
             )
-            return _create_real_servicenow_ticket(employee_id, preferred_model)
+            return _create_real_servicenow_ticket(
+                user_identifier, servicenow_laptop_code
+            )
         except Exception as e:
             logging.warning(f"ServiceNow API failed, falling back to mock: {e}")
             # Fall through to mock implementation
 
     # Use mock implementation
     logging.info(
-        f"Using mock ServiceNow implementation - authoritative_user_id: {authoritative_user_id}, employee_id: {employee_id}"
+        f"Using mock ServiceNow implementation - authoritative_user_id: {authoritative_user_id}, employee_id: {employee_id}, using: {user_identifier}, laptop_code: {servicenow_laptop_code}"
     )
     return _create_mock_ticket(
-        employee_id,
+        user_identifier,
         employee_name,
         business_justification,
-        preferred_model,
+        servicenow_laptop_code,
         authoritative_user_id,
     )
 

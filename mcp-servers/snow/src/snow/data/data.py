@@ -47,9 +47,10 @@ MOCK_TICKET_DATA = {}
 
 def generate_ticket_number():
     """Generate a mock ServiceNow ticket number."""
-    import uuid
+    import random
 
-    return f"INC{str(uuid.uuid4().hex[:8]).upper()}"
+    # Generate 7-digit number to match ServiceNow format (e.g., REQ0010037)
+    return f"REQ{random.randint(1000000, 9999999):07d}"
 
 
 def create_laptop_refresh_ticket(

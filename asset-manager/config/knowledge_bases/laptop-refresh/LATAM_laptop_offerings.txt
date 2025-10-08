@@ -4,6 +4,7 @@ Corporate Laptop Offering List
 
 Manufacturer: Apple
 Model: MacBook Air M2
+ServiceNow Code: apple_mac_book_air_m_2
 Target User: General Office
 Cost: \$1,250 USD
 Operating System: macOS
@@ -19,6 +20,7 @@ Dimensions: 11.97 x 8.46 x 0.44 inches
 
 Manufacturer: Apple
 Model: MacBook Pro 14 M3
+ServiceNow Code: apple_mac_book_pro_14_m_3
 Target User: Developers
 Cost: \$1,999 USD
 Operating System: macOS
@@ -34,6 +36,7 @@ Dimensions: 12.31 x 8.71 x 0.61 inches
 
 Manufacturer: Lenovo
 Model: ThinkPad T14 Gen 4 Intel
+ServiceNow Code: lenovo_think_pad_t_14_gen_4_intel
 Target User: General Office
 Cost: \$1,399 USD
 Operating System: Windows 11 Pro
@@ -49,6 +52,7 @@ Dimensions: 12.5 x 8.8 x 0.7 inches
 
 Manufacturer: Lenovo
 Model: ThinkPad P16s Gen 2
+ServiceNow Code: lenovo_think_pad_p_16_s_gen_2
 Target User: Engineers
 Cost: \$2,100 USD
 Operating System: Red Hat Linux
