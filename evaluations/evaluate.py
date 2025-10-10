@@ -536,7 +536,9 @@ def _parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def run_check_known_bad_conversations(timeout: int = 600) -> int:
+def run_check_known_bad_conversations(
+    timeout: int = 600, no_employee_id: bool = False
+) -> int:
     """
     Check known bad conversations by running deepeval on them.
 
@@ -546,6 +548,7 @@ def run_check_known_bad_conversations(timeout: int = 600) -> int:
 
     Args:
         timeout: Timeout in seconds for deepeval execution
+        no_employee_id: Exclude employee ID-related checks in evaluation metrics
 
     Returns:
         Exit code (0 if all known bad conversations failed as expected, 1 otherwise)
@@ -575,6 +578,8 @@ def run_check_known_bad_conversations(timeout: int = 600) -> int:
     # Run deepeval on the known bad conversations
     logger.info("📊 Running deepeval on known bad conversations...")
     deep_eval_args = ["--results-dir", "results/known_bad_conversation_results"]
+    if no_employee_id:
+        deep_eval_args.append("--no-employee-id")
     # For the check option, we want to run deep_eval and analyze the results
     # even if it returns a non-zero exit code (which indicates it found issues)
     run_script("deep_eval.py", args=deep_eval_args, timeout=timeout)
@@ -944,7 +949,9 @@ def main() -> int:
             return 0
 
         if args.check:
-            return run_check_known_bad_conversations(timeout=args.timeout)
+            return run_check_known_bad_conversations(
+                timeout=args.timeout, no_employee_id=args.no_employee_id
+            )
         else:
             return run_evaluation_pipeline(
                 num_conversations=args.num_conversations,

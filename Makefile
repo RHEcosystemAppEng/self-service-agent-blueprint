@@ -748,6 +748,12 @@ test-short-resp-integration-request-mgr:
 	uv --directory evaluations run evaluate.py -n 1 --no-employee-id --test-script chat-responses-request-mgr.py --reset-conversation
 	@echo "short responses integrations tests with Request Manager completed successfully!"
 
+.PHONY: test-long-resp-integration-request-mgr
+test-long-resp-integration-request-mgr:
+	@echo "Running long responses integration test with Request Manager..."
+	uv --directory evaluations run evaluate.py -n 20 --no-employee-id --test-script chat-responses-request-mgr.py --reset-conversation --timeout=1800
+	@echo "long responses integrations tests with Request Manager completed successfully!"
+
 # Create namespace and deploy
 namespace:
 	@kubectl create namespace $(NAMESPACE) &> /dev/null && kubectl label namespace $(NAMESPACE) modelmesh-enabled=false ||:
