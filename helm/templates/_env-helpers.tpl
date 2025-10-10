@@ -32,6 +32,19 @@ Generate database environment variables from pgvector secret
     secretKeyRef:
       name: pgvector
       key: password
+{{/* Database Performance Configuration */}}
+- name: DB_POOL_SIZE
+  value: {{ if hasKey .Values.requestManagement "database" }}{{ .Values.requestManagement.database.poolSize | default "10" | quote }}{{ else }}"10"{{ end }}
+- name: DB_MAX_OVERFLOW
+  value: {{ if hasKey .Values.requestManagement "database" }}{{ .Values.requestManagement.database.maxOverflow | default "20" | quote }}{{ else }}"20"{{ end }}
+- name: DB_POOL_TIMEOUT
+  value: {{ if hasKey .Values.requestManagement "database" }}{{ .Values.requestManagement.database.poolTimeout | default "30" | quote }}{{ else }}"30"{{ end }}
+- name: DB_POOL_RECYCLE
+  value: {{ if hasKey .Values.requestManagement "database" }}{{ .Values.requestManagement.database.poolRecycle | default "3600" | quote }}{{ else }}"3600"{{ end }}
+- name: DB_STATEMENT_TIMEOUT
+  value: {{ if hasKey .Values.requestManagement "database" }}{{ .Values.requestManagement.database.statementTimeout | default "30000" | quote }}{{ else }}"30000"{{ end }}
+- name: DB_IDLE_TRANSACTION_TIMEOUT
+  value: {{ if hasKey .Values.requestManagement "database" }}{{ .Values.requestManagement.database.idleTransactionTimeout | default "300000" | quote }}{{ else }}"300000"{{ end }}
 {{- end }}
 
 {{/*

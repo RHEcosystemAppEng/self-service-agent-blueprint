@@ -291,11 +291,22 @@ async def get_current_user(
     return None
 
 
-@app.get("/health", response_model=HealthCheck)
-async def health_check(
+@app.get("/health")
+async def health_check() -> Dict[str, Any]:
+    """Health check endpoint - lightweight without database dependency."""
+    return {
+        "status": "healthy",
+        "service": "request-manager",
+        "version": __version__,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/health/detailed", response_model=HealthCheck)
+async def detailed_health_check(
     db: AsyncSession = Depends(get_db_session_dependency),
 ) -> HealthCheck:
-    """Health check endpoint."""
+    """Detailed health check with database dependency for monitoring."""
     result = await create_health_check_endpoint(
         service_name="request-manager",
         version=__version__,

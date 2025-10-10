@@ -1238,10 +1238,21 @@ app = FastAPI(
 
 
 @app.get("/health")
-async def health_check(
+async def health_check() -> Dict[str, Any]:
+    """Health check endpoint - lightweight without database dependency."""
+    return {
+        "status": "healthy",
+        "service": "agent-service",
+        "version": __version__,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/health/detailed")
+async def detailed_health_check(
     db: AsyncSession = Depends(get_db_session_dependency),
 ) -> Dict[str, Any]:
-    """Health check endpoint."""
+    """Detailed health check with database dependency for monitoring."""
     return await simple_health_check(
         service_name="agent-service",
         version=__version__,

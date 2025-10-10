@@ -139,6 +139,10 @@ async def create_shared_lifespan(
         if not migration_ready:
             raise Exception("Database migration did not complete within timeout")
         logger.info("Database migration verified and ready")
+
+        # Log database configuration and test connection
+        await db_manager.log_database_config()
+
     except Exception as e:
         logger.error("Failed to verify database migration", error=str(e))
         raise

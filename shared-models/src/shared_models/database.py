@@ -8,7 +8,6 @@ import structlog
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.pool import NullPool
 
 logger = structlog.get_logger()
 
@@ -82,11 +81,23 @@ class DatabaseManager:
     def __init__(self):
         self.config = DatabaseConfig()
 
-        # Create async engine
+        # Create async engine with connection pooling for better performance
         self.engine = create_async_engine(
             self.config.connection_string,
-            poolclass=NullPool,  # Use NullPool for serverless/Knative
             echo=self.config.echo_sql,
+            pool_pre_ping=True,  # Verify connections before use
+            pool_recycle=self.config.pool_recycle,  # Recycle connections periodically
+            pool_size=self.config.pool_size,
+            max_overflow=self.config.max_overflow,
+            pool_timeout=self.config.pool_timeout,
+            connect_args={
+                "command_timeout": 30,  # Connection timeout
+                "server_settings": {
+                    "application_name": "self-service-agent",
+                    "statement_timeout": "30000",  # 30 second statement timeout
+                    "idle_in_transaction_session_timeout": "300000",  # 5 minute idle timeout
+                },
+            },
         )
 
         # Create session maker
@@ -96,12 +107,41 @@ class DatabaseManager:
             expire_on_commit=False,
         )
 
-        logger.info(
-            "Database manager initialized",
-            host=self.config.host,
-            database=self.config.database,
-            user=self.config.user,
-        )
+    async def log_database_config(self) -> None:
+        """Log database configuration and test connection at startup."""
+        try:
+            # Get the actual pool class being used
+            pool_class = self.engine.pool.__class__.__name__
+
+            # Test the connection
+            async with self.engine.begin() as conn:
+                result = await conn.execute(text("SELECT 1 as test"))
+                test_value = result.scalar()
+
+            logger.info(
+                "Database configuration initialized successfully",
+                pool_class=pool_class,
+                pool_size=self.config.pool_size,
+                max_overflow=self.config.max_overflow,
+                pool_timeout=self.config.pool_timeout,
+                pool_recycle=self.config.pool_recycle,
+                connection_test=test_value,
+                host=self.config.host,
+                database=self.config.database,
+                application_name="self-service-agent",
+            )
+
+        except Exception as e:
+            logger.error(
+                "Failed to initialize database connection",
+                error=str(e),
+                pool_class=pool_class if "pool_class" in locals() else "unknown",
+                pool_size=self.config.pool_size,
+                max_overflow=self.config.max_overflow,
+                host=self.config.host,
+                database=self.config.database,
+            )
+            raise
 
     async def close(self) -> None:
         """Close database connections."""

@@ -89,3 +89,15 @@ requestManagement:
 
 # # Production logging
 # logLevel: "INFO"  # Use INFO level for production (not DEBUG)
+
+  # Database Performance Configuration for Production
+  database:
+    # Connection pool settings optimized for production workloads
+    poolSize: 20              # Larger pool for production concurrency
+    maxOverflow: 30           # More overflow connections for peak loads
+    poolTimeout: 30           # Standard timeout
+    poolRecycle: 3600         # 1 hour connection recycling
+    # Statement timeout (60 seconds for production)
+    statementTimeout: 60000
+    # Idle transaction timeout (10 minutes for production)
+    idleTransactionTimeout: 600000

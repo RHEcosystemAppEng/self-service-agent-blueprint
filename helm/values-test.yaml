@@ -66,3 +66,15 @@ requestManagement:
         periodSeconds: 3            # Moderate frequency
         timeoutSeconds: 10          # Moderate timeout for LLM on test nodes
         failureThreshold: 25        # 1.25 minutes total startup time
+
+  # Database Performance Configuration for concurrent requests
+  database:
+    # Connection pool settings optimized for concurrent requests
+    poolSize: 10
+    maxOverflow: 20
+    poolTimeout: 30
+    poolRecycle: 3600
+    # Statement timeout (30 seconds)
+    statementTimeout: 30000
+    # Idle transaction timeout (5 minutes)
+    idleTransactionTimeout: 300000

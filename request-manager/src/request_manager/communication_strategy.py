@@ -322,7 +322,12 @@ class EventingStrategy(CommunicationStrategy):
                 "Timeout waiting for response event",
                 request_id=request_id,
                 timeout=timeout,
+                registry_size=len(_response_futures_registry),
+                active_requests=list(_response_futures_registry.keys()),
             )
+            # Clean up the future on timeout
+            if request_id in _response_futures_registry:
+                del _response_futures_registry[request_id]
             raise Exception(f"Timeout waiting for response after {timeout} seconds")
         finally:
             # Clean up the future only if it wasn't resolved
