@@ -41,7 +41,7 @@ spec:
       {{- end }}
       initContainers:
         - name: wait-for-init-job
-          image: quay.io/openshift/origin-cli:latest
+          image: {{ include "self-service-agent.ocCliImage" . }}
           command:
             - /bin/bash
             - -c

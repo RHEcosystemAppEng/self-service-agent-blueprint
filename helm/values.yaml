@@ -21,6 +21,15 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: "0.0.2"
 
+arch: linux/amd64
+
+# OC CLI Image Configuration (used for init containers)
+ocCli:
+  # Default OC CLI image for amd64
+  defaultImage: "quay.io/openshift/origin-cli:latest"
+  # ARM64 specific OC CLI image 
+  arm64Image: "quay.io/fercoli/oc-cli-aarch64:4.19.9"
+
 # Test Integration Configuration
 testIntegrationEnabled: false
 

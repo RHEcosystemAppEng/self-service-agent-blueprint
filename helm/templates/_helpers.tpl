@@ -6,6 +6,17 @@ Expand the name of the chart.
 {{- end }}
 
 {{/*
+Get OC CLI image based on architecture
+*/}}
+{{- define "self-service-agent.ocCliImage" -}}
+{{- if eq .Values.arch "linux/arm64" -}}
+{{- .Values.ocCli.arm64Image }}
+{{- else -}}
+{{- .Values.ocCli.defaultImage }}
+{{- end -}}
+{{- end }}
+
+{{/*
 Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
