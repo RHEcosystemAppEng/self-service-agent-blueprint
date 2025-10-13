@@ -208,3 +208,6 @@ helm/charts/*
 helm/tmpcharts*
 evaluations/.deepeval/*
 evaluations/results/deep_eval_results/*.json
+
+# Os specific files
+.DS_Store
