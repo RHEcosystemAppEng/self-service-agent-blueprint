@@ -520,8 +520,8 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--test-script",
         type=str,
-        default="chat.py",
-        help="Name of the test script to execute (default: chat.py)",
+        default="chat-responses-request-mgr.py",
+        help="Name of the test script to execute (default: chat-responses-request-mgr.py)",
     )
     parser.add_argument(
         "--no-employee-id",
@@ -810,7 +810,7 @@ def run_evaluation_pipeline(
     num_conversations: int = 20,
     timeout: int = 600,
     max_turns: int = 20,
-    test_script: str = "chat.py",
+    test_script: str = "chat-responses-request-mgr.py",
     no_employee_id: bool = False,
     reset_conversation: bool = False,
 ) -> int:

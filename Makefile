@@ -174,9 +174,7 @@ help:
 	@echo "  test-mcp-snow                       - Run tests for snow MCP server"
 	@echo "  test-request-manager                - Run tests for request manager"
 	@echo "  test-shared-models                  - Run tests for shared models"
-	@echo "  test-short-integration              - Run short integration tests"
 	@echo "  test-short-integration-request-mgr  - Run short integration tests with Request Manager"
-	@echo "  test-short-resp-integration		 - Run short responses integration tests (no employee ID)"
 	@echo "  test-short-resp-integration-request-mgr - Run short responses integration tests with Request Manager (no employee ID)"
 	@echo ""
 	@echo "Utility Commands:"
@@ -723,18 +721,6 @@ sync-evaluations:
 	@echo "Syncing evaluations libraries"
 	uv --directory evaluations sync
 	@echo "Syncing evaluations libraries completed successfully!"
-
-.PHONY: test-short-integration
-test-short-integration:
-	@echo "Running short integration test..."
-	uv --directory evaluations run evaluate.py -n 1
-	@echo "short integrations tests completed successfully!"
-
-.PHONY: test-short-resp-integration
-test-short-resp-integration:
-	@echo "Running short responses integration test..."
-	uv --directory evaluations run evaluate.py -n 1 --no-employee-id --test-script chat-responses.py
-	@echo "short responses integrations tests completed successfully!"
 
 .PHONY: test-short-integration-request-mgr
 test-short-integration-request-mgr:

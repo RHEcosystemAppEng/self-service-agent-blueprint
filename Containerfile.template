@@ -31,7 +31,6 @@ COPY agent-service/ ./agent-service
 COPY asset-manager/ ./asset-manager
 COPY shared-clients/ ./shared-clients
 COPY shared-models/ ./shared-models
-COPY session-manager/ ./session-manager
 COPY scripts/ ./scripts
 
 # ---------- Production Stage ----------
@@ -45,14 +44,13 @@ COPY --from=builder /app/agent-service /app/agent-service
 COPY --from=builder /app/asset-manager /app/asset-manager
 COPY --from=builder /app/shared-clients /app/shared-clients
 COPY --from=builder /app/shared-models /app/shared-models
-COPY --from=builder /app/session-manager /app/session-manager
 COPY --from=builder /app/tracing-config /app/tracing-config
 COPY --from=builder /app/scripts /app/scripts
 COPY --from=builder /app/test /app/test
 
 # Set up environment
 ENV PATH="/app/.venv/bin:$PATH"
-ENV PYTHONPATH="/app/agent-service/src:/app/asset-manager/src:/app/shared-clients/src:/app/shared-models/src:/app/session-manager/src:/app/tracing-config/src:$PYTHONPATH"
+ENV PYTHONPATH="/app/agent-service/src:/app/asset-manager/src:/app/shared-clients/src:/app/shared-models/src:/app/tracing-config/src:$PYTHONPATH"
 
 # Drop privileges
 USER 1001

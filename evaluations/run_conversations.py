@@ -13,8 +13,8 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--test-script",
         type=str,
-        default="chat.py",
-        help="Name of the test script to execute (default: chat.py)",
+        default="chat-responses-request-mgr.py",
+        help="Name of the test script to execute (default: chat-responses-request-mgr.py)",
     )
     parser.add_argument(
         "--no-employee-id",

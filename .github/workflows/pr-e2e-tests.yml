@@ -57,29 +57,11 @@ jobs:
         run: |
           make sync-evaluations
 
-      - name: Run evaluations
-        if: always()
-        shell: bash
-        run: |
-          make test-short-integration
-        env:
-          LLM_URL: ${{ vars.LLM_URL_EVAL }}
-          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL }}
-
       - name: Run evaluations (Request Manager)
         if: always()
         shell: bash
         run: |
           make test-short-integration-request-mgr
-        env:
-          LLM_URL: ${{ vars.LLM_URL_EVAL }}
-          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL }}
-
-      - name: Run responses evaluations
-        if: always()
-        shell: bash
-        run: |
-          make test-short-resp-integration
         env:
           LLM_URL: ${{ vars.LLM_URL_EVAL }}
           LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL }}

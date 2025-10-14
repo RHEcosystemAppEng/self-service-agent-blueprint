@@ -16,13 +16,15 @@ class ConversationFlowTester:
     """Test runner for conversation flows"""
 
     def __init__(
-        self, test_script: str = "chat.py", reset_conversation: bool = False
+        self,
+        test_script: str = "chat-responses-request-mgr.py",
+        reset_conversation: bool = False,
     ) -> None:
         """
         Initialize the ConversationFlowTester.
 
         Args:
-            test_script: Name of the test script to execute (default: "chat.py")
+            test_script: Name of the test script to execute (default: "chat-responses-request-mgr.py")
             reset_conversation: If True, send 'reset' message at the start of each conversation
         """
         self.test_script = test_script

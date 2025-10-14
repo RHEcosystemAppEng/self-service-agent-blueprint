@@ -18,7 +18,7 @@ class OpenShiftChatClient:
         self,
         authoritative_user_id: str,
         deployment_name: str = "deploy/self-service-agent",
-        test_script: str = "chat.py",
+        test_script: str = "chat-responses-request-mgr.py",
         reset_conversation: bool = False,
     ):
         """
@@ -27,7 +27,7 @@ class OpenShiftChatClient:
         Args:
             authoritative_user_id: Required user ID to set as AUTHORITATIVE_USER_ID environment variable
             deployment_name: Name of the OpenShift deployment to connect to
-            test_script: Name of the test script to execute (default: "chat.py")
+            test_script: Name of the test script to execute (default: "chat-responses-request-mgr.py")
             reset_conversation: If True, send "reset" message after initialization
         """
         self.deployment_name = deployment_name
@@ -51,7 +51,7 @@ class OpenShiftChatClient:
         """
         Start an interactive session with the chat client.
 
-        Creates a subprocess that executes the chat.py script inside the
+        Creates a subprocess that executes the chat script inside the
         OpenShift pod via 'oc exec'. Sets up stdin/stdout pipes for
         communication and marks the session as active.
 

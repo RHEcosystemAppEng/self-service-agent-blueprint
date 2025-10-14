@@ -296,7 +296,7 @@ class CLIChatClient(RequestManagerClient):
             print(agent_response)
 
     def _format_token_summary(self, token_summary_line: str) -> None:
-        """Format and print token summary like test/chat.py."""
+        """Format and print token summary."""
         # Parse the token summary to create formatted output
         # Format: TOKEN_SUMMARY:INPUT:1100:OUTPUT:590:TOTAL:1690:CALLS:6:MAX_SINGLE_INPUT:236:MAX_SINGLE_OUTPUT:184:MAX_SINGLE_TOTAL:348
         parts = token_summary_line.split(":")
@@ -309,7 +309,7 @@ class CLIChatClient(RequestManagerClient):
             max_output = int(parts[12])
             max_total = int(parts[14])
 
-            # Print the formatted summary like test/chat.py
+            # Print the formatted summary
             print(
                 f"CURRENT_TOKEN_SUMMARY:INPUT:{input_tokens}:OUTPUT:{output_tokens}:TOTAL:{total_tokens}:CALLS:{calls}:MAX_SINGLE_INPUT:{max_input}:MAX_SINGLE_OUTPUT:{max_output}:MAX_SINGLE_TOTAL:{max_total}"
             )
