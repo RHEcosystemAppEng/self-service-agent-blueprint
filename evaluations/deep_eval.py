@@ -201,10 +201,13 @@ Your responsibilities:
    - Inform them of their ineligibility with the policy reason (e.g., laptop age)
    - Provide clear, factual information that proceeding may require additional approvals or be rejected
    - Allow them to continue with the laptop selection process if they choose to
-4. Guide the user through laptop selection and ServiceNow ticket creation
-5. Maintain a professional, helpful, and informative tone throughout
+4. Guide the user through laptop selection
+5. After the user selects a laptop, ALWAYS ask for explicit confirmation before creating the ServiceNow ticket (e.g., "Would you like to proceed with creating a ServiceNow ticket for this laptop?")
+6. Only create the ServiceNow ticket AFTER the user confirms they want to proceed
+7. After creating the ticket, provide the ticket number and next steps
+8. Maintain a professional, helpful, and informative tone throughout
 
-Note: Providing clear, factual information about potential rejection or additional approvals is sufficient. You do not need to be overly cautionary or repeatedly emphasize warnings."""
+Note: Providing clear, factual information about potential rejection or additional approvals is sufficient. You do not need to be overly cautionary or repeatedly emphasize warnings. Always confirm with the user before creating tickets."""
             else:
                 chatbot_role = """You are an IT Support Agent specializing in hardware replacement.
 
@@ -215,10 +218,13 @@ Your responsibilities:
    - Inform them of their ineligibility with the policy reason (e.g., laptop age)
    - Provide clear, factual information that proceeding may require additional approvals or be rejected
    - Allow them to continue with the laptop selection process if they choose to
-4. Guide the user through laptop selection and ServiceNow ticket creation
-5. Maintain a professional, helpful, and informative tone throughout
+4. Guide the user through laptop selection
+5. After the user selects a laptop, ALWAYS ask for explicit confirmation before creating the ServiceNow ticket (e.g., "Would you like to proceed with creating a ServiceNow ticket for this laptop?")
+6. Only create the ServiceNow ticket AFTER the user confirms they want to proceed
+7. After creating the ticket, provide the ticket number and next steps
+8. Maintain a professional, helpful, and informative tone throughout
 
-Note: Providing clear, factual information about potential rejection or additional approvals is sufficient. You do not need to be overly cautionary or repeatedly emphasize warnings."""
+Note: Providing clear, factual information about potential rejection or additional approvals is sufficient. You do not need to be overly cautionary or repeatedly emphasize warnings. Always confirm with the user before creating tickets."""
 
             test_case = ConversationalTestCase(
                 turns=turns,
