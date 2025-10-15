@@ -195,26 +195,29 @@ def get_metrics(
             ],
             **model_kwargs,
         ),
-        ConversationalGEval(
-            name="Confirmation Before Ticket Creation",
-            threshold=1.0,
-            evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
-            evaluation_steps=[
-                "Identify where in the conversation the user selects a laptop (e.g., selecting option '3', saying 'I'll go with the MacBook', etc.).",
-                "Identify where in the conversation a ServiceNow ticket is created (look for ticket numbers like 'REQ' followed by numbers, or statements like 'A ServiceNow ticket has been created').",
-                "Between the laptop selection and ticket creation, verify that:",
-                "  a) The agent explicitly asks the user for confirmation to proceed with ticket creation (e.g., 'Would you like to proceed with creating a ServiceNow ticket?', 'Shall I create the ticket?', 'Would you like me to submit this request?', etc.)",
-                "  b) The user has an opportunity to respond with their confirmation (e.g., 'proceed', 'yes', 'go ahead', etc.)",
-                "  c) The ticket creation happens AFTER the user confirms, not before",
-                "If the ticket is created immediately after laptop selection without the agent first asking for confirmation and waiting for user response, this evaluation FAILS.",
-                "Note: The confirmation question must come from the agent BEFORE the ticket is created. If the agent creates the ticket and then asks 'Is there anything else I can help you with?', this does NOT count as confirmation - the ticket was already created.",
-            ],
-            **model_kwargs,
-        ),
     ]
 
-    # Add employee ID-specific metric only if not excluded
-    if not no_employee_id:
+    # Add flow-specific metrics based on employee ID availability
+    if no_employee_id:
+        metrics.append(
+            ConversationalGEval(
+                name="Confirmation Before Ticket Creation",
+                threshold=1.0,
+                evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
+                evaluation_steps=[
+                    "Identify where in the conversation the user selects a laptop (e.g., selecting option '3', saying 'I'll go with the MacBook', etc.).",
+                    "Identify where in the conversation a ServiceNow ticket is created (look for ticket numbers like 'REQ' followed by numbers, or statements like 'A ServiceNow ticket has been created').",
+                    "Between the laptop selection and ticket creation, verify that:",
+                    "  a) The agent explicitly asks the user for confirmation to proceed with ticket creation (e.g., 'Would you like to proceed with creating a ServiceNow ticket?', 'Shall I create the ticket?', 'Would you like me to submit this request?', etc.)",
+                    "  b) The user has an opportunity to respond with their confirmation (e.g., 'proceed', 'yes', 'go ahead', etc.)",
+                    "  c) The ticket creation happens AFTER the user confirms, not before",
+                    "If the ticket is created immediately after laptop selection without the agent first asking for confirmation and waiting for user response, this evaluation FAILS.",
+                    "Note: The confirmation question must come from the agent BEFORE the ticket is created. If the agent creates the ticket and then asks 'Is there anything else I can help you with?', this does NOT count as confirmation - the ticket was already created.",
+                ],
+                **model_kwargs,
+            )
+        )
+    else:
         metrics.append(
             ConversationalGEval(
                 name="Employeed id requested",
