@@ -105,13 +105,11 @@ def _parse_arguments() -> argparse.Namespace:
 
 def _create_conversation_golden(conversation_number: int) -> ConversationalGolden:
     """Create a single ConversationalGolden object for simulation."""
-    # Use conversation number to ensure reproducible but varied employee IDs
-    employee_id = random.randint(1001, 1010)
 
     conversation_golden = ConversationalGolden(
-        scenario="An Employee wants to refresh their laptop, they do not share their employee id until asked for it. The agent shows them a list they can choose from, they select the appropriate laptop and a service now ticket number is returned.",
+        scenario="An Employee wants to refresh their laptop. The agent shows them a list they can choose from, they select the appropriate laptop and a service now ticket number is returned.",
         expected_outcome="They get a Service now ticket number for their refresh request",
-        user_description=f"user with employee id {employee_id} who tries to answer the asssitants last question",
+        user_description="user who tries to answer the asssitants last question",
     )
 
     return conversation_golden

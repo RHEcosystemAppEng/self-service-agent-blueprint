@@ -4,7 +4,7 @@ Script to copy context files to the default_context directory for evaluations.
 
 This script copies:
 1. All files from asset-manager/config/knowledge_bases/laptop-refresh/
-2. The employee data file from mcp-servers/employee-info/src/employee_info/data/data.py
+2. The ServiceNow data file from mcp-servers/snow/src/snow/data.py
 
 All files are copied to evaluations/conversations_config/default_context/
 """
@@ -24,7 +24,7 @@ def copy_context_files() -> None:
 
     This function copies:
     1. All files from asset-manager/config/knowledge_bases/laptop-refresh/
-    2. The employee data file from mcp-servers/employee-info/src/employee_info/data/data.py
+    2. The ServiceNow data file from mcp-servers/snow/src/snow/data.py
 
     All files are copied to evaluations/conversations_config/default_context/
 
@@ -45,14 +45,8 @@ def copy_context_files() -> None:
         / "knowledge_bases"
         / "laptop-refresh"
     )
-    employee_data_source = (
-        workspace_root
-        / "mcp-servers"
-        / "employee-info"
-        / "src"
-        / "employee_info"
-        / "data"
-        / "data.py"
+    snow_data_source = (
+        workspace_root / "mcp-servers" / "snow" / "src" / "snow" / "data.py"
     )
     target_dir = (
         workspace_root / "evaluations" / "conversations_config" / "default_context"
@@ -70,12 +64,12 @@ def copy_context_files() -> None:
     else:
         logger.warning(f"Source directory not found: {laptop_refresh_source}")
 
-    # Copy the employee data file
-    if employee_data_source.exists():
-        target_file = target_dir / "data.py"
-        shutil.copy2(employee_data_source, target_file)
+    # Copy the ServiceNow data file
+    if snow_data_source.exists():
+        target_file = target_dir / "snow_data.py"
+        shutil.copy2(snow_data_source, target_file)
     else:
-        logger.warning(f"Employee data file not found: {employee_data_source}")
+        logger.warning(f"ServiceNow data file not found: {snow_data_source}")
 
 
 if __name__ == "__main__":

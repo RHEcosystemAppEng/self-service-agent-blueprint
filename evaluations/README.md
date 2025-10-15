@@ -878,10 +878,10 @@ RESULTS FOR: no-ticket-number.json
    ...
    ❌ FAIL Ticket number validation [Conversational GEval]: 0.000 (threshold: 1.0)
       Reason: The conversation does not mention the ticket number, so it's impossible to verify...
-   ❌ FAIL Employee id requested [Conversational GEval]: 0.000 (threshold: 1.0)
-      Reason: The conversation completely fails to meet the criteria because the assistant never asks...
+   ❌ FAIL Confirmation Before Ticket Creation [Conversational GEval]: 0.000 (threshold: 1.0)
+      Reason: The conversation completely fails to meet the criteria because the assistant never asks for confirmation...
 
-   📈 PASS RATE: 12/14 (85.7%)
+   📈 PASS RATE: 12/13 (92.3%)
 
 ================================================================================
 🔍 KNOWN BAD CONVERSATIONS CHECK RESULTS
@@ -890,19 +890,16 @@ RESULTS FOR: no-ticket-number.json
    • Total known bad conversations: 9
    • Successfully evaluated: 9
    • LLM evaluation failures: 0
-   • Overall metric pass rate: 97/126 (77.0%)
+   • Overall metric pass rate: 97/117 (82.9%)
 
 ──────────────────────────────────────────────────
 
 🏁 CONVERSATION RESULTS:
-   ⚠️ missing-employee-id-prompt.json: 1/14 metrics failed (as expected: False)
-      Failed metrics:
-        • Employee id requested [Conversational GEval] (score: 0.000) - ...
-   ⚠️ incomplete.json: 4/14 metrics failed (as expected: False)
+   ⚠️ incomplete.json: 4/13 metrics failed (as expected: False)
       Failed metrics:
         • Turn Relevancy (score: 0.750) - ...
         • Flow termination [Conversational GEval] (score: 0.000) - ...
-   ❌ allowed_invalid_user-laptop-selection.json: 11/14 metrics failed (as expected: True)
+   ❌ allowed_invalid_user-laptop-selection.json: 11/13 metrics failed (as expected: True)
       Failed metrics:
         • Turn Relevancy (score: 0.667) - ...
         • Role Adherence (score: 0.333) - ...
@@ -916,14 +913,13 @@ RESULTS FOR: no-ticket-number.json
    • Failing conversations: 9
 
 ❌ FAILING CONVERSATIONS:
-   • missing-employee-id-prompt.json: 1/14 metrics failed (7.1%)
-   • not-all-laptop-options.json: 1/14 metrics failed (7.1%)
-   • no-ticket-number.json: 2/14 metrics failed (14.3%)
-   • incomplete.json: 4/14 metrics failed (28.6%)
-   • wrong-selection.json: 6/14 metrics failed (42.9%)
-   • allowed_invalid_user-laptop-selection.json: 11/14 metrics failed (78.6%)
+   • not-all-laptop-options.json: 1/13 metrics failed (7.7%)
+   • no-ticket-number.json: 2/13 metrics failed (15.4%)
+   • incomplete.json: 4/13 metrics failed (30.8%)
+   • wrong-selection.json: 6/13 metrics failed (46.2%)
+   • allowed_invalid_user-laptop-selection.json: 11/13 metrics failed (84.6%)
 
-🎉 OVERALL RESULT: 9/9 KNOWN BAD CONVERSATIONS FAILED AS EXPECTED
+🎉 OVERALL RESULT: 8/8 KNOWN BAD CONVERSATIONS FAILED AS EXPECTED
 ```
 
 **Workflow for Adding Known Bad Conversations**
@@ -1543,7 +1539,7 @@ For the laptop refresh use case we defined custom ConversationalGEval metrics de
 - **Correct Eligibility Validation** - Verifies accurate policy statements (3-year cycle)
 - **No Errors Reported by Agent** - Validates absence of system errors
 - **Correct Laptop Options for User Location** - Validates complete regional option lists
-- **Employee ID Requested** - Validates employee ID collection
+- **Confirmation Before Ticket Creation** - Validates explicit user confirmation before creating tickets
 
 ---
 
@@ -1558,14 +1554,12 @@ For the laptop refresh use case we defined custom ConversationalGEval metrics de
 evaluation_steps=[
     "Evaluate if the assistant gathers necessary information about the user's current laptop.",
     "Check if the assistant follows a logical flow for information collection.",
-    "Assess if the assistant properly requests employee ID from the user."  # Conditional
 ]
 ```
 
 **What It Checks**:
 - Gathers current laptop information
 - Follows logical information collection sequence
-- Requests employee ID
 
 ---
 
@@ -1820,31 +1814,37 @@ evaluation_steps=[
 
 ---
 
-#### Employee ID Requested
+#### Confirmation Before Ticket Creation
 
-**Purpose**: Validates the agent requests the user's employee ID (conditional metric).
+**Purpose**: Validates that the agent asks for explicit user confirmation before creating a ServiceNow ticket.
 
 **Threshold**: 1.0 (strict - must be perfect)
 
 **Evaluation Steps**:
 ```python
 evaluation_steps=[
-    "Validate the assistant asks for the users employee id",
+    "Identify where in the conversation the user selects a laptop (e.g., selecting option '3', saying 'I'll go with the MacBook', etc.).",
+    "Identify where in the conversation a ServiceNow ticket is created (look for ticket numbers like 'REQ' followed by numbers, or statements like 'A ServiceNow ticket has been created').",
+    "Between the laptop selection and ticket creation, verify that:",
+    "  a) The agent explicitly asks the user for confirmation to proceed with ticket creation (e.g., 'Would you like to proceed with creating a ServiceNow ticket?', 'Shall I create the ticket?', 'Would you like me to submit this request?', etc.)",
+    "  b) The user has an opportunity to respond with their confirmation (e.g., 'proceed', 'yes', 'go ahead', etc.)",
+    "  c) The ticket creation happens AFTER the user confirms, not before",
+    "If the ticket is created immediately after laptop selection without the agent first asking for confirmation and waiting for user response, this evaluation FAILS.",
+    "Note: The confirmation question must come from the agent BEFORE the ticket is created. If the agent creates the ticket and then asks 'Is there anything else I can help you with?', this does NOT count as confirmation - the ticket was already created.",
 ]
 ```
 
 **What It Checks**:
-- Agent explicitly asks for employee ID
-- Request happens during the conversation
-- Not included when testing authenticated user flows
+- Agent explicitly asks for confirmation before creating ticket
+- User has opportunity to respond
+- Ticket creation happens after confirmation, not before
 
 **Example Failure**:
 
 ```
-❌ FAIL Employee id requested [Conversational GEval]: 0.000 (threshold: 1.0)
-   Reason: The conversation completely fails to meet the criteria because the
-   assistant never asks for the user's employee ID, which is a required step
-   according to the evaluation steps.
+❌ FAIL Confirmation Before Ticket Creation [Conversational GEval]: 0.000 (threshold: 1.0)
+   Reason: The ticket is created immediately after laptop selection without the agent
+   first asking for confirmation and waiting for user response.
 ```
 
 ## 8. Context and Additional Data

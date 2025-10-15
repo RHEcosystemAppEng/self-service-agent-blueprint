@@ -30,7 +30,7 @@
     },
     {
       "role": "user",
-      "content": "Yes, please proceed with creating the ServiceNow ticket for the laptop refresh, and do I need to provide my employee ID for the ticket?"
+      "content": "Yes, please proceed with creating the ServiceNow ticket for the laptop refresh"
     },
     {
       "role": "assistant",

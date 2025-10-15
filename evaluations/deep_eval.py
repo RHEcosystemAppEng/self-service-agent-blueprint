@@ -74,7 +74,6 @@ def _evaluate_conversations(
     results_dir: str = "results/conversation_results",
     output_dir: str = "results/deep_eval_results",
     context_dir: Optional[str] = None,
-    no_employee_id: bool = False,
 ) -> int:
     """
     Main evaluation function that processes conversation files and generates assessment reports.
@@ -128,7 +127,7 @@ def _evaluate_conversations(
 
     print(f"Found {len(json_files)} conversation files to evaluate")
 
-    metrics = get_metrics(custom_model, no_employee_id=no_employee_id)
+    metrics = get_metrics(custom_model)
 
     # Initialize tracking for evaluation results and success metrics
     all_results = []
@@ -190,29 +189,11 @@ def _evaluate_conversations(
                     f"Using {len(context_for_file)} context item(s) for {filename}"
                 )
 
-            # Set chatbot role based on no_employee_id flag
-            if no_employee_id:
-                chatbot_role = """You are an IT Support Agent specializing in hardware replacement.
+            # Set chatbot role
+            chatbot_role = """You are an IT Support Agent specializing in hardware replacement.
 
 Your responsibilities:
 1. Determine if the authenticated user's laptop is eligible for replacement based on company policy
-2. Clearly communicate the eligibility status and policy reasons to the user
-3. If the user is NOT eligible:
-   - Inform them of their ineligibility with the policy reason (e.g., laptop age)
-   - Provide clear, factual information that proceeding may require additional approvals or be rejected
-   - Allow them to continue with the laptop selection process if they choose to
-4. Guide the user through laptop selection
-5. After the user selects a laptop, ALWAYS ask for explicit confirmation before creating the ServiceNow ticket (e.g., "Would you like to proceed with creating a ServiceNow ticket for this laptop?")
-6. Only create the ServiceNow ticket AFTER the user confirms they want to proceed
-7. After creating the ticket, provide the ticket number and next steps
-8. Maintain a professional, helpful, and informative tone throughout
-
-Note: Providing clear, factual information about potential rejection or additional approvals is sufficient. You do not need to be overly cautionary or repeatedly emphasize warnings. Always confirm with the user before creating tickets."""
-            else:
-                chatbot_role = """You are an IT Support Agent specializing in hardware replacement.
-
-Your responsibilities:
-1. Determine if an employee's laptop is eligible for replacement based on company policy
 2. Clearly communicate the eligibility status and policy reasons to the user
 3. If the user is NOT eligible:
    - Inform them of their ineligibility with the policy reason (e.g., laptop age)
@@ -442,12 +423,6 @@ def _parse_arguments() -> argparse.Namespace:
         help="Directory containing context files (matched by conversation filename). Note: 'conversations_config/default_context/' and 'conversations_config/conversation_context/' directories are automatically used if they exist.",
     )
 
-    parser.add_argument(
-        "--no-employee-id",
-        action="store_true",
-        help="Exclude employee ID-related checks in evaluation metrics",
-    )
-
     return parser.parse_args()
 
 
@@ -489,7 +464,6 @@ if __name__ == "__main__":
         results_dir=args.results_dir,
         output_dir=args.output_dir,
         context_dir=args.context_dir,
-        no_employee_id=args.no_employee_id,
     )
 
     # Print token usage summary using shared function

@@ -16,7 +16,6 @@ This is a complete AI agent management system implementing a self-service agent 
 - **`mock-eventing-service/`** - Lightweight mock service for testing without Knative infrastructure
 
 ### MCP Servers
-- **`mcp-servers/employee-info/`** - Employee information MCP server
 - **`mcp-servers/snow/`** - ServiceNow integration MCP server
 
 ### Shared Libraries
@@ -92,7 +91,6 @@ make install-asset-manager      # Asset manager dependencies
 make install-request-manager    # Request manager dependencies
 make install-agent-service      # Agent service dependencies
 make install-integration-dispatcher  # Integration dispatcher dependencies
-make install-mcp-emp-info       # Employee info MCP dependencies
 make install-mcp-snow          # ServiceNow MCP dependencies
 ```
 
@@ -114,7 +112,6 @@ make test-asset-manager         # Run tests for asset manager
 make test-request-manager       # Run tests for request manager
 make test-agent-service         # Run tests for agent service
 make test-integration-dispatcher # Run tests for integration dispatcher
-make test-mcp-emp-info          # Run tests for employee info MCP
 make test-mcp-snow             # Run tests for ServiceNow MCP
 ```
 
@@ -131,7 +128,6 @@ make build-asset-mgr-image      # Build asset manager image
 make build-request-mgr-image    # Build request manager image
 make build-agent-service-image  # Build agent service image
 make build-integration-dispatcher-image  # Build integration dispatcher image
-make build-mcp-emp-info-image   # Build employee info MCP image
 make build-mcp-snow-image       # Build ServiceNow MCP image
 ```
 
@@ -150,7 +146,6 @@ make push-asset-mgr-image       # Push asset manager image
 make push-request-mgr-image     # Push request manager image
 make push-agent-service-image   # Push agent service image
 make push-integration-dispatcher-image  # Push integration dispatcher image
-make push-mcp-emp-info-image    # Push employee info MCP image
 make push-mcp-snow-image        # Push ServiceNow MCP image
 ```
 
@@ -233,7 +228,6 @@ Run `make help` to see all available commands with descriptions. Key deployment 
 
 ### Component Documentation
 - [Asset Manager](asset-manager/README.md) - Detailed asset manager documentation
-- [Employee Info MCP](mcp-servers/employee-info/README.md) - Employee information service documentation
 - [ServiceNow MCP](mcp-servers/snow/README.md) - ServiceNow integration documentation
 
 ## Local Deployment with Kind cluster

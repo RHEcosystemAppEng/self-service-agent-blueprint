@@ -113,7 +113,6 @@ class ConversationFlowTester:
         self,
         input_dir: str = "conversations_config/conversations",
         output_dir: str = "results/conversation_results",
-        no_employee_id: bool = False,
     ) -> None:
         """
         Process all conversation files in the input directory and run them through run_flow.
@@ -125,7 +124,6 @@ class ConversationFlowTester:
         Args:
             input_dir: Directory containing conversation JSON files to process
             output_dir: Directory where results will be saved
-            no_employee_id: If True, use alternative files from no-employee-id subdirectory when available
 
         Raises:
             json.JSONDecodeError: If a conversation file contains invalid JSON
@@ -150,20 +148,7 @@ class ConversationFlowTester:
         logger.info(f"Found {len(json_files)} JSON files to process")
 
         for filename in json_files:
-            # Check for alternative file in no-employee-id subdirectory if flag is set
-            if no_employee_id:
-                alternative_path = os.path.join(input_dir, "no-employee-id", filename)
-                if os.path.exists(alternative_path):
-                    input_path = alternative_path
-                    logger.info(
-                        f"Using alternative file from no-employee-id subdirectory: {filename}"
-                    )
-                else:
-                    input_path = os.path.join(input_dir, filename)
-                    logger.info(f"No alternative file found, using default: {filename}")
-            else:
-                input_path = os.path.join(input_dir, filename)
-
+            input_path = os.path.join(input_dir, filename)
             output_path = os.path.join(output_dir, filename)
 
             try:

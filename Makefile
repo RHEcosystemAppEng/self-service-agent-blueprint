@@ -174,8 +174,7 @@ help:
 	@echo "  test-mcp-snow                       - Run tests for snow MCP server"
 	@echo "  test-request-manager                - Run tests for request manager"
 	@echo "  test-shared-models                  - Run tests for shared models"
-	@echo "  test-short-integration-request-mgr  - Run short integration tests with Request Manager"
-	@echo "  test-short-resp-integration-request-mgr - Run short responses integration tests with Request Manager (no employee ID)"
+	@echo "  test-short-resp-integration-request-mgr - Run short responses integration tests with Request Manager"
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  format                              - Run isort import sorting and Black formatting on entire codebase"
@@ -722,22 +721,16 @@ sync-evaluations:
 	uv --directory evaluations sync
 	@echo "Syncing evaluations libraries completed successfully!"
 
-.PHONY: test-short-integration-request-mgr
-test-short-integration-request-mgr:
-	@echo "Running short integration test with Request Manager..."
-	uv --directory evaluations run evaluate.py -n 1 --test-script chat-request-mgr.py
-	@echo "short integrations tests with Request Manager completed successfully!"
-
 .PHONY: test-short-resp-integration-request-mgr
 test-short-resp-integration-request-mgr:
 	@echo "Running short responses integration test with Request Manager..."
-	uv --directory evaluations run evaluate.py -n 1 --no-employee-id --test-script chat-responses-request-mgr.py --reset-conversation
+	uv --directory evaluations run evaluate.py -n 1 --test-script chat-responses-request-mgr.py --reset-conversation
 	@echo "short responses integrations tests with Request Manager completed successfully!"
 
 .PHONY: test-long-resp-integration-request-mgr
 test-long-resp-integration-request-mgr:
 	@echo "Running long responses integration test with Request Manager..."
-	uv --directory evaluations run evaluate.py -n 20 --no-employee-id --test-script chat-responses-request-mgr.py --reset-conversation --timeout=1800
+	uv --directory evaluations run evaluate.py -n 20 --test-script chat-responses-request-mgr.py --reset-conversation --timeout=1800
 	@echo "long responses integrations tests with Request Manager completed successfully!"
 
 # Create namespace and deploy

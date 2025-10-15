@@ -524,11 +524,6 @@ def _parse_arguments() -> argparse.Namespace:
         help="Name of the test script to execute (default: chat-responses-request-mgr.py)",
     )
     parser.add_argument(
-        "--no-employee-id",
-        action="store_true",
-        help="Exclude employee ID-related checks in evaluation metrics",
-    )
-    parser.add_argument(
         "--reset-conversation",
         action="store_true",
         help="Send 'reset' message at the start of each conversation",
@@ -536,9 +531,7 @@ def _parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def run_check_known_bad_conversations(
-    timeout: int = 600, no_employee_id: bool = False
-) -> int:
+def run_check_known_bad_conversations(timeout: int = 600) -> int:
     """
     Check known bad conversations by running deepeval on them.
 
@@ -548,7 +541,6 @@ def run_check_known_bad_conversations(
 
     Args:
         timeout: Timeout in seconds for deepeval execution
-        no_employee_id: Exclude employee ID-related checks in evaluation metrics
 
     Returns:
         Exit code (0 if all known bad conversations failed as expected, 1 otherwise)
@@ -578,8 +570,6 @@ def run_check_known_bad_conversations(
     # Run deepeval on the known bad conversations
     logger.info("📊 Running deepeval on known bad conversations...")
     deep_eval_args = ["--results-dir", "results/known_bad_conversation_results"]
-    if no_employee_id:
-        deep_eval_args.append("--no-employee-id")
     # For the check option, we want to run deep_eval and analyze the results
     # even if it returns a non-zero exit code (which indicates it found issues)
     run_script("deep_eval.py", args=deep_eval_args, timeout=timeout)
@@ -811,7 +801,6 @@ def run_evaluation_pipeline(
     timeout: int = 600,
     max_turns: int = 20,
     test_script: str = "chat-responses-request-mgr.py",
-    no_employee_id: bool = False,
     reset_conversation: bool = False,
 ) -> int:
     """
@@ -828,7 +817,6 @@ def run_evaluation_pipeline(
         timeout: Timeout in seconds for each script execution
         max_turns: Maximum number of turns per conversation in generator.py
         test_script: Name of the test script to execute
-        no_employee_id: Exclude employee ID-related checks in evaluation metrics
         reset_conversation: Send 'reset' message at the start of each conversation
 
     Returns:
@@ -847,8 +835,6 @@ def run_evaluation_pipeline(
     # Step 1: Run conversation flows
     logger.info("📋 Step 1/3: Running predefined conversation flows...")
     run_conversations_args = ["--test-script", test_script]
-    if no_employee_id:
-        run_conversations_args.append("--no-employee-id")
     if reset_conversation:
         run_conversations_args.append("--reset-conversation")
     if not run_script(
@@ -885,8 +871,6 @@ def run_evaluation_pipeline(
     # Step 3: Run deepeval evaluation
     logger.info("📊 Step 3/3: Running deepeval evaluation...")
     deep_eval_args = []
-    if no_employee_id:
-        deep_eval_args.append("--no-employee-id")
     if not run_script("deep_eval.py", args=deep_eval_args, timeout=timeout):
         failed_steps.append("deep_eval.py")
         logger.error("❌ Step 3 failed")
@@ -949,16 +933,13 @@ def main() -> int:
             return 0
 
         if args.check:
-            return run_check_known_bad_conversations(
-                timeout=args.timeout, no_employee_id=args.no_employee_id
-            )
+            return run_check_known_bad_conversations(timeout=args.timeout)
         else:
             return run_evaluation_pipeline(
                 num_conversations=args.num_conversations,
                 timeout=args.timeout,
                 max_turns=args.max_turns,
                 test_script=args.test_script,
-                no_employee_id=args.no_employee_id,
                 reset_conversation=args.reset_conversation,
             )
     except KeyboardInterrupt:

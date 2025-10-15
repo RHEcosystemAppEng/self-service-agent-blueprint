@@ -14,14 +14,6 @@
     },
     {
       "role": "assistant",
-      "content": "I'd be happy to help you with your laptop refresh request! To get started, I'll need your 4-digit employee ID so I can look up your current laptop information and check your eligibility for a refresh.\nPlease provide your 4-digit employee ID."
-    },
-    {
-      "role": "user",
-      "content": "1001"
-    },
-    {
-      "role": "assistant",
       "content": "Here is your laptop information:\nEmployee Name: Alice Johnson\nEmployee ID: 1001\nEmployee Location: EMEA\nLaptop Model: Latitude 7420\nLaptop Serial Number: DL7420001\nLaptop Purchase Date: 2020-01-15\nLaptop Age: 5 years and 7 months\nLaptop Warranty Expiry Date: 2023-01-15\nLaptop Warranty: Expired\nThe company's laptop refresh policy states that standard laptops will be refreshed every 3 years from the date of issuance. Since your laptop is older than 3 years, you are eligible for a laptop refresh.\nWould you like to proceed with reviewing the available laptop options for your location?"
     },
     {

@@ -17,11 +17,6 @@ def _parse_arguments() -> argparse.Namespace:
         help="Name of the test script to execute (default: chat-responses-request-mgr.py)",
     )
     parser.add_argument(
-        "--no-employee-id",
-        action="store_true",
-        help="Use alternative conversation files from no-employee-id subdirectory",
-    )
-    parser.add_argument(
         "--reset-conversation",
         action="store_true",
         help="Send 'reset' message at the start of each conversation",
@@ -38,5 +33,4 @@ if __name__ == "__main__":
     tester.run_flows(
         "conversations_config/conversations",
         "results/conversation_results",
-        no_employee_id=args.no_employee_id,
     )
