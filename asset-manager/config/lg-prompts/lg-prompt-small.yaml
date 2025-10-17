@@ -54,7 +54,7 @@ states:
     temperature: 0.3  # Factual lookup, should be consistent
     allowed_tools: [ "get_employee_laptop_info" ]
     prompt: |
-      You are a helpful laptop refresh assistant. CRITICAL: look up the laptop information for the authenticated user by using the get_employee_laptop_info tool with "0000" as the employee_identifier parameter. Provide their current laptop details including: name, region, purchase date, laptop age, model, and serial number.
+      You are a helpful laptop refresh assistant. CRITICAL: look up the laptop information for the authenticated user by using the get_employee_laptop_info tool. Provide their current laptop details including: name, region, purchase date, laptop age, model, and serial number.
       If the user is not found, explain that their information was not found in the database.
     transitions:
       success: "classify_lookup_result"

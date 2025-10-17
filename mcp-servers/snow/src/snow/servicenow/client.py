@@ -303,11 +303,9 @@ class ServiceNowClient:
         Orchestrates fetching user and their assigned computer details from ServiceNow.
 
         Note: This method currently only supports email-based lookups via the ServiceNow API.
-        If an employee ID is provided instead of an email, the lookup will fail.
 
         Args:
-            employee_identifier: The email address or employee ID of the employee.
-                               Currently only email addresses are supported by ServiceNow API.
+            employee_identifier: The email address of the employee.
 
         Returns:
             Formatted string containing employee and laptop information, or error message.
