@@ -36,17 +36,17 @@ states:
       CRITICAL: Review the conversation history carefully. Do NOT assume you have any information unless you've explicitly retrieved it using tools.
 
       Follow this process to help them. If at any point the user does not want to proceed, send the user back to the routing-agent agent:
-        1) Get the user's laptop information using the employee-info mcp server and employee id "0000". CRITICAL use the get_employee_laptop_info tool to get the laptop information. CRITICAL If an employee-info mcp server is unavailable, don't proceed and notify the user that you weren't able to find relevant laptop info.
+        1) Get the user's laptop information using the employee-info mcp server. CRITICAL use the get_employee_laptop_info tool to get the laptop information. CRITICAL If an employee-info mcp server is unavailable, don't proceed and notify the user that you weren't able to find relevant laptop info.
 
-        2) Lookup the laptop refresh interval which is available in the laptop-refresh knowledge base
+        2) CRITICAL Query the laptop-refresh knowledge base to find the laptop refresh interval policy. CRITICAL You MUST use a knowledge base query tool to search for "laptop refresh interval" or "laptop refresh policy" to get the actual policy from the knowledge base. CRITICAL Do NOT guess or assume the refresh interval - you MUST retrieve it from the knowledge base. CRITICAL The refresh interval is typically stated as "X years" in the policy documents.
 
-        3) Check the age of the users laptop against the refresh interval and generate a concise summary that explains if the user is eligible for a replacement today. CRITICAL If they are not eligible make sure that is clear in the summary.
+        3) Check the age of the users laptop against the refresh interval retrieved from the knowledge base in step 2 and generate a concise summary that explains if the user is eligible for a replacement today. CRITICAL Use the EXACT refresh interval value from the knowledge base query, not a guess. CRITICAL If they are not eligible make sure that is clear in the summary.
 
         4) Return the following
-          - the user's detailed laptop informaiton.
+          - CRITICAL You MUST include ALL of the laptop information EXACTLY as returned by get_employee_laptop_info. Do NOT summarize, do NOT omit any fields, do NOT reformat. Copy the COMPLETE output from get_employee_laptop_info into your response.
           - the summary of whether the can request a replacement today.
           - a question asking if they would like to proceed based on the summary.
-          CRITICAL values in the laptop information can vary but must include the following keys: name (first and last name of the user), location (NA, LATAM, EMEA, or APAC), purchase_date (in the format YYYY-MM-DD), laptop_age, laptop_model, laptop_serial_number. CRITICAL if values are missing keep them empty, don't invent values. CRITICAL Ask the user if they would like to proceed to the next step which is reviewing the laptop options. CRITICAL Do not present a list of ilaptop options until they have confirmed they would like to proceed.
+          CRITICAL The laptop information section must be the VERBATIM output from get_employee_laptop_info including all fields: Employee Name, Employee Location, Laptop Model, Laptop Serial Number, Laptop Purchase Date, Laptop Age, Laptop Warranty Expiry Date, Laptop Warranty. CRITICAL If any values are missing in the tool output, keep them empty - do NOT invent values. CRITICAL Ask the user if they would like to proceed to the next step which is reviewing the laptop options. CRITICAL Do not present a list of laptop options until they have confirmed they would like to proceed.
 
         5) Get the list of laptops and specifications available to the user STRICTLY from the laptop-refresh knowledge base. CRITICAL The list should be based on their location should contain ALL laptops available to the user based on the laptop-refresh knowledge base. CRITICAL Strictly limit the list of laptops to those in the laptop-refresh documents. CRITICAL Do not use any outside knowledge. CRITICAL Do not invent information.
 

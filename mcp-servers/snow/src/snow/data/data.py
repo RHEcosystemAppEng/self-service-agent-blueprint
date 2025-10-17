@@ -54,17 +54,31 @@ def generate_ticket_number():
 
 
 def create_laptop_refresh_ticket(
-    employee_id: str,
+    authoritative_user_id: str,
     employee_name: str,
     business_justification: str,
     preferred_model: str,
-):
-    """Create a mock laptop refresh ticket and return ticket details."""
+) -> str:
+    """Create a mock laptop refresh ticket and return formatted response.
+
+    Args:
+        authoritative_user_id: Authoritative user ID from request headers (email address)
+        employee_name: Employee's full name
+        business_justification: Business reason for laptop refresh
+        preferred_model: ServiceNow laptop model code
+
+    Returns:
+        Formatted ticket details string matching real ServiceNow response format
+    """
     ticket_number = generate_ticket_number()
+
+    # Look up employee to get their employee_id for sys_id
+    employee_data = find_employee_by_authoritative_user_id(authoritative_user_id)
+    employee_id = employee_data["employee_id"]
 
     ticket_data = {
         "ticket_number": ticket_number,
-        "employee_id": employee_id,
+        "authoritative_user_id": authoritative_user_id,
         "employee_name": employee_name,
         "request_type": "Laptop Refresh",
         "business_justification": business_justification,
@@ -74,18 +88,19 @@ def create_laptop_refresh_ticket(
         "created_date": datetime.now().isoformat(),
         "expected_completion": (datetime.now() + timedelta(days=5)).isoformat(),
         "assigned_group": "IT Hardware Team",
-        "description": f"Laptop refresh request for employee {employee_name} (ID: {employee_id}). Justification: {business_justification}",
+        "description": f"Laptop refresh request for employee {employee_name} ({authoritative_user_id}). Justification: {business_justification}",
+        "sys_id": employee_id,  # Use employee_id as sys_id for consistency with real ServiceNow
     }
 
     # Store in mock data
     MOCK_TICKET_DATA[ticket_number] = ticket_data
 
-    return ticket_data
+    # Return format matching real ServiceNow response
+    return f"{ticket_number} opened for employee {authoritative_user_id}. System ID: {employee_id}"
 
 
-# Build employee data by ID for efficient lookup
 MOCK_EMPLOYEE_DATA = {
-    "1001": {
+    "alice.johnson@company.com": {
         "employee_id": "1001",
         "name": "Alice Johnson",
         "email": "alice.johnson@company.com",
@@ -96,7 +111,7 @@ MOCK_EMPLOYEE_DATA = {
         "warranty_expiry": "2023-01-15",
         "warranty_status": "Expired",
     },
-    "1002": {
+    "john.doe@company.com": {
         "employee_id": "1002",
         "name": "John Doe",
         "email": "john.doe@company.com",
@@ -107,7 +122,7 @@ MOCK_EMPLOYEE_DATA = {
         "warranty_expiry": "2026-03-20",
         "warranty_status": "Active",
     },
-    "1003": {
+    "maria.garcia@company.com": {
         "employee_id": "1003",
         "name": "Maria Garcia",
         "email": "maria.garcia@company.com",
@@ -118,7 +133,7 @@ MOCK_EMPLOYEE_DATA = {
         "warranty_expiry": "2025-11-10",
         "warranty_status": "Active",
     },
-    "1004": {
+    "oliver.smith@company.com": {
         "employee_id": "1004",
         "name": "Oliver Smith",
         "email": "oliver.smith@company.com",
@@ -129,7 +144,7 @@ MOCK_EMPLOYEE_DATA = {
         "warranty_expiry": "2022-05-12",
         "warranty_status": "Expired",
     },
-    "1005": {
+    "yuki.tanaka@company.com": {
         "employee_id": "1005",
         "name": "Yuki Tanaka",
         "email": "yuki.tanaka@company.com",
@@ -140,7 +155,7 @@ MOCK_EMPLOYEE_DATA = {
         "warranty_expiry": "2021-09-03",
         "warranty_status": "Expired",
     },
-    "1006": {
+    "isabella.mueller@company.com": {
         "employee_id": "1006",
         "name": "Isabella Mueller",
         "email": "isabella.mueller@company.com",
@@ -151,7 +166,7 @@ MOCK_EMPLOYEE_DATA = {
         "warranty_expiry": "2022-11-18",
         "warranty_status": "Expired",
     },
-    "1007": {
+    "carlos.rodriguez@company.com": {
         "employee_id": "1007",
         "name": "Carlos Rodriguez",
         "email": "carlos.rodriguez@company.com",
@@ -162,7 +177,7 @@ MOCK_EMPLOYEE_DATA = {
         "warranty_expiry": "2024-02-14",
         "warranty_status": "Active",
     },
-    "1008": {
+    "david.chen@company.com": {
         "employee_id": "1008",
         "name": "David Chen",
         "email": "david.chen@company.com",
@@ -173,7 +188,7 @@ MOCK_EMPLOYEE_DATA = {
         "warranty_expiry": "2023-07-22",
         "warranty_status": "Expired",
     },
-    "1009": {
+    "sophie.dubois@company.com": {
         "employee_id": "1009",
         "name": "Sophie Dubois",
         "email": "sophie.dubois@company.com",
@@ -184,7 +199,7 @@ MOCK_EMPLOYEE_DATA = {
         "warranty_expiry": "2024-08-05",
         "warranty_status": "Active",
     },
-    "1010": {
+    "ahmed.hassan@company.com": {
         "employee_id": "1010",
         "name": "Ahmed Hassan",
         "email": "ahmed.hassan@company.com",
@@ -195,7 +210,7 @@ MOCK_EMPLOYEE_DATA = {
         "warranty_expiry": "2021-03-14",
         "warranty_status": "Expired",
     },
-    "2001": {
+    "jane.smith@company.com": {
         "employee_id": "2001",
         "name": "Jane Smith",
         "email": "jane.smith@company.com",
@@ -206,7 +221,7 @@ MOCK_EMPLOYEE_DATA = {
         "warranty_expiry": "2026-01-10",
         "warranty_status": "Active",
     },
-    "2002": {
+    "bob.wilson@company.com": {
         "employee_id": "2002",
         "name": "Bob Wilson",
         "email": "bob.wilson@company.com",
@@ -217,7 +232,7 @@ MOCK_EMPLOYEE_DATA = {
         "warranty_expiry": "2026-09-05",
         "warranty_status": "Active",
     },
-    "2003": {
+    "alice.brown@company.com": {
         "employee_id": "2003",
         "name": "Alice Brown",
         "email": "alice.brown@company.com",
@@ -228,7 +243,7 @@ MOCK_EMPLOYEE_DATA = {
         "warranty_expiry": "2025-11-12",
         "warranty_status": "Active",
     },
-    "2004": {
+    "charlie.davis@company.com": {
         "employee_id": "2004",
         "name": "Charlie Davis",
         "email": "charlie.davis@company.com",
@@ -239,7 +254,7 @@ MOCK_EMPLOYEE_DATA = {
         "warranty_expiry": "2026-04-18",
         "warranty_status": "Active",
     },
-    "3001": {
+    "tchughesiv@gmail.com": {
         "employee_id": "3001",
         "name": "Tommy Hughes",
         "email": "tchughesiv@gmail.com",
@@ -250,7 +265,7 @@ MOCK_EMPLOYEE_DATA = {
         "warranty_expiry": "2024-01-10",
         "warranty_status": "Expired",
     },
-    "3002": {
+    "midawson@redhat.com": {
         "employee_id": "3002",
         "name": "Michael Dawson",
         "email": "midawson@redhat.com",
@@ -263,77 +278,48 @@ MOCK_EMPLOYEE_DATA = {
     },
 }
 
-# Email to employee ID mapping for O(1) lookup performance
-EMAIL_TO_EMPLOYEE_ID = {
-    emp_data["email"].lower(): emp_id for emp_id, emp_data in MOCK_EMPLOYEE_DATA.items()
-}
 
-
-def find_employee_by_id_or_email(identifier: str) -> dict:
-    """Find employee by either employee ID or email address.
-
-    Uses O(1) hash table lookups for both employee ID and email address.
+def find_employee_by_authoritative_user_id(authoritative_user_id: str) -> dict:
+    """Find employee by email from authoritative user ID. Currently only
+       email is supported for authoritative user id
 
     Args:
-        identifier: Either employee ID (e.g., '1001') or email address (e.g., 'alice.johnson@company.com')
+        authoritative_user_id: the authoritative user id
 
     Returns:
         Employee data dictionary if found
 
     Raises:
-        ValueError: If identifier is not found
+        ValueError: If email is not found or is empty
     """
-    if not identifier:
-        raise ValueError("Employee identifier cannot be empty")
+    if not authoritative_user_id:
+        raise ValueError("Authoritative user ID cannot be empty")
 
-    # First try direct lookup by employee ID - O(1)
-    employee_data = MOCK_EMPLOYEE_DATA.get(identifier)
+    employee_data = MOCK_EMPLOYEE_DATA.get(authoritative_user_id.lower())
     if employee_data:
         return employee_data
 
-    # If not found by ID, try lookup by email using the mapping - O(1)
-    employee_id = EMAIL_TO_EMPLOYEE_ID.get(identifier.lower())
-    if employee_id:
-        return MOCK_EMPLOYEE_DATA[employee_id]
-
-    # If still not found, provide helpful error message
-    available_ids = list(MOCK_EMPLOYEE_DATA.keys())
-    available_emails = list(EMAIL_TO_EMPLOYEE_ID.keys())
+    # If not found, provide helpful error message
+    available_authoritative_user_ids = list(MOCK_EMPLOYEE_DATA.keys())
     raise ValueError(
-        f"Employee identifier '{identifier}' not found. "
-        f"Available IDs: {', '.join(available_ids)} or "
-        f"Available emails: {', '.join(available_emails)}"
+        f"Authoritative user ID '{authoritative_user_id}' not found. "
+        f"Available authoritative user IDs: {', '.join(available_authoritative_user_ids)}"
     )
 
 
-def format_laptop_info(employee_data: dict, include_employee_id: bool = True) -> str:
+def format_laptop_info(employee_data: dict) -> str:
     """Format laptop information for display.
 
     Args:
         employee_data: Employee data dictionary
-        include_employee_id: Whether to include employee ID in output
 
     Returns:
-        Formatted laptop information string
+        Formatted laptop information string (without employee ID)
     """
     # Calculate laptop age
     laptop_age = _calculate_laptop_age(employee_data["purchase_date"])
 
-    # Build laptop info, conditionally including employee ID
-    if include_employee_id:
-        laptop_info = f"""
-    Employee Name: {employee_data["name"]}
-    Employee ID: {employee_data["employee_id"]}
-    Employee Location: {employee_data["location"]}
-    Laptop Model: {employee_data["laptop_model"]}
-    Laptop Serial Number: {employee_data["laptop_serial_number"]}
-    Laptop Purchase Date: {employee_data["purchase_date"]}
-    Laptop Age: {laptop_age}
-    Laptop Warranty Expiry Date: {employee_data["warranty_expiry"]}
-    Laptop Warranty: {employee_data["warranty_status"]}
-    """
-    else:
-        laptop_info = f"""
+    laptop_info = f"""
     Employee Name: {employee_data["name"]}
     Employee Location: {employee_data["location"]}
     Laptop Model: {employee_data["laptop_model"]}
