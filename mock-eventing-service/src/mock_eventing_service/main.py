@@ -12,9 +12,11 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from shared_models import configure_logging, simple_health_check
+from tracing_config.auto_tracing import run as auto_tracing_run
 
 # Configure structured logging
 logger = configure_logging("mock-eventing-service")
+auto_tracing_run()
 
 
 class EventSubscription(BaseModel):
