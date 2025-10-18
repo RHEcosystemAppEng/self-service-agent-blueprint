@@ -21,6 +21,8 @@ dependencies = [
     "aiohttp>=3.8.0", # Required by slack-sdk for async operations
     "self-service-agent-shared-models",
     "self-service-agent-shared-clients",
+    "opentelemetry-exporter-otlp-proto-http==1.37.0",
+    "opentelemetry-instrumentation-httpx==0.58b0",
 ]
 
 [project.optional-dependencies]

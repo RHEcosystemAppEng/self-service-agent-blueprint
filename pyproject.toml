@@ -60,7 +60,7 @@ dependencies = [
     "slack_sdk>=3.36.0",
     "slack-bolt>=1.18.0",
     "opentelemetry-exporter-otlp-proto-http==1.37.0",
-    "opentelemetry-instrumentation-httpx>=0.58b0",
+    "opentelemetry-instrumentation-httpx==0.58b0",
     "self-service-agent-shared-clients",
     "self-service-agent-shared-models",
     "opentelemetry-api>=1.37.0",

@@ -1668,7 +1668,7 @@ requires-dist = [
     { name = "openai", specifier = ">=1.0.0" },
     { name = "opentelemetry-api", specifier = ">=1.37.0" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = "==1.37.0" },
-    { name = "opentelemetry-instrumentation-httpx", specifier = ">=0.58b0" },
+    { name = "opentelemetry-instrumentation-httpx", specifier = "==0.58b0" },
     { name = "opentelemetry-sdk", specifier = ">=1.37.0" },
     { name = "pandas", specifier = "==2.3.0" },
     { name = "prompt-toolkit", specifier = "==3.0.51" },
