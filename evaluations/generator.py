@@ -34,11 +34,11 @@ import logging
 import os
 import random
 from pathlib import Path
-from typing import List
+from typing import Any, List
 
-from deepeval.dataset import ConversationalGolden
-from deepeval.simulator import ConversationSimulator
-from deepeval.test_case import ConversationalTestCase, Turn
+from deepeval.dataset import ConversationalGolden  # type: ignore
+from deepeval.simulator import ConversationSimulator  # type: ignore
+from deepeval.test_case import ConversationalTestCase, Turn  # type: ignore
 from helpers.custom_llm import CustomLLM, get_api_configuration
 from helpers.openshift_chat_client import OpenShiftChatClient
 
@@ -146,7 +146,7 @@ async def _model_callback(input: str, turns: List[Turn], thread_id: str) -> Turn
 
 def _convert_test_case_to_conversation_format(
     test_case: ConversationalTestCase, authoritative_user_id: str
-) -> dict:
+) -> dict[str, Any]:
     """
     Convert a ConversationalTestCase to the conversation results format
 
@@ -174,7 +174,7 @@ def _convert_test_case_to_conversation_format(
 
 
 def _save_conversation_to_file(
-    conversation: dict, base_filename: str = "generated_conversation"
+    conversation: dict[str, Any], base_filename: str = "generated_conversation"
 ) -> str:
     """
     Save conversation to a uniquely named file in results/conversation_results
@@ -244,7 +244,7 @@ if __name__ == "__main__":
 
         # Generate conversations sequentially
         saved_files = []
-        all_test_cases = []
+        all_test_cases: List[Any] = []
 
         for i in range(args.num_conversations):
             conversation_number = i + 1

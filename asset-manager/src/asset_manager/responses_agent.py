@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any
+from typing import Any, Dict, Optional
 
 import yaml
 from asset_manager.util import load_config_from_path, resolve_asset_manager_path
@@ -170,7 +170,7 @@ class Agent:
                             if endpoint:
                                 from urllib.parse import urlparse
 
-                                parsed_url = urlparse(endpoint)
+                                parsed_url = urlparse(str(endpoint))
                                 hostname = parsed_url.hostname
                                 if (
                                     hostname
@@ -179,7 +179,7 @@ class Agent:
                                     server_url = endpoint
                                     break
 
-                    mcp_tool = {
+                    mcp_tool: Dict[str, Any] = {
                         "type": "mcp",
                         "server_label": server_name,
                         "server_url": server_url,
@@ -274,7 +274,7 @@ class Agent:
 
         return response
 
-    def _check_response_errors(self, response) -> str:
+    def _check_response_errors(self, response: Any) -> str:
         """Check for various error conditions in the LlamaStack response.
 
         Returns:
@@ -329,8 +329,8 @@ class Agent:
 
     def _print_empty_response_debug_info(
         self,
-        response,
-        current_state_name: str,
+        response: Any,
+        current_state_name: Optional[str],
         skip_all_tools: bool,
         skip_mcp_servers_only: bool,
         tools_to_use: list[Any],
@@ -562,7 +562,7 @@ class ResponsesAgentManager:
 
         # Load global configuration (config.yaml)
         global_config_path = config_path / "config.yaml"
-        global_config = {}
+        global_config: Dict[str, Any] = {}
         if global_config_path.exists():
             with open(global_config_path, "r") as f:
                 global_config = yaml.safe_load(f) or {}

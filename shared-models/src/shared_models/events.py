@@ -209,7 +209,7 @@ class CloudEventProcessor:
             session_id=event.get("sessionid"),
         )
 
-        return event.data
+        return event.data or {}
 
     def process_response_event(self, event: CloudEvent) -> Optional[Dict[str, Any]]:
         """Process an agent response ready event."""
@@ -224,7 +224,7 @@ class CloudEventProcessor:
             agent_id=event.get("agentid"),
         )
 
-        return event.data
+        return event.data or {}
 
     def process_responses_request_event(
         self, event: CloudEvent
@@ -243,7 +243,7 @@ class CloudEventProcessor:
             session_id=event.get("sessionid"),
         )
 
-        return event.data
+        return event.data or {}
 
     def process_responses_response_event(
         self, event: CloudEvent
@@ -262,7 +262,7 @@ class CloudEventProcessor:
             agent_id=event.get("agentid"),
         )
 
-        return event.data
+        return event.data or {}
 
 
 class CloudEventSender:

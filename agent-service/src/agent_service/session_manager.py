@@ -180,7 +180,7 @@ class ResponsesSessionManager(BaseSessionManager):
         self.current_agent_name = None
         self.conversation_session = None
         self.agent_manager = None
-        self.agents = []
+        self.agents: list[Any] = []
         self.request_manager_session_id = None
 
         self._initialize_conversation_state()

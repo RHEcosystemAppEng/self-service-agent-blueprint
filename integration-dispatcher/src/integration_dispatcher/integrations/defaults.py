@@ -20,7 +20,7 @@ class IntegrationDefaultsService:
     def __init__(self) -> None:
         """Initialize integration defaults service."""
         self.default_integrations = self._load_default_integrations()
-        self.last_health_status = {}
+        self.last_health_status: Dict[str, Any] = {}
         self.slack_client = None
         self._init_slack_client()
 
@@ -29,7 +29,7 @@ class IntegrationDefaultsService:
             default_integrations=list(self.default_integrations.keys()),
         )
 
-    def _update_slack_config(self, config: Dict[str, Any], **updates) -> None:
+    def _update_slack_config(self, config: Dict[str, Any], **updates: Any) -> None:
         """Helper method to update Slack config with proper mutation handling."""
         slack_config = dict(config["config"])  # Create a mutable copy
         slack_config.update(updates)
@@ -45,7 +45,7 @@ class IntegrationDefaultsService:
             logger.warning("SLACK_BOT_TOKEN not found, Slack user lookup disabled")
 
     async def _validate_mapping_with_ttl(
-        self, mapping, context: str = "validation"
+        self, mapping: Any, context: str = "validation"
     ) -> Optional[bool]:
         """Validate a user mapping with TTL check. Returns True if valid, False if invalid, None if not found."""
         if not mapping:

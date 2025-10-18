@@ -1,7 +1,7 @@
 """Shared health check utilities for all services."""
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import structlog
 from sqlalchemy import text
@@ -126,7 +126,7 @@ class HealthChecker:
         self,
         db: Optional[AsyncSession] = None,
         integration_handlers: Dict[str, Any] | None = None,
-        additional_checks: Dict[str, callable] | None = None,
+        additional_checks: Dict[str, Callable[[], Any]] | None = None,
     ) -> HealthCheckResult:
         """Perform comprehensive health check."""
         logger.debug("Starting health check", service=self.service_name)
@@ -147,7 +147,7 @@ class HealthChecker:
             for service_name, check_func in additional_checks.items():
                 try:
                     result = await check_func()
-                    services[service_name] = "healthy" if result else "unhealthy"
+                    services[service_name] = "healthy" if bool(result) else "unhealthy"
                 except Exception as e:
                     services[service_name] = f"error: {str(e)}"
                     logger.error(
@@ -199,7 +199,8 @@ class HealthChecker:
         try:
             # Check if handler has a method to check configuration
             if hasattr(handler, "is_configured"):
-                return await handler.is_configured()
+                result = await handler.is_configured()
+                return bool(result)
 
             # For integrations without explicit configuration check,
             # try to determine if they're configured by checking common attributes

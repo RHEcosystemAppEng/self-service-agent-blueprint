@@ -6,7 +6,7 @@ from llama_stack_client import LlamaStackClient
 
 
 class Manager:
-    def __init__(self, config):
+    def __init__(self, config: Any) -> None:
         self._client = None
         self._config = config
 

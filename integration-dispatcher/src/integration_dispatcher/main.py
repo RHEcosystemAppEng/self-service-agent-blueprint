@@ -46,11 +46,7 @@ from .schemas import (
     UserIntegrationConfigResponse,
     UserIntegrationConfigUpdate,
 )
-from .slack_schemas import (
-    SlackChallenge,
-    SlackInteractionPayload,
-    SlackSlashCommand,
-)
+from .slack_schemas import SlackChallenge, SlackInteractionPayload, SlackSlashCommand
 from .slack_service import SlackService
 from .template_engine import TemplateEngine
 
@@ -70,7 +66,9 @@ class IntegrationDispatcher:
         }
         self.template_engine = TemplateEngine()
 
-    def _ensure_slack_config_has_identifiers(self, user_config, user_id: str) -> None:
+    def _ensure_slack_config_has_identifiers(
+        self, user_config: Any, user_id: str
+    ) -> None:
         """Ensure Slack config has necessary identifiers for channel resolution."""
         has_channel = bool(user_config.config.get("channel_id"))
         has_user_email = bool(user_config.config.get("user_email"))
@@ -1032,7 +1030,7 @@ async def reset_user_to_integration_defaults(
 
     return {
         "message": f"User {user_id} reset to integration defaults",
-        "deleted_configs": len(configs),
+        "deleted_configs": str(len(configs)),
     }
 
 
@@ -1063,10 +1061,9 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     """Handle HTTP exceptions."""
     return JSONResponse(
         status_code=exc.status_code,
-        content=ErrorResponse(
+        content=ErrorResponse(  # type: ignore
             error=exc.detail,
             error_code=f"HTTP_{exc.status_code}",
-            timestamp=datetime.now(timezone.utc),
         ).model_dump(mode="json"),
     )
 
@@ -1078,10 +1075,9 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
 
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content=ErrorResponse(
+        content=ErrorResponse(  # type: ignore
             error="Internal server error",
             error_code="INTERNAL_ERROR",
-            timestamp=datetime.now(timezone.utc),
         ).model_dump(mode="json"),
     )
 

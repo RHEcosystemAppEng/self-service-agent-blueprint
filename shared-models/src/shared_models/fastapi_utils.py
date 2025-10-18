@@ -2,7 +2,7 @@
 
 import os
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Callable, Dict, Optional
+from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, Optional
 
 from fastapi import Depends, FastAPI
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,7 +46,7 @@ async def create_health_check_endpoint(
         custom_status = {}
         if custom_health_logic:
             try:
-                custom_status = await custom_health_logic(db)
+                custom_status = custom_health_logic(db)
             except Exception as e:
                 logger.error("Custom health check failed", error=str(e))
                 custom_status = {"custom_health": "failed", "error": str(e)}
@@ -111,8 +111,8 @@ async def create_shared_lifespan(
     service_name: str,
     version: str,
     migration_timeout: int = 300,
-    custom_startup: Optional[Callable[[], None]] = None,
-    custom_shutdown: Optional[Callable[[], None]] = None,
+    custom_startup: Optional[Callable[[], Awaitable[None]]] = None,
+    custom_shutdown: Optional[Callable[[], Awaitable[None]]] = None,
     service_client_init: bool = True,
 ) -> AsyncGenerator[None, None]:
     """
@@ -223,7 +223,7 @@ def create_standard_fastapi_app(
     service_name: str,
     version: str,
     description: str,
-    lifespan_func: Optional[Callable[[], Any]] = None,
+    lifespan_func: Optional[Callable[[FastAPI], Any]] = None,
     cors_origins: Optional[list[str]] = None,
 ) -> FastAPI:
     """
@@ -244,7 +244,11 @@ def create_standard_fastapi_app(
 
     # Use shared lifespan if none provided
     if lifespan_func is None:
-        lifespan_func = create_shared_lifespan(service_name, version)
+
+        def lifespan_wrapper(app: FastAPI) -> Any:
+            return create_shared_lifespan(service_name, version)
+
+        lifespan_func = lifespan_wrapper
 
     # Create FastAPI app
     app = FastAPI(

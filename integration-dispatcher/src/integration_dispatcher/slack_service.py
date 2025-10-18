@@ -36,7 +36,7 @@ class SlackService:
         )  # Reduced from 180s
         self.agent_service_client = AgentServiceClient()
         # Simple rate limiting: track last request time per user
-        self._last_request_time = {}
+        self._last_request_time: Dict[str, float] = {}
         # Eventing configuration
         self.eventing_enabled = os.getenv("EVENTING_ENABLED", "true").lower() == "true"
         self.broker_url = os.getenv("BROKER_URL")
@@ -68,7 +68,7 @@ class SlackService:
             body=body,
             timestamp=timestamp,
             signature=signature,
-            secret=self.signing_secret,
+            secret=self.signing_secret or "",
             debug_logging=True,  # Enable debug logging for this service
         )
 
@@ -965,12 +965,12 @@ class SlackService:
 
                 # Send chunk to Slack
                 await self._send_cloudevent(
-                    event_type="slack.message.stream",
-                    data={
+                    {
                         "channel": channel,
                         "text": chunk,
                         "thread_ts": thread_ts,
                     },
+                    "slack.message.stream",
                 )
 
                 # Small delay between chunks for better UX

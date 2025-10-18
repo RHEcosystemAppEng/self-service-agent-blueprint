@@ -171,7 +171,7 @@ def _aggregate_token_usage() -> Dict[str, Any]:
     Returns:
         Dictionary containing aggregated token statistics
     """
-    aggregated_stats: dict = {
+    aggregated_stats: dict[str, Any] = {
         "total_input_tokens": 0,
         "total_output_tokens": 0,
         "total_tokens": 0,
@@ -870,7 +870,7 @@ def run_evaluation_pipeline(
 
     # Step 3: Run deepeval evaluation
     logger.info("📊 Step 3/3: Running deepeval evaluation...")
-    deep_eval_args = []
+    deep_eval_args: list[str] = []
     if not run_script("deep_eval.py", args=deep_eval_args, timeout=timeout):
         failed_steps.append("deep_eval.py")
         logger.error("❌ Step 3 failed")

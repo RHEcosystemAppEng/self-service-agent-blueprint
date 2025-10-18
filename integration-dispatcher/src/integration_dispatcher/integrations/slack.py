@@ -67,7 +67,7 @@ class SlackIntegrationHandler(BaseIntegrationHandler):
             blocks = self._build_message_blocks(
                 template_content.get("body", ""),
                 request,
-                slack_config,
+                dict(slack_config) if slack_config else {},
             )
 
             # Send message
@@ -196,6 +196,8 @@ class SlackIntegrationHandler(BaseIntegrationHandler):
 
     async def _get_user_dm_channel(self, user_email: str) -> str:
         """Get or create DM channel with user."""
+        if not self.client:
+            raise Exception("Slack client not initialized")
         try:
             # Find user by email
             users_response = await self.client.users_lookupByEmail(email=user_email)
@@ -216,6 +218,8 @@ class SlackIntegrationHandler(BaseIntegrationHandler):
 
     async def _get_user_dm_channel_by_id(self, user_id: str) -> str:
         """Get or create DM channel with user by user ID."""
+        if not self.client:
+            raise Exception("Slack client not initialized")
         try:
             # Open DM channel directly with user ID
             dm_response = await self.client.conversations_open(users=[user_id])
@@ -234,7 +238,7 @@ class SlackIntegrationHandler(BaseIntegrationHandler):
         config: Dict[str, Any],
     ) -> list[Dict[str, Any]]:
         """Build Slack message blocks."""
-        blocks = []
+        blocks: list[Dict[str, Any]] = []
 
         # Main content block
         blocks.append(
@@ -249,15 +253,16 @@ class SlackIntegrationHandler(BaseIntegrationHandler):
 
         # Agent info if enabled
         if config.get("include_agent_info") and request.agent_id:
+            elements: list[Dict[str, str]] = [
+                {
+                    "type": "mrkdwn",
+                    "text": f"_Response from agent: {request.agent_id}_",
+                }
+            ]
             blocks.append(
                 {
                     "type": "context",
-                    "elements": [
-                        {
-                            "type": "mrkdwn",
-                            "text": f"_Response from agent: {request.agent_id}_",
-                        }
-                    ],
+                    "elements": elements,
                 }
             )
 

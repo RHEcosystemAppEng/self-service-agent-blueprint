@@ -307,7 +307,7 @@ class DatabaseUtils:
         try:
             stmt = select(model_class).limit(limit).offset(offset)
             result = await db.execute(stmt)
-            return result.scalars().all()
+            return list(result.scalars().all())
         except Exception as e:
             logger.error(
                 "Failed to get all records",
@@ -335,7 +335,7 @@ class DatabaseUtils:
             return None
 
     @staticmethod
-    async def update_record(db: AsyncSession, record: T, **updates) -> Optional[T]:
+    async def update_record(db: AsyncSession, record: T, **updates: Any) -> Optional[T]:
         """Update a record with provided fields."""
         try:
             for field, value in updates.items():

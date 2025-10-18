@@ -1,6 +1,7 @@
 """Mock data for ServiceNow ticket management."""
 
 from datetime import datetime, timedelta
+from typing import Any
 
 
 def _calculate_laptop_age(purchase_date_str: str) -> str:
@@ -45,7 +46,7 @@ def _calculate_laptop_age(purchase_date_str: str) -> str:
 MOCK_TICKET_DATA = {}
 
 
-def generate_ticket_number():
+def generate_ticket_number() -> str:
     """Generate a mock ServiceNow ticket number."""
     import random
 
@@ -58,7 +59,7 @@ def create_laptop_refresh_ticket(
     employee_name: str,
     business_justification: str,
     preferred_model: str,
-):
+) -> dict[str, Any]:
     """Create a mock laptop refresh ticket and return ticket details."""
     ticket_number = generate_ticket_number()
 
@@ -269,7 +270,7 @@ EMAIL_TO_EMPLOYEE_ID = {
 }
 
 
-def find_employee_by_id_or_email(identifier: str) -> dict:
+def find_employee_by_id_or_email(identifier: str) -> dict[str, Any]:
     """Find employee by either employee ID or email address.
 
     Uses O(1) hash table lookups for both employee ID and email address.
@@ -306,7 +307,9 @@ def find_employee_by_id_or_email(identifier: str) -> dict:
     )
 
 
-def format_laptop_info(employee_data: dict, include_employee_id: bool = True) -> str:
+def format_laptop_info(
+    employee_data: dict[str, Any], include_employee_id: bool = True
+) -> str:
     """Format laptop information for display.
 
     Args:

@@ -5,7 +5,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any, Dict
 
-import aiosmtplib
+import aiosmtplib  # type: ignore
 from shared_models import configure_logging
 from shared_models.models import DeliveryRequest, DeliveryStatus, UserIntegrationConfig
 
@@ -67,14 +67,14 @@ class EmailIntegrationHandler(BaseIntegrationHandler):
                 html_content = self._create_html_content(
                     template_content.get("body", ""),
                     request,
-                    email_config,
+                    dict(email_config) if email_config else {},
                 )
                 msg.attach(MIMEText(html_content, "html"))
             else:
                 text_content = self._create_text_content(
                     template_content.get("body", ""),
                     request,
-                    email_config,
+                    dict(email_config) if email_config else {},
                 )
                 msg.attach(MIMEText(text_content, "plain"))
 

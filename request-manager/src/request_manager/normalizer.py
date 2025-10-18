@@ -7,13 +7,7 @@ from typing import Any, Dict, Optional, Union
 from shared_models import get_enum_value
 from shared_models.models import NormalizedRequest
 
-from .schemas import (
-    BaseRequest,
-    CLIRequest,
-    SlackRequest,
-    ToolRequest,
-    WebRequest,
-)
+from .schemas import BaseRequest, CLIRequest, SlackRequest, ToolRequest, WebRequest
 
 
 class RequestNormalizer:

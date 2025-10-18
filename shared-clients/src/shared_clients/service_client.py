@@ -27,13 +27,13 @@ class ServiceClient:
             headers={"Accept-Encoding": "gzip, deflate, br"},  # Enable compression
         )
 
-    async def get(self, path: str, **kwargs) -> httpx.Response:
+    async def get(self, path: str, **kwargs: Any) -> httpx.Response:
         """Make a GET request."""
         url = f"{self.base_url}{path}"
         logger.debug("Making GET request", url=url)
         return await self.client.get(url, **kwargs)
 
-    async def post(self, path: str, **kwargs) -> httpx.Response:
+    async def post(self, path: str, **kwargs: Any) -> httpx.Response:
         """Make a POST request."""
         url = f"{self.base_url}{path}"
         logger.debug("Making POST request", url=url)
@@ -46,13 +46,13 @@ class ServiceClient:
         # Return the async context manager directly
         return self.client.stream("POST", url, **kwargs)
 
-    async def put(self, path: str, **kwargs) -> httpx.Response:
+    async def put(self, path: str, **kwargs: Any) -> httpx.Response:
         """Make a PUT request."""
         url = f"{self.base_url}{path}"
         logger.debug("Making PUT request", url=url)
         return await self.client.put(url, **kwargs)
 
-    async def delete(self, path: str, **kwargs) -> httpx.Response:
+    async def delete(self, path: str, **kwargs: Any) -> httpx.Response:
         """Make a DELETE request."""
         url = f"{self.base_url}{path}"
         logger.debug("Making DELETE request", url=url)
@@ -67,10 +67,14 @@ class AgentServiceClient(ServiceClient):
     """Client for communicating with the Agent Service."""
 
     def __init__(self, base_url: Optional[str] = None, timeout: float = 60.0):
-        url = base_url or os.getenv(
-            "AGENT_SERVICE_URL", "http://self-service-agent-agent-service:80"
+        url = (
+            base_url
+            or os.getenv(
+                "AGENT_SERVICE_URL", "http://self-service-agent-agent-service:80"
+            )
+            or "http://self-service-agent-agent-service:80"
         )
-        super().__init__(url, timeout)
+        super().__init__(url, timeout=timeout)
 
     async def process_request(
         self, request_data: Union[Dict[str, Any], Any]
@@ -162,9 +166,13 @@ class AgentServiceClient(ServiceClient):
 class RequestManagerClient(ServiceClient):
     """Client for communicating with the Request Manager."""
 
-    def __init__(self, base_url: Optional[str] = None, **kwargs):
-        url = base_url or os.getenv(
-            "REQUEST_MANAGER_URL", "http://self-service-agent-request-manager:80"
+    def __init__(self, base_url: Optional[str] = None, **kwargs: Any) -> None:
+        url = (
+            base_url
+            or os.getenv(
+                "REQUEST_MANAGER_URL", "http://self-service-agent-request-manager:80"
+            )
+            or "http://self-service-agent-request-manager:80"
         )
         super().__init__(url, **kwargs)
 
@@ -208,14 +216,18 @@ class RequestManagerClient(ServiceClient):
 class IntegrationDispatcherClient(ServiceClient):
     """Client for communicating with the Integration Dispatcher."""
 
-    def __init__(self, base_url: Optional[str] = None, **kwargs):
-        url = base_url or os.getenv(
-            "INTEGRATION_DISPATCHER_URL",
-            "http://self-service-agent-integration-dispatcher:8080",
+    def __init__(self, base_url: Optional[str] = None, **kwargs: Any) -> None:
+        url = (
+            base_url
+            or os.getenv(
+                "INTEGRATION_DISPATCHER_URL",
+                "http://self-service-agent-integration-dispatcher:8080",
+            )
+            or "http://self-service-agent-integration-dispatcher:8080"
         )
         super().__init__(url, **kwargs)
 
-    async def deliver_response(self, delivery_data) -> bool:
+    async def deliver_response(self, delivery_data: Dict[str, Any]) -> bool:
         """Deliver a response to the integration dispatcher."""
         try:
             # Handle both Pydantic models and dictionaries

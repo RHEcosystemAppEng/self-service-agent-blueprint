@@ -1,11 +1,11 @@
 """Tests for Snow Server MCP server."""
 
 import pytest
-from mcp.server.fastmcp import Context
+from mcp.server.fastmcp import Context  # type: ignore
 from snow.server import open_laptop_refresh_ticket
 
 
-def test_open_laptop_refresh_ticket_success():
+def test_open_laptop_refresh_ticket_success() -> None:
     """Test successful ticket creation."""
     employee_id = "1001"
     employee_name = "John Doe"
@@ -30,7 +30,7 @@ def test_open_laptop_refresh_ticket_success():
     assert "REQ" in result  # Ticket number format
 
 
-def test_open_laptop_refresh_ticket_required_model():
+def test_open_laptop_refresh_ticket_required_model() -> None:
     """Test ticket creation with required ServiceNow laptop code."""
     employee_id = "1002"
     employee_name = "Jane Smith"
@@ -50,7 +50,7 @@ def test_open_laptop_refresh_ticket_required_model():
     assert servicenow_laptop_code in result
 
 
-def test_open_laptop_refresh_ticket_empty_employee_id():
+def test_open_laptop_refresh_ticket_empty_employee_id() -> None:
     """Test error handling for empty employee ID."""
     ctx = Context()
     with pytest.raises(ValueError, match="Employee ID cannot be empty"):
@@ -63,7 +63,7 @@ def test_open_laptop_refresh_ticket_empty_employee_id():
         )
 
 
-def test_open_laptop_refresh_ticket_empty_employee_name():
+def test_open_laptop_refresh_ticket_empty_employee_name() -> None:
     """Test error handling for empty employee name."""
     ctx = Context()
     with pytest.raises(ValueError, match="Employee name cannot be empty"):
@@ -76,7 +76,7 @@ def test_open_laptop_refresh_ticket_empty_employee_name():
         )
 
 
-def test_open_laptop_refresh_ticket_empty_justification():
+def test_open_laptop_refresh_ticket_empty_justification() -> None:
     """Test error handling for empty business justification."""
     ctx = Context()
     with pytest.raises(ValueError, match="Business justification cannot be empty"):
@@ -89,7 +89,7 @@ def test_open_laptop_refresh_ticket_empty_justification():
         )
 
 
-def test_open_laptop_refresh_ticket_empty_servicenow_code():
+def test_open_laptop_refresh_ticket_empty_servicenow_code() -> None:
     """Test error handling for empty ServiceNow laptop code."""
     ctx = Context()
     with pytest.raises(ValueError, match="ServiceNow laptop code cannot be empty"):

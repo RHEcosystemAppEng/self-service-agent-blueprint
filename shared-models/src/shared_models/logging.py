@@ -3,7 +3,7 @@
 import logging
 import os
 import sys
-from typing import Any, Optional
+from typing import Any, MutableMapping, Optional
 
 import structlog
 
@@ -70,7 +70,9 @@ class LoggingConfig:
             cache_logger_on_first_use=True,
         )
 
-    def _add_service_context(self, logger, method_name, event_dict):
+    def _add_service_context(
+        self, logger: Any, method_name: str, event_dict: MutableMapping[str, Any]
+    ) -> MutableMapping[str, Any]:
         """Add service name to log context."""
         event_dict["service"] = self.service_name
         return event_dict
@@ -116,13 +118,13 @@ class ServiceLogger:
 
     def __init__(self, service_name: str):
         self.service_name = service_name
-        self.logger = None
+        self.logger: Optional[structlog.BoundLogger] = None
 
-    def __enter__(self):
+    def __enter__(self) -> structlog.BoundLogger:
         self.logger = get_service_logger(self.service_name)
         return self.logger
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         pass
 
 

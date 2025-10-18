@@ -1,7 +1,7 @@
 """Shared streaming utilities for LlamaStack stream processing."""
 
 import asyncio
-from typing import Any, Callable, Dict, Optional
+from typing import Any, AsyncGenerator, Callable, Dict, Optional
 
 import structlog
 
@@ -12,7 +12,7 @@ class LlamaStackStreamProcessor:
     """Unified stream processor for LlamaStack streaming responses."""
 
     @staticmethod
-    def _extract_token_usage(usage_object) -> tuple[int, int, int]:
+    def _extract_token_usage(usage_object: Any) -> tuple[int, int, int]:
         """Extract token usage from a usage object. Returns (input_tokens, output_tokens, total_tokens)."""
         if not usage_object:
             return (0, 0, 0)
@@ -41,7 +41,7 @@ class LlamaStackStreamProcessor:
 
     @staticmethod
     async def process_stream(
-        response_stream,
+        response_stream: Any,
         on_content: Optional[Callable[[str], None]] = None,
         on_error: Optional[Callable[[str], None]] = None,
         on_tool_call: Optional[Callable[[str], None]] = None,
@@ -266,7 +266,7 @@ class LlamaStackStreamProcessor:
     @staticmethod
     async def stream_content_optimized(
         content: str, content_type: str = "content", **kwargs: Any
-    ) -> None:
+    ) -> AsyncGenerator[str, None]:
         """Optimized streaming with adaptive performance based on content."""
         import json
 
@@ -288,7 +288,7 @@ class LlamaStackStreamProcessor:
             await asyncio.sleep(stream_delay)
 
     @staticmethod
-    def create_sse_response(generator, **kwargs):
+    def create_sse_response(generator: Any, **kwargs: Any) -> Any:
         """Create a standardized SSE StreamingResponse."""
         from fastapi.responses import StreamingResponse
 

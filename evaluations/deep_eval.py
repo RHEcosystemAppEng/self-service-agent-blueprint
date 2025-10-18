@@ -5,11 +5,11 @@ import json
 import logging
 import os
 import sys
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-from deepeval.evaluate import DisplayConfig, evaluate
-from deepeval.test_case import ConversationalTestCase, Turn
-from deepeval.test_run import global_test_run_manager
+from deepeval.evaluate import DisplayConfig, evaluate  # type: ignore
+from deepeval.test_case import ConversationalTestCase, Turn  # type: ignore
+from deepeval.test_run import global_test_run_manager  # type: ignore
 from get_deepeval_metrics import get_metrics
 from helpers.copy_context import copy_context_files
 from helpers.custom_llm import CustomLLM, get_api_configuration
@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def _no_op_wrap_up_test_run(*args, **kwargs) -> None:
+def _no_op_wrap_up_test_run(*args: Any, **kwargs: Any) -> None:
     """
     No-operation function to override DeepEval's default wrap_up_test_run behavior.
 

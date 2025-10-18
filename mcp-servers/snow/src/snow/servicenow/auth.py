@@ -21,7 +21,7 @@ class AuthManager:
     different authentication methods.
     """
 
-    def __init__(self, config: AuthConfig, instance_url: str = None):
+    def __init__(self, config: AuthConfig, instance_url: str | None = None):
         """
         Initialize the authentication manager.
 
@@ -68,7 +68,7 @@ class AuthManager:
 
         return headers
 
-    def _get_oauth_token(self):
+    def _get_oauth_token(self) -> str:
         """
         Get an OAuth token from ServiceNow.
 
@@ -113,7 +113,7 @@ class AuthManager:
             token_data = response.json()
             self.token = token_data.get("access_token")
             self.token_type = token_data.get("token_type", "Bearer")
-            return
+            return self.token
 
         # Try password grant if client_credentials failed
         if oauth_config.username and oauth_config.password:
@@ -133,13 +133,13 @@ class AuthManager:
                 token_data = response.json()
                 self.token = token_data.get("access_token")
                 self.token_type = token_data.get("token_type", "Bearer")
-                return
+                return self.token
 
         raise ValueError(
             "Failed to get OAuth token using both client_credentials and password grants."
         )
 
-    def refresh_token(self):
+    def refresh_token(self) -> None:
         """Refresh the OAuth token if using OAuth authentication."""
         if self.config.type == AuthType.OAUTH:
             self._get_oauth_token()

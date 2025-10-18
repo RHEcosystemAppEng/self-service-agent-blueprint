@@ -1,7 +1,7 @@
 """Shared error handling utilities for all services."""
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 import structlog
 from fastapi import HTTPException
@@ -16,10 +16,10 @@ class ErrorResponse(BaseModel):
     error: str
     error_code: str
     detail: Optional[str] = None
-    timestamp: str = None
+    timestamp: Optional[str] = None
     request_id: Optional[str] = None
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any):
         if "timestamp" not in data:
             data["timestamp"] = datetime.now(timezone.utc).isoformat()
         super().__init__(**data)
@@ -129,6 +129,7 @@ def create_error_response(
         error_code=error_code,
         detail=detail,
         request_id=request_id,
+        timestamp=datetime.now(timezone.utc).isoformat(),
     )
 
     return HTTPException(
@@ -154,6 +155,7 @@ def handle_service_error(error: ServiceError) -> HTTPException:
             error_code=error.error_code,
             detail=error.detail,
             request_id=error.request_id,
+            timestamp=datetime.now(timezone.utc).isoformat(),
         ).dict(),
     )
 

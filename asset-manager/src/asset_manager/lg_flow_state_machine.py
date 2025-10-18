@@ -18,7 +18,7 @@ from langgraph.types import Command
 
 # Import SqliteSaver - will be replace by more persistent state storage
 try:
-    from langgraph_checkpoint_sqlite import SqliteSaver
+    from langgraph_checkpoint_sqlite import SqliteSaver  # type: ignore
 except ImportError:
     try:
         from langgraph.checkpoint.sqlite import SqliteSaver
@@ -65,7 +65,7 @@ def create_agent_state_class(state_schema: dict[str, Any]) -> Any:
     fields["_last_waiting_node"] = Optional[str]  # Track last waiting node for resume
 
     # Create the TypedDict class dynamically
-    return TypedDict("AgentState", fields)
+    return TypedDict("AgentState", fields)  # type: ignore[operator]
 
 
 class StateMachine:
@@ -95,7 +95,7 @@ class StateMachine:
         settings = self.config.get("settings", {})
         return settings.get("empty_response_retry_count", 3)
 
-    def _is_config_disabled(self, config_value) -> bool:
+    def _is_config_disabled(self, config_value) -> bool:  # type: ignore[no-untyped-def]
         """Check if a config value represents 'disabled' (no/No/NO or False).
 
         Args:
@@ -209,7 +209,7 @@ class StateMachine:
             format_data["conversation_history"] = conversation_history.strip()
 
             # Custom dot notation replacement
-            def replace_placeholders(text, data):
+            def replace_placeholders(text, data):  # type: ignore[no-untyped-def]
                 # First, temporarily replace escaped braces to protect them
                 text = text.replace("{{", "\x00ESCAPED_OPEN\x00")
                 text = text.replace("}}", "\x00ESCAPED_CLOSE\x00")
@@ -217,7 +217,7 @@ class StateMachine:
                 # Pattern to match {field.subfield} or {field} (but not escaped ones)
                 pattern = r"\{([^}]+)\}"
 
-                def replacer(match):
+                def replacer(match):  # type: ignore[no-untyped-def]
                     field_path = match.group(1)
                     try:
                         # Split by dots and navigate the data structure
@@ -593,7 +593,7 @@ class StateMachine:
         state_schema = self.config.get("state_schema", {})
 
         # Create state with default values from schema
-        state = {}
+        state: Dict[str, Any] = {}
 
         # Add required system fields automatically
         state["messages"] = []
@@ -649,7 +649,7 @@ class StateMachine:
             fields_to_clear = all_fields
 
         # Create new state using schema defaults
-        state = {}
+        state: Dict[str, Any] = {}
 
         # Handle required system fields
         if "messages" in fields_to_clear:
@@ -954,7 +954,7 @@ class ConversationSession:
     Uses LangGraph checkpoints and threads for persistence across process restarts.
     """
 
-    def __init__(
+    def __init__(  # type: ignore[no-untyped-def]
         self,
         agent,
         thread_id: str | None = None,
@@ -1024,7 +1024,7 @@ class ConversationSession:
             node_names.append(state_name)
 
             # Create node function with closure to capture state_name
-            def make_node_func(name, stype):
+            def make_node_func(name, stype):  # type: ignore[no-untyped-def]
                 def node_func(state: dict[str, Any]) -> Any:
                     """Node function that returns Command for routing (or state for terminal nodes)."""
                     logger.info(
@@ -1105,7 +1105,7 @@ class ConversationSession:
                 # New conversation - start from initial state
                 return Command(goto=initial_state, update=state)
 
-        workflow.add_node("__resume_dispatcher__", resume_dispatcher)
+        workflow.add_node("__resume_dispatcher__", resume_dispatcher)  # type: ignore[type-var]
 
         logger.info(f"Created {len(node_names)} nodes: {', '.join(node_names)}")
 
@@ -1290,6 +1290,6 @@ class ConversationSession:
             except Exception as e:
                 logger.warning(f"Error closing checkpointer context manager: {e}")
 
-    def __del__(self):
+    def __del__(self):  # type: ignore[no-untyped-def]
         """Destructor to ensure cleanup."""
         self.close()

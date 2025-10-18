@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-from typing import Dict, List
+from typing import Any, Dict, List
 
 
 def print_final_summary(
     total_files: int,
     successful_evaluations: int,
-    all_results: List[Dict],
-    failed_evaluations: List[Dict] = None,
+    all_results: List[Dict[str, Any]],
+    failed_evaluations: List[Dict[str, Any]] | None = None,
     output_dir: str = "deep_eval_results",
 ) -> int:
     """

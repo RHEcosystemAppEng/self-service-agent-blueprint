@@ -203,7 +203,7 @@ class CLIChatClient(RequestManagerClient):
         if command_context is None:
             command_context = {"command": "chat", "args": []}
 
-        metadata = {
+        metadata: Dict[str, Any] = {
             "command_context": command_context,
         }
 
@@ -214,8 +214,8 @@ class CLIChatClient(RequestManagerClient):
             metadata.update(
                 {
                     "request_manager_session_id": request_manager_session_id,
-                    "user_email": user_email,
-                    "session_name": session_name,
+                    "user_email": user_email or "",
+                    "session_name": session_name or "",
                 }
             )
 
@@ -269,7 +269,12 @@ class CLIChatClient(RequestManagerClient):
             return False
         elif message.lower() == "**tokens**":
             agent_response = await self.send_message(message, debug=debug)
-            self._handle_tokens_command(agent_response)
+            # Extract string content from response
+            if isinstance(agent_response, dict):
+                response_content = agent_response.get("content", str(agent_response))
+            else:
+                response_content = agent_response
+            self._handle_tokens_command(response_content)
             return False
         elif message.strip():
             agent_response = await self.send_message(message, debug=debug)
