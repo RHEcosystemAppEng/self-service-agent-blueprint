@@ -41,7 +41,11 @@ spec:
       {{- end }}
       initContainers:
         - name: wait-for-init-job
+          {{- if eq .Values.arch "linux/arm64" }}
+          image: quay.io/ecosystem-appeng/oc-cli-aarch64:4.19.9
+          {{- else }}
           image: quay.io/openshift/origin-cli:latest
+          {{- end }}
           command:
             - /bin/bash
             - -c
