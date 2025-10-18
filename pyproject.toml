@@ -63,6 +63,8 @@ dependencies = [
     "opentelemetry-instrumentation-httpx>=0.58b0",
     "self-service-agent-shared-clients",
     "self-service-agent-shared-models",
+    "opentelemetry-api>=1.37.0",
+    "opentelemetry-sdk>=1.37.0",
 ]
 
 [project.optional-dependencies]

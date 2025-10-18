@@ -312,3 +312,15 @@ The system uses two key shared libraries:
 
 - [CLAUDE.md](CLAUDE.md) - Development guidance for Claude Code
 - [GUIDELINES.md](GUIDELINES.md) - Code practices and project structure guidelines
+
+## Tracing
+
+To enable tracing, it is possible to specify a remote OpenTelemetry collector,
+with the `OTEL_EXPORTER_OTLP_ENDPOINT` environement variable.
+
+```yaml
+servingRuntime:
+  env:
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: http://jaeger-collector:4317
+```

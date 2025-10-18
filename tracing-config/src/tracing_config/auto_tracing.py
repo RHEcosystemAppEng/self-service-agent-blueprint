@@ -7,13 +7,18 @@ from opentelemetry.propagate import set_global_textmap
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+from shared_models import configure_logging
+
+logger = configure_logging("tracing-config")
 
 
 def run() -> None:
     otel_exporter_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
     if not otel_exporter_endpoint:
+        logger.info("OTEL exporter endpoint not provided -- skip auto tracing config.")
         return
 
+    logger.info(f"Export tracing to {otel_exporter_endpoint}")
     # Set up the tracer provider
     trace.set_tracer_provider(TracerProvider())
 
