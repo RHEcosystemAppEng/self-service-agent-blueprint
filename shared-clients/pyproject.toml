@@ -13,7 +13,6 @@ dependencies = [
     "structlog>=23.2.0",
     "pydantic>=2.5.0",
     "self-service-agent-shared-models",
-    "self-service-agent-service",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -42,7 +41,6 @@ testpaths = ["tests"]
 
 [tool.uv.sources]
 self-service-agent-shared-models = { path = "../shared-models" }
-self-service-agent-service = { path = "../agent-service" }
 
 [dependency-groups]
 dev = [

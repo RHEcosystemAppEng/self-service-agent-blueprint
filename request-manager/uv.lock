@@ -1795,7 +1795,6 @@ source = { directory = "../shared-clients" }
 dependencies = [
     { name = "httpx", extra = ["http2"] },
     { name = "pydantic" },
-    { name = "self-service-agent-service" },
     { name = "self-service-agent-shared-models" },
     { name = "structlog" },
 ]
@@ -1809,7 +1808,6 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.5.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
-    { name = "self-service-agent-service", directory = "../agent-service" },
     { name = "self-service-agent-shared-models", directory = "../shared-models" },
     { name = "structlog", specifier = ">=23.2.0" },
 ]
