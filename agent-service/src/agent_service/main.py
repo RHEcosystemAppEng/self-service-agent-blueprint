@@ -29,6 +29,7 @@ from shared_models import (
 )
 from shared_models.models import AgentResponse, NormalizedRequest, SessionStatus
 from sqlalchemy.ext.asyncio import AsyncSession
+from tracing_config.auto_tracing import run as auto_tracing_run
 
 from . import __version__
 from .schemas import SessionCreate, SessionResponse, SessionUpdate
@@ -36,6 +37,7 @@ from .session_manager import BaseSessionManager, ResponsesSessionManager
 
 # Configure structured logging
 logger = configure_logging("agent-service")
+auto_tracing_run()
 
 # Type aliases for clarity
 RequestManagerSessionId = NewType("RequestManagerSessionId", str)

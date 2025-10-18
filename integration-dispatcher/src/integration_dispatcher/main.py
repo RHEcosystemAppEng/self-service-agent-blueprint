@@ -31,6 +31,7 @@ from shared_models.models import (
 )
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from tracing_config.auto_tracing import run as auto_tracing_run
 
 from . import __version__
 from .integrations.base import BaseIntegrationHandler
@@ -56,6 +57,7 @@ from .template_engine import TemplateEngine
 
 # Configure structured logging
 logger = configure_logging("integration-dispatcher")
+auto_tracing_run()
 
 
 class IntegrationDispatcher:

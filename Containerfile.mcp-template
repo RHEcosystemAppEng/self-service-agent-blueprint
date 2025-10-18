@@ -11,6 +11,8 @@ RUN pip3 install --no-cache-dir uv
 
 WORKDIR /app
 
+COPY tracing-config/ ./tracing-config
+
 ARG SERVICE_NAME
 COPY ${SERVICE_NAME}/ .
 RUN uv sync --frozen --no-cache
@@ -19,6 +21,8 @@ RUN uv sync --frozen --no-cache
 FROM registry.access.redhat.com/ubi9/python-312-minimal:latest
 
 WORKDIR /app
+
+COPY --from=builder /app/tracing-config /app/tracing-config
 
 # Copy virtual environment from builder
 COPY --from=builder /app/.venv /app/.venv

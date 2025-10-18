@@ -30,6 +30,8 @@ dependencies = [
     "openai>=1.0.0",
     "pyyaml>=6.0.0",
     "self-service-agent-shared-clients",
+    "opentelemetry-exporter-otlp-proto-http==1.37.0",
+    "opentelemetry-instrumentation-httpx==0.58b0",
 ]
 
 [project.optional-dependencies]

@@ -31,6 +31,7 @@ from shared_models.models import (
 )
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from tracing_config.auto_tracing import run as auto_tracing_run
 
 from . import __version__
 from .communication_strategy import (
@@ -51,6 +52,7 @@ from .schemas import (
 
 # Configure structured logging
 logger = configure_logging("request-manager")
+auto_tracing_run()
 
 
 async def _request_manager_startup() -> None:
