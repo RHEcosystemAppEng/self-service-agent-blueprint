@@ -71,6 +71,10 @@ spec:
           env:
             - name: LLAMA_STACK_MODELS
               value: {{ include "self-service-agent.getModelList" . }}
+            {{- if .Values.otelExporter }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.otelExporter }}
+            {{- end }}  
             - name: REQUEST_MANAGER_URL
               value: "http://{{ include "self-service-agent.fullname" . }}-request-manager.{{ .Release.Namespace }}.svc.cluster.local:80"
           ports:
