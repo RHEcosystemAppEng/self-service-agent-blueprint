@@ -27,7 +27,6 @@ class RequestManagerClient:
         request_manager_url: str | None = None,
         user_id: str | None = None,
         timeout: float = 180.0,
-        use_responses: bool = True,
     ) -> None:
         """
         Initialize the Request Manager client.
@@ -36,13 +35,11 @@ class RequestManagerClient:
             request_manager_url: URL of the Request Manager service
             user_id: User ID for authentication (generates UUID if not provided)
             timeout: HTTP client timeout in seconds
-            use_responses: Enable responses API mode (LangGraph-based conversations)
         """
         self.request_manager_url = request_manager_url or os.getenv(
             "REQUEST_MANAGER_URL", "http://localhost:8080"
         )
         self.user_id = user_id or str(uuid.uuid4())
-        self.use_responses = use_responses
         self.client = httpx.AsyncClient(
             timeout=timeout,
             # Performance optimizations
@@ -52,21 +49,15 @@ class RequestManagerClient:
         )
 
     def _format_response(self, result: dict[str, Any]) -> str:
-        """Format the response based on the mode."""
-        if self.use_responses:
-            # For responses mode, check if result is the response object directly
-            # or wrapped in a "response" key
-            if "content" in result and "agent_id" in result:
-                # Result is the response object directly
-                content = result.get("content")
-                return str(content) if content is not None else "No response content"
-            else:
-                # Result is wrapped in a "response" key
-                response_data = result.get("response", {})
-                content = response_data.get("content")
-                return str(content) if content is not None else "No response content"
+        """Format the response."""
+        # Check if result is the response object directly
+        # or wrapped in a "response" key
+        if "content" in result and "agent_id" in result:
+            # Result is the response object directly
+            content = result.get("content")
+            return str(content) if content is not None else "No response content"
         else:
-            # For traditional agents mode, extract just the content
+            # Result is wrapped in a "response" key
             response_data = result.get("response", {})
             content = response_data.get("content")
             return str(content) if content is not None else "No response content"
@@ -78,7 +69,6 @@ class RequestManagerClient:
         request_type: str = "message",
         metadata: Optional[Dict[str, Any]] = None,
         endpoint: str = "generic",
-        use_responses: bool | None = None,
     ) -> Dict[str, Any]:
         """
         Send a request to the Request Manager service.
@@ -89,7 +79,6 @@ class RequestManagerClient:
             request_type: Type of request (message, command, etc.)
             metadata: Additional metadata for the request
             endpoint: API endpoint to use (generic, cli, web, etc.)
-            use_responses: Override client-level use_responses setting (None = use client default)
 
         Returns:
             Response dictionary containing session_id, response content, etc.
@@ -97,17 +86,12 @@ class RequestManagerClient:
         Raises:
             httpx.HTTPError: If the HTTP request fails
         """
-        # Use client-level use_responses if not explicitly overridden
-        if use_responses is None:
-            use_responses = self.use_responses
-
         payload = {
             "user_id": self.user_id,
             "content": content,
             "integration_type": integration_type,
             "request_type": request_type,
             "metadata": metadata or {},
-            "use_responses": use_responses,
         }
 
         headers = {"x-user-id": self.user_id}
@@ -183,7 +167,7 @@ class CLIChatClient(RequestManagerClient):
             request_manager_url: URL of the Request Manager service
             user_id: User ID for authentication (generates UUID if not provided)
             timeout: HTTP client timeout in seconds
-            **kwargs: Additional arguments passed to parent class (including use_responses)
+            **kwargs: Additional arguments passed to parent class
         """
         super().__init__(request_manager_url, user_id, timeout, **kwargs)
 
@@ -203,12 +187,12 @@ class CLIChatClient(RequestManagerClient):
             message: The message to send
             command_context: CLI command context (default: {"command": "chat", "args": []})
             debug: Whether to print debug information
-            request_manager_session_id: Session ID for responses mode (auto-generated if not provided)
-            user_email: User email for responses mode
-            session_name: Session name for responses mode
+            request_manager_session_id: Session ID (auto-generated if not provided)
+            user_email: User email
+            session_name: Session name
 
         Returns:
-            Full response dictionary for use_responses=True, agent response content string for use_responses=False
+            Agent response content string
 
         Raises:
             httpx.HTTPError: If the HTTP request fails
@@ -216,28 +200,21 @@ class CLIChatClient(RequestManagerClient):
         if command_context is None:
             command_context = {"command": "chat", "args": []}
 
+        if not request_manager_session_id:
+            request_manager_session_id = str(uuid.uuid4())
+
         metadata: Dict[str, Any] = {
             "command_context": command_context,
+            "request_manager_session_id": request_manager_session_id,
+            "user_email": user_email or "",
+            "session_name": session_name or "",
         }
-
-        # For responses mode, add session metadata
-        if self.use_responses:
-            if not request_manager_session_id:
-                request_manager_session_id = str(uuid.uuid4())
-            metadata.update(
-                {
-                    "request_manager_session_id": request_manager_session_id,
-                    "user_email": user_email or "",
-                    "session_name": session_name or "",
-                }
-            )
 
         if debug:
             print(
                 f"DEBUG: Sending request to {self.request_manager_url}/api/v1/requests/generic"
             )
             print(f"DEBUG: Payload: {message}")
-            print(f"DEBUG: Use responses: {self.use_responses}")
 
         try:
             result = await self.send_request(
@@ -246,7 +223,6 @@ class CLIChatClient(RequestManagerClient):
                 request_type="message",
                 metadata=metadata,
                 endpoint="generic",
-                use_responses=self.use_responses,
             )
 
             if debug:

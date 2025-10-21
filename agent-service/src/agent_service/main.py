@@ -440,137 +440,7 @@ class AgentService:
             if not skip_routing:
                 await self._publish_processing_event(request)
 
-            # Check if responses mode is requested
-            if request.use_responses:
-                logger.info(
-                    "Responses mode requested, delegating to responses session manager",
-                    request_id=request.request_id,
-                    session_id=request.session_id,
-                )
-                return await self._handle_responses_mode_request(request, start_time)
-
-            # Determine which agent to use for traditional agent mode
-            agent_id = await self._determine_agent(request)
-            logger.info(
-                "Agent determined for request",
-                request_id=request.request_id,
-                target_agent_id=request.target_agent_id,
-                resolved_agent_id=agent_id,
-            )
-
-            # Handle session management (increment request count) for both eventing and direct HTTP modes
-            await self._handle_session_management(
-                request.session_id, request.request_id
-            )
-
-            # Get or create LlamaStack session for this specific agent
-            llama_stack_session_id = await self._get_or_create_llama_stack_session(
-                RequestManagerSessionId(request.session_id), AgentId(agent_id)
-            )
-
-            # Send message to agent
-            messages = [{"role": "user", "content": request.content}]
-
-            # Get full agent configuration to ensure all settings are applied
-            agent = self.client.agents.retrieve(agent_id)
-            agent_config = agent.agent_config
-
-            # Debug logging for agent configuration
-            logger.info(
-                "Agent configuration retrieved",
-                agent_id=agent_id,
-                agent_name=agent.name if hasattr(agent, "name") else "unknown",
-                toolgroups=(
-                    agent_config.toolgroups
-                    if hasattr(agent_config, "toolgroups")
-                    else None
-                ),
-                tool_choice=(
-                    getattr(agent_config.tool_config, "tool_choice", None)
-                    if hasattr(agent_config, "tool_config") and agent_config.tool_config
-                    else None
-                ),
-                sampling_params=(
-                    agent_config.sampling_params
-                    if hasattr(agent_config, "sampling_params")
-                    else None
-                ),
-            )
-            # Use streaming agent turns (required by LlamaStack)
-            turn_params = {
-                "agent_id": agent_id,
-                "session_id": llama_stack_session_id,
-                "messages": messages,
-                "stream": True,  # Enable streaming
-            }
-
-            # Add toolgroups if available
-            if agent_config.toolgroups:
-                logger.info(
-                    "Adding toolgroups to turn params",
-                    agent_id=agent_id,
-                    toolgroups=agent_config.toolgroups,
-                )
-                turn_params["toolgroups"] = agent_config.toolgroups
-            else:
-                logger.info("No toolgroups found for agent", agent_id=agent_id)
-
-            response_stream = self.client.agents.turn.create(**turn_params)  # type: ignore[call-overload]
-
-            # Use shared stream processor
-            from shared_clients.stream_processor import LlamaStackStreamProcessor
-
-            stream_result = await LlamaStackStreamProcessor.process_stream(
-                response_stream,
-                collect_content=True,
-            )
-
-            content = stream_result["content"]
-            tool_calls_made = stream_result["tool_calls_made"]
-            errors = stream_result["errors"]
-            chunk_count = stream_result["chunk_count"]
-
-            if errors:
-                logger.error("Stream processing errors", errors=errors)
-
-            # If no content collected, provide error message instead of stream object
-            if not content:
-                content = f"No response content received from agent (processed {chunk_count} chunks). This may indicate the agent didn't complete its turn or the stream format has changed."
-                logger.warning(
-                    "No content collected from stream",
-                    chunk_count=chunk_count,
-                    message="Check if agent completed its turn successfully",
-                )
-
-            # Log tool calls for monitoring (Strategy 3 only)
-            if tool_calls_made:
-                logger.info(
-                    "Tools called during agent processing",
-                    agent_id=agent_id,
-                    tool_calls=tool_calls_made,
-                )
-
-            # Create response with automatic timing calculation
-            agent_response = self._create_agent_response(
-                request=request,
-                content=stream_result["content"],
-                agent_id=agent_id,
-                metadata={
-                    "tool_calls_made": stream_result["tool_calls_made"],
-                    "chunk_count": stream_result["chunk_count"],
-                    "errors": stream_result["errors"],
-                },
-                start_time=start_time,
-            )
-
-            # Handle agent routing detection if needed (only for main requests)
-            if not skip_routing:
-                final_response = await self._handle_agent_routing(
-                    agent_response, request
-                )
-                return final_response
-            else:
-                return agent_response
+            return await self._handle_responses_mode_request(request, start_time)
 
         except Exception as e:
             logger.error(
@@ -1491,7 +1361,6 @@ def _create_normalized_request_from_data(
         user_context=request_data.get("user_context", {}),
         target_agent_id=request_data.get("target_agent_id"),
         requires_routing=request_data.get("requires_routing", True),
-        use_responses=request_data.get("use_responses", True),
         created_at=datetime.fromisoformat(
             request_data.get("created_at", datetime.now().isoformat())
         ),

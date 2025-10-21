@@ -58,43 +58,19 @@ The system consists of three main services:
 
 ## Conversation Modes
 
-The system supports two distinct conversation modes, each optimized for different use cases:
+The system uses LangGraph-based state machine conversations for advanced conversation management:
 
-### Agent Mode (Default)
-- **Technology**: LlamaStack-based agent interactions
-- **Use Case**: Traditional agent routing and specialized task handling
-- **Features**: 
-  - Intelligent agent routing based on request content
-  - Specialized agents for specific tasks (laptop refresh, HR queries, etc.)
-  - Session-based conversation context
-  - Integration with MCP servers for tool access
-- **API Endpoint**: `/api/v1/requests/generic` (default behavior)
-- **Best For**: Task-oriented interactions, specialized workflows, tool integration
-
-### Responses Mode (LangGraph)
+### Conversation Management
 - **Technology**: LangGraph state machine with persistent conversation threads
-- **Use Case**: Conversational AI with advanced state management
 - **Features**:
   - Persistent conversation threads across sessions
   - Advanced state machine-based conversation flow
   - Enhanced context management and memory
   - Support for complex multi-turn conversations
-- **API Endpoints**: All endpoints support `use_responses: true` flag
-- **Best For**: Conversational AI, complex workflows, multi-turn interactions
-
-### Choosing Between Modes
-
-- **Use Agent Mode** when you need:
-  - Specialized task handling
-  - Tool integration (MCP servers)
-  - Agent routing based on request content
-  - Traditional chatbot functionality
-
-- **Use Responses Mode** when you need:
-  - Advanced conversation management
-  - Persistent conversation threads
-  - Complex state-based workflows
-  - Multi-turn conversational AI
+  - Intelligent agent routing and specialized task handling
+  - Session-based conversation context
+- **API Endpoints**: All request endpoints support conversation management
+- **Best For**: Conversational AI, complex workflows, multi-turn interactions, task-oriented interactions
 
 ## Integration Types
 

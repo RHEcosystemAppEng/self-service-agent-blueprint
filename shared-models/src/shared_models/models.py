@@ -411,10 +411,6 @@ class NormalizedRequest(BaseModel):
     # Agent routing
     target_agent_id: Optional[str] = Field(None, max_length=255)
     requires_routing: bool = Field(default=True)
-    use_responses: bool = Field(
-        default=False,
-        description="Enable responses API mode (LangGraph-based conversations)",
-    )
 
     # Timestamps
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

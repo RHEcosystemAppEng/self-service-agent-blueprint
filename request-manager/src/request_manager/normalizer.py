@@ -36,7 +36,6 @@ class RequestNormalizer:
             "content": request.content,
             "created_at": datetime.now(timezone.utc),
             "target_agent_id": target_agent_id,
-            "use_responses": request.use_responses,
         }
 
         # Handle integration-specific normalization
