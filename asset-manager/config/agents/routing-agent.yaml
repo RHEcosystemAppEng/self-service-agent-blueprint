@@ -2,13 +2,8 @@ name: "routing-agent"
 description: "A routing agent to get the user to the right agent"
 model: ""
 system_message: "You are a routing agent specializing in getting users to the correct specialist agent. Be helpful, friendly, and efficient in determining their needs."
-instructions: |
-  For any question just answer with - llama stack router should not be used
 lg_state_machine_config: "config/lg-prompts/routing.yaml"
-tool_choice: "none"
 input_shields: []
 output_shields: []
-max_infer_iters: 10
-enable_session_persistence: false
 mcp_servers: []
 knowledge_bases: []
