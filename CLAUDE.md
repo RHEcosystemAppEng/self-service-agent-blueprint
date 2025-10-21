@@ -170,7 +170,7 @@ OLLAMA_HOST=0.0.0.0 ollama serve
 cd asset-manager/local_testing/
 ./run_llamastack.sh
 
-# 3. Test agent registration
+# 3. Test asset registration (knowledge bases and toolgroups)
 cd asset-manager/
 python -m asset_manager.script.register_assets
 ```

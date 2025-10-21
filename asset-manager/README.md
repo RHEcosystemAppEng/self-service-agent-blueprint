@@ -1,8 +1,9 @@
 # Self-service agent blueprint: Asset Manager Module
 
-This module provides two main components:
-- **AgentManager**: Manages agent creation and configuration
+This module provides asset management components for the self-service agent system:
 - **KnowledgeBaseManager**: Manages knowledge bases (vector databases) for RAG functionality
+- **ToolgroupsManager**: Manages MCP toolgroups for external tool integration
+- **ResponsesAgentManager**: Manages LangGraph-based agents for conversation handling
 
 ## Project sync
 
@@ -46,7 +47,7 @@ For convenience, I set it on my `~/.bashrc` on my Fedora machine.
 uv run script/register_assets.py
 ```
 
-This will create both knowledge bases and agents. The knowledge bases are created from directories in `config/knowledge_bases/`, where each directory becomes a separate vector database with all `.txt` files in that directory inserted as documents.
+This will register knowledge bases and toolgroups with LlamaStack. The knowledge bases are created from directories in `config/knowledge_bases/`, where each directory becomes a separate vector database with all `.txt` files in that directory inserted as documents.
 
 ## Knowledge Base Management
 
