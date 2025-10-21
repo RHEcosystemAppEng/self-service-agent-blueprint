@@ -10,17 +10,13 @@ import httpx
 from cloudevents.http import CloudEvent, to_structured
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
-from llama_stack_client import LlamaStackClient
 from shared_clients.stream_processor import LlamaStackStreamProcessor
 from shared_models import (
-    AgentMapping,
     CloudEventBuilder,
     CloudEventHandler,
     EventTypes,
     configure_logging,
-    create_agent_mapping,
     create_cloudevent_response,
-    create_not_found_error,
     create_shared_lifespan,
     generate_fallback_user_id,
     get_database_manager,
@@ -60,42 +56,7 @@ class AgentService:
 
     def __init__(self, config: AgentConfig) -> None:
         self.config = config
-        self.client: LlamaStackClient
         self.http_client = httpx.AsyncClient(timeout=30.0)
-        self.agent_mapping: AgentMapping = create_agent_mapping(
-            {}
-        )  # Type-safe agent mapping
-        self.always_refresh_mapping = (
-            os.getenv("ALWAYS_REFRESH_AGENT_MAPPING", "true").lower() == "true"
-        )
-        # Request-level cache to avoid multiple mapping refreshes per request
-        self._refreshed_requests: set[str] = set()
-        # Cache cleanup threshold - clear cache when it gets too large
-        self._max_cached_requests = 1000
-
-    async def initialize(self) -> None:
-        """Initialize the agent service."""
-        try:
-            # Create HTTP client that forces HTTP without TLS
-            import httpx
-
-            http_client = httpx.Client(
-                verify=False,  # Disable SSL verification
-                timeout=30.0,
-                follow_redirects=True,
-            )
-
-            # Initialize LlamaStackClient with explicit HTTP client
-            self.client = LlamaStackClient(
-                base_url=self.config.llama_stack_url, http_client=http_client
-            )
-            logger.debug("Connected to Llama Stack", url=self.config.llama_stack_url)
-
-            # Build initial agent name to ID mapping
-            await self._build_agent_mapping()
-        except Exception as e:
-            logger.error("Failed to connect to Llama Stack", exc_info=e)
-            raise RuntimeError(f"AgentService initialization failed: {e}") from e
 
     def _is_reset_command(self, content: str) -> bool:
         """Check if the content is a reset command."""
@@ -216,93 +177,25 @@ class AgentService:
                 content="Failed to retrieve token statistics. Please try again.",
             )
 
-    async def _build_agent_mapping(self, request_id: Optional[str] = None) -> None:
-        """Build mapping from agent names to agent IDs.
-
-        Args:
-            request_id: Optional request ID for request-level caching.
-                       If provided and mapping was already refreshed for this request,
-                       the refresh will be skipped.
-        """
-        # Check if we've already refreshed for this request
-        if request_id and request_id in self._refreshed_requests:
-            logger.debug(
-                "Skipping agent mapping refresh - already done for this request",
-                request_id=request_id,
-            )
-            return
-
-        try:
-            logger.info("Building agent name to ID mapping...", request_id=request_id)
-            agents_response = self.client.agents.list()
-            raw_mapping = {}
-
-            # Handle both dict and object formats from the API
-            agents_data = agents_response.data
-
-            logger.info("Retrieved agents from LlamaStack", count=len(agents_data))
-
-            for agent in agents_data:
-                # The API returns dict format, so we can safely access as dict
-                agent_name = agent.get("agent_config", {}).get("name") or agent.get(  # type: ignore[attr-defined]
-                    "name", "unknown"
-                )
-                agent_id = agent.get("agent_id", agent.get("id", "unknown"))
-
-                raw_mapping[agent_name] = agent_id
-                logger.debug("Mapped agent", name=agent_name, id=agent_id)
-
-            # Create type-safe mapping
-            self.agent_mapping = create_agent_mapping(dict(raw_mapping))  # type: ignore[arg-type]
-
-            # Add to request cache if request_id provided
-            if request_id:
-                self._refreshed_requests.add(request_id)
-                # Clean up cache if it gets too large
-                if len(self._refreshed_requests) > self._max_cached_requests:
-                    logger.debug(
-                        "Clearing request cache to prevent memory leaks",
-                        cache_size=len(self._refreshed_requests),
-                    )
-                    self._refreshed_requests.clear()
-
-            logger.info(
-                "Agent mapping completed",
-                total_agents=len(self.agent_mapping.get_all_names()),
-                request_id=request_id,
-            )
-
-        except Exception as e:
-            logger.error(
-                "Failed to build agent mapping",
-                error=str(e),
-                error_type=type(e).__name__,
-            )
-            self.agent_mapping = create_agent_mapping({})
-            # Continue initialization even if mapping fails
-
     async def process_request(self, request: NormalizedRequest) -> AgentResponse:
         """Process a normalized request and return agent response."""
-        return await self._process_request_core(request, skip_routing=False)
+        return await self._process_request_core(request)
 
-    async def _process_request_core(
-        self, request: NormalizedRequest, skip_routing: bool = False
-    ) -> AgentResponse:
+    async def _process_request_core(self, request: NormalizedRequest) -> AgentResponse:
         """Core request processing logic."""
         start_time = datetime.now(timezone.utc)
 
         try:
             # Check for reset command first
-            if not skip_routing and self._is_reset_command(request.content):
+            if self._is_reset_command(request.content):
                 return await self._handle_reset_command(request)
 
             # Check for tokens command
-            if not skip_routing and self._is_tokens_command(request.content):
+            if self._is_tokens_command(request.content):
                 return await self._handle_tokens_command(request)
 
-            # Publish processing started event for user notification (only for main requests)
-            if not skip_routing:
-                await self._publish_processing_event(request)
+            # Publish processing started event for user notification
+            await self._publish_processing_event(request)
 
             return await self._handle_responses_mode_request(request, start_time)
 
@@ -671,13 +564,7 @@ async def _agent_service_startup() -> None:
 
     config = AgentConfig()
     _agent_service = AgentService(config)
-
-    try:
-        await _agent_service.initialize()
-        logger.info("Agent Service initialized")
-    except Exception as e:
-        logger.error("Failed to initialize Agent Service", exc_info=e)
-        raise
+    logger.info("Agent Service initialized")
 
 
 async def _agent_service_shutdown() -> None:
@@ -731,29 +618,6 @@ async def detailed_health_check(
             db=db,
         )
     )
-
-
-@app.get("/agents")
-async def list_agents() -> Dict[str, Any]:
-    """List available agents endpoint."""
-    if not _agent_service:
-        raise create_not_found_error("Agent service not initialized")
-
-    try:
-        # Refresh agent mapping to get latest agents
-        await _agent_service._build_agent_mapping()
-
-        return {
-            "agents": _agent_service.agent_mapping.to_dict(),
-            "count": len(_agent_service.agent_mapping.get_all_names()),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-    except Exception as e:
-        logger.error("Failed to get agent list", exc_info=e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve agent list",
-        )
 
 
 @app.post("/process", response_model=None)

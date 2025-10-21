@@ -116,17 +116,6 @@ class AgentServiceClient(ServiceClient):
             )
             return None
 
-    async def list_agents(self) -> Optional[Dict[str, Any]]:
-        """List available agents."""
-        try:
-            response = await self.get("/agents")
-            response.raise_for_status()
-            result = response.json()
-            return result if isinstance(result, dict) else None
-        except Exception as e:
-            logger.error("Failed to list agents", error=str(e))
-            return None
-
     async def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Get session details via REST API."""
         try:

@@ -874,26 +874,7 @@ class SlackService:
 
             total_requests = session_data.get("total_requests", 0)
             status = session_data.get("status", "Unknown")
-            agent_id = session_data.get("current_agent_id", None) or "Not assigned"
-
-            # Convert agent UUID to human-readable name using existing AgentMapping
-            agent_name = agent_id
-            if agent_id and agent_id != "Not assigned":
-                try:
-                    from shared_models import create_agent_mapping
-
-                    agents_response = await self.agent_service_client.list_agents()
-                    if agents_response and "agents" in agents_response:
-                        # Create AgentMapping from the response
-                        agent_mapping = create_agent_mapping(agents_response["agents"])
-                        # Use the existing get_name method
-                        agent_name = agent_mapping.get_name(agent_id) or agent_id
-                except Exception as e:
-                    logger.warning(
-                        "Failed to convert agent UUID to name",
-                        agent_id=agent_id,
-                        error=str(e),
-                    )
+            agent_name = session_data.get("current_agent_id", None) or "Not assigned"
 
             return (
                 f"📋 *Session Information*\n\n"
