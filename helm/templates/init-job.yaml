@@ -48,7 +48,7 @@ spec:
               done
               echo "LlamaStack is ready"
 
-              echo "Registering knowledge bases and toolgroups..."
+              echo "Registering knowledge bases..."
 
               # Change to the asset manager directory and run the registration script
               cd /app/asset-manager
@@ -57,7 +57,7 @@ spec:
               echo "Running asset registration script..."
               /app/.venv/bin/python -m asset_manager.script.register_assets
 
-              echo "Knowledge bases and toolgroups registered successfully"
+              echo "Knowledge bases registered successfully"
               
               echo "Initialization job completed successfully"
               

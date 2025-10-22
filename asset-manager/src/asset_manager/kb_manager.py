@@ -6,17 +6,12 @@ from typing import Any, List, Optional
 
 import openai
 
-from .manager import Manager
 
-
-class KnowledgeBaseManager(Manager):
+class KnowledgeBaseManager:
     def __init__(self, config: dict[str, Any]) -> None:
         self._openai_client: openai.OpenAI | None = None
         self._config = config
         self._knowledge_bases_path = Path("config/knowledge_bases")
-        self._vector_store_registry: dict[str, str] = (
-            {}
-        )  # Map kb_name to vector_store_id
 
     def connect_to_openai_client(self) -> None:
         """Initialize OpenAI client configured to use LlamaStack"""
@@ -84,9 +79,6 @@ class KnowledgeBaseManager(Manager):
             logging.info(
                 f"Created vector store via OpenAI client: {vector_store_id} with name: {vector_store_name}"
             )
-
-            # Store mapping for later reference
-            self._vector_store_registry[kb_name] = vector_store_id
 
             # Upload files to vector store
             uploaded_files = self._upload_files_to_vector_store(

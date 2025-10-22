@@ -9,7 +9,7 @@ This is a self-service agent blueprint implementing a complete AI agent manageme
 - **agent-service/**: AI agent processing service that handles LlamaStack interactions
 - **request-manager/**: Request routing, session management, and unified communication processing
 - **integration-dispatcher/**: Multi-channel delivery (Slack, Email, etc.)
-- **asset-manager/**: Agent, knowledge base, and toolgroup registration
+- **asset-manager/**: Agent and knowledge base registration
 - **mcp-servers/**: MCP (Model Context Protocol) servers for external tool integration
 - **mock-eventing-service/**: Lightweight mock service for testing without Knative infrastructure
 - **shared-models/**: Database models, Pydantic schemas, and Alembic migrations
@@ -90,10 +90,10 @@ make helm-uninstall NAMESPACE=your-namespace
 
 ### Core Components
 
-1. **Agent Service**: Processes AI requests via LlamaStack, handles toolgroups and streaming responses
+1. **Agent Service**: Processes AI requests via LlamaStack, handles streaming responses
 2. **Request Manager**: Routes requests, manages sessions, unified communication processing with strategy pattern
 3. **Integration Dispatcher**: Delivers responses to multiple channels (Slack, Email, etc.)
-4. **Asset Manager**: Registers agents, knowledge bases, and toolgroups with LlamaStack
+4. **Asset Manager**: Registers knowledge bases with LlamaStack; MCP servers configured in agent YAML files
 5. **MCP Servers**: External tool integration (employee-info, ServiceNow)
 6. **Mock Eventing Service**: Lightweight service that mimics Knative broker behavior for testing
 7. **Shared Database**: PostgreSQL with Alembic migrations for session/request persistence
@@ -170,7 +170,7 @@ OLLAMA_HOST=0.0.0.0 ollama serve
 cd asset-manager/local_testing/
 ./run_llamastack.sh
 
-# 3. Test asset registration (knowledge bases and toolgroups)
+# 3. Test asset registration (knowledge bases)
 cd asset-manager/
 python -m asset_manager.script.register_assets
 ```
