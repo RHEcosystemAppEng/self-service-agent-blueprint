@@ -16,6 +16,7 @@ from .models import (
     AuthConfig,
     AuthType,
     BasicAuthConfig,
+    BearerTokenConfig,
     OAuthConfig,
     OpenServiceNowLaptopRefreshRequestParams,
     ServerConfig,
@@ -100,6 +101,18 @@ class ServiceNowClient:
                         "SERVICENOW_API_KEY_HEADER", "X-ServiceNow-API-Key"
                     ),
                 ),
+            )
+
+        elif auth_type == "bearer":
+            bearer_token = os.getenv("SERVICENOW_BEARER_TOKEN")
+            if not bearer_token:
+                raise ValueError(
+                    "SERVICENOW_BEARER_TOKEN is required for bearer token auth"
+                )
+
+            auth_config = AuthConfig(
+                type=AuthType.BEARER,
+                bearer=BearerTokenConfig(token=bearer_token),
             )
 
         else:

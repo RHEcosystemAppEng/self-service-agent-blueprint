@@ -128,10 +128,58 @@ snow/
 - `SELF_SERVICE_AGENT_SNOW_SERVER_SERVICE_PORT_HTTP`: HTTP port (default: 8001)
 - `MCP_HOST`: Host address (default: "0.0.0.0")
 - `SERVICENOW_INSTANCE_URL`: ServiceNow instance URL (e.g., "https://dev295439.service-now.com/")
-- `SERVICENOW_USERNAME`: ServiceNow username for authentication
-- `SERVICENOW_AUTH_TYPE`: Authentication type (e.g., "basic")
-- `SERVICENOW_PASSWORD`: ServiceNow password (sensitive - store as secret)
+- `SERVICENOW_AUTH_TYPE`: Authentication type - options: "basic", "oauth", "api_key", "bearer" (default: "basic")
 - `USE_REAL_SERVICENOW`: if set to "true" will attempt to call the APIs of `SERVICENOW_INSTANCE_URL` (default: false)
+- `SERVICENOW_BEARER_TOKEN`: Bearer token for authentication
+- `SERVICENOW_CLIENT_ID`: OAuth client ID for authentication
+- `SERVICENOW_CLIENT_SECRET`: OAuth client secret for authentication
+ 
+### Authentication Configuration
+
+Choose **one** of the following methods:
+
+### Basic Authentication
+```bash
+export SERVICENOW_INSTANCE_URL="https://your-instance-service-now.com"
+export SERVICENOW_AUTH_TYPE="basic"
+export SERVICENOW_USERNAME="your-username"
+export SERVICENOW_PASSWORD="your-password"
+export USE_REAL_SERVICENOW="true"
+```
+
+### Bearer Token Authentication
+```bash
+export SERVICENOW_INSTANCE_URL="https://your-instance-service-now.com"
+export SERVICENOW_AUTH_TYPE="bearer"
+export SERVICENOW_BEARER_TOKEN="your-bearer-token"
+export USE_REAL_SERVICENOW="true"
+```
+
+#### API Key Authentication
+- `SERVICENOW_API_KEY`: API key for authentication
+- `SERVICENOW_API_KEY_HEADER`: Header name for API key (default: "X-ServiceNow-API-Key")
+
+## Obtaining Bearer Tokens
+
+Create OAuth Application
+1. Navigate to **System OAuth** → **Application Registry**
+2. Click **New**
+3. Click **"Create an OAuth API endpoint for external clients"**
+4. Configure the application:
+   - **Name**: "Self-Service Agent Integration" (or your preferred name)
+5. Click **Save**
+6. Note the **Client ID** and **Client Secret** from the created application
+
+#### Step 3: Use OAuth Authentication
+Use the OAuth authentication method with your Client ID and Client Secret (tokens auto-refresh)
+
+### Method 3: Get Bearer Token
+
+Use the helper script to retrieve a bearer token via OAuth (tries client credentials first, then password):
+```bash
+python mcp-servers/snow/scripts/setup_oauth.py
+
+```
 
 ## Error Handling
 

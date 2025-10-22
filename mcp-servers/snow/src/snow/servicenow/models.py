@@ -14,6 +14,7 @@ class AuthType(str, Enum):
     BASIC = "basic"
     OAUTH = "oauth"
     API_KEY = "api_key"
+    BEARER = "bearer"
 
 
 class BasicAuthConfig(BaseModel):
@@ -40,6 +41,12 @@ class ApiKeyConfig(BaseModel):
     header_name: str = "X-ServiceNow-API-Key"
 
 
+class BearerTokenConfig(BaseModel):
+    """Configuration for bearer token authentication."""
+
+    token: str
+
+
 class AuthConfig(BaseModel):
     """Authentication configuration."""
 
@@ -47,6 +54,7 @@ class AuthConfig(BaseModel):
     basic: Optional[BasicAuthConfig] = None
     oauth: Optional[OAuthConfig] = None
     api_key: Optional[ApiKeyConfig] = None
+    bearer: Optional[BearerTokenConfig] = None
 
 
 class ServerConfig(BaseModel):

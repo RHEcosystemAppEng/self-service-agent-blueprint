@@ -66,6 +66,12 @@ class AuthManager:
 
             headers[self.config.api_key.header_name] = self.config.api_key.api_key
 
+        elif self.config.type == AuthType.BEARER:
+            if not self.config.bearer:
+                raise ValueError("Bearer token configuration is required")
+
+            headers["Authorization"] = f"Bearer {self.config.bearer.token}"
+
         return headers
 
     def _get_oauth_token(self) -> str:
