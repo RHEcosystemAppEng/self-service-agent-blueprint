@@ -1,15 +1,9 @@
-from pathlib import Path
-
 from asset_manager.kb_manager import KnowledgeBaseManager
-from asset_manager.util import load_config_from_path
 
 
 def main() -> None:
-    config_path = Path("config")
-    config = load_config_from_path(config_path)
-
     # Initialize managers
-    kb_manager = KnowledgeBaseManager(config)
+    kb_manager = KnowledgeBaseManager()
 
     # Register knowledge bases
     print("registering knowledge bases...")

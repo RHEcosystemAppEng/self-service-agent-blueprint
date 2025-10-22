@@ -2,15 +2,14 @@ import logging
 import os
 import uuid
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Optional
 
 import openai
 
 
 class KnowledgeBaseManager:
-    def __init__(self, config: dict[str, Any]) -> None:
+    def __init__(self) -> None:
         self._openai_client: openai.OpenAI | None = None
-        self._config = config
         self._knowledge_bases_path = Path("config/knowledge_bases")
 
     def connect_to_openai_client(self) -> None:
@@ -148,16 +147,3 @@ class KnowledgeBaseManager:
                     continue
 
         return uploaded_count
-
-    def list_knowledge_bases(self) -> List[str]:
-        """List all available knowledge base directories"""
-        knowledge_bases: list[str] = []
-
-        if not self._knowledge_bases_path.exists():
-            return knowledge_bases
-
-        for kb_dir in self._knowledge_bases_path.iterdir():
-            if kb_dir.is_dir():
-                knowledge_bases.append(kb_dir.name)
-
-        return knowledge_bases
