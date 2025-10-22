@@ -13,15 +13,11 @@ def main() -> None:
     kb_manager = KnowledgeBaseManager(config)
     tg_manager = ToolgroupsManager(config)
 
-    # Connect to llama stack
+    # Connect to llama stack for toolgroups
     print("connecting to llama stack...")
-    kb_manager.connect_to_llama_stack()
     tg_manager.connect_to_llama_stack()
 
-    # Register knowledge bases first
-    print("kb_manager is_connected:", kb_manager.is_connected())
-    print("unregistering knowledge bases...")  # temporary
-    kb_manager.unregister_knowledge_bases()  # temporary
+    # Register knowledge bases
     print("registering knowledge bases...")
     kb_manager.register_knowledge_bases()
 
