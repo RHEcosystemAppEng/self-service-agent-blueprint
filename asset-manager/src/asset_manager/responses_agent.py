@@ -41,8 +41,8 @@ class Agent:
         self.system_message = system_message or self._get_default_system_message()
 
         # Build tools once during initialization (without authoritative_user_id)
-        mcp_servers = self.config.get("mcp_servers", [])
-        self.tools = self._get_mcp_tools_to_use(mcp_servers)
+        mcp_server_configs = self.config.get("mcp_servers", [])
+        self.tools = self._get_mcp_tools_to_use(mcp_server_configs)
 
         logger.info(
             f"Initialized Agent '{agent_name}' with model '{self.model}' and {len(self.tools)} tools"
@@ -132,11 +132,20 @@ class Agent:
 
     def _get_mcp_tools_to_use(
         self,
-        requested_servers: list[str] | None = None,
+        mcp_server_configs: list[dict[str, Any]] | None = None,
         authoritative_user_id: str | None = None,
         allowed_tools: list[str] | None = None,
     ) -> list[Any]:
-        """Get complete tools array for LlamaStack responses API."""
+        """Get complete tools array for LlamaStack responses API.
+
+        Args:
+            mcp_server_configs: List of MCP server configurations with name, uri, etc.
+            authoritative_user_id: Optional user ID to pass to MCP servers
+            allowed_tools: Optional list of tool names to restrict
+
+        Returns:
+            List of tool configurations for LlamaStack responses API
+        """
         tools_to_use = []
 
         # Add file_search tools for knowledge bases from agent config
@@ -155,37 +164,26 @@ class Agent:
                 }
                 tools_to_use.append(knowledge_base_tool)
 
-        # Add MCP tools for requested servers
-        if requested_servers:
-            for server_name in requested_servers:
+        # Add MCP tools from server configurations
+        if mcp_server_configs:
+            for server_config in mcp_server_configs:
                 try:
-                    # Use the existing LlamaStack client for tool lookup
-                    llama_tools = self.llama_client.tools.list()
-                    server_url = None
-                    for tool in llama_tools:
-                        if (
-                            tool.provider_id == "model-context-protocol"
-                            and hasattr(tool, "metadata")
-                            and tool.metadata
-                        ):
-                            endpoint = tool.metadata.get("endpoint")
-                            if endpoint:
-                                from urllib.parse import urlparse
+                    server_name = server_config.get("name")
+                    server_uri = server_config.get("uri")
 
-                                parsed_url = urlparse(str(endpoint))
-                                hostname = parsed_url.hostname
-                                if (
-                                    hostname
-                                    and f"self-service-agent-{server_name}" in hostname
-                                ):
-                                    server_url = endpoint
-                                    break
+                    if not server_name or not server_uri:
+                        logger.warning(
+                            f"Skipping MCP server with missing name or uri: {server_config}"
+                        )
+                        continue
 
                     mcp_tool: Dict[str, Any] = {
                         "type": "mcp",
                         "server_label": server_name,
-                        "server_url": server_url,
-                        "require_approval": "never",
+                        "server_url": server_uri,
+                        "require_approval": server_config.get(
+                            "require_approval", "never"
+                        ),
                     }
 
                     # Add headers if authoritative_user_id is provided
@@ -194,18 +192,21 @@ class Agent:
                             "AUTHORITATIVE_USER_ID": authoritative_user_id
                         }
 
-                    # Add allowed_tools if specified
+                    # Add allowed_tools if specified (from parameter or config)
+                    config_allowed_tools = server_config.get("allowed_tools")
                     if allowed_tools:
                         mcp_tool["allowed_tools"] = allowed_tools
+                    elif config_allowed_tools:
+                        mcp_tool["allowed_tools"] = config_allowed_tools
 
                     tools_to_use.append(mcp_tool)
 
                 except Exception as e:
                     logger.error(
-                        f"Error building MCP tool for server '{server_name}': {e}"
+                        f"Error building MCP tool for server config {server_config}: {e}"
                     )
 
-            logger.info(f"Built tools array with {len(tools_to_use)} tools")
+        logger.info(f"Built tools array with {len(tools_to_use)} tools")
 
         return tools_to_use
 
@@ -428,9 +429,9 @@ class Agent:
                 )
             elif authoritative_user_id or allowed_tools:
                 # Include MCP servers and knowledge base tools
-                mcp_servers = self.config.get("mcp_servers", [])
+                mcp_server_configs = self.config.get("mcp_servers", [])
                 tools_to_use = self._get_mcp_tools_to_use(
-                    mcp_servers, authoritative_user_id, allowed_tools
+                    mcp_server_configs, authoritative_user_id, allowed_tools
                 )
             else:
                 tools_to_use = self.tools

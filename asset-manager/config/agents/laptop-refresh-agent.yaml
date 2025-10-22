@@ -11,5 +11,8 @@ sampling_params:
     temperature: 0.7
     top_p: 0.95
   max_tokens: 2000
-mcp_servers: ["snow"]
+mcp_servers:
+  - name: "snow"
+    uri: "http://self-service-agent-snow:8000/sse"
+    require_approval: "never"
 knowledge_bases: ["laptop-refresh"]
