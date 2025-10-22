@@ -18,7 +18,7 @@ from getpass import getpass
 import requests
 
 
-def get_oauth_token():
+def get_oauth_token() -> None:
     """
     Guides the user through fetching a ServiceNow OAuth token and prints it.
     """
