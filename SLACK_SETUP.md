@@ -43,6 +43,10 @@ After creating the app, update the placeholder URLs:
    - Update Request URL to: `https://your-integration-dispatcher-route/slack/interactive`
    - Click **"Save Changes"**
 
+3. **Slash Commands**:
+  - Update Request URL to: `https://your-integration-dispatcher-route/slack/commands`
+  - Click **"Save Changes"**
+
 ### Step 4: Install App
 
 1. Go to **"Install App"**
