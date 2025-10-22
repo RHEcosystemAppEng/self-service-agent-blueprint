@@ -67,7 +67,7 @@ class SlackIntegrationHandler(BaseIntegrationHandler):
             blocks = self._build_message_blocks(
                 template_content.get("body", ""),
                 request,
-                slack_config,
+                dict(slack_config) if slack_config else {},
             )
 
             # Send message
@@ -90,7 +90,7 @@ class SlackIntegrationHandler(BaseIntegrationHandler):
                     metadata={
                         "channel": response["channel"],
                         "ts": response["ts"],
-                        "message_id": response.get("message", {}).get("ts"),
+                        "message_id": response.get("message", {}).get("ts"),  # type: ignore[call-overload]
                     },
                 )
             else:
@@ -196,6 +196,8 @@ class SlackIntegrationHandler(BaseIntegrationHandler):
 
     async def _get_user_dm_channel(self, user_email: str) -> str:
         """Get or create DM channel with user."""
+        if not self.client:
+            raise Exception("Slack client not initialized")
         try:
             # Find user by email
             users_response = await self.client.users_lookupByEmail(email=user_email)
@@ -209,20 +211,24 @@ class SlackIntegrationHandler(BaseIntegrationHandler):
             if not dm_response["ok"]:
                 raise Exception("Failed to open DM channel")
 
-            return dm_response["channel"]["id"]
+            channel_id = dm_response["channel"]["id"]
+            return str(channel_id) if channel_id is not None else ""
 
         except Exception as e:
             raise Exception(f"Failed to get DM channel: {str(e)}")
 
     async def _get_user_dm_channel_by_id(self, user_id: str) -> str:
         """Get or create DM channel with user by user ID."""
+        if not self.client:
+            raise Exception("Slack client not initialized")
         try:
             # Open DM channel directly with user ID
             dm_response = await self.client.conversations_open(users=[user_id])
             if not dm_response["ok"]:
                 raise Exception("Failed to open DM channel")
 
-            return dm_response["channel"]["id"]
+            channel_id = dm_response["channel"]["id"]
+            return str(channel_id) if channel_id is not None else ""
 
         except Exception as e:
             raise Exception(f"Failed to get DM channel for user {user_id}: {str(e)}")
@@ -234,7 +240,7 @@ class SlackIntegrationHandler(BaseIntegrationHandler):
         config: Dict[str, Any],
     ) -> list[Dict[str, Any]]:
         """Build Slack message blocks."""
-        blocks = []
+        blocks: list[Dict[str, Any]] = []
 
         # Main content block
         blocks.append(
@@ -249,15 +255,16 @@ class SlackIntegrationHandler(BaseIntegrationHandler):
 
         # Agent info if enabled
         if config.get("include_agent_info") and request.agent_id:
+            elements: list[Dict[str, str]] = [
+                {
+                    "type": "mrkdwn",
+                    "text": f"_Response from agent: {request.agent_id}_",
+                }
+            ]
             blocks.append(
                 {
                     "type": "context",
-                    "elements": [
-                        {
-                            "type": "mrkdwn",
-                            "text": f"_Response from agent: {request.agent_id}_",
-                        }
-                    ],
+                    "elements": elements,
                 }
             )
 

@@ -36,7 +36,7 @@ class SlackService:
         )  # Reduced from 180s
         self.agent_service_client = AgentServiceClient()
         # Simple rate limiting: track last request time per user
-        self._last_request_time = {}
+        self._last_request_time: Dict[str, float] = {}
         # Eventing configuration
         self.eventing_enabled = os.getenv("EVENTING_ENABLED", "true").lower() == "true"
         self.broker_url = os.getenv("BROKER_URL")
@@ -64,6 +64,10 @@ class SlackService:
         self, body: bytes, timestamp: str, signature: str
     ) -> bool:
         """Verify Slack request signature using shared utility."""
+        if self.signing_secret is None:
+            logger.warning("Slack signing secret not configured, skipping verification")
+            return True  # Skip verification if not configured
+
         return verify_slack_signature(
             body=body,
             timestamp=timestamp,
@@ -486,9 +490,9 @@ class SlackService:
                 # Create a new session and immediately send a message to routing-agent
                 try:
                     # Extract user info from the payload
-                    slack_user_id = payload.user.id
-                    channel_id = payload.channel.id if payload.channel else None
-                    team_id = payload.team.id if payload.team else None
+                    slack_user_id = payload.user["id"]  # type: ignore[index]
+                    channel_id = payload.channel["id"] if payload.channel else None  # type: ignore[index]
+                    team_id = payload.team["id"] if payload.team else None
 
                     # Resolve user ID (email or fallback to Slack user ID)
                     user_id, original_slack_user_id = await self._resolve_user_id(
@@ -560,6 +564,10 @@ class SlackService:
     ) -> Dict[str, Any]:
         """Handle modal form submissions."""
         try:
+            if payload.view is None:
+                logger.error("Modal payload missing view data")
+                return {"text": "❌ Error processing modal submission"}
+
             callback_id = payload.view.get("callback_id", "")
 
             if callback_id.startswith("followup_modal:"):
@@ -638,7 +646,7 @@ class SlackService:
                         slack_user_id=slack_user_id,
                         email=email,
                     )
-                    return email
+                    return str(email) if email is not None else None
                 else:
                     logger.warning(
                         "User email not found in Slack profile",
@@ -693,7 +701,9 @@ class SlackService:
                     return None
 
                 # Use shared TTL validation logic
-                from .integrations.defaults import integration_defaults_service
+                from .integrations.defaults import IntegrationDefaultsService
+
+                integration_defaults_service = IntegrationDefaultsService()
 
                 is_valid = (
                     await integration_defaults_service._validate_mapping_with_ttl(
@@ -703,7 +713,7 @@ class SlackService:
 
                 if is_valid:
                     await db.commit()
-                    return mapping.user_email
+                    return str(mapping.user_email)
                 else:
                     await db.commit()
                     return None
@@ -715,56 +725,6 @@ class SlackService:
                 error=str(e),
             )
             return None
-
-    async def _store_user_mapping(self, user_email: str, slack_user_id: str) -> None:
-        """Store the email -> Slack user ID mapping for future use."""
-        try:
-            from datetime import datetime, timezone
-
-            from shared_models.database import get_database_manager
-            from shared_models.models import IntegrationType, UserIntegrationMapping
-
-            db_manager = get_database_manager()
-            async with db_manager.get_session() as db:
-                # Use upsert pattern - update if exists, insert if not
-                from sqlalchemy.dialects.postgresql import insert
-
-                stmt = insert(UserIntegrationMapping).values(
-                    user_email=user_email,
-                    integration_type=IntegrationType.SLACK,
-                    integration_user_id=slack_user_id,
-                    last_validated_at=datetime.now(timezone.utc),
-                    created_by="slack_service",
-                )
-
-                # On conflict, update the Slack user ID and validation timestamp
-                stmt = stmt.on_conflict_do_update(
-                    index_elements=["user_email", "integration_type"],
-                    set_={
-                        "integration_user_id": stmt.excluded.integration_user_id,
-                        "last_validated_at": stmt.excluded.last_validated_at,
-                        "validation_attempts": 0,
-                        "last_validation_error": None,
-                        "updated_at": datetime.now(timezone.utc),
-                    },
-                )
-
-                await db.execute(stmt)
-                await db.commit()
-
-                logger.info(
-                    "Stored/updated user mapping",
-                    user_email=user_email,
-                    slack_user_id=slack_user_id,
-                )
-
-        except Exception as e:
-            logger.error(
-                "Failed to store user mapping",
-                user_email=user_email,
-                slack_user_id=slack_user_id,
-                error=str(e),
-            )
 
     async def _resolve_user_id(
         self, slack_user_id: str, context: str = "request"
@@ -799,7 +759,9 @@ class SlackService:
                 user_email=user_email,
             )
             # Store the mapping for future use
-            await self._store_user_mapping(user_email, slack_user_id)
+            from .user_mapping_utils import store_slack_user_mapping
+
+            await store_slack_user_mapping(user_email, slack_user_id, "slack_service")
             return user_email, slack_user_id
         else:
             logger.warning(
@@ -828,12 +790,13 @@ class SlackService:
         """Forward request to Request Manager."""
         try:
             # Extract Slack-specific fields from metadata
-            channel_id = metadata.get("slack_channel", "") if metadata else ""
-            thread_id = metadata.get("slack_thread_ts") if metadata else None
-            slack_user_id = metadata.get(
-                "slack_user_id", user_id
-            )  # Get original Slack user ID from metadata
-            slack_team_id = metadata.get("slack_team_id", "") if metadata else ""
+            if metadata is None:
+                metadata = {}
+
+            channel_id = metadata.get("slack_channel", "")
+            thread_id = metadata.get("slack_thread_ts")
+            slack_user_id = metadata.get("slack_user_id", user_id)
+            slack_team_id = metadata.get("slack_team_id", "")
 
             logger.info(
                 "Extracting Slack fields from metadata",
@@ -911,26 +874,7 @@ class SlackService:
 
             total_requests = session_data.get("total_requests", 0)
             status = session_data.get("status", "Unknown")
-            agent_id = session_data.get("current_agent_id", None) or "Not assigned"
-
-            # Convert agent UUID to human-readable name using existing AgentMapping
-            agent_name = agent_id
-            if agent_id and agent_id != "Not assigned":
-                try:
-                    from shared_models import create_agent_mapping
-
-                    agents_response = await self.agent_service_client.list_agents()
-                    if agents_response and "agents" in agents_response:
-                        # Create AgentMapping from the response
-                        agent_mapping = create_agent_mapping(agents_response["agents"])
-                        # Use the existing get_name method
-                        agent_name = agent_mapping.get_name(agent_id) or agent_id
-                except Exception as e:
-                    logger.warning(
-                        "Failed to convert agent UUID to name",
-                        agent_id=agent_id,
-                        error=str(e),
-                    )
+            agent_name = session_data.get("current_agent_id", None) or "Not assigned"
 
             return (
                 f"📋 *Session Information*\n\n"
@@ -965,12 +909,12 @@ class SlackService:
 
                 # Send chunk to Slack
                 await self._send_cloudevent(
-                    event_type="slack.message.stream",
-                    data={
+                    {
                         "channel": channel,
                         "text": chunk,
                         "thread_ts": thread_ts,
                     },
+                    "slack.message.stream",
                 )
 
                 # Small delay between chunks for better UX

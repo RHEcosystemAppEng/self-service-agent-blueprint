@@ -12,7 +12,7 @@ from .manager import Manager
 class KnowledgeBaseManager(Manager):
     def __init__(self, config: dict[str, Any]) -> None:
         self._client = None
-        self._openai_client = None
+        self._openai_client: openai.OpenAI | None = None
         self._config = config
         self._knowledge_bases_path = Path("config/knowledge_bases")
         self._vector_store_registry: dict[str, str] = (
@@ -82,11 +82,15 @@ class KnowledgeBaseManager(Manager):
 
         logging.info(f"Registering knowledge base: {vector_db_id}")
 
+        if self._client is None:
+            logging.error("Client not connected. Cannot register knowledge bases.")
+            return None
+
         try:
             # Select the first embedding model
             models = self._client.models.list()
             embedding_model_id = (
-                em := next(m for m in models if m.model_type == "embedding")
+                em := next(m for m in models if m.api_model_type == "embedding")
             ).identifier
             embedding_dimension = em.metadata["embedding_dimension"]
 
@@ -102,7 +106,7 @@ class KnowledgeBaseManager(Manager):
             self._client.vector_dbs.register(
                 vector_db_id=vector_db_id,
                 embedding_model=embedding_model_id,
-                embedding_dimension=embedding_dimension,
+                embedding_dimension=embedding_dimension,  # type: ignore[arg-type]
                 provider_id=vector_provider.provider_id,
             )
 
@@ -153,20 +157,22 @@ class KnowledgeBaseManager(Manager):
         if rag_documents:
             for doc in rag_documents:
                 print(doc["document_id"])
-            try:
-                logging.info(
-                    f"Inserting {len(rag_documents)} documents into {vector_db_id}"
-                )
-                self._client.tool_runtime.rag_tool.insert(
-                    documents=rag_documents,
-                    vector_db_id=vector_db_id,
-                    chunk_size_in_tokens=1024,
-                )
-                logging.info(f"Successfully inserted documents into {vector_db_id}")
-            except Exception as e:
-                logging.error(
-                    f"Failed to insert documents into {vector_db_id}: {str(e)}"
-                )
+        if self._client is None:
+            logging.error("Client not connected. Cannot insert documents.")
+            return
+
+        try:
+            logging.info(
+                f"Inserting {len(rag_documents)} documents into {vector_db_id}"
+            )
+            self._client.tool_runtime.rag_tool.insert(
+                documents=rag_documents,  # type: ignore[arg-type]
+                vector_db_id=vector_db_id,
+                chunk_size_in_tokens=1024,
+            )
+            logging.info(f"Successfully inserted documents into {vector_db_id}")
+        except Exception as e:
+            logging.error(f"Failed to insert documents into {vector_db_id}: {str(e)}")
         else:
             logging.warning(f"No txt files found in {directory}")
 
@@ -175,6 +181,12 @@ class KnowledgeBaseManager(Manager):
         kb_name = kb_directory.name
 
         logging.info(f"Registering knowledge base via OpenAI API: {kb_name}")
+
+        if self._openai_client is None:
+            logging.error(
+                "OpenAI client not connected. Cannot register knowledge base."
+            )
+            return None
 
         try:
             # Create vector store with unique name
@@ -217,6 +229,10 @@ class KnowledgeBaseManager(Manager):
         self, directory: Path, vector_store_id: str
     ) -> int:
         """Upload all txt files from a directory to OpenAI vector store"""
+        if self._openai_client is None:
+            logging.error("OpenAI client not connected. Cannot upload files.")
+            return 0
+
         uploaded_count = 0
 
         # Find all .txt files in the directory
@@ -267,7 +283,8 @@ class KnowledgeBaseManager(Manager):
     def unregister_knowledge_bases(self) -> None:
         """Unregister all registered vector databases"""
         if self._client is None:
-            self.connect_to_llama_stack()
+            logging.error("Client not connected. Cannot unregister knowledge bases.")
+            return
 
         logging.debug("Unregistering knowledge bases")
 
@@ -306,7 +323,8 @@ class KnowledgeBaseManager(Manager):
     def get_knowledge_base_by_vector_db_id(self, vector_db_id: str) -> Any | None:
         """Get a knowledge base by its vector database ID"""
         if self._client is None:
-            self.connect_to_llama_stack()
+            logging.error("Client not connected. Cannot get knowledge base.")
+            return None
 
         try:
             # Get list of all registered vector databases

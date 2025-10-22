@@ -30,8 +30,6 @@ spec:
           image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            - name: LLAMA_STACK_MODELS
-              value: {{ include "self-service-agent.getModelList" . }}
             - name: LLAMA_STACK_URL
               value: {{ .Values.llama_stack_url }}
             - name: LLAMASTACK_SERVICE_HOST
@@ -49,17 +47,17 @@ spec:
                 sleep 10
               done
               echo "LlamaStack is ready"
-              
-              echo "Registering agents..."
-              
+
+              echo "Registering knowledge bases and toolgroups..."
+
               # Change to the asset manager directory and run the registration script
               cd /app/asset-manager
-              
+
               # Activate virtual environment and run the asset registration script
               echo "Running asset registration script..."
               /app/.venv/bin/python -m asset_manager.script.register_assets
-              
-              echo "Agents registered successfully"
+
+              echo "Knowledge bases and toolgroups registered successfully"
               
               echo "Initialization job completed successfully"
               

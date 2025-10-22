@@ -4,7 +4,7 @@ import logging
 import os
 import subprocess
 import time
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +34,9 @@ class OpenShiftChatClient:
         self.test_script = test_script
         self.authoritative_user_id = authoritative_user_id
         self.reset_conversation = reset_conversation
-        self.process = None
+        self.process: Optional[subprocess.Popen[str]] = None
         self.session_active = False
-        self.session_output = []  # Capture all output for token parsing
+        self.session_output: list[str] = []  # Capture all output for token parsing
         self.app_tokens = {
             "input": 0,
             "output": 0,
@@ -161,8 +161,9 @@ class OpenShiftChatClient:
             raise RuntimeError("Session not active. Call start_session() first.")
 
         try:
-            self.process.stdin.write(message + "\n")
-            self.process.stdin.flush()
+            if self.process.stdin is not None:
+                self.process.stdin.write(message + "\n")
+                self.process.stdin.flush()
 
             response = self._read_full_agent_message(timeout)
 
@@ -199,12 +200,15 @@ class OpenShiftChatClient:
         lines_read = 0
 
         while time.time() - start_time < timeout:
-            if self.process.poll() is not None:
+            if self.process is not None and self.process.poll() is not None:
                 logger.debug("Process terminated while reading message")
                 break
 
             try:
-                line = self.process.stdout.readline()
+                if self.process is not None and self.process.stdout is not None:
+                    line = self.process.stdout.readline()
+                else:
+                    line = ""
                 if not line:
                     time.sleep(0.1)
                     continue

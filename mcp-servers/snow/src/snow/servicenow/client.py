@@ -5,7 +5,7 @@ ServiceNow API client for laptop refresh requests.
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import requests
 from snow.data.data import _calculate_laptop_age
@@ -29,7 +29,7 @@ class ServiceNowClient:
     ServiceNow API client for making requests to ServiceNow instance.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """
         Initialize the ServiceNow client with configuration from environment variables.
         """
@@ -182,7 +182,9 @@ class ServiceNowClient:
                 "data": None,
             }
 
-    def _get(self, endpoint, params=None):
+    def _get(
+        self, endpoint: str, params: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
         """Internal method for making GET requests to ServiceNow API."""
         full_url = f"{self.config.instance_url}{endpoint}"
         headers = self.auth_manager.get_headers()
@@ -193,7 +195,8 @@ class ServiceNowClient:
                 full_url, headers=headers, params=params, timeout=self.config.timeout
             )
             response.raise_for_status()
-            return response.json()
+            result = response.json()
+            return result if isinstance(result, dict) else None
 
         except requests.exceptions.RequestException as e:
             logger.error(f"ServiceNow API Error: {e}")
@@ -229,7 +232,7 @@ class ServiceNowClient:
                     "message": "Failed to connect to ServiceNow API",
                 }
 
-            if data.get("result") and len(data["result"]) > 0:
+            if data and data.get("result") and len(data["result"]) > 0:
                 user_data = data["result"][0]
                 return {
                     "success": True,
@@ -279,7 +282,7 @@ class ServiceNowClient:
                     "message": "Failed to connect to ServiceNow API",
                 }
 
-            if data.get("result"):
+            if data and data.get("result"):
                 computers = data["result"]
                 return {
                     "success": True,

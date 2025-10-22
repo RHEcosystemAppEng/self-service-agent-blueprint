@@ -2,10 +2,10 @@
 
 import logging
 import os
-from typing import Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import openai
-from deepeval.models import DeepEvalBaseLLM
+from deepeval.models import DeepEvalBaseLLM  # type: ignore
 
 from .token_counter import count_tokens_from_response
 
@@ -20,7 +20,7 @@ class CustomLLM(DeepEvalBaseLLM):
         self,
         api_key: str,
         base_url: str,
-        model_name: str = None,
+        model_name: str | None = None,
     ):
         """
         Initialize the CustomLLM with API credentials and configuration.
@@ -61,7 +61,7 @@ class CustomLLM(DeepEvalBaseLLM):
         client = self.load_model()
         try:
             # Build kwargs for the API call
-            api_kwargs = {
+            api_kwargs: Dict[str, Any] = {
                 "model": self.model_name,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.1,
@@ -86,7 +86,8 @@ class CustomLLM(DeepEvalBaseLLM):
                 response, self.model_name, "custom_llm_evaluation"
             )
 
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+            return str(content) if content is not None else ""
         except Exception as e:
             logger.error(f"Error generating response: {e}")
             raise
@@ -112,7 +113,7 @@ class CustomLLM(DeepEvalBaseLLM):
             )
 
             # Build kwargs for the API call
-            api_kwargs = {
+            api_kwargs: Dict[str, Any] = {
                 "model": self.model_name,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.1,  # Slightly higher temperature for better JSON formatting
@@ -137,7 +138,8 @@ class CustomLLM(DeepEvalBaseLLM):
                 response, self.model_name, "custom_llm_evaluation_async"
             )
 
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+            return str(content) if content is not None else ""
 
         except Exception as e:
             logger.error(f"Error generating async response: {e}")

@@ -236,11 +236,11 @@ Generate Integration Dispatcher specific environment variables
 {{- end }}
 {{- end }}
 {{- end }}
-{{- end }}
 {{/* Webhook default URL configuration */}}
 {{- if and (hasKey .Values.requestManagement "integrations") (hasKey .Values.requestManagement.integrations "userDefaults") (hasKey .Values.requestManagement.integrations.userDefaults "WEBHOOK") (hasKey .Values.requestManagement.integrations.userDefaults.WEBHOOK "url") }}
 - name: DEFAULT_WEBHOOK_URL
   value: {{ .Values.requestManagement.integrations.userDefaults.WEBHOOK.url | quote }}
+{{- end }}
 {{- end }}
 
 {{/*

@@ -4,10 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field, field_validator
-from shared_models.models import (
-    IntegrationType,
-    SessionStatus,
-)
+from shared_models.models import IntegrationType, SessionStatus
 
 
 class SessionCreate(BaseModel):
@@ -25,7 +22,7 @@ class SessionCreate(BaseModel):
 
     @field_validator("integration_type", mode="before")
     @classmethod
-    def normalize_integration_type(cls, v):
+    def normalize_integration_type(cls, v: Any) -> Any:
         """Convert integration_type to uppercase for case-insensitive input."""
         if isinstance(v, str):
             return IntegrationType(v.upper())

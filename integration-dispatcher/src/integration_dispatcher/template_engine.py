@@ -26,7 +26,7 @@ class TemplateEngine:
     async def render(
         self,
         integration_type: IntegrationType,
-        subject: str,
+        subject: str | None,
         content: str,
         variables: Dict[str, Any],
         db: AsyncSession,
@@ -47,32 +47,36 @@ class TemplateEngine:
             Dict with rendered 'subject' and 'body' content
         """
         # Get template from database
-        template = await self._get_template(integration_type, template_name, db)
+        template = await self._get_template(integration_type, template_name or "", db)
 
         # Prepare template variables
         template_vars = {
-            "subject": subject,
+            "subject": subject or "",
             "content": content,
             "integration_type": get_enum_value(integration_type),
             **variables,
         }
 
         # Render subject and body
-        rendered_subject = subject
+        rendered_subject = subject or ""
         rendered_body = content
         template_used = None
 
         if template:
-            template_used = template.template_name
+            template_used = (
+                str(template.template_name) if template.template_name else None
+            )
 
             # Render subject if template has one
             if template.subject_template:
-                subject_template = self.jinja_env.from_string(template.subject_template)
+                subject_template = self.jinja_env.from_string(
+                    str(template.subject_template)
+                )
                 rendered_subject = subject_template.render(**template_vars)
 
             # Render body
             if template.body_template:
-                body_template = self.jinja_env.from_string(template.body_template)
+                body_template = self.jinja_env.from_string(str(template.body_template))
                 rendered_body = body_template.render(**template_vars)
         else:
             # Use default formatting based on integration type
@@ -83,7 +87,7 @@ class TemplateEngine:
         return {
             "subject": rendered_subject,
             "body": rendered_body,
-            "template_name": template_used,
+            "template_name": template_used or "",
         }
 
     async def _get_template(
@@ -91,7 +95,7 @@ class TemplateEngine:
         integration_type: IntegrationType,
         template_name: str,
         db: AsyncSession,
-    ) -> IntegrationTemplate:
+    ) -> IntegrationTemplate | None:
         """Get template from database."""
         if template_name:
             # Get specific template
@@ -114,7 +118,7 @@ class TemplateEngine:
     def _apply_default_formatting(
         self,
         integration_type: IntegrationType,
-        subject: str,
+        subject: str | None,
         content: str,
         variables: Dict[str, Any],
     ) -> tuple[str, str]:

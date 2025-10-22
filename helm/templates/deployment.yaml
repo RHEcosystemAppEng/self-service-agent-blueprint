@@ -69,8 +69,6 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["./scripts/containers/entrypoint.sh"]
           env:
-            - name: LLAMA_STACK_MODELS
-              value: {{ include "self-service-agent.getModelList" . }}
             - name: REQUEST_MANAGER_URL
               value: "http://{{ include "self-service-agent.fullname" . }}-request-manager.{{ .Release.Namespace }}.svc.cluster.local:80"
           ports:

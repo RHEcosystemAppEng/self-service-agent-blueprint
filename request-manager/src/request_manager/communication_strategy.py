@@ -1,12 +1,14 @@
 """Communication strategy abstraction for eventing vs direct HTTP modes."""
 
+import asyncio
 import os
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, AsyncGenerator, Dict, Optional
 
 from agent_service.schemas import SessionResponse
 from fastapi import HTTPException, status
+from fastapi.responses import StreamingResponse
 from shared_clients import get_agent_client, get_integration_dispatcher_client
 from shared_clients.stream_processor import LlamaStackStreamProcessor
 from shared_models import CloudEventSender, configure_logging, get_enum_value
@@ -51,7 +53,7 @@ def resolve_response_future(request_id: str, response_data: Dict[str, Any]) -> N
 
 
 async def create_or_get_session_shared(
-    request, db: AsyncSession
+    request: Any, db: AsyncSession
 ) -> Optional[SessionResponse]:
     """Shared session management logic for all communication strategies.
 
@@ -120,7 +122,7 @@ async def create_or_get_session_shared(
             )
 
         # Update activity timestamp
-        existing_session.last_request_at = datetime.now(timezone.utc)
+        existing_session.last_request_at = datetime.now(timezone.utc)  # type: ignore[assignment]
         await db.commit()
         logger.info(
             "Reusing existing session",
@@ -157,7 +159,7 @@ class CommunicationStrategy(ABC):
     """Abstract base class for communication strategies."""
 
     async def create_or_get_session(
-        self, request, db: AsyncSession
+        self, request: Any, db: AsyncSession
     ) -> Optional[SessionResponse]:
         """Create or get session using shared session management logic.
 
@@ -256,7 +258,7 @@ class EventingStrategy(CommunicationStrategy):
         """Deliver responses response via CloudEvent."""
         success = await self.event_sender.send_responses_response_event(
             response_data,
-            response_data.get("request_id"),
+            response_data.get("request_id") or "",
             response_data.get("agent_id"),
             response_data.get("session_id"),
         )
@@ -274,8 +276,6 @@ class EventingStrategy(CommunicationStrategy):
 
     async def wait_for_response(self, request_id: str, timeout: int) -> Dict[str, Any]:
         """Wait for response event using event-driven approach."""
-        import asyncio
-
         logger.info(
             "Waiting for response event",
             request_id=request_id,
@@ -283,7 +283,7 @@ class EventingStrategy(CommunicationStrategy):
         )
 
         # Create a future that will be resolved when the response event is received
-        response_future = asyncio.Future()
+        response_future: asyncio.Future[Any] = asyncio.Future()
 
         # Store the future in the global registry so the event handler can resolve it
         _response_futures_registry[request_id] = response_future
@@ -377,7 +377,9 @@ class DirectHttpStrategy(CommunicationStrategy):
             logger.error("Integration client not initialized")
             return False
 
-        success = await self.integration_client.deliver_response(agent_response)
+        success = await self.integration_client.deliver_response(
+            agent_response.model_dump(mode="json")
+        )
 
         if not success:
             logger.error("Failed to deliver response via direct HTTP")
@@ -390,14 +392,16 @@ class DirectHttpStrategy(CommunicationStrategy):
         )
         return True
 
-    async def stream_response(self, agent_response: AgentResponse) -> None:
+    async def stream_response(
+        self, agent_response: AgentResponse
+    ) -> StreamingResponse | None:
         """Stream response using optimized streaming for direct HTTP mode."""
         if not self.integration_client:
             logger.error("Integration client not initialized")
             return None
 
         # Use optimized streaming for better performance
-        async def generate_stream() -> Any:
+        async def generate_stream() -> AsyncGenerator[str, None]:
             try:
                 # Stream start event
                 yield LlamaStackStreamProcessor.create_sse_start_event(
@@ -414,9 +418,23 @@ class DirectHttpStrategy(CommunicationStrategy):
                     yield chunk_data
 
                 # Stream completion event
-                yield LlamaStackStreamProcessor.create_sse_complete_event(
-                    agent_response.agent_id, agent_response.processing_time_ms
-                )
+                if (
+                    agent_response.agent_id is None
+                    or agent_response.processing_time_ms is None
+                ):
+                    logger.error(
+                        "Cannot send completion event - missing agent_id or processing_time_ms",
+                        agent_id=agent_response.agent_id,
+                        processing_time_ms=agent_response.processing_time_ms,
+                    )
+                    yield LlamaStackStreamProcessor.create_sse_error_event(
+                        "Missing required response data"
+                    )
+                else:
+                    yield LlamaStackStreamProcessor.create_sse_complete_event(
+                        agent_response.agent_id,
+                        agent_response.processing_time_ms,
+                    )
 
             except Exception as e:
                 logger.error("Error in streaming response", error=str(e))
@@ -469,11 +487,13 @@ async def check_communication_strategy() -> bool:
 class UnifiedRequestProcessor:
     """Unified request processor that works with any communication strategy."""
 
-    def __init__(self, strategy: CommunicationStrategy, agent_client=None):
+    def __init__(
+        self, strategy: CommunicationStrategy, agent_client: Any = None
+    ) -> None:
         self.strategy = strategy
         self.agent_client = agent_client
 
-    def _extract_session_data(self, session) -> tuple[str, str]:
+    def _extract_session_data(self, session: Any) -> tuple[str, str]:
         """Extract session_id and current_agent_id from session data.
 
         Handles SessionResponse objects (from agent client) and SessionResponse objects (from session manager).
@@ -481,7 +501,9 @@ class UnifiedRequestProcessor:
         # Both agent client and session manager now return SessionResponse objects
         return session.session_id, session.current_agent_id
 
-    async def process_request_async(self, request, db: AsyncSession) -> Dict[str, Any]:
+    async def process_request_async(
+        self, request: Any, db: AsyncSession
+    ) -> Dict[str, Any]:
         """Process a request asynchronously (eventing mode)."""
         logger.info(
             "Starting async request processing",
@@ -532,7 +554,7 @@ class UnifiedRequestProcessor:
         }
 
     async def process_request_async_with_delivery(
-        self, request, db: AsyncSession, timeout: int = 120
+        self, request: Any, db: AsyncSession, timeout: int = 120
     ) -> Dict[str, Any]:
         """Process a request asynchronously but deliver response in direct HTTP mode."""
         # Common request preparation
@@ -543,8 +565,6 @@ class UnifiedRequestProcessor:
         # In direct HTTP mode, process synchronously but return immediately to avoid timeout
         if isinstance(self.strategy, DirectHttpStrategy):
             # Process the request in the background
-            import asyncio
-
             asyncio.create_task(
                 self._process_and_deliver_background(normalized_request, db)
             )
@@ -585,7 +605,9 @@ class UnifiedRequestProcessor:
                 "message": "Request has been queued for processing",
             }
 
-    async def _process_and_deliver_background(self, normalized_request, db):
+    async def _process_and_deliver_background(
+        self, normalized_request: Any, db: AsyncSession
+    ) -> None:
         """Process request in background and deliver response."""
         try:
             # Process the request
@@ -623,7 +645,7 @@ class UnifiedRequestProcessor:
             )
 
     async def process_request_sync(
-        self, request, db: AsyncSession, timeout: int = 120
+        self, request: Any, db: AsyncSession, timeout: int = 120
     ) -> Dict[str, Any]:
         """Process a request synchronously and wait for response."""
         # Common request preparation
@@ -711,7 +733,7 @@ class UnifiedRequestProcessor:
         }
 
     async def _process_streaming_response(
-        self, stream_context_manager, normalized_request
+        self, stream_context_manager: Any, normalized_request: Any
     ) -> Optional[AgentResponse]:
         """Process a streaming response and extract the final AgentResponse."""
         import json
@@ -722,9 +744,9 @@ class UnifiedRequestProcessor:
             content = ""
             agent_id = None
             processing_time_ms = None
-            metadata = {}
+            metadata: Dict[str, Any] = {}
             requires_followup = False
-            followup_actions = []
+            followup_actions: list[Any] = []
 
             # Use the async context manager to get the response
             async with stream_context_manager as response:
@@ -775,7 +797,7 @@ class UnifiedRequestProcessor:
             return None
 
     async def _prepare_request(
-        self, request, db: AsyncSession
+        self, request: Any, db: AsyncSession
     ) -> tuple[NormalizedRequest, str, str]:
         """Common request preparation logic: session management, normalization, and RequestLog creation.
 

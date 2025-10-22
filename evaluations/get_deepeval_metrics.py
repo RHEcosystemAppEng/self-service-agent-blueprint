@@ -9,14 +9,14 @@ suite of conversational metrics for assessing agent performance.
 
 from typing import List, Optional
 
-from deepeval.metrics import (
+from deepeval.metrics import (  # type: ignore
     ConversationalGEval,
     ConversationCompletenessMetric,
     RoleAdherenceMetric,
     TurnRelevancyMetric,
 )
-from deepeval.models import DeepEvalBaseLLM
-from deepeval.test_case import TurnParams
+from deepeval.models import DeepEvalBaseLLM  # type: ignore
+from deepeval.test_case import TurnParams  # type: ignore
 from helpers.load_conversation_context import load_default_context
 
 

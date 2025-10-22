@@ -34,11 +34,11 @@ import logging
 import os
 import random
 from pathlib import Path
-from typing import List
+from typing import Any, List, Optional
 
-from deepeval.dataset import ConversationalGolden
-from deepeval.simulator import ConversationSimulator
-from deepeval.test_case import ConversationalTestCase, Turn
+from deepeval.dataset import ConversationalGolden  # type: ignore
+from deepeval.simulator import ConversationSimulator  # type: ignore
+from deepeval.test_case import ConversationalTestCase, Turn  # type: ignore
 from helpers.custom_llm import CustomLLM, get_api_configuration
 from helpers.openshift_chat_client import OpenShiftChatClient
 
@@ -47,7 +47,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize the OpenShift client (for agent under test) - will be updated with test_script in main
-client = None
+client: Optional[OpenShiftChatClient] = None
 
 # Track app tokens separately from evaluation tokens
 total_app_tokens = {"input": 0, "output": 0, "total": 0, "calls": 0}
@@ -123,13 +123,20 @@ async def _model_callback(input: str, turns: List[Turn], thread_id: str) -> Turn
         )
 
         logger.info(f"Sending to agent: {input}")
+
+        if client is None:
+            logger.error("OpenShift client not initialized")
+            return Turn(
+                id="error",
+                input=input,
+                output="I apologize, but the system is not properly initialized.",
+                thread_id=thread_id,
+            )
+
         response = client.send_message(input)
 
         # Check if we got a valid response
-        if response is None:
-            logger.error("Agent returned None response")
-            response = "I apologize, but I didn't receive a response from the system."
-        elif isinstance(response, str) and not response.strip():
+        if isinstance(response, str) and not response.strip():
             logger.error("Agent returned empty response")
             response = "I apologize, but I received an empty response from the system."
 
@@ -146,7 +153,7 @@ async def _model_callback(input: str, turns: List[Turn], thread_id: str) -> Turn
 
 def _convert_test_case_to_conversation_format(
     test_case: ConversationalTestCase, authoritative_user_id: str
-) -> dict:
+) -> dict[str, Any]:
     """
     Convert a ConversationalTestCase to the conversation results format
 
@@ -174,7 +181,7 @@ def _convert_test_case_to_conversation_format(
 
 
 def _save_conversation_to_file(
-    conversation: dict, base_filename: str = "generated_conversation"
+    conversation: dict[str, Any], base_filename: str = "generated_conversation"
 ) -> str:
     """
     Save conversation to a uniquely named file in results/conversation_results
@@ -244,7 +251,7 @@ if __name__ == "__main__":
 
         # Generate conversations sequentially
         saved_files = []
-        all_test_cases = []
+        all_test_cases: List[Any] = []
 
         for i in range(args.num_conversations):
             conversation_number = i + 1

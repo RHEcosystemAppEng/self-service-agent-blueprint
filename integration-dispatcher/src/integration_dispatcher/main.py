@@ -46,11 +46,7 @@ from .schemas import (
     UserIntegrationConfigResponse,
     UserIntegrationConfigUpdate,
 )
-from .slack_schemas import (
-    SlackChallenge,
-    SlackInteractionPayload,
-    SlackSlashCommand,
-)
+from .slack_schemas import SlackChallenge, SlackInteractionPayload, SlackSlashCommand
 from .slack_service import SlackService
 from .template_engine import TemplateEngine
 
@@ -70,7 +66,9 @@ class IntegrationDispatcher:
         }
         self.template_engine = TemplateEngine()
 
-    def _ensure_slack_config_has_identifiers(self, user_config, user_id: str) -> None:
+    def _ensure_slack_config_has_identifiers(
+        self, user_config: Any, user_id: str
+    ) -> None:
         """Ensure Slack config has necessary identifiers for channel resolution."""
         has_channel = bool(user_config.config.get("channel_id"))
         has_user_email = bool(user_config.config.get("user_email"))
@@ -151,7 +149,7 @@ class IntegrationDispatcher:
         # Start with user-specific configs (these override smart defaults)
         for user_config in user_configs:
             # For Slack configs, ensure they have channel information
-            if user_config.integration_type.value == "SLACK":
+            if user_config.integration_type == IntegrationType.SLACK:
                 self._ensure_slack_config_has_identifiers(user_config, user_id)
 
             final_configs.append(user_config)
@@ -253,7 +251,7 @@ class IntegrationDispatcher:
         db: AsyncSession,
     ) -> Dict[str, Any]:
         """Dispatch to a single integration."""
-        handler = self.handlers.get(config.integration_type)
+        handler = self.handlers.get(config.integration_type)  # type: ignore[call-overload]
         if not handler:
             raise ValueError(
                 f"No handler for integration type: {config.integration_type}"
@@ -261,7 +259,7 @@ class IntegrationDispatcher:
 
         # Render templates
         template_content = await self.template_engine.render(
-            integration_type=config.integration_type,
+            integration_type=config.integration_type,  # type: ignore[arg-type]
             subject=request.subject,
             content=request.content,
             variables=request.template_variables,
@@ -288,9 +286,9 @@ class IntegrationDispatcher:
 
         # Attempt delivery
         try:
-            delivery_log.first_attempt_at = datetime.now(timezone.utc)
-            delivery_log.last_attempt_at = datetime.now(timezone.utc)
-            delivery_log.attempts = 1
+            delivery_log.first_attempt_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+            delivery_log.last_attempt_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+            delivery_log.attempts = 1  # type: ignore[assignment]
 
             integration_result = await handler.deliver(
                 request, config, template_content
@@ -301,7 +299,7 @@ class IntegrationDispatcher:
             delivery_log.integration_metadata = integration_result.metadata
 
             if integration_result.success:
-                delivery_log.delivered_at = datetime.now(timezone.utc)
+                delivery_log.delivered_at = datetime.now(timezone.utc)  # type: ignore[assignment]
                 logger.info(
                     "Integration delivery successful",
                     user_id=request.user_id,
@@ -343,8 +341,8 @@ class IntegrationDispatcher:
             }
 
         except Exception as e:
-            delivery_log.status = DeliveryStatus.FAILED.value
-            delivery_log.error_message = f"Handler error: {str(e)}"
+            delivery_log.status = DeliveryStatus.FAILED.value  # type: ignore[assignment]
+            delivery_log.error_message = f"Handler error: {str(e)}"  # type: ignore[assignment]
             await db.commit()
             raise
 
@@ -479,6 +477,7 @@ async def _integration_health_logic(db: AsyncSession) -> Dict[str, Any]:
     )
 
     return {
+        "database_connected": result.database_connected,
         "integrations_available": result.integrations_available,
         "services": {
             "database": "connected" if result.database_connected else "disconnected",
@@ -570,9 +569,21 @@ async def handle_cloudevent(
         # Parse CloudEvent from request using shared utility
         event_data = await parse_cloudevent_from_request(request)
 
+        # Extract CloudEvent fields with explicit handling
         event_id = event_data.get("id")
         event_type = event_data.get("type")
         event_source = event_data.get("source")
+
+        # Log warning if critical fields are missing
+        if not event_id:
+            logger.warning("CloudEvent missing event ID")
+            event_id = "unknown"
+        if not event_type:
+            logger.warning("CloudEvent missing event type")
+            event_type = "unknown"
+        if not event_source:
+            logger.warning("CloudEvent missing event source")
+            event_source = "unknown"
 
         logger.info(
             "CloudEvent received",
@@ -612,8 +623,8 @@ async def handle_cloudevent(
                 event_id,
                 event_type,
                 event_source,
-                None,
-                None,
+                "unknown",  # request_id
+                "unknown",  # session_id
                 "integration-dispatcher",
                 "ignored",
                 "unhandled event type",
@@ -683,16 +694,23 @@ async def handle_cloudevent(
         )
 
         # ✅ RECORD SUCCESSFUL EVENT PROCESSING
-        await _record_processed_event(
-            db,
-            event_id,
-            event_type,
-            event_source,
-            delivery_request.request_id,
-            delivery_request.session_id,
-            "integration-dispatcher",
-            "success",
-        )
+        if delivery_request.request_id and delivery_request.session_id:
+            await _record_processed_event(
+                db,
+                event_id,
+                event_type,
+                event_source,
+                delivery_request.request_id,
+                delivery_request.session_id,
+                "integration-dispatcher",
+                "success",
+            )
+        else:
+            logger.warning(
+                "Cannot record processed event - missing request_id or session_id",
+                request_id=delivery_request.request_id,
+                session_id=delivery_request.session_id,
+            )
 
         return await create_cloudevent_response(
             status="processed",
@@ -713,13 +731,23 @@ async def handle_cloudevent(
         )
 
         # ✅ RECORD FAILED EVENT PROCESSING
+        request_id = event_data.get("request_id")
+        session_id = event_data.get("session_id")
+
+        if not request_id:
+            logger.warning("CloudEvent missing request_id for error recording")
+            request_id = "unknown"
+        if not session_id:
+            logger.warning("CloudEvent missing session_id for error recording")
+            session_id = "unknown"
+
         await _record_processed_event(
             db,
-            event_id,
-            event_type,
-            event_source,
-            event_data.get("request_id") if "event_data" in locals() else None,
-            event_data.get("session_id") if "event_data" in locals() else None,
+            str(event_id),
+            str(event_type),
+            str(event_source),
+            request_id,
+            session_id,
             "integration-dispatcher",
             "error",
             str(e),
@@ -838,15 +866,15 @@ async def create_user_integration(
 
     if existing_config:
         # Update existing configuration
-        existing_config.enabled = config_data.enabled
-        existing_config.config = config_data.config
-        existing_config.priority = config_data.priority
-        existing_config.retry_count = config_data.retry_count
-        existing_config.retry_delay_seconds = config_data.retry_delay_seconds
-        existing_config.updated_at = datetime.now(timezone.utc)
+        existing_config.enabled = config_data.enabled  # type: ignore[assignment]
+        existing_config.config = config_data.config  # type: ignore[assignment]
+        existing_config.priority = config_data.priority  # type: ignore[assignment]
+        existing_config.retry_count = config_data.retry_count  # type: ignore[assignment]
+        existing_config.retry_delay_seconds = config_data.retry_delay_seconds  # type: ignore[assignment]
+        existing_config.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
         # Ensure Slack configs have necessary identifiers
-        if existing_config.integration_type.value == "SLACK":
+        if existing_config.integration_type == IntegrationType.SLACK:
             dispatcher._ensure_slack_config_has_identifiers(existing_config, user_id)
 
         await db.commit()
@@ -856,7 +884,7 @@ async def create_user_integration(
         # Create new configuration
         config = UserIntegrationConfig(
             user_id=user_id,
-            integration_type=get_enum_value(config_data.integration_type),
+            integration_type=config_data.integration_type,
             enabled=config_data.enabled,
             config=config_data.config,
             priority=config_data.priority,
@@ -865,7 +893,7 @@ async def create_user_integration(
         )
 
         # Ensure Slack configs have necessary identifiers
-        if config.integration_type.value == "SLACK":
+        if config.integration_type == IntegrationType.SLACK:
             dispatcher._ensure_slack_config_has_identifiers(config, user_id)
 
         db.add(config)
@@ -913,10 +941,10 @@ async def update_user_integration(
         setattr(config, field, value)
 
     # Ensure Slack configs have necessary identifiers
-    if config.integration_type.value == "SLACK":
+    if config.integration_type == IntegrationType.SLACK:
         dispatcher._ensure_slack_config_has_identifiers(config, user_id)
 
-    config.updated_at = datetime.now(timezone.utc)
+    config.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
     await db.commit()
     await db.refresh(config)
@@ -1032,7 +1060,7 @@ async def reset_user_to_integration_defaults(
 
     return {
         "message": f"User {user_id} reset to integration defaults",
-        "deleted_configs": len(configs),
+        "deleted_configs": str(len(configs)),
     }
 
 
@@ -1063,10 +1091,9 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     """Handle HTTP exceptions."""
     return JSONResponse(
         status_code=exc.status_code,
-        content=ErrorResponse(
+        content=ErrorResponse(  # type: ignore
             error=exc.detail,
             error_code=f"HTTP_{exc.status_code}",
-            timestamp=datetime.now(timezone.utc),
         ).model_dump(mode="json"),
     )
 
@@ -1078,10 +1105,9 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
 
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content=ErrorResponse(
+        content=ErrorResponse(  # type: ignore
             error="Internal server error",
             error_code="INTERNAL_ERROR",
-            timestamp=datetime.now(timezone.utc),
         ).model_dump(mode="json"),
     )
 
@@ -1092,7 +1118,7 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
 @app.post("/slack/events")
 async def handle_slack_events(
     request: Request, db: AsyncSession = Depends(get_db_session_dependency)
-) -> Any:
+) -> Dict[str, Any]:
     """Handle Slack events (messages, mentions, etc.)."""
     try:
         body = await request.body()
@@ -1149,7 +1175,7 @@ async def handle_slack_events(
 
 
 @app.post("/slack/interactive")
-async def handle_slack_interactive(request: Request) -> Any:
+async def handle_slack_interactive(request: Request) -> Dict[str, Any]:
     """Handle Slack interactive components (buttons, etc.)."""
     try:
         body = await request.body()
@@ -1209,7 +1235,7 @@ async def handle_slack_commands(
     response_url: str = Form(...),
     trigger_id: str = Form(...),
     api_app_id: str = Form(...),
-) -> Any:
+) -> Dict[str, Any]:
     """Handle Slack slash commands."""
     try:
         # Create command object

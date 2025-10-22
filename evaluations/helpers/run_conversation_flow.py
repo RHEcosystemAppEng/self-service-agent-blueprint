@@ -3,7 +3,7 @@
 import json
 import logging
 import os
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from .openshift_chat_client import OpenShiftChatClient
 
@@ -29,10 +29,12 @@ class ConversationFlowTester:
         """
         self.test_script = test_script
         self.reset_conversation = reset_conversation
-        self.conversation_history = []
+        self.conversation_history: list[Any] = []
         self.total_app_tokens = {"input": 0, "output": 0, "total": 0, "calls": 0}
 
-    def run_flow(self, questions, authoritative_user_id: str) -> List[Dict[str, str]]:
+    def run_flow(
+        self, questions: list[str], authoritative_user_id: str
+    ) -> List[Dict[str, str]]:
         """
         Run a conversation flow with the given questions.
 

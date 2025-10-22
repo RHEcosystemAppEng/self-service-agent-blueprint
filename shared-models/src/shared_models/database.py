@@ -267,7 +267,7 @@ class DatabaseUtils:
     ) -> Optional[T]:
         """Get a record by ID."""
         try:
-            stmt = select(model_class).where(model_class.id == id_value)
+            stmt = select(model_class).where(model_class.id == id_value)  # type: ignore[attr-defined]
             result = await db.execute(stmt)
             return result.scalar_one_or_none()
         except Exception as e:
@@ -307,7 +307,7 @@ class DatabaseUtils:
         try:
             stmt = select(model_class).limit(limit).offset(offset)
             result = await db.execute(stmt)
-            return result.scalars().all()
+            return list(result.scalars().all())
         except Exception as e:
             logger.error(
                 "Failed to get all records",
@@ -335,7 +335,7 @@ class DatabaseUtils:
             return None
 
     @staticmethod
-    async def update_record(db: AsyncSession, record: T, **updates) -> Optional[T]:
+    async def update_record(db: AsyncSession, record: T, **updates: Any) -> Optional[T]:
         """Update a record with provided fields."""
         try:
             for field, value in updates.items():
@@ -376,7 +376,7 @@ class DatabaseUtils:
     async def count_records(db: AsyncSession, model_class: Type[T]) -> int:
         """Count total records in a table."""
         try:
-            stmt = select(func.count(model_class.id))
+            stmt = select(func.count(model_class.id))  # type: ignore[attr-defined]
             result = await db.execute(stmt)
             return result.scalar() or 0
         except Exception as e:

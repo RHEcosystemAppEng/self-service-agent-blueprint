@@ -226,6 +226,9 @@ class CloudEventPublisher:
                     max_attempts=self.config.max_retries + 1,
                 )
 
+                if not self.config.broker_url:
+                    raise ValueError("Broker URL is not configured")
+
                 response = await self.client.post(
                     self.config.broker_url,
                     headers=headers,
@@ -321,7 +324,8 @@ class CloudEventHandler:
         handler = self.handlers[event_type]
 
         try:
-            return await handler(event)
+            result = await handler(event)
+            return result if isinstance(result, dict) else None
         except Exception as e:
             logger.error("Error handling event", event_type=event_type, error=str(e))
             return None

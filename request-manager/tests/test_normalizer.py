@@ -152,6 +152,7 @@ class TestRequestNormalizer:
                 user_id="user123",
                 content="test content",
                 tool_id=tool_id,
+                tool_instance_id="test-instance",
                 trigger_event="test.event",
             )
 

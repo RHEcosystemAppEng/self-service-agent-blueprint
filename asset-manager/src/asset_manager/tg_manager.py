@@ -28,6 +28,10 @@ class ToolgroupsManager(Manager):
 
         logging.info(f"Unregistering toolgroup_id: {toolgroup_id}")
 
+        if self._client is None:
+            logging.error("Client not connected. Cannot unregister toolgroups.")
+            return None
+
         try:
             self._client.toolgroups.unregister(toolgroup_id=toolgroup_id)
 
@@ -55,11 +59,15 @@ class ToolgroupsManager(Manager):
 
         logging.info(f"Registering toolgroup_id: {toolgroup_id}")
 
+        if self._client is None:
+            logging.error("Client not connected. Cannot register toolgroups.")
+            return None
+
         try:
             self._client.toolgroups.register(
                 toolgroup_id=toolgroup_id,
                 provider_id="model-context-protocol",
-                mcp_endpoint={"uri": tg.get("uri")},
+                mcp_endpoint={"uri": tg.get("uri")},  # type: ignore[arg-type]
                 args={},
             )
 

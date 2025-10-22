@@ -60,23 +60,3 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
-
-{{- define "self-service-agent.mergeModels" -}}
-  {{- $globalModels := .Values.global | default dict }}
-  {{- $globalModels := $globalModels.models | default dict }}
-  {{- $localModels := .Values.models | default dict }}
-  {{- $merged := merge $globalModels $localModels }}
-  {{- toJson $merged }}
-{{- end }}
-
-{{- define "self-service-agent.getModelList" -}}
-  {{- $modelNames := list -}}
-  {{- $root := . -}}
-  {{- $models := include "self-service-agent.mergeModels" . | fromJson -}}
-  {{- range $key, $model := $models -}}
-    {{- if and $model.enabled -}}
-      {{- $modelNames = append $modelNames ($model.id | default $key) -}}
-    {{- end -}}
-  {{- end -}}
-  {{- join "," $modelNames | quote -}}
-{{- end }}

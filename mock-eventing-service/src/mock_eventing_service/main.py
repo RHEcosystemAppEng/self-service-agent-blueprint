@@ -210,7 +210,7 @@ async def initialize_default_subscriptions() -> None:
         namespace = os.getenv("NAMESPACE", "default")
 
         # Default subscriptions that should always exist
-        default_subscriptions = [
+        default_subscriptions: list[dict[str, Any]] = [
             {
                 "event_type": "com.self-service-agent.request.created",
                 "subscriber_url": f"http://{service_name}-agent-service.{namespace}.svc.cluster.local/api/v1/events/cloudevents",

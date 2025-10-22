@@ -5,24 +5,34 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import (
-    JSON,
-    Boolean,
-    Column,
-)
+from sqlalchemy import JSON, Boolean, Column
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy import (
-    ForeignKey,
-    Index,
-    Integer,
-    String,
-    Text,
-    UniqueConstraint,
-)
+from sqlalchemy import ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.orm import relationship
 
 from .base import Base, TimestampMixin
+
+# Export Base for use in other modules
+__all__ = [
+    "Base",
+    "IntegrationType",
+    "SessionStatus",
+    "DeliveryStatus",
+    "RequestSession",
+    "RequestLog",
+    "UserIntegrationConfig",
+    "IntegrationDefaultConfig",
+    "IntegrationTemplate",
+    "DeliveryLog",
+    "ProcessedEvent",
+    "IntegrationCredential",
+    "UserIntegrationMapping",
+    "AgentResponse",
+    "NormalizedRequest",
+    "DeliveryRequest",
+    "ErrorResponse",
+]
 
 
 # Enums used across services
@@ -69,8 +79,10 @@ class RequestSession(Base, TimestampMixin):
     id = Column(Integer, primary_key=True)
     session_id = Column(String(36), unique=True, nullable=False, index=True)
     user_id = Column(String(255), nullable=False, index=True)
-    integration_type = Column(SQLEnum(IntegrationType), nullable=False)
-    status = Column(
+    integration_type: Column[IntegrationType] = Column(
+        SQLEnum(IntegrationType), nullable=False
+    )
+    status: Column[SessionStatus] = Column(
         SQLEnum(SessionStatus), default=SessionStatus.ACTIVE.value, nullable=False
     )
 
@@ -148,7 +160,9 @@ class UserIntegrationConfig(Base, TimestampMixin):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(String(255), nullable=False, index=True)
-    integration_type = Column(SQLEnum(IntegrationType), nullable=False)
+    integration_type: Column[IntegrationType] = Column(
+        SQLEnum(IntegrationType), nullable=False
+    )
     enabled = Column(Boolean, default=True, nullable=False)
 
     # Integration-specific configuration
@@ -179,7 +193,9 @@ class IntegrationDefaultConfig(Base, TimestampMixin):
     __tablename__ = "integration_default_configs"
 
     id = Column(Integer, primary_key=True)
-    integration_type = Column(SQLEnum(IntegrationType), nullable=False, unique=True)
+    integration_type: Column[IntegrationType] = Column(
+        SQLEnum(IntegrationType), nullable=False, unique=True
+    )
     enabled = Column(Boolean, default=True, nullable=False)
 
     # Integration-specific configuration
@@ -200,7 +216,9 @@ class IntegrationTemplate(Base, TimestampMixin):
     __tablename__ = "integration_templates"
 
     id = Column(Integer, primary_key=True)
-    integration_type = Column(SQLEnum(IntegrationType), nullable=False)
+    integration_type: Column[IntegrationType] = Column(
+        SQLEnum(IntegrationType), nullable=False
+    )
     template_name = Column(String(100), nullable=False)
 
     # Template content
@@ -241,7 +259,9 @@ class DeliveryLog(Base, TimestampMixin):
         ForeignKey("user_integration_configs.id", ondelete="CASCADE"),
         nullable=True,  # Allow null for smart defaults (lazy approach)
     )
-    integration_type = Column(SQLEnum(IntegrationType), nullable=False)
+    integration_type: Column[IntegrationType] = Column(
+        SQLEnum(IntegrationType), nullable=False
+    )
 
     # Message content
     subject = Column(Text)
@@ -249,7 +269,7 @@ class DeliveryLog(Base, TimestampMixin):
     template_used = Column(String(100))
 
     # Delivery tracking
-    status = Column(
+    status: Column[DeliveryStatus] = Column(
         SQLEnum(DeliveryStatus), default=DeliveryStatus.PENDING.value, nullable=False
     )
     attempts = Column(Integer, default=0, nullable=False)
@@ -303,7 +323,9 @@ class IntegrationCredential(Base, TimestampMixin):
     __tablename__ = "integration_credentials"
 
     id = Column(Integer, primary_key=True)
-    integration_type = Column(SQLEnum(IntegrationType), nullable=False)
+    integration_type: Column[IntegrationType] = Column(
+        SQLEnum(IntegrationType), nullable=False
+    )
     credential_name = Column(
         String(100), nullable=False
     )  # e.g., "slack_bot_token", "smtp_password"
@@ -330,7 +352,9 @@ class UserIntegrationMapping(Base, TimestampMixin):
 
     id = Column(Integer, primary_key=True)
     user_email = Column(String(255), nullable=False, index=True)
-    integration_type = Column(SQLEnum(IntegrationType), nullable=False)
+    integration_type: Column[IntegrationType] = Column(
+        SQLEnum(IntegrationType), nullable=False
+    )
     integration_user_id = Column(String(255), nullable=False)  # e.g., Slack user ID
 
     # Validation metadata
@@ -387,17 +411,13 @@ class NormalizedRequest(BaseModel):
     # Agent routing
     target_agent_id: Optional[str] = Field(None, max_length=255)
     requires_routing: bool = Field(default=True)
-    use_responses: bool = Field(
-        default=False,
-        description="Enable responses API mode (LangGraph-based conversations)",
-    )
 
     # Timestamps
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @field_validator("integration_type", mode="before")
     @classmethod
-    def normalize_integration_type(cls, v):
+    def normalize_integration_type(cls, v: Any) -> Any:
         """Convert integration_type to uppercase for case-insensitive input."""
         if isinstance(v, str):
             return IntegrationType(v.upper())

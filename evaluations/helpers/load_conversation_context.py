@@ -28,7 +28,7 @@ def load_context_files_from_directory(
     Returns:
         List of context strings loaded from files with file headers
     """
-    context_list = []
+    context_list: list[str] = []
 
     if not os.path.exists(directory):
         return context_list

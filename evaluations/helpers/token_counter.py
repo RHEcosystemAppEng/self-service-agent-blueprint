@@ -3,7 +3,7 @@ import json
 import os
 import threading
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -17,7 +17,7 @@ class _TokenUsage:
     context: Optional[str] = None
     timestamp: Optional[float] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.timestamp is None:
             import time
 
@@ -37,7 +37,7 @@ class _TokenStats:
     max_total_tokens: int = 0
     calls: List[_TokenUsage] = field(default_factory=list)
 
-    def add_usage(self, usage: _TokenUsage):
+    def add_usage(self, usage: _TokenUsage) -> None:
         """Add a token usage record"""
         self.total_input_tokens += usage.input_tokens
         self.total_output_tokens += usage.output_tokens
@@ -58,7 +58,7 @@ class TokenCounter:
     _instance = None
     _lock = threading.Lock()
 
-    def __new__(cls):
+    def __new__(cls) -> "TokenCounter":
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -66,7 +66,7 @@ class TokenCounter:
                     cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not getattr(self, "_initialized", False):
             self._stats_lock = threading.Lock()
             self._stats = _TokenStats()
@@ -79,7 +79,7 @@ class TokenCounter:
         output_tokens: int,
         model: Optional[str] = None,
         context: Optional[str] = None,
-    ):
+    ) -> None:
         """Add token usage with optional context"""
         total_tokens = input_tokens + output_tokens
         usage = _TokenUsage(
@@ -117,8 +117,8 @@ class TokenCounter:
 
 
 def count_tokens_from_response(
-    response, model: Optional[str] = None, context: Optional[str] = None
-):
+    response: Any, model: Optional[str] = None, context: Optional[str] = None
+) -> tuple[int, int]:
     """Extract and count tokens from an OpenAI-style response object"""
     try:
         if hasattr(response, "usage") and response.usage is not None:
@@ -147,7 +147,7 @@ def print_token_summary(
     app_tokens: Optional[Dict[str, int]] = None,
     save_file_prefix: Optional[str] = None,
     save_to_results: bool = True,
-):
+) -> None:
     """
     Print a comprehensive token usage summary with separate app and evaluation tokens.
 

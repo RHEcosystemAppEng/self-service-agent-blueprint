@@ -14,6 +14,7 @@ Environment Variables Required:
 
 import os
 import sys
+from typing import Any, Optional
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -23,7 +24,7 @@ from snow.data.data import MOCK_EMPLOYEE_DATA
 class ServiceNowUserCreator:
     """Create users and laptops in ServiceNow based on mock data."""
 
-    def __init__(self, instance_url, username, password):
+    def __init__(self, instance_url: str, username: str, password: str) -> None:
         """Initialize the ServiceNow user creator.
 
         Args:
@@ -37,15 +38,19 @@ class ServiceNowUserCreator:
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
-        self.created_users = []
-        self.created_computers = []
-        self.created_models = []
-        self.created_locations = []
-        self.model_cache = {}  # Cache model lookups to avoid duplicate API calls
-        self.location_cache = {}  # Cache location lookups to avoid duplicate API calls
-        self.errors = []
+        self.created_users: list[dict[str, Any]] = []
+        self.created_computers: list[dict[str, Any]] = []
+        self.created_models: list[dict[str, Any]] = []
+        self.created_locations: list[dict[str, Any]] = []
+        self.model_cache: dict[str, str] = (
+            {}
+        )  # Cache model lookups to avoid duplicate API calls
+        self.location_cache: dict[str, str] = (
+            {}
+        )  # Cache location lookups to avoid duplicate API calls
+        self.errors: list[str] = []
 
-    def get_or_create_model(self, model_name):
+    def get_or_create_model(self, model_name: str) -> str | None:
         """Get or create a product model in ServiceNow.
 
         Args:
@@ -79,7 +84,7 @@ class ServiceNowUserCreator:
             if response.status_code == 200:
                 result = response.json().get("result", [])
                 if result:
-                    model_sys_id = result[0].get("sys_id")
+                    model_sys_id = str(result[0].get("sys_id", ""))
                     print(
                         f"    ℹ️  Found existing model: {model_name} (sys_id: {model_sys_id})"
                     )
@@ -104,7 +109,7 @@ class ServiceNowUserCreator:
 
             if create_response.status_code == 201:
                 result = create_response.json().get("result", {})
-                model_sys_id = result.get("sys_id")
+                model_sys_id = str(result.get("sys_id", ""))
                 print(f"    ✅ Created model: {model_name} (sys_id: {model_sys_id})")
                 self.model_cache[model_name] = model_sys_id
                 self.created_models.append({"name": model_name, "sys_id": model_sys_id})
@@ -120,7 +125,7 @@ class ServiceNowUserCreator:
             print(f"    ⚠️  {error_msg}")
             return None
 
-    def get_or_create_location(self, location_name):
+    def get_or_create_location(self, location_name: str) -> Optional[str]:
         """Get or create a location in ServiceNow.
 
         Args:
@@ -155,11 +160,14 @@ class ServiceNowUserCreator:
                 result = response.json().get("result", [])
                 if result:
                     location_sys_id = result[0].get("sys_id")
-                    print(
-                        f"    ℹ️  Found existing location: {location_name} (sys_id: {location_sys_id})"
+                    sys_id_str = (
+                        str(location_sys_id) if location_sys_id is not None else None
                     )
-                    self.location_cache[location_name] = location_sys_id
-                    return location_sys_id
+                    print(
+                        f"    ℹ️  Found existing location: {location_name} (sys_id: {sys_id_str})"
+                    )
+                    self.location_cache[location_name] = sys_id_str or ""
+                    return sys_id_str
 
             # Location not found, create it
             location_payload = {
@@ -178,14 +186,17 @@ class ServiceNowUserCreator:
             if create_response.status_code == 201:
                 result = create_response.json().get("result", {})
                 location_sys_id = result.get("sys_id")
+                sys_id_str = (
+                    str(location_sys_id) if location_sys_id is not None else None
+                )
                 print(
-                    f"    ✅ Created location: {location_name} (sys_id: {location_sys_id})"
+                    f"    ✅ Created location: {location_name} (sys_id: {sys_id_str})"
                 )
-                self.location_cache[location_name] = location_sys_id
+                self.location_cache[location_name] = sys_id_str or ""
                 self.created_locations.append(
-                    {"name": location_name, "sys_id": location_sys_id}
+                    {"name": location_name, "sys_id": sys_id_str}
                 )
-                return location_sys_id
+                return sys_id_str
             else:
                 error_msg = f"Failed to create location {location_name}: {create_response.status_code} - {create_response.text}"
                 print(f"    ⚠️  {error_msg}")
@@ -197,7 +208,7 @@ class ServiceNowUserCreator:
             print(f"    ⚠️  {error_msg}")
             return None
 
-    def create_user(self, employee_data):
+    def create_user(self, employee_data: dict[str, Any]) -> str | None:
         """Create a user in ServiceNow.
 
         Args:
@@ -238,18 +249,19 @@ class ServiceNowUserCreator:
             if response.status_code == 201:
                 result = response.json().get("result", {})
                 user_sys_id = result.get("sys_id")
+                sys_id_str = str(user_sys_id) if user_sys_id is not None else None
                 print(
                     f"  ✅ Created user: {employee_data['name']} ({employee_data['email']})"
                 )
-                print(f"     User sys_id: {user_sys_id}")
+                print(f"     User sys_id: {sys_id_str}")
                 self.created_users.append(
                     {
                         "email": employee_data["email"],
-                        "sys_id": user_sys_id,
+                        "sys_id": sys_id_str,
                         "name": employee_data["name"],
                     }
                 )
-                return user_sys_id
+                return sys_id_str
             else:
                 error_msg = f"Failed to create user {employee_data['email']}: {response.status_code} - {response.text}"
                 print(f"  ❌ {error_msg}")
@@ -262,7 +274,9 @@ class ServiceNowUserCreator:
             self.errors.append(error_msg)
             return None
 
-    def create_computer(self, employee_data, user_sys_id):
+    def create_computer(
+        self, employee_data: dict[str, Any], user_sys_id: str
+    ) -> str | None:
         """Create a computer/laptop in ServiceNow.
 
         Args:
@@ -305,18 +319,21 @@ class ServiceNowUserCreator:
             if response.status_code == 201:
                 result = response.json().get("result", {})
                 computer_sys_id = result.get("sys_id")
+                sys_id_str = (
+                    str(computer_sys_id) if computer_sys_id is not None else None
+                )
                 print(
                     f"  ✅ Created laptop: {employee_data['laptop_model']} (S/N: {employee_data['laptop_serial_number']})"
                 )
-                print(f"     Computer sys_id: {computer_sys_id}")
+                print(f"     Computer sys_id: {sys_id_str}")
                 self.created_computers.append(
                     {
                         "serial_number": employee_data["laptop_serial_number"],
-                        "sys_id": computer_sys_id,
+                        "sys_id": sys_id_str,
                         "model": employee_data["laptop_model"],
                     }
                 )
-                return computer_sys_id
+                return sys_id_str
             else:
                 error_msg = f"Failed to create laptop for {employee_data['email']}: {response.status_code} - {response.text}"
                 print(f"  ❌ {error_msg}")
@@ -331,7 +348,7 @@ class ServiceNowUserCreator:
             self.errors.append(error_msg)
             return None
 
-    def check_user_exists(self, email):
+    def check_user_exists(self, email: str) -> Optional[str]:
         """Check if a user already exists in ServiceNow.
 
         Args:
@@ -359,13 +376,14 @@ class ServiceNowUserCreator:
             if response.status_code == 200:
                 result = response.json().get("result", [])
                 if result:
-                    return result[0].get("sys_id")
+                    sys_id = result[0].get("sys_id")
+                    return str(sys_id) if sys_id is not None else None
             return None
 
         except Exception:
             return None
 
-    def create_all_users(self, skip_existing=True):
+    def create_all_users(self, skip_existing: bool = True) -> None:
         """Create all users and laptops from mock data.
 
         Args:
@@ -394,10 +412,10 @@ class ServiceNowUserCreator:
                     user_sys_id = existing_user_id
                 else:
                     # Create user
-                    user_sys_id = self.create_user(employee_data)
+                    user_sys_id = self.create_user(employee_data) or ""
             else:
                 # Create user
-                user_sys_id = self.create_user(employee_data)
+                user_sys_id = self.create_user(employee_data) or ""
 
             # Create laptop if user was created/found successfully
             if user_sys_id:
@@ -407,7 +425,7 @@ class ServiceNowUserCreator:
 
             print()
 
-    def print_summary(self):
+    def print_summary(self) -> None:
         """Print a summary of created resources and errors."""
         print("=" * 80)
         print("Summary")
@@ -456,7 +474,7 @@ class ServiceNowUserCreator:
         print("=" * 80)
 
 
-def main():
+def main() -> None:
     """Main function to create evaluation users."""
     # Get credentials from environment
     instance_url = os.getenv("SERVICENOW_INSTANCE_URL")

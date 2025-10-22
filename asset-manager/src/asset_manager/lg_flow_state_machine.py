@@ -18,7 +18,7 @@ from langgraph.types import Command
 
 # Import SqliteSaver - will be replace by more persistent state storage
 try:
-    from langgraph_checkpoint_sqlite import SqliteSaver
+    from langgraph_checkpoint_sqlite import SqliteSaver  # type: ignore
 except ImportError:
     try:
         from langgraph.checkpoint.sqlite import SqliteSaver
@@ -30,14 +30,14 @@ logger = logging.getLogger(__name__)
 
 
 # Dynamic state definition created from YAML configuration
-def create_agent_state_class(state_schema: dict[str, Any]) -> Any:
+def create_agent_state_class(state_schema: dict[str, Any]) -> type[dict[str, Any]]:
     """Create a dynamic AgentState TypedDict class based on YAML configuration."""
     # Collect all field definitions
     fields = {}
 
     # Add required system fields automatically (no need to define in YAML)
     fields["messages"] = Annotated[List[BaseMessage], add_messages]
-    fields["current_state"] = str
+    fields["current_state"] = str  # type: ignore[assignment]
 
     # Handle case where state_schema is None or empty
     if not state_schema:
@@ -51,7 +51,7 @@ def create_agent_state_class(state_schema: dict[str, Any]) -> Any:
         if field_type == "string":
             fields[field_name] = Optional[str]
         elif field_type == "list":
-            fields[field_name] = List[Dict[str, Any]]
+            fields[field_name] = List[Dict[str, Any]]  # type: ignore[assignment]
         elif field_type == "dict":
             fields[field_name] = Optional[Dict[str, Any]]
         elif field_type == "boolean":
@@ -65,7 +65,8 @@ def create_agent_state_class(state_schema: dict[str, Any]) -> Any:
     fields["_last_waiting_node"] = Optional[str]  # Track last waiting node for resume
 
     # Create the TypedDict class dynamically
-    return TypedDict("AgentState", fields)
+    agent_state_class = TypedDict("AgentState", fields)  # type: ignore[misc]
+    return agent_state_class  # type: ignore[return-value]
 
 
 class StateMachine:
@@ -84,7 +85,8 @@ class StateMachine:
         """Load state machine configuration from YAML file."""
         try:
             with open(self.config_path, "r") as f:
-                return yaml.safe_load(f)
+                config = yaml.safe_load(f)
+                return config if isinstance(config, dict) else {}
         except Exception as e:
             raise RuntimeError(
                 f"Failed to load state machine config from {self.config_path}: {e}"
@@ -93,9 +95,10 @@ class StateMachine:
     def _get_retry_count(self) -> int:
         """Get the configured retry count for empty responses."""
         settings = self.config.get("settings", {})
-        return settings.get("empty_response_retry_count", 3)
+        retry_count = settings.get("empty_response_retry_count")
+        return int(retry_count) if isinstance(retry_count, (int, str)) else 3
 
-    def _is_config_disabled(self, config_value) -> bool:
+    def _is_config_disabled(self, config_value) -> bool:  # type: ignore[no-untyped-def]
         """Check if a config value represents 'disabled' (no/No/NO or False).
 
         Args:
@@ -168,6 +171,10 @@ class StateMachine:
 
         return response_kwargs
 
+    def _get_user_id(self, authoritative_user_id: str | None) -> str:
+        """Get user ID with proper fallback handling."""
+        return authoritative_user_id if authoritative_user_id is not None else "system"
+
     def _format_text(
         self,
         text: str,
@@ -189,27 +196,28 @@ class StateMachine:
             messages = state_data.get("messages", [])
             last_user_message = ""
             for msg in reversed(messages):
-                if (
-                    hasattr(msg, "content")
-                    and getattr(msg, "__class__", None).__name__ == "HumanMessage"
-                ):
-                    last_user_message = msg.content
-                    break
+                if hasattr(msg, "content"):
+                    msg_class = getattr(msg, "__class__", None)
+                    if msg_class is not None and msg_class.__name__ == "HumanMessage":
+                        last_user_message = msg.content
+                        break
             format_data["last_user_message"] = last_user_message
 
             # Add conversation_history placeholder
             conversation_history = ""
             for i, msg in enumerate(messages):
                 if hasattr(msg, "content"):
-                    msg_type = getattr(msg, "__class__", None).__name__
-                    if msg_type == "HumanMessage":
-                        conversation_history += f"User: {msg.content}\n"
-                    elif msg_type == "AIMessage":
-                        conversation_history += f"Assistant: {msg.content}\n"
+                    msg_class = getattr(msg, "__class__", None)
+                    if msg_class is not None:
+                        msg_type = msg_class.__name__
+                        if msg_type == "HumanMessage":
+                            conversation_history += f"User: {msg.content}\n"
+                        elif msg_type == "AIMessage":
+                            conversation_history += f"Assistant: {msg.content}\n"
             format_data["conversation_history"] = conversation_history.strip()
 
             # Custom dot notation replacement
-            def replace_placeholders(text, data):
+            def replace_placeholders(text, data):  # type: ignore[no-untyped-def]
                 # First, temporarily replace escaped braces to protect them
                 text = text.replace("{{", "\x00ESCAPED_OPEN\x00")
                 text = text.replace("}}", "\x00ESCAPED_CLOSE\x00")
@@ -217,7 +225,7 @@ class StateMachine:
                 # Pattern to match {field.subfield} or {field} (but not escaped ones)
                 pattern = r"\{([^}]+)\}"
 
-                def replacer(match):
+                def replacer(match):  # type: ignore[no-untyped-def]
                     field_path = match.group(1)
                     try:
                         # Split by dots and navigate the data structure
@@ -242,7 +250,8 @@ class StateMachine:
 
                 return text
 
-            return replace_placeholders(text, format_data)
+            result = replace_placeholders(text, format_data)
+            return str(result) if result is not None else text
 
         except Exception as e:
             logger.warning(f"Error formatting text: {e}, returning original text")
@@ -283,15 +292,17 @@ class StateMachine:
             )
             for msg in state_messages:
                 if hasattr(msg, "content"):
-                    msg_type = getattr(msg, "__class__", None).__name__
-                    if msg_type == "HumanMessage":
-                        messages_to_send.append(
-                            {"role": "user", "content": msg.content}
-                        )
-                    elif msg_type == "AIMessage":
-                        messages_to_send.append(
-                            {"role": "assistant", "content": msg.content}
-                        )
+                    msg_class = getattr(msg, "__class__", None)
+                    if msg_class is not None:
+                        msg_type = msg_class.__name__
+                        if msg_type == "HumanMessage":
+                            messages_to_send.append(
+                                {"role": "user", "content": msg.content}
+                            )
+                        elif msg_type == "AIMessage":
+                            messages_to_send.append(
+                                {"role": "assistant", "content": msg.content}
+                            )
 
             logger.info(
                 f"Sending {len(messages_to_send)} messages to LLM (1 system + {len(messages_to_send) - 1} conversation)"
@@ -303,16 +314,17 @@ class StateMachine:
                 "Using traditional approach - sending prompt as single user message"
             )
 
-        temperature = state_config.get("temperature")
+        temperature = state_config.get("temperature") or 0.7
         allowed_tools = state_config.get("allowed_tools")
 
-        # Build kwargs for create_response_with_retry
-        # Use token_context parameter passed from ConversationSession
+        # Use fallback if authoritative_user_id is not provided
+        user_id = self._get_user_id(authoritative_user_id)
+
         response_kwargs = self._build_response_kwargs(
             state,
             state_config,
             temperature,
-            authoritative_user_id,
+            user_id,
             allowed_tools,
             token_context=token_context,
         )
@@ -406,10 +418,12 @@ class StateMachine:
         field_value_lower = str(field_value).lower()
         return any(phrase.lower() in field_value_lower for phrase in check_phrases)
 
-    def _get_nested_field_value(self, state: dict[str, Any], field_path: str) -> Any:
+    def _get_nested_field_value(
+        self, state: dict[str, Any], field_path: str
+    ) -> Any | None:
         """Get a nested field value using dot notation (e.g., 'laptop_eligibility.response')."""
         try:
-            value = state
+            value: Any = state
             for part in field_path.split("."):
                 if isinstance(value, dict):
                     value = value.get(part)
@@ -446,7 +460,8 @@ class StateMachine:
 
         # Fallback to simple transitions
         transitions = state_config.get("transitions", {})
-        return transitions.get("success", "end")
+        success_transition = transitions.get("success")
+        return str(success_transition) if success_transition is not None else "end"
 
     def _process_response_analysis(
         self,
@@ -487,7 +502,8 @@ class StateMachine:
                 return next_state
 
         # If no conditions matched, use default transition
-        return analysis_config.get("default_transition", "end")
+        default_transition = analysis_config.get("default_transition")
+        return str(default_transition) if default_transition is not None else "end"
 
     def _execute_actions(
         self,
@@ -496,7 +512,7 @@ class StateMachine:
         response: str,
         response_lower: str,
         authoritative_user_id: str | None = None,
-    ) -> str:
+    ) -> str | None:
         """Execute a list of actions completely generically based on configuration."""
         next_state = None
 
@@ -567,24 +583,28 @@ class StateMachine:
         """Get the last user message from the conversation."""
         messages = state.get("messages", [])
         for msg in reversed(messages):
-            if (
-                hasattr(msg, "content")
-                and getattr(msg, "__class__", None).__name__ == "HumanMessage"
-            ):
-                return msg.content
+            if hasattr(msg, "content"):
+                msg_class = getattr(msg, "__class__", None)
+                if msg_class is not None and msg_class.__name__ == "HumanMessage":
+                    content = msg.content
+                    return str(content) if content is not None else ""
         return ""
 
     def is_terminal_state(self, state_name: str) -> bool:
         """Check if the given state is a terminal state."""
         settings = self.config.get("settings", {})
         terminal_state = settings.get("terminal_state", "end")
-        return state_name == terminal_state
+        terminal_state_str = (
+            str(terminal_state) if terminal_state is not None else "end"
+        )
+        return state_name == terminal_state_str
 
     def is_waiting_state(self, state_name: str) -> bool:
         """Check if the given state is a waiting state by looking up its type."""
         states = self.config.get("states", {})
         state_config = states.get(state_name, {})
-        return state_config.get("type") == "waiting"
+        state_type = state_config.get("type")
+        return str(state_type) == "waiting" if state_type is not None else False
 
     def create_initial_state(self) -> dict[str, Any]:
         """Create initial state with default field values from configuration."""
@@ -593,7 +613,7 @@ class StateMachine:
         state_schema = self.config.get("state_schema", {})
 
         # Create state with default values from schema
-        state = {}
+        state: Dict[str, Any] = {}
 
         # Add required system fields automatically
         state["messages"] = []
@@ -649,7 +669,7 @@ class StateMachine:
             fields_to_clear = all_fields
 
         # Create new state using schema defaults
-        state = {}
+        state: Dict[str, Any] = {}
 
         # Handle required system fields
         if "messages" in fields_to_clear:
@@ -711,15 +731,16 @@ class StateMachine:
             authoritative_user_id,
         )
         intent_messages = [{"role": "user", "content": intent_prompt}]
-        temperature = state_config.get("temperature")
+        temperature = state_config.get("temperature") or 0.7
         allowed_tools = state_config.get("allowed_tools")
 
         # Build kwargs for create_response_with_retry
+        user_id = self._get_user_id(authoritative_user_id)
         response_kwargs = self._build_response_kwargs(
             state,
             state_config,
             temperature,
-            authoritative_user_id,
+            user_id,
             allowed_tools,
             token_context=token_context,
         )
@@ -761,11 +782,12 @@ class StateMachine:
                     action_allowed_tools = action.get("allowed_tools", allowed_tools)
 
                     # Build kwargs for create_response_with_retry (with action-level config)
+                    user_id = self._get_user_id(authoritative_user_id)
                     action_response_kwargs = self._build_response_kwargs(
                         state,
                         state_config,
                         action_temperature,
-                        authoritative_user_id,
+                        user_id,
                         action_allowed_tools,
                         action_config=action,
                         token_context=token_context,
@@ -804,7 +826,7 @@ class StateMachine:
         agent: Any,
         authoritative_user_id: str | None = None,
         token_context: str | None = None,
-    ) -> tuple[dict[str, Any], str]:
+    ) -> tuple[dict[str, Any], str | None]:
         """Process llm_validator type states (like laptop selection validation).
 
         Returns:
@@ -814,7 +836,7 @@ class StateMachine:
         last_message = messages[-1] if messages else None
 
         if not last_message or not isinstance(last_message, HumanMessage):
-            return state
+            return state, None
 
         user_input = last_message.content.strip()
 
@@ -841,11 +863,12 @@ class StateMachine:
         allowed_tools = state_config.get("allowed_tools")
 
         # Build kwargs for create_response_with_retry
+        user_id = self._get_user_id(authoritative_user_id)
         response_kwargs = self._build_response_kwargs(
             state,
             state_config,
             temperature,
-            authoritative_user_id,
+            user_id,
             allowed_tools,
             token_context=token_context,
         )
@@ -865,11 +888,12 @@ class StateMachine:
         validation_messages = [{"role": "user", "content": success_validation_prompt}]
 
         # Build kwargs for validation response
+        user_id = self._get_user_id(authoritative_user_id)
         validation_kwargs = self._build_response_kwargs(
             state,
             state_config,
             0.1,
-            authoritative_user_id,
+            user_id,
             allowed_tools,
             token_context=token_context,
         )
@@ -915,7 +939,7 @@ class StateMachine:
         agent: Any,
         authoritative_user_id: str | None = None,
         token_context: str | None = None,
-    ) -> tuple[dict[str, Any], str]:
+    ) -> tuple[dict[str, Any], str | None]:
         """Process the current state based on its configuration.
 
         Returns:
@@ -954,7 +978,7 @@ class ConversationSession:
     Uses LangGraph checkpoints and threads for persistence across process restarts.
     """
 
-    def __init__(
+    def __init__(  # type: ignore[no-untyped-def]
         self,
         agent,
         thread_id: str | None = None,
@@ -996,7 +1020,7 @@ class ConversationSession:
         self.checkpointer = self.checkpointer_cm.__enter__()
 
         # Initialize state machine
-        self.state_machine = StateMachine(self.config_path)
+        self.state_machine = StateMachine(str(self.config_path))
 
         # Create the graph with checkpointer
         self.app = self._create_graph()
@@ -1005,12 +1029,12 @@ class ConversationSession:
         self.thread_config = {"configurable": {"thread_id": self.thread_id}}
 
         # Store current token context for this session
-        self.current_token_context = None
+        self.current_token_context: Optional[str] = None
 
-    def _create_graph(self) -> Any:
+    def _create_graph(self) -> Any:  # LangGraph CompiledGraph type
         """Create the LangGraph workflow with one node per YAML state."""
         # Use the dynamic AgentState from the state machine
-        workflow = StateGraph(self.state_machine.AgentState)
+        workflow = StateGraph(self.state_machine.AgentState)  # type: ignore[type-var]
 
         # Get all states from configuration
         states_config = self.state_machine.config.get("states", {})
@@ -1024,8 +1048,8 @@ class ConversationSession:
             node_names.append(state_name)
 
             # Create node function with closure to capture state_name
-            def make_node_func(name, stype):
-                def node_func(state: dict[str, Any]) -> Any:
+            def make_node_func(name, stype):  # type: ignore[no-untyped-def]
+                def node_func(state: dict[str, Any]) -> Command | dict[str, Any]:
                     """Node function that returns Command for routing (or state for terminal nodes)."""
                     logger.info(
                         f"Thread {self.thread_id} processing node: {name}, type: {stype}"
@@ -1094,7 +1118,7 @@ class ConversationSession:
             workflow.add_node(state_name, make_node_func(state_name, state_type))
 
         # Add a resume dispatcher node that routes to the correct starting point
-        def resume_dispatcher(state: dict[str, Any]) -> Any:
+        def resume_dispatcher(state: dict[str, Any]) -> Command:
             """Dispatcher that resumes from last waiting node or starts from initial state"""
             last_waiting_node = state.get("_last_waiting_node")
 
@@ -1105,7 +1129,7 @@ class ConversationSession:
                 # New conversation - start from initial state
                 return Command(goto=initial_state, update=state)
 
-        workflow.add_node("__resume_dispatcher__", resume_dispatcher)
+        workflow.add_node("__resume_dispatcher__", resume_dispatcher)  # type: ignore[type-var]
 
         logger.info(f"Created {len(node_names)} nodes: {', '.join(node_names)}")
 
@@ -1123,7 +1147,7 @@ class ConversationSession:
         # Compile with checkpointer only
         return workflow.compile(checkpointer=self.checkpointer, debug=False)
 
-    def get_initial_response(self) -> str:
+    def get_initial_response(self) -> str | list[str | dict]:
         """Get the initial response from the agent by checking conversation history."""
         try:
             # Check if there's existing conversation state
@@ -1212,7 +1236,7 @@ class ConversationSession:
                 if token_context:
                     self.current_token_context = token_context
 
-                result = self.app.invoke(initial_state, config=self.thread_config)
+                result: Any = self.app.invoke(initial_state, config=self.thread_config)
             else:
                 # Existing conversation - add user message and continue
                 # Add the user message and reset the consumed flag for this new invoke
@@ -1225,20 +1249,25 @@ class ConversationSession:
                 if token_context:
                     self.current_token_context = token_context
 
-                result = self.app.invoke(user_input, config=self.thread_config)
+                result2: Any = self.app.invoke(user_input, config=self.thread_config)
 
             # Extract agent response
             agent_response = ""
-            if result and result.get("messages"):
+            current_result = result if "result" in locals() else result2
+            if current_result and current_result.get("messages"):
                 # Find the last AI message
-                for msg in reversed(result["messages"]):
+                for msg in reversed(current_result["messages"]):
                     if isinstance(msg, AIMessage):
-                        agent_response = msg.content
+                        if isinstance(msg.content, str):
+                            agent_response = msg.content
+                        else:
+                            # Handle list content by joining or converting to string
+                            agent_response = str(msg.content)
                         break
 
             # Check if conversation ended and reset if needed
-            if result and self.state_machine.is_terminal_state(
-                result.get("current_state")
+            if current_result and self.state_machine.is_terminal_state(
+                current_result.get("current_state")
             ):
                 # Check if the end state has reset_behavior configured
                 end_state_config = self.state_machine.config.get("states", {}).get(
@@ -1290,6 +1319,6 @@ class ConversationSession:
             except Exception as e:
                 logger.warning(f"Error closing checkpointer context manager: {e}")
 
-    def __del__(self):
+    def __del__(self):  # type: ignore[no-untyped-def]
         """Destructor to ensure cleanup."""
         self.close()

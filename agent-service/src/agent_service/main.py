@@ -4,22 +4,19 @@ import json
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, NewType, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 from cloudevents.http import CloudEvent, to_structured
 from fastapi import Depends, FastAPI, HTTPException, Request, status
-from llama_stack_client import LlamaStackClient
+from fastapi.responses import StreamingResponse
 from shared_clients.stream_processor import LlamaStackStreamProcessor
 from shared_models import (
-    AgentMapping,
     CloudEventBuilder,
     CloudEventHandler,
     EventTypes,
     configure_logging,
-    create_agent_mapping,
     create_cloudevent_response,
-    create_not_found_error,
     create_shared_lifespan,
     generate_fallback_user_id,
     get_database_manager,
@@ -37,11 +34,6 @@ from .session_manager import BaseSessionManager, ResponsesSessionManager
 # Configure structured logging
 logger = configure_logging("agent-service")
 
-# Type aliases for clarity
-RequestManagerSessionId = NewType("RequestManagerSessionId", str)
-LlamaStackSessionId = NewType("LlamaStackSessionId", str)
-AgentId = NewType("AgentId", str)
-
 
 class AgentConfig:
     """Configuration for agent service."""
@@ -58,51 +50,13 @@ class AgentConfig:
                 "Set EVENTING_ENABLED=false to disable eventing or configure BROKER_URL."
             )
 
-        self.default_agent_id = os.getenv("DEFAULT_AGENT_ID", "routing-agent")
-        self.timeout = float(os.getenv("AGENT_TIMEOUT", "120"))
-
 
 class AgentService:
     """Service for handling agent interactions."""
 
     def __init__(self, config: AgentConfig) -> None:
         self.config = config
-        self.client: Optional[LlamaStackClient] = None
         self.http_client = httpx.AsyncClient(timeout=30.0)
-        self.agent_mapping: AgentMapping = create_agent_mapping(
-            {}
-        )  # Type-safe agent mapping
-        self.always_refresh_mapping = (
-            os.getenv("ALWAYS_REFRESH_AGENT_MAPPING", "true").lower() == "true"
-        )
-        # Request-level cache to avoid multiple mapping refreshes per request
-        self._refreshed_requests: set[str] = set()
-        # Cache cleanup threshold - clear cache when it gets too large
-        self._max_cached_requests = 1000
-
-    async def initialize(self) -> None:
-        """Initialize the agent service."""
-        try:
-            # Create HTTP client that forces HTTP without TLS
-            import httpx
-
-            http_client = httpx.Client(
-                verify=False,  # Disable SSL verification
-                timeout=30.0,
-                follow_redirects=True,
-            )
-
-            # Initialize LlamaStackClient with explicit HTTP client
-            self.client = LlamaStackClient(
-                base_url=self.config.llama_stack_url, http_client=http_client
-            )
-            logger.debug("Connected to Llama Stack", url=self.config.llama_stack_url)
-
-            # Build initial agent name to ID mapping
-            await self._build_agent_mapping()
-        except Exception as e:
-            logger.error("Failed to connect to Llama Stack", exc_info=e)
-            raise
 
     def _is_reset_command(self, content: str) -> bool:
         """Check if the content is a reset command."""
@@ -223,354 +177,27 @@ class AgentService:
                 content="Failed to retrieve token statistics. Please try again.",
             )
 
-    async def _build_agent_mapping(self, request_id: Optional[str] = None) -> None:
-        """Build mapping from agent names to agent IDs.
-
-        Args:
-            request_id: Optional request ID for request-level caching.
-                       If provided and mapping was already refreshed for this request,
-                       the refresh will be skipped.
-        """
-        # Check if we've already refreshed for this request
-        if request_id and request_id in self._refreshed_requests:
-            logger.debug(
-                "Skipping agent mapping refresh - already done for this request",
-                request_id=request_id,
-            )
-            return
-
-        try:
-            logger.info("Building agent name to ID mapping...", request_id=request_id)
-            agents_response = self.client.agents.list()
-            raw_mapping = {}
-
-            logger.info(
-                "Retrieved agents from LlamaStack", count=len(agents_response.data)
-            )
-
-            for agent in agents_response.data:
-                # Handle both dict and object formats
-                if isinstance(agent, dict):
-                    agent_name = agent.get("agent_config", {}).get("name") or agent.get(
-                        "name", "unknown"
-                    )
-                    agent_id = agent.get("agent_id", agent.get("id", "unknown"))
-                else:
-                    agent_name = (
-                        getattr(agent.agent_config, "name", "unknown")
-                        if hasattr(agent, "agent_config")
-                        else getattr(agent, "name", "unknown")
-                    )
-                    agent_id = getattr(
-                        agent, "agent_id", getattr(agent, "id", "unknown")
-                    )
-
-                raw_mapping[agent_name] = agent_id
-                logger.debug("Mapped agent", name=agent_name, id=agent_id)
-
-            # Create type-safe mapping
-            self.agent_mapping = create_agent_mapping(raw_mapping)
-
-            # Add to request cache if request_id provided
-            if request_id:
-                self._refreshed_requests.add(request_id)
-                # Clean up cache if it gets too large
-                if len(self._refreshed_requests) > self._max_cached_requests:
-                    logger.debug(
-                        "Clearing request cache to prevent memory leaks",
-                        cache_size=len(self._refreshed_requests),
-                    )
-                    self._refreshed_requests.clear()
-
-            logger.info(
-                "Agent mapping completed",
-                total_agents=len(self.agent_mapping.get_all_names()),
-                request_id=request_id,
-            )
-
-        except Exception as e:
-            logger.error(
-                "Failed to build agent mapping",
-                error=str(e),
-                error_type=type(e).__name__,
-            )
-            self.agent_mapping = create_agent_mapping({})
-            # Continue initialization even if mapping fails
-
     async def process_request(self, request: NormalizedRequest) -> AgentResponse:
         """Process a normalized request and return agent response."""
-        return await self._process_request_core(request, skip_routing=False)
+        return await self._process_request_core(request)
 
-    async def _handle_agent_routing(
-        self, agent_response: AgentResponse, request: NormalizedRequest
-    ) -> AgentResponse:
-        """Handle agent routing detection and processing."""
-        from .routing import detect_and_validate_agent_routing
-
-        # Get current agent name for routing detection
-        current_agent_name = self.agent_mapping.get_name(agent_response.agent_id)
-        if not current_agent_name:
-            logger.warning(
-                "Could not find agent name for UUID, skipping routing detection",
-                agent_uuid=agent_response.agent_id,
-            )
-            return agent_response
-
-        # Always perform routing detection, but with different logic based on current agent
-        is_routing_agent = (
-            current_agent_name.lower() == self.config.default_agent_id.lower()
-        )
-
-        if not is_routing_agent:
-            logger.debug(
-                "Checking for task completion signal from specialist agent",
-                current_agent=current_agent_name,
-                request_id=request.request_id,
-            )
-
-        # Use existing agent mapping for routing detection (no HTTP call needed)
-        # Check for routing signals
-        routed_agent = await detect_and_validate_agent_routing(
-            agent_response.content, current_agent_name, self.agent_mapping
-        )
-
-        if routed_agent:
-            logger.info(
-                "Agent routing detected - switching to target agent",
-                from_agent=agent_response.agent_id,
-                to_agent=routed_agent,
-                request_id=request.request_id,
-                is_routing_agent=is_routing_agent,
-            )
-
-            # Update session with the routed agent as current agent
-            try:
-                from shared_models import get_database_manager
-
-                db_manager = get_database_manager()
-                async with db_manager.get_session() as db_session:
-                    session_manager = BaseSessionManager(db_session)
-
-                    # Get the routed agent UUID for validation
-                    routed_agent_uuid = self.agent_mapping.convert_to_uuid(routed_agent)
-
-                    # Mark this as a fresh agent transition for introductory response
-                    conversation_context = {
-                        "agent_transition": True,
-                        "previous_agent": agent_response.agent_id,
-                        "new_agent": routed_agent,  # Store agent name for consistency
-                        "agent_uuid": routed_agent_uuid,  # Store UUID for validation
-                        "session_type": "llamastack_agent",
-                        "transition_timestamp": datetime.now(timezone.utc).isoformat(),
-                    }
-
-                    updated_session = await session_manager.update_session(
-                        session_id=request.session_id,
-                        agent_id=routed_agent,  # Store agent name directly
-                        conversation_context=conversation_context,
-                    )
-
-                    logger.info(
-                        "Updated session with routed agent",
-                        session_id=request.session_id,
-                        agent_name=routed_agent,
-                        update_successful=updated_session is not None,
-                        request_id=request.request_id,
-                    )
-            except Exception as e:
-                logger.error(
-                    "Failed to update session after routing",
-                    session_id=request.session_id,
-                    routed_agent=routed_agent,
-                    error=str(e),
-                )
-
-            # Create a direct request to the routed agent with the original user message
-            # Bypass routing logic to prevent duplicate responses
-            routed_request = request.model_copy()
-            routed_request.target_agent_id = routed_agent
-            routed_request.content = request.content  # Send original user message
-
-            # Process the routed request directly without going through routing logic
-            routed_response = await self._process_request_direct(routed_request)
-
-            if routed_response:
-                logger.info(
-                    "Successfully routed to target agent with original message",
-                    target_agent=routed_agent,
-                    request_id=request.request_id,
-                    final_agent_id=routed_response.agent_id,
-                )
-                # Return the specialist agent's response to the user's original question
-                return routed_response
-            else:
-                logger.error(
-                    "Failed to get response from routed agent",
-                    target_agent=routed_agent,
-                    request_id=request.request_id,
-                )
-                # Fallback to routing agent response if specialist fails
-                return agent_response
-
-        # No routing detected, return original response
-        return agent_response
-
-    async def _process_request_direct(
-        self, request: NormalizedRequest
-    ) -> AgentResponse:
-        """Process a request directly without routing logic to prevent duplicate responses."""
-        return await self._process_request_core(request, skip_routing=True)
-
-    async def _process_request_core(
-        self, request: NormalizedRequest, skip_routing: bool = False
-    ) -> AgentResponse:
-        """Core request processing logic shared between process_request and _process_request_direct."""
+    async def _process_request_core(self, request: NormalizedRequest) -> AgentResponse:
+        """Core request processing logic."""
         start_time = datetime.now(timezone.utc)
 
         try:
             # Check for reset command first
-            if not skip_routing and self._is_reset_command(request.content):
+            if self._is_reset_command(request.content):
                 return await self._handle_reset_command(request)
 
             # Check for tokens command
-            if not skip_routing and self._is_tokens_command(request.content):
+            if self._is_tokens_command(request.content):
                 return await self._handle_tokens_command(request)
 
-            # Publish processing started event for user notification (only for main requests)
-            if not skip_routing:
-                await self._publish_processing_event(request)
+            # Publish processing started event for user notification
+            await self._publish_processing_event(request)
 
-            # Check if responses mode is requested
-            if request.use_responses:
-                logger.info(
-                    "Responses mode requested, delegating to responses session manager",
-                    request_id=request.request_id,
-                    session_id=request.session_id,
-                )
-                return await self._handle_responses_mode_request(request, start_time)
-
-            # Determine which agent to use for traditional agent mode
-            agent_id = await self._determine_agent(request)
-            logger.info(
-                "Agent determined for request",
-                request_id=request.request_id,
-                target_agent_id=request.target_agent_id,
-                resolved_agent_id=agent_id,
-            )
-
-            # Handle session management (increment request count) for both eventing and direct HTTP modes
-            await self._handle_session_management(
-                request.session_id, request.request_id
-            )
-
-            # Get or create LlamaStack session for this specific agent
-            llama_stack_session_id = await self._get_or_create_llama_stack_session(
-                RequestManagerSessionId(request.session_id), AgentId(agent_id)
-            )
-
-            # Send message to agent
-            messages = [{"role": "user", "content": request.content}]
-
-            # Get full agent configuration to ensure all settings are applied
-            agent = self.client.agents.retrieve(agent_id)
-            agent_config = agent.agent_config
-
-            # Debug logging for agent configuration
-            logger.info(
-                "Agent configuration retrieved",
-                agent_id=agent_id,
-                agent_name=agent.name if hasattr(agent, "name") else "unknown",
-                toolgroups=(
-                    agent_config.toolgroups
-                    if hasattr(agent_config, "toolgroups")
-                    else None
-                ),
-                tool_choice=(
-                    getattr(agent_config.tool_config, "tool_choice", None)
-                    if hasattr(agent_config, "tool_config") and agent_config.tool_config
-                    else None
-                ),
-                sampling_params=(
-                    agent_config.sampling_params
-                    if hasattr(agent_config, "sampling_params")
-                    else None
-                ),
-            )
-            # Use streaming agent turns (required by LlamaStack)
-            turn_params = {
-                "agent_id": agent_id,
-                "session_id": llama_stack_session_id,
-                "messages": messages,
-                "stream": True,  # Enable streaming
-            }
-
-            # Add toolgroups if available
-            if agent_config.toolgroups:
-                logger.info(
-                    "Adding toolgroups to turn params",
-                    agent_id=agent_id,
-                    toolgroups=agent_config.toolgroups,
-                )
-                turn_params["toolgroups"] = agent_config.toolgroups
-            else:
-                logger.info("No toolgroups found for agent", agent_id=agent_id)
-
-            response_stream = self.client.agents.turn.create(**turn_params)
-
-            # Use shared stream processor
-            from shared_clients.stream_processor import LlamaStackStreamProcessor
-
-            stream_result = await LlamaStackStreamProcessor.process_stream(
-                response_stream,
-                collect_content=True,
-            )
-
-            content = stream_result["content"]
-            tool_calls_made = stream_result["tool_calls_made"]
-            errors = stream_result["errors"]
-            chunk_count = stream_result["chunk_count"]
-
-            if errors:
-                logger.error("Stream processing errors", errors=errors)
-
-            # If no content collected, provide error message instead of stream object
-            if not content:
-                content = f"No response content received from agent (processed {chunk_count} chunks). This may indicate the agent didn't complete its turn or the stream format has changed."
-                logger.warning(
-                    "No content collected from stream",
-                    chunk_count=chunk_count,
-                    message="Check if agent completed its turn successfully",
-                )
-
-            # Log tool calls for monitoring (Strategy 3 only)
-            if tool_calls_made:
-                logger.info(
-                    "Tools called during agent processing",
-                    agent_id=agent_id,
-                    tool_calls=tool_calls_made,
-                )
-
-            # Create response with automatic timing calculation
-            agent_response = self._create_agent_response(
-                request=request,
-                content=stream_result["content"],
-                agent_id=agent_id,
-                metadata={
-                    "tool_calls_made": stream_result["tool_calls_made"],
-                    "chunk_count": stream_result["chunk_count"],
-                    "errors": stream_result["errors"],
-                },
-                start_time=start_time,
-            )
-
-            # Handle agent routing detection if needed (only for main requests)
-            if not skip_routing:
-                final_response = await self._handle_agent_routing(
-                    agent_response, request
-                )
-                return final_response
-            else:
-                return agent_response
+            return await self._handle_responses_mode_request(request, start_time)
 
         except Exception as e:
             logger.error(
@@ -581,266 +208,8 @@ class AgentService:
             return self._create_error_response(
                 request=request,
                 content=f"I apologize, but I encountered an error processing your request: {str(e)}",
-                agent_id=None,
+                agent_id="unknown",
             )
-
-    async def _determine_agent(self, request: NormalizedRequest) -> str:
-        """Determine which agent should handle the request."""
-        if request.target_agent_id:
-            # Refresh agent mapping if configured to do so or if mapping is empty
-            if (
-                self.always_refresh_mapping
-                or len(self.agent_mapping.get_all_names()) == 0
-            ):
-                logger.debug(
-                    "Refreshing agent mapping for request",
-                    agent_name=request.target_agent_id,
-                )
-                await self._build_agent_mapping(request_id=request.request_id)
-
-            # Use simple conversion
-            agent_uuid = self.agent_mapping.convert_to_uuid(request.target_agent_id)
-            if agent_uuid:
-                logger.info(
-                    "Resolved target agent name to ID",
-                    agent_name=request.target_agent_id,
-                    agent_id=agent_uuid,
-                )
-                return agent_uuid
-            else:
-                available_agents = self.agent_mapping.get_all_names()
-                logger.error(
-                    "Target agent not found in mapping",
-                    target_agent_id=request.target_agent_id,
-                    available_agents=available_agents,
-                )
-                raise ValueError(
-                    f"Target agent '{request.target_agent_id}' not found in llama-stack. "
-                    f"Available agents: {available_agents}. "
-                    f"Please check agent configuration."
-                )
-
-        # Check if session has a current agent assigned
-        try:
-            from shared_models import get_database_manager
-
-            db_manager = get_database_manager()
-            async with db_manager.get_session() as db_session:
-                session_manager = BaseSessionManager(db_session)
-                session = await session_manager.get_session(request.session_id)
-
-                # Debug logging to understand what's happening
-                logger.info(
-                    "Session lookup result",
-                    session_id=request.session_id,
-                    session_found=session is not None,
-                    current_agent_id=session.current_agent_id if session else None,
-                    session_status=session.status if session else None,
-                    session_data=session.model_dump() if session else None,
-                )
-
-                if session and session.current_agent_id:
-                    # User is already assigned to a specific agent, use that agent
-                    await self._build_agent_mapping(request_id=request.request_id)
-
-                    # Use the existing agent mapping conversion method
-                    stored_agent_id = session.current_agent_id
-                    agent_uuid = self.agent_mapping.convert_to_uuid(stored_agent_id)
-
-                    # Check if the agent actually exists in the mapping (not just if it's a valid UUID)
-                    if agent_uuid and self.agent_mapping.get_name(agent_uuid):
-                        logger.info(
-                            "Using session's current agent",
-                            session_id=request.session_id,
-                            current_agent=stored_agent_id,
-                            agent_id=agent_uuid,
-                        )
-                        return agent_uuid
-                    else:
-                        logger.warning(
-                            "Session's current agent not found in mapping, resetting to routing agent",
-                            session_id=request.session_id,
-                            current_agent=stored_agent_id,
-                        )
-
-                        # Reset session to routing agent to fix invalid agent UUID
-                        try:
-                            default_agent_uuid = self.agent_mapping.convert_to_uuid(
-                                self.config.default_agent_id
-                            )
-                            if default_agent_uuid:
-                                await session_manager.update_session(
-                                    session_id=request.session_id,
-                                    agent_id=default_agent_uuid,
-                                )
-                                logger.info(
-                                    "Reset session to routing agent due to invalid agent UUID",
-                                    session_id=request.session_id,
-                                    old_agent=stored_agent_id,
-                                    new_agent=default_agent_uuid,
-                                )
-                        except Exception as e:
-                            logger.error(
-                                "Failed to reset session to routing agent",
-                                session_id=request.session_id,
-                                error=str(e),
-                            )
-                else:
-                    logger.info(
-                        "No current agent in session, will use routing agent",
-                        session_id=request.session_id,
-                        session_found=session is not None,
-                        current_agent_id=session.current_agent_id if session else None,
-                    )
-        except Exception as e:
-            logger.warning(
-                "Failed to check session current agent, falling back to routing agent",
-                session_id=request.session_id,
-                error=str(e),
-            )
-
-        # Use routing agent for all requests unless a specific target agent is provided
-        agent_name = self.config.default_agent_id
-
-        # Always refresh agent mapping to ensure we have the latest agents from LlamaStack
-        logger.debug("Refreshing agent mapping for request", agent_name=agent_name)
-        await self._build_agent_mapping(request_id=request.request_id)
-
-        # Resolve agent name to ID using simple conversion
-        logger.debug(
-            "Resolving agent name to ID",
-            agent_name=agent_name,
-            available_agents=self.agent_mapping.get_all_names(),
-        )
-
-        agent_uuid = self.agent_mapping.convert_to_uuid(agent_name)
-        if agent_uuid:
-            logger.info(
-                "Resolved agent name to ID", agent_name=agent_name, agent_id=agent_uuid
-            )
-            return agent_uuid
-        else:
-            available_agents = self.agent_mapping.get_all_names()
-            logger.error(
-                "Agent name not found in mapping",
-                agent_name=agent_name,
-                available_agents=available_agents,
-            )
-            raise ValueError(
-                f"Agent '{agent_name}' not found in llama-stack. "
-                f"Available agents: {available_agents}. "
-                f"Please check agent configuration or create the agent in llama-stack."
-            )
-
-    async def _get_or_create_llama_stack_session(
-        self, request_manager_session_id: RequestManagerSessionId, agent_id: AgentId
-    ) -> LlamaStackSessionId:
-        """Get or create a LlamaStack session for a specific agent.
-
-        This method handles LlamaStack session management (AI conversation history)
-        which is separate from Request Manager session management (database context).
-
-        Args:
-            request_manager_session_id: The Request Manager session ID (user conversation context)
-            agent_id: The agent ID for which to create/get the LlamaStack session
-
-        Returns:
-            The LlamaStack session ID for this agent
-
-        Note: This method also updates the Request Manager session to store the
-        LlamaStack session ID reference, but the actual LlamaStack session
-        management is handled via LlamaStackClient API calls.
-        """
-        # Get database session for persistent storage
-        db_manager = get_database_manager()
-        async with db_manager.get_session() as db:
-            session_manager = BaseSessionManager(db)
-
-            # Try to get existing session from database
-            existing_session = await session_manager.get_session(
-                request_manager_session_id
-            )
-
-            if existing_session and existing_session.conversation_thread_id:
-                # Check if agent UUID has changed (agent was recreated)
-                stored_uuid = None
-                if existing_session.conversation_context:
-                    stored_uuid = existing_session.conversation_context.get(
-                        "agent_uuid"
-                    )
-
-                if stored_uuid and stored_uuid != agent_id:
-                    logger.warning(
-                        "Agent UUID has changed, agent was likely recreated",
-                        request_manager_session_id=request_manager_session_id,
-                        stored_uuid=stored_uuid,
-                        current_uuid=agent_id,
-                        agent_name=existing_session.current_agent_id,
-                    )
-                else:
-                    # Verify the session still exists in LlamaStack
-                    try:
-                        self.client.agents.session.retrieve(
-                            agent_id=agent_id,
-                            session_id=existing_session.conversation_thread_id,
-                        )
-                        logger.info(
-                            "Reusing existing LlamaStack session from database",
-                            request_manager_session_id=request_manager_session_id,
-                            agent_id=agent_id,
-                            llama_stack_session_id=existing_session.conversation_thread_id,
-                        )
-                        return existing_session.conversation_thread_id
-                    except Exception as e:
-                        logger.warning(
-                            "Database session no longer valid in LlamaStack, will create new one",
-                            request_manager_session_id=request_manager_session_id,
-                            agent_id=agent_id,
-                            session_id=existing_session.conversation_thread_id,
-                            error=str(e),
-                        )
-
-        try:
-            # Create new session
-            session_response = self.client.agents.session.create(
-                agent_id=agent_id,
-                session_name=f"session-{request_manager_session_id}",
-            )
-
-            llama_stack_session_id = session_response.session_id
-
-            # Store the LlamaStack session ID in the database
-            async with db_manager.get_session() as db:
-                session_manager = BaseSessionManager(db)
-                # Get agent name for consistent storage
-                agent_name = self.agent_mapping.get_name(agent_id) or agent_id
-
-                # Store both agent name and UUID for validation
-                conversation_context = {
-                    "agent_name": agent_name,
-                    "agent_uuid": agent_id,
-                    "session_type": "llamastack_agent",
-                }
-
-                await session_manager.update_session(
-                    session_id=request_manager_session_id,
-                    agent_id=agent_name,  # Store agent name for readability
-                    conversation_thread_id=llama_stack_session_id,
-                    conversation_context=conversation_context,  # Store UUID for validation
-                )
-
-            logger.info(
-                "Created new agent session and stored in database",
-                request_manager_session_id=request_manager_session_id,
-                llama_stack_session_id=llama_stack_session_id,
-                agent_id=agent_id,
-            )
-
-            return llama_stack_session_id
-
-        except Exception as e:
-            logger.error("Failed to create agent session", exc_info=e)
-            raise
 
     async def publish_response(self, response: AgentResponse) -> bool:
         """Publish agent response as CloudEvent and update database."""
@@ -915,6 +284,10 @@ class AgentService:
 
             headers, body = to_structured(event)
 
+            if self.config.broker_url is None:
+                logger.error("Broker URL not configured")
+                return False
+
             response_http = await self.http_client.post(
                 self.config.broker_url,
                 headers=headers,
@@ -945,7 +318,7 @@ class AgentService:
         Args:
             request: The normalized request
             content: Response content
-            agent_id: Agent identifier
+            agent_id: Agent identifier (required)
             response_type: Type of response (default: "message")
             metadata: Optional metadata dictionary
             processing_time_ms: Processing time in milliseconds (if None and start_time provided, will calculate)
@@ -959,7 +332,7 @@ class AgentService:
                 (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
             )
 
-        return AgentResponse(
+        response = AgentResponse(
             request_id=request.request_id,
             session_id=request.session_id,
             user_id=request.user_id,
@@ -972,6 +345,7 @@ class AgentService:
             followup_actions=followup_actions or [],
             created_at=datetime.now(timezone.utc),
         )
+        return response
 
     def _create_error_response(
         self,
@@ -1007,6 +381,14 @@ class AgentService:
 
     async def _update_request_log(self, response: AgentResponse) -> None:
         """Update RequestLog in database with response content."""
+        if response.agent_id is None:
+            logger.error(
+                "Cannot update request log - response missing agent_id",
+                request_id=response.request_id,
+                session_id=response.session_id,
+            )
+            return
+
         await _update_request_log_unified(
             request_id=response.request_id,
             response_content=response.content,
@@ -1045,10 +427,21 @@ class AgentService:
                 )
 
                 # Create response with automatic timing calculation
+                if session_manager.current_agent_name is None:
+                    logger.error(
+                        "Cannot create agent response - no agent assigned",
+                        request_id=request.request_id,
+                        session_id=request.session_id,
+                    )
+                    return self._create_error_response(
+                        request=request,
+                        content="Error: No agent assigned to handle this request",
+                    )
+
                 return self._create_agent_response(
                     request=request,
                     content=response_content,
-                    agent_id=session_manager.current_agent_name or "responses",
+                    agent_id=session_manager.current_agent_name,
                     start_time=start_time,
                 )
 
@@ -1102,6 +495,10 @@ class AgentService:
 
             headers, body = to_structured(event)
 
+            if self.config.broker_url is None:
+                logger.error("Broker URL not configured")
+                return False
+
             response = await self.http_client.post(
                 self.config.broker_url,
                 headers=headers,
@@ -1122,39 +519,6 @@ class AgentService:
         except Exception as e:
             logger.error("Failed to publish processing event", exc_info=e)
             return False
-
-    async def _log_agent_config(self, agent_id: str) -> None:
-        """Log agent configuration for debugging."""
-        try:
-            # Get agent details from llama-stack
-            response = self.client.get("v1/agents", cast_to=httpx.Response)
-            json_string = response.content.decode("utf-8")
-            data = json.loads(json_string)
-
-            # Find the agent with matching ID
-            for agent in data.get("data", []):
-                if isinstance(agent, dict) and agent.get("agent_id") == agent_id:
-                    agent_config = agent.get("agent_config", {})
-                    logger.info(
-                        "Agent configuration in llama-stack",
-                        agent_id=agent_id,
-                        agent_name=agent.get("name"),
-                        toolgroups=agent_config.get("toolgroups"),
-                        tool_choice=agent_config.get("tool_config", {}).get(
-                            "tool_choice"
-                        ),
-                        max_infer_iters=agent_config.get("max_infer_iters"),
-                        sampling_params=agent_config.get("sampling_params"),
-                    )
-                    return
-
-            logger.warning(
-                "Agent configuration not found in llama-stack", agent_id=agent_id
-            )
-        except Exception as e:
-            logger.error(
-                "Failed to get agent configuration", agent_id=agent_id, error=str(e)
-            )
 
     async def close(self) -> None:
         """Close HTTP client."""
@@ -1200,13 +564,7 @@ async def _agent_service_startup() -> None:
 
     config = AgentConfig()
     _agent_service = AgentService(config)
-
-    try:
-        await _agent_service.initialize()
-        logger.info("Agent Service initialized")
-    except Exception as e:
-        logger.error("Failed to initialize Agent Service", exc_info=e)
-        raise
+    logger.info("Agent Service initialized")
 
 
 async def _agent_service_shutdown() -> None:
@@ -1253,38 +611,19 @@ async def detailed_health_check(
     db: AsyncSession = Depends(get_db_session_dependency),
 ) -> Dict[str, Any]:
     """Detailed health check with database dependency for monitoring."""
-    return await simple_health_check(
-        service_name="agent-service",
-        version=__version__,
-        db=db,
+    return dict(
+        await simple_health_check(
+            service_name="agent-service",
+            version=__version__,
+            db=db,
+        )
     )
 
 
-@app.get("/agents")
-async def list_agents() -> Dict[str, Any]:
-    """List available agents endpoint."""
-    if not _agent_service:
-        raise create_not_found_error("Agent service not initialized")
-
-    try:
-        # Refresh agent mapping to get latest agents
-        await _agent_service._build_agent_mapping()
-
-        return {
-            "agents": _agent_service.agent_mapping.to_dict(),
-            "count": len(_agent_service.agent_mapping.get_all_names()),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-    except Exception as e:
-        logger.error("Failed to get agent list", exc_info=e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve agent list",
-        )
-
-
-@app.post("/process")
-async def handle_direct_request(request: Request, stream: bool = False) -> Any:
+@app.post("/process", response_model=None)
+async def handle_direct_request(
+    request: Request, stream: bool = False
+) -> StreamingResponse | Dict[str, Any]:
     """Handle direct HTTP requests with optional streaming support."""
     if not _agent_service:
         raise HTTPException(
@@ -1331,9 +670,25 @@ async def handle_direct_request(request: Request, stream: bool = False) -> Any:
                         yield chunk_data
 
                     # Send completion event
-                    yield LlamaStackStreamProcessor.create_sse_complete_event(
-                        agent_response.agent_id, agent_response.processing_time_ms
-                    )
+                    if (
+                        agent_response.agent_id is None
+                        or agent_response.processing_time_ms is None
+                    ):
+                        logger.error(
+                            "Cannot send completion event - missing agent_id or processing_time_ms",
+                            request_id=agent_response.request_id,
+                            session_id=agent_response.session_id,
+                            agent_id=agent_response.agent_id,
+                            processing_time_ms=agent_response.processing_time_ms,
+                        )
+                        yield LlamaStackStreamProcessor.create_sse_error_event(
+                            "Missing required response data"
+                        )
+                    else:
+                        yield LlamaStackStreamProcessor.create_sse_complete_event(
+                            agent_response.agent_id,
+                            agent_response.processing_time_ms,
+                        )
 
                 except Exception as e:
                     logger.error("Error in streaming response", exc_info=e)
@@ -1356,10 +711,12 @@ async def handle_direct_request(request: Request, stream: bool = False) -> Any:
 
 
 @app.post("/process/stream")
-async def handle_direct_request_stream(request: Request) -> Any:
+async def handle_direct_request_stream(
+    request: Request,
+) -> StreamingResponse:
     """Handle direct HTTP requests with streaming responses (legacy endpoint)."""
     # Redirect to unified endpoint with streaming enabled
-    return await handle_direct_request(request, stream=True)
+    return await handle_direct_request(request, stream=True)  # type: ignore[return-value]
 
 
 @app.post("/api/v1/events/cloudevents")
@@ -1394,10 +751,12 @@ async def handle_cloudevent(request: Request) -> Dict[str, Any]:
             )
 
         logger.warning("Unhandled CloudEvent type", event_type=event_type)
-        return await create_cloudevent_response(
-            status="ignored",
-            message="Unhandled event type",
-            details={"event_type": event_type},
+        return dict(
+            await create_cloudevent_response(
+                status="ignored",
+                message="Unhandled event type",
+                details={"event_type": event_type},
+            )
         )
 
     except Exception as e:
@@ -1411,19 +770,32 @@ async def handle_cloudevent(request: Request) -> Dict[str, Any]:
 def _create_normalized_request_from_data(
     request_data: Dict[str, Any],
 ) -> NormalizedRequest:
-    """Create a NormalizedRequest from request data with proper defaults."""
+    """Create a NormalizedRequest from request data with proper validation."""
+    # Validate required fields
+    required_fields = [
+        "request_id",
+        "session_id",
+        "user_id",
+        "integration_type",
+        "request_type",
+        "content",
+    ]
+    missing_fields = [field for field in required_fields if not request_data.get(field)]
+
+    if missing_fields:
+        raise ValueError(f"Missing required fields in request data: {missing_fields}")
+
     return NormalizedRequest(
-        request_id=request_data.get("request_id", "unknown"),
-        session_id=request_data.get("session_id", "unknown"),
-        user_id=request_data.get("user_id", "unknown"),
-        integration_type=request_data.get("integration_type", "CLI"),
-        request_type=request_data.get("request_type", "general"),
-        content=request_data.get("content", ""),
+        request_id=request_data["request_id"],
+        session_id=request_data["session_id"],
+        user_id=request_data["user_id"],
+        integration_type=request_data["integration_type"],
+        request_type=request_data["request_type"],
+        content=request_data["content"],
         integration_context=request_data.get("integration_context", {}),
         user_context=request_data.get("user_context", {}),
         target_agent_id=request_data.get("target_agent_id"),
         requires_routing=request_data.get("requires_routing", True),
-        use_responses=request_data.get("use_responses", True),
         created_at=datetime.fromisoformat(
             request_data.get("created_at", datetime.now().isoformat())
         ),
@@ -1527,6 +899,10 @@ async def _handle_responses_request_event_from_data(
                 detail="Missing required fields: request_manager_session_id, user_id, message",
             )
 
+        # At this point, we know these are not None due to the check above
+        assert user_id is not None
+        assert message is not None
+
         # Get database session
         db_manager = get_database_manager()
 
@@ -1546,13 +922,26 @@ async def _handle_responses_request_event_from_data(
             )
 
             # Get current agent name for response metadata
-            current_agent_name = session_manager.current_agent_name or "responses"
+            current_agent_name = session_manager.current_agent_name
             current_thread_id = session_manager.get_current_thread_id()
 
             # Clean up the session manager
             await session_manager.close()
 
         # Return response in the expected format
+        if current_agent_name is None:
+            logger.error(
+                "Cannot create response - no agent assigned",
+                user_id=user_id,
+                request_manager_session_id=request_manager_session_id,
+            )
+            return {
+                "status": "error",
+                "error": "No agent assigned to handle this request",
+                "request_manager_session_id": request_manager_session_id,
+                "user_id": user_id,
+            }
+
         return {
             "status": "success",
             "response": {

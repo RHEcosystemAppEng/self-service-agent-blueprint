@@ -1,10 +1,6 @@
 """Tests for shared agent utilities."""
 
-from shared_models.agent_types import (
-    create_agent_mapping,
-    is_agent_name,
-    is_agent_uuid,
-)
+from shared_models.agent_types import create_agent_mapping, is_agent_name, is_agent_uuid
 
 
 def test_agent_mapping() -> None:

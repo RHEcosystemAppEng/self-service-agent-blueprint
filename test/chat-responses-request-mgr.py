@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Simple CLI-based chat application with Request Manager integration for responses mode.
+Simple CLI-based chat application with Request Manager integration.
 
 This module provides a command-line interface for chatting with an AI agent
-using the Request Manager system in responses mode. It uses the shared CLIChatClient
-for synchronous requests with use_responses=True.
+using the Request Manager system. It uses the shared CLIChatClient
+for synchronous requests.
 """
 
 import argparse
@@ -22,12 +22,10 @@ AUTHORITATIVE_USER_ID = os.environ.get("AUTHORITATIVE_USER_ID", None)
 
 async def main() -> None:
     """
-    Main chat application loop using the shared CLIChatClient with responses mode.
+    Main chat application loop using the shared CLIChatClient.
     """
     # Parse command line arguments
-    parser = argparse.ArgumentParser(
-        description="CLI Chat with Request Manager (Responses Mode)"
-    )
+    parser = argparse.ArgumentParser(description="CLI Chat with Request Manager")
     parser.add_argument("--user-id", help="User ID for the chat session")
     parser.add_argument("--request-manager-url", help="Request Manager URL")
     parser.add_argument("--debug", action="store_true", help="Enable debug output")
@@ -39,7 +37,7 @@ async def main() -> None:
     request_manager_url = args.request_manager_url or REQUEST_MANAGER_URL
     debug = args.debug
 
-    # Create chat client with optional user_id and use_responses=True
+    # Create chat client with optional user_id
     chat_client = CLIChatClient(
         request_manager_url=request_manager_url,
         user_id=user_id,
@@ -50,7 +48,7 @@ async def main() -> None:
     else:
         print("No user ID specified - using auto-generated UUID")
 
-    print("Responses mode enabled - using LangGraph state machine")
+    print("Using LangGraph state machine for conversation management")
 
     # Interactive mode: run the chat loop (default)
     if sys.stdin.isatty():

@@ -70,18 +70,20 @@ class IntegrationDefaultsMigration:
 
             logger.info(
                 "Configuration analysis completed",
-                total_configs=analysis["total_configs"],
-                users_with_configs=analysis["users_with_configs"],
-                integration_types=analysis["integration_types"],
-                enabled_configs=analysis["enabled_configs"],
-                disabled_configs=analysis["disabled_configs"],
+                extra={
+                    "total_configs": analysis["total_configs"],
+                    "users_with_configs": analysis["users_with_configs"],
+                    "integration_types": analysis["integration_types"],
+                    "enabled_configs": analysis["enabled_configs"],
+                    "disabled_configs": analysis["disabled_configs"],
+                },
             )
 
             return analysis
 
     async def migrate_to_integration_defaults(
         self, dry_run: bool = True, preserve_existing: bool = True
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """Migrate existing configurations to integration defaults approach.
 
         Args:
@@ -90,8 +92,10 @@ class IntegrationDefaultsMigration:
         """
         logger.info(
             "Starting integration defaults migration",
-            dry_run=dry_run,
-            preserve_existing=preserve_existing,
+            extra={
+                "dry_run": dry_run,
+                "preserve_existing": preserve_existing,
+            },
         )
 
         async with self.db_manager.get_session() as db:
@@ -100,7 +104,7 @@ class IntegrationDefaultsMigration:
             result = await db.execute(stmt)
             configs = result.scalars().all()
 
-            migration_results = {
+            migration_results: Dict[str, Any] = {
                 "total_configs": len(configs),
                 "users_affected": set(),
                 "configs_to_remove": [],
@@ -122,9 +126,11 @@ class IntegrationDefaultsMigration:
                     )
                     logger.info(
                         "Preserving existing configuration",
-                        user_id=config.user_id,
-                        integration_type=config.integration_type.value,
-                        enabled=config.enabled,
+                        extra={
+                            "user_id": config.user_id,
+                            "integration_type": config.integration_type.value,
+                            "enabled": config.enabled,
+                        },
                     )
                 else:
                     # Mark for removal (will use smart defaults instead)
@@ -141,8 +147,10 @@ class IntegrationDefaultsMigration:
                         await db.delete(config)
                         logger.info(
                             "Removed user configuration (will use smart defaults)",
-                            user_id=config.user_id,
-                            integration_type=config.integration_type.value,
+                            extra={
+                                "user_id": config.user_id,
+                                "integration_type": config.integration_type.value,
+                            },
                         )
 
             if not dry_run and not preserve_existing:
@@ -155,19 +163,23 @@ class IntegrationDefaultsMigration:
 
             logger.info(
                 "Integration defaults migration completed",
-                dry_run=dry_run,
-                preserve_existing=preserve_existing,
-                total_configs=migration_results["total_configs"],
-                users_affected=migration_results["users_affected"],
-                configs_to_remove=len(migration_results["configs_to_remove"]),
-                configs_to_preserve=len(migration_results["configs_to_preserve"]),
+                extra={
+                    "dry_run": dry_run,
+                    "preserve_existing": preserve_existing,
+                    "total_configs": migration_results["total_configs"],
+                    "users_affected": migration_results["users_affected"],
+                    "configs_to_remove": len(migration_results["configs_to_remove"]),
+                    "configs_to_preserve": len(
+                        migration_results["configs_to_preserve"]
+                    ),
+                },
             )
 
             return migration_results
 
     async def reset_user_to_integration_defaults(
         self, user_id: str, dry_run: bool = True
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """Reset a specific user to integration defaults.
 
         Args:
@@ -175,7 +187,8 @@ class IntegrationDefaultsMigration:
             dry_run: If True, only analyze changes without making them
         """
         logger.info(
-            "Resetting user to integration defaults", user_id=user_id, dry_run=dry_run
+            "Resetting user to integration defaults",
+            extra={"user_id": user_id, "dry_run": dry_run},
         )
 
         async with self.db_manager.get_session() as db:
@@ -186,7 +199,7 @@ class IntegrationDefaultsMigration:
             result = await db.execute(stmt)
             configs = result.scalars().all()
 
-            reset_results = {
+            reset_results: Dict[str, Any] = {
                 "user_id": user_id,
                 "configs_found": len(configs),
                 "configs_to_remove": [],
@@ -205,8 +218,10 @@ class IntegrationDefaultsMigration:
                     await db.delete(config)
                     logger.info(
                         "Removed user configuration",
-                        user_id=user_id,
-                        integration_type=config.integration_type.value,
+                        extra={
+                            "user_id": user_id,
+                            "integration_type": config.integration_type.value,
+                        },
                     )
 
             if not dry_run:

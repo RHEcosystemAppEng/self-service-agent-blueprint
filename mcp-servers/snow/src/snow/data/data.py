@@ -1,6 +1,7 @@
 """Mock data for ServiceNow ticket management."""
 
 from datetime import datetime, timedelta
+from typing import Any
 
 
 def _calculate_laptop_age(purchase_date_str: str) -> str:
@@ -45,7 +46,7 @@ def _calculate_laptop_age(purchase_date_str: str) -> str:
 MOCK_TICKET_DATA = {}
 
 
-def generate_ticket_number():
+def generate_ticket_number() -> str:
     """Generate a mock ServiceNow ticket number."""
     import random
 
@@ -279,7 +280,9 @@ MOCK_EMPLOYEE_DATA = {
 }
 
 
-def find_employee_by_authoritative_user_id(authoritative_user_id: str) -> dict:
+def find_employee_by_authoritative_user_id(
+    authoritative_user_id: str,
+) -> dict[str, Any]:
     """Find employee by email from authoritative user ID. Currently only
        email is supported for authoritative user id
 
@@ -307,7 +310,7 @@ def find_employee_by_authoritative_user_id(authoritative_user_id: str) -> dict:
     )
 
 
-def format_laptop_info(employee_data: dict) -> str:
+def format_laptop_info(employee_data: dict[str, Any]) -> str:
     """Format laptop information for display.
 
     Args:

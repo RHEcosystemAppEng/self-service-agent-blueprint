@@ -31,15 +31,17 @@ logging.getLogger("langgraph").setLevel(logging.WARNING)
 logging.getLogger("asset_manager").setLevel(logging.WARNING)
 
 
-def get_session_token_context(session_id: str) -> str:
+def get_session_token_context(session_id: str | None) -> str:
     """Generate session-specific token context for consistent token counting.
 
     Args:
-        session_id: The Request Manager session ID
+        session_id: The Request Manager session ID (can be None for fallback)
 
     Returns:
-        Session-specific token context string (e.g., "session_123")
+        Session-specific token context string (e.g., "session_123" or "fallback_session")
     """
+    if session_id is None:
+        return "fallback_session"
     return f"session_{session_id}"
 
 
@@ -102,7 +104,7 @@ class BaseSessionManager:
         user_context: Optional[Dict[str, Any]] = None,
     ) -> Optional[SessionResponse]:
         """Update Request Manager session information in database."""
-        update_data = {
+        update_data: Dict[str, Any] = {
             "updated_at": datetime.now(timezone.utc),
             "last_request_at": datetime.now(timezone.utc),
         }
@@ -176,12 +178,12 @@ class ResponsesSessionManager(BaseSessionManager):
         self.user_email = user_email
 
         # Conversation state for responses mode
-        self.current_session = None
-        self.current_agent_name = None
-        self.conversation_session = None
-        self.agent_manager = None
-        self.agents = []
-        self.request_manager_session_id = None
+        self.current_session: dict[str, Any] | None = None
+        self.current_agent_name: str | None = None
+        self.conversation_session: Any | None = None
+        self.agent_manager: Any | None = None
+        self.agents: list[Any] = []
+        self.request_manager_session_id: str | None = None
 
         self._initialize_conversation_state()
 
@@ -191,10 +193,17 @@ class ResponsesSessionManager(BaseSessionManager):
             from .langgraph import ResponsesAgentManager
 
             self.agent_manager = ResponsesAgentManager()
+            assert (
+                self.agent_manager is not None
+            )  # ResponsesAgentManager() never returns None
             self.agents = list(self.agent_manager.agents_dict.keys())
             logger.info(f"Loaded agents for responses mode - agents: {self.agents}")
         except ImportError as e:
             logger.warning(f"LangGraph components not available: {e}")
+            self.agent_manager = None
+            self.agents = []
+        except Exception as e:
+            logger.error(f"Failed to initialize ResponsesAgentManager: {e}")
             self.agent_manager = None
             self.agents = []
 
@@ -208,21 +217,23 @@ class ResponsesSessionManager(BaseSessionManager):
         session_name: Optional[str] = None,
     ) -> str:
         """Handle a message in responses mode with full conversation management."""
-        if not self.user_id or not self.agent_manager:
-            logger.error(
-                f"Responses mode not available - user_id: {self.user_id}, agent_manager_available: {bool(self.agent_manager)}"
-            )
+        if not self.user_id:
+            logger.error(f"Responses mode not available - user_id: {self.user_id}")
             return "Error: Responses mode not available"
 
+        if not self.agent_manager:
+            logger.error("Agent manager not initialized")
+            return "Error: Agent manager not initialized"
+
+        # Store the request manager session ID for database updates
+        if request_manager_session_id:
+            self.request_manager_session_id = request_manager_session_id
+
+        logger.debug(
+            f"Handling responses message - user_id: {self.user_id}, message_preview: {text[:100]}, request_manager_session_id: {request_manager_session_id}, session_name: {session_name}, has_current_session: {bool(self.current_session)}, current_agent: {self.current_agent_name}"
+        )
+
         try:
-            # Store the request manager session ID for database updates
-            if request_manager_session_id:
-                self.request_manager_session_id = request_manager_session_id
-
-            logger.debug(
-                f"Handling responses message - user_id: {self.user_id}, message_preview: {text[:100]}, request_manager_session_id: {request_manager_session_id}, session_name: {session_name}, has_current_session: {bool(self.current_session)}, current_agent: {self.current_agent_name}"
-            )
-
             # Check if we need to create or resume a session
             if not self.current_session:
                 # Try to resume existing session from database
@@ -268,6 +279,10 @@ class ResponsesSessionManager(BaseSessionManager):
             )
 
             token_context = get_session_token_context(self.request_manager_session_id)
+            if self.conversation_session is None:
+                logger.error("Conversation session not initialized")
+                return "Error: Conversation session not initialized"
+
             response = self.conversation_session.send_message(
                 text,
                 token_context=token_context,
@@ -305,6 +320,12 @@ class ResponsesSessionManager(BaseSessionManager):
             )
 
             # Get routing agent
+            if self.agent_manager is None:
+                logger.error(
+                    "Agent manager not initialized. Cannot create initial session."
+                )
+                return False
+
             routing_agent = self.agent_manager.get_agent(self.ROUTING_AGENT_NAME)
             if not routing_agent:
                 logger.error(
@@ -399,10 +420,14 @@ class ResponsesSessionManager(BaseSessionManager):
             )
 
             # Get the agent
+            if self.agent_manager is None:
+                logger.error("Agent manager not initialized. Cannot resume session.")
+                return False
+
             agent = self.agent_manager.get_agent(current_agent_id)
             if not agent:
                 logger.error(
-                    f"Agent not found for resumption - agent_id: {current_agent_id}, available_agents: {list(self.agent_manager.agents_dict.keys())}"
+                    f"Agent not found for resumption - agent_id: {current_agent_id}, available_agents: {list(self.agent_manager.agents_dict.keys()) if self.agent_manager else []}"
                 )
                 return False
 
@@ -679,6 +704,12 @@ class ResponsesSessionManager(BaseSessionManager):
             )
 
             # Get the specialist agent
+            if self.agent_manager is None:
+                logger.error(
+                    "Agent manager not initialized. Cannot route to specialist."
+                )
+                return "Error: Agent manager not initialized."
+
             agent = self.agent_manager.get_agent(agent_name)
             if not agent:
                 logger.error(
@@ -911,7 +942,7 @@ class ResponsesSessionManager(BaseSessionManager):
     def get_current_thread_id(self) -> Optional[str]:
         """Get the current thread ID for the user session."""
         if self.conversation_session:
-            return self.conversation_session.thread_id
+            return str(self.conversation_session.thread_id)
         return None
 
     def get_current_agent_name(self) -> Optional[str]:

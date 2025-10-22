@@ -7,12 +7,12 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Union
 
-import jwt
+import jwt  # type: ignore
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jwt.exceptions import InvalidTokenError
+from jwt.exceptions import InvalidTokenError  # type: ignore
 from shared_models import (
     CloudEventHandler,
     CloudEventSender,
@@ -25,10 +25,7 @@ from shared_models import (
     parse_cloudevent_from_request,
     verify_slack_signature,
 )
-from shared_models.models import (
-    ErrorResponse,
-    ProcessedEvent,
-)
+from shared_models.models import ErrorResponse, ProcessedEvent
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -142,15 +139,16 @@ def verify_api_key(api_key: str, tool_id: Optional[str] = None) -> bool:
     return False
 
 
-def verify_web_api_key(api_key: str) -> Optional[str]:
+def verify_web_api_key(api_key: Optional[str]) -> Optional[str]:
     """Verify web API key and return associated user email."""
     if not API_KEYS_ENABLED or not api_key:
         return None
 
-    return WEB_API_KEYS.get(api_key)
+    api_key_value = WEB_API_KEYS.get(api_key)
+    return str(api_key_value) if api_key_value is not None else None
 
 
-async def validate_jwt_token(token: str) -> Optional[Dict[str, Any]]:
+async def validate_jwt_token(token: Optional[str]) -> Optional[Dict[str, Any]]:
     """Validate JWT token and return user information."""
     if not JWT_ENABLED or not token:
         return None
@@ -687,18 +685,7 @@ async def _handle_responses_response_event_from_data(
 
         # Forward to Integration Dispatcher if not a duplicate
         if result.get("status") == "completed":
-            await _forward_response_to_integration_dispatcher(
-                db,
-                request_id,
-                session_id,
-                user_id,
-                agent_id,
-                content,
-                result.get("metadata", {}),
-                event_data.get("processing_time_ms"),
-                event_data.get("requires_followup", False),
-                event_data.get("followup_actions", []),
-            )
+            await _forward_response_to_integration_dispatcher(response_data, False)
         else:
             logger.info(
                 "Skipping Integration Dispatcher forwarding for duplicate responses response",
@@ -756,10 +743,9 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     """Handle HTTP exceptions."""
     return JSONResponse(
         status_code=exc.status_code,
-        content=ErrorResponse(
+        content=ErrorResponse(  # type: ignore
             error=exc.detail,
             error_code=f"HTTP_{exc.status_code}",
-            timestamp=datetime.now(timezone.utc),
         ).model_dump(mode="json"),
     )
 
@@ -771,10 +757,9 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
 
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content=ErrorResponse(
+        content=ErrorResponse(  # type: ignore
             error="Internal server error",
             error_code="INTERNAL_ERROR",
-            timestamp=datetime.now(timezone.utc),
         ).model_dump(mode="json"),
     )
 
@@ -891,7 +876,7 @@ async def _forward_response_to_integration_dispatcher(
         # Send response event using shared utilities
         success = await event_sender.send_response_event(
             delivery_event_data,
-            event_data.get("request_id"),
+            event_data.get("request_id"),  # type: ignore[arg-type]
             event_data.get("agent_id"),
             event_data.get("session_id"),
         )

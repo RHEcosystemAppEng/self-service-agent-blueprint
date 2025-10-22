@@ -227,23 +227,22 @@ curl -X POST https://your-request-manager/api/v1/requests/generic \
   }'
 ```
 
-### Responses Mode Support
+### Conversation Management
 
-**All endpoints support responses mode** when `use_responses: true` is included in the request body. This enables LangGraph state machine for conversation management.
+**All endpoints use LangGraph state machine** for advanced conversation management with persistent thread management and context.
 
 **Supported Endpoints**:
-- `/api/v1/requests/slack` - Slack integration with responses mode
-- `/api/v1/requests/web` - Web interface with responses mode  
-- `/api/v1/requests/cli` - CLI tool with responses mode
-- `/api/v1/requests/tool` - Tool integration with responses mode
-- `/api/v1/requests/generic` - Generic requests with responses mode
+- `/api/v1/requests/slack` - Slack integration
+- `/api/v1/requests/web` - Web interface
+- `/api/v1/requests/cli` - CLI tool
+- `/api/v1/requests/tool` - Tool integration
+- `/api/v1/requests/generic` - Generic requests
 
-**Request Body** (add to any endpoint):
+**Request Body**:
 ```json
 {
   "user_id": "string",
   "content": "string",
-  "use_responses": true,
   "request_manager_session_id": "string" (optional),
   "user_email": "string" (optional),
   "session_name": "string" (optional),
@@ -251,7 +250,7 @@ curl -X POST https://your-request-manager/api/v1/requests/generic \
 }
 ```
 
-**Response** (Responses Mode):
+**Response**:
 ```json
 {
   "status": "success",
@@ -266,7 +265,7 @@ curl -X POST https://your-request-manager/api/v1/requests/generic \
 }
 ```
 
-**Example** (Web endpoint with responses mode):
+**Example** (Web endpoint):
 ```bash
 curl -X POST https://your-request-manager/api/v1/requests/web \
   -H "Content-Type: application/json" \
@@ -274,7 +273,6 @@ curl -X POST https://your-request-manager/api/v1/requests/web \
   -d '{
     "user_id": "user123",
     "content": "I need help with my laptop",
-    "use_responses": true,
     "user_email": "user@example.com",
     "session_name": "Laptop Support Session"
   }'

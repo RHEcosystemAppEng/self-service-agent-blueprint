@@ -141,7 +141,7 @@ async def create_cloudevent_response(
     Returns:
         Standardized response dictionary
     """
-    response = {
+    response: Dict[str, Any] = {
         "status": status,
         "message": message,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -167,6 +167,10 @@ class CloudEventHandler:
             Extracted request/response data from the event
         """
         request_data = event_data.get("data", {})
+
+        # Ensure we return a dict
+        if not isinstance(request_data, dict):
+            request_data = {}
 
         logger.debug(
             "Processing event data",
@@ -268,7 +272,7 @@ class RequestLogService:
         integration_type: str,
         db: Any,  # AsyncSession
         integration_context: Dict[str, Any] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Create a unified request log entry.
 
@@ -310,7 +314,7 @@ class RequestLogService:
         processing_time_ms: int,
         db: Any,  # AsyncSession
         response_metadata: Dict[str, Any] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Update a request log entry with response information.
 

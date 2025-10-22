@@ -6,8 +6,9 @@ ServiceNow laptop refresh tickets.
 
 import logging
 import os
+from typing import Any
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.fastmcp import Context, FastMCP  # type: ignore
 from snow.data.data import (
     create_laptop_refresh_ticket,
     find_employee_by_authoritative_user_id,
@@ -95,7 +96,7 @@ def _create_real_servicenow_ticket(
         raise  # Re-raise to allow fallback handling
 
 
-def _extract_authoritative_user_id(ctx: Context) -> str:
+def _extract_authoritative_user_id(ctx: Context) -> str | None:
     """Extract authoritative user ID from request context headers.
 
     Args:
@@ -110,9 +111,10 @@ def _extract_authoritative_user_id(ctx: Context) -> str:
             request = request_context.request
             if hasattr(request, "headers"):
                 headers = request.headers
-                return headers.get("AUTHORITATIVE_USER_ID") or headers.get(
+                user_id = headers.get("AUTHORITATIVE_USER_ID") or headers.get(
                     "authoritative_user_id"
                 )
+                return str(user_id) if user_id is not None else None
     except Exception as e:
         logging.debug(f"Error extracting headers from request context: {e}")
 
@@ -160,13 +162,13 @@ def _get_mock_laptop_info(authoritative_user_id: str) -> str:
     return format_laptop_info(employee_data)
 
 
-@mcp.custom_route("/health", methods=["GET"])
-async def health(request):
+@mcp.custom_route("/health", methods=["GET"])  # type: ignore
+async def health(request: Any) -> JSONResponse:
     """Health check endpoint."""
     return JSONResponse({"status": "OK"})
 
 
-@mcp.tool()
+@mcp.tool()  # type: ignore
 def open_laptop_refresh_ticket(
     employee_name: str,
     business_justification: str,
@@ -225,7 +227,7 @@ def open_laptop_refresh_ticket(
     )
 
 
-@mcp.tool()
+@mcp.tool()  # type: ignore
 def get_employee_laptop_info(
     ctx: Context,
     dummy_parameter: str = "",

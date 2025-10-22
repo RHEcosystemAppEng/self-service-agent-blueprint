@@ -17,55 +17,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.12"
-
-      - name: Install Python dependencies
-        run: |
-          pip install flake8 black isort
-
-      - name: Run flake8 (warning only)
-        run: |
-          echo "🔍 Running flake8 checks..."
-          flake8 --max-line-length=99 --extend-ignore=E203,W503 . || {
-            echo "::warning::Flake8 found code style issues"
-            echo "Run 'flake8 .' locally to see details"
-            exit 1
-          }
-
-      - name: Check code formatting
-        run: |
-          echo "🎨 Checking code formatting..."
-          black --check --diff . || {
-            echo "::warning::Code formatting issues found"
-            echo "Run 'black .' locally to fix formatting"
-            exit 1
-          }
-
-      - name: Check import sorting
-        run: |
-          echo "📦 Checking import sorting..."
-          isort --check-only --diff . || {
-            echo "::warning::Import sorting issues found"
-            echo "Run 'isort .' locally to fix imports"
-            exit 1
-          }
-
-  pull-request-tests:
-    name: Run unit-tests
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ${{ env.ASSET_MANAGER_DIR }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: "Set up Python"
         uses: actions/setup-python@v5
         with:
-          python-version-file: "${{ env.ASSET_MANAGER_DIR }}/pyproject.toml"
+          python-version: "3.12"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -74,7 +28,64 @@ jobs:
           version: "0.8.9"
 
       - name: Install the project
-        run: uv sync
+        run: make install-all
+
+      - name: Run flake8 (warning only)
+        run: |
+          echo "🔍 Running flake8 checks..."
+          uv run flake8 --max-line-length=99 --extend-ignore=E203,W503 . || {
+            echo "::warning::Flake8 found code style issues"
+            echo "Run 'make lint' locally to see details"
+            exit 1
+          }
+
+      - name: Check code formatting
+        run: |
+          echo "🎨 Checking code formatting..."
+          uv run black --check --diff . || {
+            echo "::warning::Code formatting issues found"
+            echo "Run 'make format' locally to fix formatting"
+            exit 1
+          }
+
+      - name: Check import sorting
+        run: |
+          echo "📦 Checking import sorting..."
+          uv run isort --check-only --diff . || {
+            echo "::warning::Import sorting issues found"
+            echo "Run 'make format' locally to fix imports"
+            exit 1
+          }
+
+      - name: Run mypy static analysis
+        run: |
+          echo "🔍 Running mypy static analysis..."
+          uv run mypy . || {
+            echo "::warning::MyPy found static analysis issues"
+            echo "Run 'make lint' locally to see details"
+            exit 1
+          }
+
+  pull-request-tests:
+    name: Run unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          # Install a specific version of uv.
+          version: "0.8.9"
+
+      - name: Install the project
+        run: make install-all
   
       - name: Run tests
-        run: uv run pytest tests
+        run: make test-all

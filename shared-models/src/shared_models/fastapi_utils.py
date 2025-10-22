@@ -2,7 +2,7 @@
 
 import os
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Callable, Dict, Optional
+from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, Optional
 
 from fastapi import Depends, FastAPI
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +19,9 @@ async def create_health_check_endpoint(
     version: str,
     db: AsyncSession,
     additional_checks: Optional[Dict[str, Callable[..., Any]]] = None,
-    custom_health_logic: Optional[Callable[[AsyncSession], Dict[str, Any]]] = None,
+    custom_health_logic: Optional[
+        Callable[[AsyncSession], Awaitable[Dict[str, Any]]]
+    ] = None,
 ) -> Dict[str, Any]:
     """
     Create a standardized health check endpoint for any service.
@@ -38,7 +40,7 @@ async def create_health_check_endpoint(
 
     try:
         # Perform standard health checks
-        result = checker.perform_health_check(
+        result = await checker.perform_health_check(
             db=db, additional_checks=additional_checks
         )
 
@@ -77,7 +79,9 @@ def create_health_check_dependency(
     service_name: str,
     version: str,
     additional_checks: Optional[Dict[str, Callable[..., Any]]] = None,
-    custom_health_logic: Optional[Callable[[AsyncSession], Dict[str, Any]]] = None,
+    custom_health_logic: Optional[
+        Callable[[AsyncSession], Awaitable[Dict[str, Any]]]
+    ] = None,
 ) -> Callable[..., Any]:
     """
     Create a health check dependency function for FastAPI endpoints.
@@ -111,8 +115,8 @@ async def create_shared_lifespan(
     service_name: str,
     version: str,
     migration_timeout: int = 300,
-    custom_startup: Optional[Callable[[], None]] = None,
-    custom_shutdown: Optional[Callable[[], None]] = None,
+    custom_startup: Optional[Callable[[], Awaitable[None]]] = None,
+    custom_shutdown: Optional[Callable[[], Awaitable[None]]] = None,
     service_client_init: bool = True,
 ) -> AsyncGenerator[None, None]:
     """
@@ -223,7 +227,7 @@ def create_standard_fastapi_app(
     service_name: str,
     version: str,
     description: str,
-    lifespan_func: Optional[Callable[[], Any]] = None,
+    lifespan_func: Optional[Callable[[FastAPI], Any]] = None,
     cors_origins: Optional[list[str]] = None,
 ) -> FastAPI:
     """
@@ -244,7 +248,11 @@ def create_standard_fastapi_app(
 
     # Use shared lifespan if none provided
     if lifespan_func is None:
-        lifespan_func = create_shared_lifespan(service_name, version)
+
+        def lifespan_wrapper(app: FastAPI) -> Any:
+            return create_shared_lifespan(service_name, version)
+
+        lifespan_func = lifespan_wrapper
 
     # Create FastAPI app
     app = FastAPI(

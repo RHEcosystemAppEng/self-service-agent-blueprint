@@ -24,7 +24,7 @@ def run() -> None:
 
     # Set up the span processor
     span_processor = BatchSpanProcessor(otlp_exporter)
-    trace.get_tracer_provider().add_span_processor(span_processor)
+    trace.get_tracer_provider().add_span_processor(span_processor)  # type: ignore[attr-defined]
 
     # Set up instrumentations
     HTTPXClientInstrumentor().instrument()

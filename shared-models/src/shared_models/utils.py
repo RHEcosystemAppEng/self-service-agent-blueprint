@@ -39,7 +39,7 @@ def get_enum_value(enum_obj: Union[Enum, str, Any]) -> str:
     return str(enum_obj)
 
 
-def generate_fallback_user_id(request_id: str) -> str:
+def generate_fallback_user_id(request_id: str | None) -> str:
     """
     Generate a fallback user_id when the original user_id is missing.
 
@@ -47,15 +47,21 @@ def generate_fallback_user_id(request_id: str) -> str:
     prefix to ensure uniqueness and traceability.
 
     Args:
-        request_id: The request ID to use for generating the fallback
+        request_id: The request ID to use for generating the fallback (can be None)
 
     Returns:
-        str: A fallback user_id in the format "unknown-{request_id_prefix}"
+        str: A fallback user_id in the format "unknown-{request_id_prefix}" or "unknown-{unique_id}" if request_id is None
 
     Examples:
         >>> generate_fallback_user_id("abc12345-def6-7890-ghij-klmnopqrstuv")
         'unknown-abc12345'
         >>> generate_fallback_user_id("short")
         'unknown-short'
+        >>> generate_fallback_user_id(None)
+        'unknown-a1b2c3d4'  # unique identifier
     """
+    if request_id is None:
+        import uuid
+
+        return f"unknown-{str(uuid.uuid4())[:8]}"
     return f"unknown-{request_id[:8]}"
