@@ -179,7 +179,7 @@ class DatabaseManager:
 
         # Determine expected version from parameter, environment, or default
         if expected_version is None:
-            expected_version = os.getenv("EXPECTED_MIGRATION_VERSION", "001")
+            expected_version = os.getenv("EXPECTED_MIGRATION_VERSION", "002")
 
         start_time = time()
         logger.info(
@@ -215,9 +215,6 @@ class DatabaseManager:
                     await session.execute(text("SELECT 1 FROM request_logs LIMIT 1"))
                     await session.execute(
                         text("SELECT 1 FROM user_integration_configs LIMIT 1")
-                    )
-                    await session.execute(
-                        text("SELECT 1 FROM integration_templates LIMIT 1")
                     )
                     await session.execute(
                         text("SELECT 1 FROM integration_credentials LIMIT 1")

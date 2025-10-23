@@ -258,12 +258,11 @@ class IntegrationDispatcher:
             )
 
         # Render templates
-        template_content = await self.template_engine.render(
+        template_content = self.template_engine.render(
             integration_type=config.integration_type,  # type: ignore[arg-type]
             subject=request.subject,
             content=request.content,
             variables=request.template_variables,
-            db=db,
         )
 
         # Create delivery log
@@ -842,7 +841,7 @@ async def get_user_integrations(
     result = await db.execute(stmt)
     configs = result.scalars().all()
 
-    return [UserIntegrationConfigResponse.from_orm(config) for config in configs]
+    return [UserIntegrationConfigResponse.model_validate(config) for config in configs]
 
 
 @app.post(
@@ -879,7 +878,7 @@ async def create_user_integration(
 
         await db.commit()
         await db.refresh(existing_config)
-        return UserIntegrationConfigResponse.from_orm(existing_config)
+        return UserIntegrationConfigResponse.model_validate(existing_config)
     else:
         # Create new configuration
         config = UserIntegrationConfig(
@@ -907,7 +906,7 @@ async def create_user_integration(
             enabled=config_data.enabled,
         )
 
-        return UserIntegrationConfigResponse.from_orm(config)
+        return UserIntegrationConfigResponse.model_validate(config)
 
 
 @app.put(
@@ -949,7 +948,7 @@ async def update_user_integration(
     await db.commit()
     await db.refresh(config)
 
-    return UserIntegrationConfigResponse.from_orm(config)
+    return UserIntegrationConfigResponse.model_validate(config)
 
 
 @app.delete("/api/v1/users/{user_id}/integrations/{integration_type}")
@@ -1083,7 +1082,7 @@ async def get_user_deliveries(
     result = await db.execute(stmt)
     deliveries = result.scalars().all()
 
-    return [DeliveryLogResponse.from_orm(delivery) for delivery in deliveries]
+    return [DeliveryLogResponse.model_validate(delivery) for delivery in deliveries]
 
 
 @app.exception_handler(HTTPException)

@@ -23,7 +23,6 @@ __all__ = [
     "RequestLog",
     "UserIntegrationConfig",
     "IntegrationDefaultConfig",
-    "IntegrationTemplate",
     "DeliveryLog",
     "ProcessedEvent",
     "IntegrationCredential",
@@ -208,37 +207,6 @@ class IntegrationDefaultConfig(Base, TimestampMixin):
 
     # Metadata
     created_by = Column(String(255), default="system")  # System-generated defaults
-
-
-class IntegrationTemplate(Base, TimestampMixin):
-    """Templates for different integration types."""
-
-    __tablename__ = "integration_templates"
-
-    id = Column(Integer, primary_key=True)
-    integration_type: Column[IntegrationType] = Column(
-        SQLEnum(IntegrationType), nullable=False
-    )
-    template_name = Column(String(100), nullable=False)
-
-    # Template content
-    subject_template = Column(Text)  # For email/notification title
-    body_template = Column(Text, nullable=False)
-
-    # Template variables and metadata
-    required_variables = Column(JSON, default=list)  # List of required template vars
-    optional_variables = Column(JSON, default=list)  # List of optional template vars
-
-    # Template configuration
-    is_default = Column(Boolean, default=False, nullable=False)
-    is_active = Column(Boolean, default=True, nullable=False)
-
-    # Unique template per integration type and name
-    __table_args__ = (
-        UniqueConstraint(
-            "integration_type", "template_name", name="uq_integration_template"
-        ),
-    )
 
 
 class DeliveryLog(Base, TimestampMixin):

@@ -4,9 +4,7 @@ from typing import Any, Dict
 
 import jinja2
 from shared_models import get_enum_value
-from shared_models.models import IntegrationTemplate, IntegrationType
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from shared_models.models import IntegrationType
 
 
 class TemplateEngine:
@@ -23,14 +21,12 @@ class TemplateEngine:
         self.jinja_env.filters["markdown_to_slack"] = self._markdown_to_slack
         self.jinja_env.filters["markdown_to_html"] = self._markdown_to_html
 
-    async def render(
+    def render(
         self,
         integration_type: IntegrationType,
         subject: str | None,
         content: str,
         variables: Dict[str, Any],
-        db: AsyncSession,
-        template_name: str | None = None,
     ) -> Dict[str, str]:
         """
         Render templates for an integration type.
@@ -40,15 +36,10 @@ class TemplateEngine:
             subject: Original subject/title
             content: Original content
             variables: Template variables
-            db: Database session
-            template_name: Specific template name (optional)
 
         Returns:
             Dict with rendered 'subject' and 'body' content
         """
-        # Get template from database
-        template = await self._get_template(integration_type, template_name or "", db)
-
         # Prepare template variables
         template_vars = {
             "subject": subject or "",
@@ -57,63 +48,16 @@ class TemplateEngine:
             **variables,
         }
 
-        # Render subject and body
-        rendered_subject = subject or ""
-        rendered_body = content
-        template_used = None
-
-        if template:
-            template_used = (
-                str(template.template_name) if template.template_name else None
-            )
-
-            # Render subject if template has one
-            if template.subject_template:
-                subject_template = self.jinja_env.from_string(
-                    str(template.subject_template)
-                )
-                rendered_subject = subject_template.render(**template_vars)
-
-            # Render body
-            if template.body_template:
-                body_template = self.jinja_env.from_string(str(template.body_template))
-                rendered_body = body_template.render(**template_vars)
-        else:
-            # Use default formatting based on integration type
-            rendered_subject, rendered_body = self._apply_default_formatting(
-                integration_type, subject, content, template_vars
-            )
+        # Apply default formatting based on integration type
+        rendered_subject, rendered_body = self._apply_default_formatting(
+            integration_type, subject, content, template_vars
+        )
 
         return {
             "subject": rendered_subject,
             "body": rendered_body,
-            "template_name": template_used or "",
+            "template_name": "",
         }
-
-    async def _get_template(
-        self,
-        integration_type: IntegrationType,
-        template_name: str,
-        db: AsyncSession,
-    ) -> IntegrationTemplate | None:
-        """Get template from database."""
-        if template_name:
-            # Get specific template
-            stmt = select(IntegrationTemplate).where(
-                IntegrationTemplate.integration_type == integration_type,
-                IntegrationTemplate.template_name == template_name,
-                IntegrationTemplate.is_active == True,  # noqa: E712
-            )
-        else:
-            # Get default template
-            stmt = select(IntegrationTemplate).where(
-                IntegrationTemplate.integration_type == integration_type,
-                IntegrationTemplate.is_default == True,  # noqa: E712
-                IntegrationTemplate.is_active == True,  # noqa: E712
-            )
-
-        result = await db.execute(stmt)
-        return result.scalar_one_or_none()
 
     def _apply_default_formatting(
         self,

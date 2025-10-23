@@ -54,37 +54,6 @@ class UserIntegrationConfigResponse(BaseModel):
         from_attributes = True
 
 
-class IntegrationTemplateCreate(BaseModel):
-    """Schema for creating integration template."""
-
-    integration_type: IntegrationType
-    template_name: str
-    subject_template: Optional[str] = None
-    body_template: str
-    required_variables: List[str] = Field(default_factory=list)
-    optional_variables: List[str] = Field(default_factory=list)
-    is_default: bool = False
-
-
-class IntegrationTemplateResponse(BaseModel):
-    """Schema for integration template response."""
-
-    id: int
-    integration_type: IntegrationType
-    template_name: str
-    subject_template: Optional[str]
-    body_template: str
-    required_variables: List[str]
-    optional_variables: List[str]
-    is_default: bool
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
 class DeliveryLogResponse(BaseModel):
     """Schema for delivery log response."""
 
@@ -109,47 +78,6 @@ class DeliveryLogResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class SlackConfig(BaseModel):
-    """Slack integration configuration."""
-
-    channel_id: Optional[str] = None  # Default channel, can be overridden
-    workspace_id: Optional[str] = None
-    thread_replies: bool = True  # Reply in thread vs new message
-    mention_user: bool = False  # @mention the user
-    include_agent_info: bool = True  # Include which agent responded
-
-
-class EmailConfig(BaseModel):
-    """Email integration configuration."""
-
-    email_address: str
-    display_name: Optional[str] = None
-    format: str = "html"  # "html" or "text"
-    include_signature: bool = True
-    reply_to: Optional[str] = None
-
-
-class SMSConfig(BaseModel):
-    """SMS integration configuration."""
-
-    phone_number: str
-    country_code: str = "+1"
-    max_length: int = 160  # Split long messages
-    include_short_link: bool = True  # Link to full response
-
-
-class WebhookConfig(BaseModel):
-    """Webhook integration configuration."""
-
-    url: str
-    method: str = "POST"
-    headers: Dict[str, str] = Field(default_factory=dict)
-    timeout_seconds: int = 30
-    verify_ssl: bool = True
-    auth_type: Optional[str] = None  # "bearer", "basic", "api_key"
-    auth_config: Dict[str, str] = Field(default_factory=dict)
 
 
 class HealthCheck(BaseModel):

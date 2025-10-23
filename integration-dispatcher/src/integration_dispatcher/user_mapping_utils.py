@@ -14,11 +14,8 @@ Usage:
         created_by="my_service"
     )
 
-    # Convenience functions (easier to use for specific types)
+    # Convenience function for Slack
     await store_slack_user_mapping("user@example.com", "U1234567890", "slack_service")
-    await store_email_user_mapping("user@example.com", "E1234567890", "email_service")
-    await store_webhook_user_mapping("user@example.com", "W1234567890", "webhook_service")
-    await store_test_user_mapping("user@example.com", "T1234567890", "test_service")
 """
 
 from datetime import datetime, timezone
