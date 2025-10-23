@@ -1,6 +1,6 @@
 """Mock data for ServiceNow ticket management."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 
@@ -42,10 +42,6 @@ def _calculate_laptop_age(purchase_date_str: str) -> str:
         return "Unable to calculate age (invalid date format)"
 
 
-# Mock ticket data for simulation purposes
-MOCK_TICKET_DATA = {}
-
-
 def generate_ticket_number() -> str:
     """Generate a mock ServiceNow ticket number."""
     import random
@@ -76,25 +72,6 @@ def create_laptop_refresh_ticket(
     # Look up employee to get their employee_id for sys_id
     employee_data = find_employee_by_authoritative_user_id(authoritative_user_id)
     employee_id = employee_data["employee_id"]
-
-    ticket_data = {
-        "ticket_number": ticket_number,
-        "authoritative_user_id": authoritative_user_id,
-        "employee_name": employee_name,
-        "request_type": "Laptop Refresh",
-        "business_justification": business_justification,
-        "preferred_model": preferred_model or "Standard Business Laptop",
-        "status": "Open",
-        "priority": "Medium",
-        "created_date": datetime.now().isoformat(),
-        "expected_completion": (datetime.now() + timedelta(days=5)).isoformat(),
-        "assigned_group": "IT Hardware Team",
-        "description": f"Laptop refresh request for employee {employee_name} ({authoritative_user_id}). Justification: {business_justification}",
-        "sys_id": employee_id,  # Use employee_id as sys_id for consistency with real ServiceNow
-    }
-
-    # Store in mock data
-    MOCK_TICKET_DATA[ticket_number] = ticket_data
 
     # Return format matching real ServiceNow response
     return f"{ticket_number} opened for employee {authoritative_user_id}. System ID: {employee_id}"
