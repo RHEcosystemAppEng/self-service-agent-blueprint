@@ -56,7 +56,6 @@ class TemplateEngine:
         return {
             "subject": rendered_subject,
             "body": rendered_body,
-            "template_name": "",
         }
 
     def _apply_default_formatting(

@@ -31,7 +31,7 @@ testIntegrationEnabled: false
 # Database Configuration
 database:
   # Expected migration version that services should wait for
-  expectedMigrationVersion: "002"
+  expectedMigrationVersion: "003"
   
   # Database connection URL - leave empty to use default pgvector service
   # Format: postgresql://username:password@host:port/database
@@ -199,9 +199,9 @@ requestManagement:
         replicationFactor: 1
         retentionDuration: P7D
     
-    # Mock Eventing Service (for testing and CI when Knative eventing is disabled)
+    # Mock Eventing Service (default eventing mode for development and testing)
     mockEventing:
-      enabled: false  # Set to true to use mock eventing service (testing/CI mode)
+      enabled: true  # Default to mock eventing service (disable for full Knative eventing)
       logLevel: "INFO"
       resources: {}
       # Health check configuration (dev-optimized for resource-constrained environments)

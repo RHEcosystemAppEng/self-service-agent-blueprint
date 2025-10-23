@@ -274,7 +274,6 @@ class IntegrationDispatcher:
             integration_type=get_enum_value(config.integration_type),
             subject=template_content.get("subject"),
             content=template_content.get("body"),
-            template_used=template_content.get("template_name"),
             max_attempts=config.retry_count,
             expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
         )

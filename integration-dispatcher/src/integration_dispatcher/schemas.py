@@ -64,7 +64,6 @@ class DeliveryLogResponse(BaseModel):
     integration_type: IntegrationType
     subject: Optional[str]
     content: str
-    template_used: Optional[str]
     status: DeliveryStatus
     attempts: int
     max_attempts: int

@@ -234,7 +234,6 @@ class DeliveryLog(Base, TimestampMixin):
     # Message content
     subject = Column(Text)
     content = Column(Text, nullable=False)
-    template_used = Column(String(100))
 
     # Delivery tracking
     status: Column[DeliveryStatus] = Column(
