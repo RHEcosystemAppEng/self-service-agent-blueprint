@@ -7,29 +7,9 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.104.0",
-    "uvicorn[standard]>=0.24.0",
-    "pydantic>=2.5.0",
-    "cloudevents>=1.10.0",
-    "httpx>=0.25.0",
-    "structlog>=23.2.0",
-    # LlamaStack integration (matches Helm chart version 0.2.18)
-    "llama-stack-client==0.2.18",
-    "python-multipart>=0.0.6",
-    "python-json-logger>=2.0.7",
-    "fire>=0.5.0",
-    "requests>=2.31.0",
-    "self-service-agent-shared-models",
+    "self-service-agent-shared-clients",
     # Asset manager for LangGraph components
     "asset-manager",
-    # LangGraph dependencies
-    "langchain-core>=0.3.0",
-    "langgraph>=0.6.7",
-    "langgraph-checkpoint-sqlite>=2.0.0",
-    "aiosqlite>=0.19.0",
-    "openai>=1.0.0",
-    "pyyaml>=6.0.0",
-    "self-service-agent-shared-clients",
 ]
 
 [project.optional-dependencies]
@@ -65,7 +45,6 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 
 [tool.uv.sources]
-self-service-agent-shared-models = { path = "../shared-models" }
 self-service-agent-shared-clients = { path = "../shared-clients" }
 asset-manager = { path = "../asset-manager" }
 
