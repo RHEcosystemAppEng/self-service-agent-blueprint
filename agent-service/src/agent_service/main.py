@@ -726,12 +726,6 @@ async def handle_cloudevent(request: Request) -> Dict[str, Any]:
         if event_type == EventTypes.REQUEST_CREATED:
             return await _handle_request_event_from_data(event_data, _agent_service)
 
-        # Handle responses mode events
-        if event_type == EventTypes.RESPONSES_REQUEST_CREATED:
-            return await _handle_responses_request_event_from_data(
-                event_data, _agent_service
-            )
-
         # Handle database update events
         if event_type == EventTypes.DATABASE_UPDATE_REQUESTED:
             return await _handle_database_update_event_from_data(
@@ -859,101 +853,6 @@ async def _handle_request_event_from_data(
     except Exception as e:
         logger.error("Failed to handle request event", exc_info=e)
         raise
-
-
-async def _handle_responses_request_event_from_data(
-    event_data: Dict[str, Any], agent_service: AgentService
-) -> Dict[str, Any]:
-    """Handle responses request CloudEvent using pre-parsed event data."""
-    start_time = datetime.now(timezone.utc)
-    try:
-        # Extract event data using common utility
-        request_data = CloudEventHandler.extract_event_data(event_data)
-
-        # Extract required fields
-        request_manager_session_id = request_data.get("request_manager_session_id")
-        user_id = request_data.get("user_id")
-        message = request_data.get("message")
-        user_email = request_data.get("user_email")
-        session_name = request_data.get("session_name")
-
-        if not all([request_manager_session_id, user_id, message]):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Missing required fields: request_manager_session_id, user_id, message",
-            )
-
-        # At this point, we know these are not None due to the check above
-        assert user_id is not None
-        assert message is not None
-
-        # Get database session
-        db_manager = get_database_manager()
-
-        async with db_manager.get_session() as db:
-            # Create responses session manager
-            session_manager = ResponsesSessionManager(
-                db_session=db,
-                user_id=user_id,
-                user_email=user_email,
-            )
-
-            # Process the message using responses mode
-            response_content = await session_manager.handle_responses_message(
-                text=message,
-                request_manager_session_id=request_manager_session_id,
-                session_name=session_name,
-            )
-
-            # Get current agent name for response metadata
-            current_agent_name = session_manager.current_agent_name
-            current_thread_id = session_manager.get_current_thread_id()
-
-            # Clean up the session manager
-            await session_manager.close()
-
-        # Return response in the expected format
-        if current_agent_name is None:
-            logger.error(
-                "Cannot create response - no agent assigned",
-                user_id=user_id,
-                request_manager_session_id=request_manager_session_id,
-            )
-            return {
-                "status": "error",
-                "error": "No agent assigned to handle this request",
-                "request_manager_session_id": request_manager_session_id,
-                "user_id": user_id,
-            }
-
-        return {
-            "status": "success",
-            "response": {
-                "content": response_content,
-                "agent_id": current_agent_name,
-                "metadata": {
-                    "agent_name": current_agent_name,
-                    "session_type": "responses_api",
-                    "thread_id": current_thread_id,
-                },
-                "processing_time_ms": int(
-                    (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
-                ),
-                "requires_followup": False,
-                "followup_actions": [],
-            },
-            "request_manager_session_id": request_manager_session_id,
-            "user_id": user_id,
-            "current_agent": current_agent_name,
-            "thread_id": current_thread_id,
-        }
-
-    except Exception as e:
-        logger.error("Failed to handle responses request event", exc_info=e)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to process responses request event",
-        )
 
 
 async def _handle_database_update_event_from_data(

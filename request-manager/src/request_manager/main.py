@@ -485,11 +485,6 @@ async def handle_cloudevent(
             # Use the already parsed event data from shared utility
             return await _handle_agent_response_event_from_data(event_data, db)
 
-        # Handle responses mode response events
-        if event_type == EventTypes.RESPONSES_RESPONSE_READY:
-            # Use the already parsed event data from shared utility
-            return await _handle_responses_response_event_from_data(event_data, db)
-
         logger.warning("Unhandled CloudEvent type", event_type=event_type)
         return await create_cloudevent_response(
             status="ignored",
@@ -616,105 +611,6 @@ async def _handle_agent_response_event_from_data(
 
     except Exception as e:
         logger.error("Failed to handle agent response event", error=str(e))
-
-        # Record failed event processing
-        from .database_utils import record_processed_event
-
-        await record_processed_event(
-            db,
-            event_id,
-            event_type,
-            event_source,
-            response_data.get("request_id") if "response_data" in locals() else None,
-            response_data.get("session_id") if "response_data" in locals() else None,
-            "request-manager",
-            "error",
-            str(e),
-        )
-        raise
-
-
-async def _handle_responses_response_event_from_data(
-    event_data: Dict[str, Any], db: AsyncSession
-) -> Dict[str, Any]:
-    """Handle responses response CloudEvent using unified response handler with pre-parsed data."""
-
-    # Extract event metadata using common utility
-    event_id, event_type, event_source = CloudEventHandler.get_event_metadata(
-        event_data
-    )
-
-    try:
-        # Extract response data using common utility
-        response_data = CloudEventHandler.extract_event_data(event_data)
-        request_id, session_id, agent_id, content, user_id = (
-            CloudEventHandler.extract_response_data(response_data)
-        )
-
-        # Use unified response handler
-        response_handler = UnifiedResponseHandler(db)
-        result = await response_handler.process_agent_response(
-            request_id=request_id,
-            session_id=session_id,
-            user_id=user_id,
-            agent_id=agent_id,
-            content=content,
-            metadata=event_data.get("metadata", {}),
-            processing_time_ms=event_data.get("processing_time_ms"),
-            requires_followup=event_data.get("requires_followup", False),
-            followup_actions=event_data.get("followup_actions", []),
-        )
-
-        # Resolve any waiting response futures for this request
-        from .communication_strategy import _response_futures_registry
-
-        if request_id in _response_futures_registry:
-            future = _response_futures_registry.pop(request_id)
-            if not future.done():
-                future.set_result(response_data)
-                logger.info(
-                    "Resolved waiting response future",
-                    request_id=request_id,
-                    session_id=session_id,
-                )
-
-        # Forward to Integration Dispatcher if not a duplicate
-        if result.get("status") == "completed":
-            await _forward_response_to_integration_dispatcher(response_data, False)
-        else:
-            logger.info(
-                "Skipping Integration Dispatcher forwarding for duplicate responses response",
-                request_id=request_id,
-                status=result.get("status"),
-                reason=result.get("reason"),
-            )
-
-        logger.info(
-            "Responses response received and processed",
-            request_id=request_id,
-            session_id=session_id,
-            agent_id=agent_id,
-            status=result.get("status"),
-        )
-
-        # Record successful event processing
-        from .database_utils import record_processed_event
-
-        await record_processed_event(
-            db,
-            event_id,
-            event_type,
-            event_source,
-            request_id,
-            session_id,
-            "request-manager",
-            "success",
-        )
-
-        return {"status": "processed", "request_id": request_id}
-
-    except Exception as e:
-        logger.error("Failed to handle responses response event", error=str(e))
 
         # Record failed event processing
         from .database_utils import record_processed_event

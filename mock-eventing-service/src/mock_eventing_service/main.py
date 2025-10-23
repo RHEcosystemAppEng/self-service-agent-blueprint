@@ -238,22 +238,6 @@ async def initialize_default_subscriptions() -> None:
                 "subscriber_url": f"http://{service_name}-agent-service.{namespace}.svc.cluster.local/api/v1/events/cloudevents",
                 "filter_attributes": {"source": "request-manager"},
             },
-            # Responses mode event subscriptions
-            {
-                "event_type": "com.self-service-agent.responses.request.created",
-                "subscriber_url": f"http://{service_name}-agent-service.{namespace}.svc.cluster.local/api/v1/events/cloudevents",
-                "filter_attributes": {},
-            },
-            {
-                "event_type": "com.self-service-agent.responses.response.ready",
-                "subscriber_url": f"http://{service_name}-request-manager.{namespace}.svc.cluster.local/api/v1/events/cloudevents",
-                "filter_attributes": {"source": "agent-service"},
-            },
-            {
-                "event_type": "com.self-service-agent.responses.response.ready",
-                "subscriber_url": f"http://{service_name}-integration-dispatcher.{namespace}.svc.cluster.local",
-                "filter_attributes": {"source": "request-manager"},
-            },
         ]
 
         for sub_data in default_subscriptions:

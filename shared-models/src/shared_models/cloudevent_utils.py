@@ -90,41 +90,6 @@ async def parse_cloudevent_from_request(request: Request) -> Dict[str, Any]:
         )
 
 
-def validate_cloudevent_headers(headers: Dict[str, str]) -> Dict[str, str]:
-    """
-    Validate and extract CloudEvent headers.
-
-    Args:
-        headers: Request headers dictionary
-
-    Returns:
-        Extracted CloudEvent headers
-
-    Raises:
-        HTTPException: If required headers are missing
-    """
-    required_headers = ["ce-id", "ce-source", "ce-type", "ce-specversion"]
-    extracted = {}
-
-    for header in required_headers:
-        value = headers.get(header)
-        if not value:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Missing required CloudEvent header: {header}",
-            )
-        extracted[header] = value
-
-    # Optional headers
-    optional_headers = ["ce-time", "ce-datacontenttype", "ce-dataschema", "ce-subject"]
-    for header in optional_headers:
-        value = headers.get(header)
-        if value:
-            extracted[header] = value
-
-    return extracted
-
-
 async def create_cloudevent_response(
     status: str = "success",
     message: str = "CloudEvent processed successfully",
@@ -220,29 +185,6 @@ class CloudEventHandler:
         return request_id, session_id, agent_id, content, user_id
 
     @staticmethod
-    def extract_request_data(request_data: Dict[str, Any]) -> tuple[Any, ...]:
-        """Extract and validate request data from CloudEvents.
-
-        Args:
-            request_data: Request data from CloudEvent
-
-        Returns:
-            Tuple of (request_id, user_id, message, session_id)
-
-        Raises:
-            ValueError: If required fields are missing
-        """
-        request_id = request_data.get("request_id")
-        user_id = request_data.get("user_id")
-        message = request_data.get("message")
-        session_id = request_data.get("request_manager_session_id")
-
-        if not all([request_id, user_id, message]):
-            raise ValueError("Missing required fields: request_id, user_id, message")
-
-        return request_id, user_id, message, session_id
-
-    @staticmethod
     def get_event_metadata(event_data: Dict[str, Any]) -> tuple[Any, ...]:
         """Extract common event metadata.
 
@@ -257,93 +199,3 @@ class CloudEventHandler:
         event_source = event_data.get("source")
 
         return event_id, event_type, event_source
-
-
-class RequestLogService:
-    """Common utilities for request log operations."""
-
-    @staticmethod
-    async def create_log_entry(
-        request_id: str,
-        session_id: str,
-        user_id: str,
-        content: str,
-        request_type: str,
-        integration_type: str,
-        db: Any,  # AsyncSession
-        integration_context: Dict[str, Any] | None = None,
-        **kwargs: Any,
-    ) -> None:
-        """Create a unified request log entry.
-
-        Args:
-            request_id: Unique request identifier
-            session_id: Session identifier
-            user_id: User identifier
-            content: Request content/message
-            request_type: Type of request (e.g., "responses_api", "agent_api")
-            integration_type: Integration type (e.g., "CLI", "Slack")
-            db: Database session
-            integration_context: Additional integration context
-            **kwargs: Additional fields for the log entry
-        """
-        from .models import RequestLog
-
-        integration_context = integration_context or {}
-
-        log_entry = RequestLog(
-            request_id=request_id,
-            session_id=session_id,
-            user_id=user_id,
-            content=content,
-            request_type=request_type,
-            integration_type=integration_type,
-            integration_context=integration_context,
-            created_at=datetime.now(timezone.utc),
-            **kwargs,
-        )
-
-        db.add(log_entry)
-        await db.commit()
-
-    @staticmethod
-    async def update_log_entry(
-        request_id: str,
-        response_content: str,
-        agent_id: str,
-        processing_time_ms: int,
-        db: Any,  # AsyncSession
-        response_metadata: Dict[str, Any] | None = None,
-        **kwargs: Any,
-    ) -> None:
-        """Update a request log entry with response information.
-
-        Args:
-            request_id: Unique request identifier
-            response_content: Agent response content
-            agent_id: Agent that processed the request
-            processing_time_ms: Processing time in milliseconds
-            db: Database session
-            response_metadata: Additional response metadata
-            **kwargs: Additional fields for the log entry
-        """
-        from sqlalchemy import update
-
-        from .models import RequestLog
-
-        response_metadata = response_metadata or {}
-
-        stmt = (
-            update(RequestLog)
-            .where(RequestLog.request_id == request_id)
-            .values(
-                response_content=response_content,
-                agent_id=agent_id,
-                processing_time_ms=processing_time_ms,
-                response_metadata=response_metadata,
-                **kwargs,
-            )
-        )
-
-        await db.execute(stmt)
-        await db.commit()
