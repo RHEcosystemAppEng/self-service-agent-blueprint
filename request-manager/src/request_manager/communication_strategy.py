@@ -4,14 +4,12 @@ import asyncio
 import os
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Any, AsyncGenerator, Dict, Optional
+from typing import Any, Dict, Optional
 
 from agent_service.schemas import SessionResponse
 from fastapi import HTTPException, status
-from fastapi.responses import StreamingResponse
 from shared_clients import get_agent_client, get_integration_dispatcher_client
-from shared_clients.stream_processor import LlamaStackStreamProcessor
-from shared_models import CloudEventSender, configure_logging, get_enum_value
+from shared_models import CloudEventSender, configure_logging
 from shared_models.models import AgentResponse, NormalizedRequest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -234,46 +232,6 @@ class EventingStrategy(CommunicationStrategy):
         )
         return True
 
-    async def send_responses_request(self, request_data: Dict[str, Any]) -> bool:
-        """Send responses request via CloudEvent."""
-        success = await self.event_sender.send_responses_request_event(
-            request_data,
-            request_data.get("request_id"),
-            request_data.get("user_id"),
-            request_data.get("request_manager_session_id"),
-        )
-
-        if not success:
-            logger.error("Failed to publish responses request event")
-            return False
-
-        logger.info(
-            "Responses request sent via eventing",
-            request_id=request_data.get("request_id"),
-            session_id=request_data.get("request_manager_session_id"),
-        )
-        return True
-
-    async def deliver_responses_response(self, response_data: Dict[str, Any]) -> bool:
-        """Deliver responses response via CloudEvent."""
-        success = await self.event_sender.send_responses_response_event(
-            response_data,
-            response_data.get("request_id") or "",
-            response_data.get("agent_id"),
-            response_data.get("session_id"),
-        )
-
-        if not success:
-            logger.error("Failed to publish responses response event")
-            return False
-
-        logger.info(
-            "Responses response delivered via eventing",
-            request_id=response_data.get("request_id"),
-            session_id=response_data.get("session_id"),
-        )
-        return True
-
     async def wait_for_response(self, request_id: str, timeout: int) -> Dict[str, Any]:
         """Wait for response event using event-driven approach."""
         logger.info(
@@ -392,56 +350,6 @@ class DirectHttpStrategy(CommunicationStrategy):
         )
         return True
 
-    async def stream_response(
-        self, agent_response: AgentResponse
-    ) -> StreamingResponse | None:
-        """Stream response using optimized streaming for direct HTTP mode."""
-        if not self.integration_client:
-            logger.error("Integration client not initialized")
-            return None
-
-        # Use optimized streaming for better performance
-        async def generate_stream() -> AsyncGenerator[str, None]:
-            try:
-                # Stream start event
-                yield LlamaStackStreamProcessor.create_sse_start_event(
-                    agent_response.request_id
-                )
-
-                # Stream content with optimized performance
-                async for (
-                    chunk_data
-                ) in LlamaStackStreamProcessor.stream_content_optimized(
-                    agent_response.content,
-                    content_type="content",
-                ):
-                    yield chunk_data
-
-                # Stream completion event
-                if (
-                    agent_response.agent_id is None
-                    or agent_response.processing_time_ms is None
-                ):
-                    logger.error(
-                        "Cannot send completion event - missing agent_id or processing_time_ms",
-                        agent_id=agent_response.agent_id,
-                        processing_time_ms=agent_response.processing_time_ms,
-                    )
-                    yield LlamaStackStreamProcessor.create_sse_error_event(
-                        "Missing required response data"
-                    )
-                else:
-                    yield LlamaStackStreamProcessor.create_sse_complete_event(
-                        agent_response.agent_id,
-                        agent_response.processing_time_ms,
-                    )
-
-            except Exception as e:
-                logger.error("Error in streaming response", error=str(e))
-                yield LlamaStackStreamProcessor.create_sse_error_event(str(e))
-
-        return LlamaStackStreamProcessor.create_sse_response(generate_stream())
-
 
 def get_communication_strategy() -> CommunicationStrategy:
     """Get the appropriate communication strategy based on configuration."""
@@ -500,149 +408,6 @@ class UnifiedRequestProcessor:
         """
         # Both agent client and session manager now return SessionResponse objects
         return session.session_id, session.current_agent_id
-
-    async def process_request_async(
-        self, request: Any, db: AsyncSession
-    ) -> Dict[str, Any]:
-        """Process a request asynchronously (eventing mode)."""
-        logger.info(
-            "Starting async request processing",
-            user_id=request.user_id,
-            request_type=request.request_type,
-        )
-
-        # Common request preparation
-        normalized_request, session_id, current_agent_id = await self._prepare_request(
-            request, db
-        )
-
-        # Send request using strategy
-        logger.debug(
-            "Sending request using strategy",
-            request_id=normalized_request.request_id,
-            session_id=session_id,
-        )
-        success = await self.strategy.send_request(normalized_request)
-
-        if not success:
-            logger.error(
-                "Failed to send request",
-                request_id=normalized_request.request_id,
-                session_id=session_id,
-            )
-            raise Exception("Failed to send request")
-        else:
-            logger.debug(
-                "Request sent successfully",
-                request_id=normalized_request.request_id,
-                session_id=session_id,
-            )
-
-        logger.info(
-            "Request processed asynchronously",
-            request_id=normalized_request.request_id,
-            session_id=session_id,
-            user_id=request.user_id,
-            integration_type=get_enum_value(request.integration_type),
-        )
-
-        return {
-            "request_id": normalized_request.request_id,
-            "session_id": session_id,
-            "status": "accepted",
-            "message": "Request has been queued for processing",
-        }
-
-    async def process_request_async_with_delivery(
-        self, request: Any, db: AsyncSession, timeout: int = 120
-    ) -> Dict[str, Any]:
-        """Process a request asynchronously but deliver response in direct HTTP mode."""
-        # Common request preparation
-        normalized_request, session_id, current_agent_id = await self._prepare_request(
-            request, db
-        )
-
-        # In direct HTTP mode, process synchronously but return immediately to avoid timeout
-        if isinstance(self.strategy, DirectHttpStrategy):
-            # Process the request in the background
-            asyncio.create_task(
-                self._process_and_deliver_background(normalized_request, db)
-            )
-
-            logger.info(
-                "Request queued for background processing",
-                request_id=normalized_request.request_id,
-                session_id=session_id,
-                user_id=request.user_id,
-                integration_type=get_enum_value(request.integration_type),
-            )
-
-            return {
-                "request_id": normalized_request.request_id,
-                "session_id": session_id,
-                "status": "accepted",
-                "message": "Request has been queued for processing",
-            }
-        else:
-            # Eventing mode - use standard async processing
-            success = await self.strategy.send_request(normalized_request)
-
-            if not success:
-                raise Exception("Failed to send request")
-
-            logger.info(
-                "Request processed asynchronously",
-                request_id=normalized_request.request_id,
-                session_id=session_id,
-                user_id=request.user_id,
-                integration_type=get_enum_value(request.integration_type),
-            )
-
-            return {
-                "request_id": normalized_request.request_id,
-                "session_id": session_id,
-                "status": "accepted",
-                "message": "Request has been queued for processing",
-            }
-
-    async def _process_and_deliver_background(
-        self, normalized_request: Any, db: AsyncSession
-    ) -> None:
-        """Process request in background and deliver response."""
-        try:
-            # Process the request
-            agent_client = get_agent_client()
-            if not agent_client:
-                logger.error("Agent client not initialized for background processing")
-                return
-
-            # Note: Session management is now handled by the Agent Service automatically
-
-            agent_response = await agent_client.process_request(normalized_request)
-            if not agent_response:
-                logger.error("Agent service failed to process request in background")
-                return
-
-            # Note: Request logging is now handled by the Agent Service
-
-            # Deliver response via integration dispatcher
-            delivery_success = await self.strategy.deliver_response(agent_response)
-            if not delivery_success:
-                logger.warning("Failed to deliver response in background")
-
-            logger.info(
-                "Background request processing completed",
-                request_id=normalized_request.request_id,
-                session_id=normalized_request.session_id,
-                user_id=normalized_request.user_id,
-            )
-
-        except Exception as e:
-            logger.error(
-                "Error in background request processing",
-                request_id=normalized_request.request_id,
-                error=str(e),
-            )
 
     async def process_request_sync(
         self, request: Any, db: AsyncSession, timeout: int = 120

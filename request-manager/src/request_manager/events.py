@@ -1,16 +1,14 @@
 """CloudEvents integration for event-driven communication."""
 
 import asyncio
-import json
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Dict, Optional
 
 import httpx
 from cloudevents.http import CloudEvent, to_structured
 from cloudevents.http.event import CloudEvent as CloudEventType
-from shared_models import EventTypes, configure_logging, get_enum_value
-from shared_models.models import AgentResponse, NormalizedRequest
+from shared_models import EventTypes, configure_logging
 
 logger = configure_logging("request-manager")
 
@@ -68,93 +66,6 @@ class CloudEventPublisher:
         self.config = config
         self.client = httpx.AsyncClient(timeout=config.timeout)
 
-    async def publish_request_event(
-        self,
-        normalized_request: NormalizedRequest,
-        event_type: str = EventTypes.REQUEST_CREATED,
-    ) -> bool:
-        """Publish a normalized request as a CloudEvent."""
-        # If eventing is disabled, return success without publishing
-        if not self.config.eventing_enabled:
-            logger.info(
-                "Eventing disabled - skipping event publication",
-                event_type=event_type,
-                request_id=normalized_request.request_id,
-            )
-            return True
-
-        event_data = {
-            "request_id": normalized_request.request_id,
-            "session_id": normalized_request.session_id,
-            "user_id": normalized_request.user_id,
-            "integration_type": get_enum_value(normalized_request.integration_type),
-            "request_type": normalized_request.request_type,
-            "content": normalized_request.content,
-            "integration_context": normalized_request.integration_context,
-            "user_context": normalized_request.user_context,
-            "target_agent_id": normalized_request.target_agent_id,
-            "requires_routing": normalized_request.requires_routing,
-            "created_at": normalized_request.created_at.isoformat(),
-        }
-
-        event = CloudEvent(
-            {
-                "specversion": "1.0",
-                "type": event_type,
-                "source": self.config.source,
-                "id": str(uuid.uuid4()),
-                "time": datetime.now(timezone.utc).isoformat(),
-                "subject": f"session/{normalized_request.session_id}",
-                "datacontenttype": "application/json",
-            },
-            event_data,
-        )
-
-        return await self._publish_event(event)
-
-    async def publish_response_event(
-        self,
-        agent_response: AgentResponse,
-        event_type: str = EventTypes.AGENT_RESPONSE_READY,
-    ) -> bool:
-        """Publish an agent response as a CloudEvent."""
-        # If eventing is disabled, return success without publishing
-        if not self.config.eventing_enabled:
-            logger.info(
-                "Eventing disabled - skipping event publication",
-                event_type=event_type,
-                request_id=agent_response.request_id,
-            )
-            return True
-
-        event_data = {
-            "request_id": agent_response.request_id,
-            "session_id": agent_response.session_id,
-            "agent_id": agent_response.agent_id,
-            "content": agent_response.content,
-            "response_type": agent_response.response_type,
-            "metadata": agent_response.metadata,
-            "processing_time_ms": agent_response.processing_time_ms,
-            "requires_followup": agent_response.requires_followup,
-            "followup_actions": agent_response.followup_actions,
-            "created_at": agent_response.created_at.isoformat(),
-        }
-
-        event = CloudEvent(
-            {
-                "specversion": "1.0",
-                "type": event_type,
-                "source": self.config.source,
-                "id": str(uuid.uuid4()),
-                "time": datetime.now(timezone.utc).isoformat(),
-                "subject": f"session/{agent_response.session_id}",
-                "datacontenttype": "application/json",
-            },
-            event_data,
-        )
-
-        return await self._publish_event(event)
-
     async def publish_database_update_event(self, update_data: Dict[str, Any]) -> bool:
         """Publish database update event to Agent Service."""
         # If eventing is disabled, return success without publishing
@@ -176,37 +87,6 @@ class CloudEventPublisher:
                 "datacontenttype": "application/json",
             },
             update_data,
-        )
-
-        return await self._publish_event(event)
-
-    async def publish_session_event(
-        self,
-        session_id: str,
-        event_type: str,
-        event_data: Dict[str, Any],
-    ) -> bool:
-        """Publish a session-related event."""
-        # If eventing is disabled, return success without publishing
-        if not self.config.eventing_enabled:
-            logger.info(
-                "Eventing disabled - skipping event publication",
-                event_type=event_type,
-                session_id=session_id,
-            )
-            return True
-
-        event = CloudEvent(
-            {
-                "specversion": "1.0",
-                "type": event_type,
-                "source": self.config.source,
-                "id": str(uuid.uuid4()),
-                "time": datetime.now(timezone.utc).isoformat(),
-                "subject": f"session/{session_id}",
-                "datacontenttype": "application/json",
-            },
-            event_data,
         )
 
         return await self._publish_event(event)
@@ -295,68 +175,6 @@ class CloudEventPublisher:
         )
 
         return False
-
-    async def close(self) -> None:
-        """Close the HTTP client."""
-        await self.client.aclose()
-
-
-class CloudEventHandler:
-    """Handles incoming CloudEvents."""
-
-    def __init__(self) -> None:
-        self.handlers: Dict[str, Callable[..., Any]] = {}
-
-    def register_handler(self, event_type: str, handler: Callable[..., Any]) -> None:
-        """Register a handler for a specific event type."""
-        self.handlers[event_type] = handler
-
-    async def handle_event(self, event: CloudEventType) -> Optional[Dict[str, Any]]:
-        """Handle an incoming CloudEvent."""
-        event_type = event.get("type")
-
-        if event_type not in self.handlers:
-            logger.warning(
-                "No handler registered for event type", event_type=event_type
-            )
-            return None
-
-        handler = self.handlers[event_type]
-
-        try:
-            result = await handler(event)
-            return result if isinstance(result, dict) else None
-        except Exception as e:
-            logger.error("Error handling event", event_type=event_type, error=str(e))
-            return None
-
-    def parse_cloudevent_from_request(
-        self, headers: Dict[str, str], body: bytes
-    ) -> Optional[CloudEventType]:
-        """Parse a CloudEvent from HTTP request headers and body."""
-        try:
-            # Try structured content first
-            if headers.get("content-type", "").startswith(
-                "application/cloudevents+json"
-            ):
-                event_data = json.loads(body)
-                return CloudEvent(event_data)
-
-            # Try binary content
-            ce_headers = {
-                key[3:].lower(): value  # Remove 'ce-' prefix and lowercase
-                for key, value in headers.items()
-                if key.lower().startswith("ce-")
-            }
-
-            if ce_headers:
-                return CloudEvent(ce_headers, json.loads(body) if body else None)
-
-            return None
-
-        except Exception as e:
-            logger.error("Failed to parse CloudEvent", error=str(e))
-            return None
 
 
 # Global event publisher instance

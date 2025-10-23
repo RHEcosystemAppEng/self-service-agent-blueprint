@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field, field_validator
-from shared_models.models import AgentResponse, IntegrationType, NormalizedRequest
+from shared_models.models import IntegrationType
 
 
 class BaseRequest(BaseModel):
@@ -66,32 +66,6 @@ class ToolRequest(BaseRequest):
 
 
 # Session schemas moved to shared-models
-
-
-class CloudEventRequest(BaseModel):
-    """Schema for CloudEvent requests."""
-
-    specversion: str = Field(default="1.0")
-    type: str = Field(..., description="Event type")
-    source: str = Field(..., description="Event source")
-    id: str = Field(..., description="Event ID")
-    time: Optional[datetime] = None
-    subject: Optional[str] = None
-    datacontenttype: str = Field(default="application/json")
-    data: NormalizedRequest = Field(..., description="Event data")
-
-
-class CloudEventResponse(BaseModel):
-    """Schema for CloudEvent responses."""
-
-    specversion: str = Field(default="1.0")
-    type: str = Field(..., description="Event type")
-    source: str = Field(..., description="Event source")
-    id: str = Field(..., description="Event ID")
-    time: Optional[datetime] = None
-    subject: Optional[str] = None
-    datacontenttype: str = Field(default="application/json")
-    data: AgentResponse = Field(..., description="Event data")
 
 
 class HealthCheck(BaseModel):

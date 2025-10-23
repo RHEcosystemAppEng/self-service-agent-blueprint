@@ -229,9 +229,10 @@ class TestJWTValidation:
             importlib.reload(request_manager.main)
 
             # Mock a token with matching algorithm but wrong issuer
-            with patch(
-                "request_manager.main.jwt.get_unverified_header"
-            ) as mock_header, patch("request_manager.main.jwt.decode") as mock_decode:
+            with (
+                patch("request_manager.main.jwt.get_unverified_header") as mock_header,
+                patch("request_manager.main.jwt.decode") as mock_decode,
+            ):
                 mock_header.return_value = {"alg": "RS256"}
                 mock_decode.return_value = {
                     "iss": "https://wrong.com",
@@ -260,9 +261,10 @@ class TestJWTValidation:
             importlib.reload(request_manager.main)
 
             # Mock a token with wrong audience
-            with patch(
-                "request_manager.main.jwt.get_unverified_header"
-            ) as mock_header, patch("request_manager.main.jwt.decode") as mock_decode:
+            with (
+                patch("request_manager.main.jwt.get_unverified_header") as mock_header,
+                patch("request_manager.main.jwt.decode") as mock_decode,
+            ):
                 mock_header.return_value = {"alg": "RS256"}
                 mock_decode.return_value = {
                     "iss": "https://test.com",
@@ -291,9 +293,10 @@ class TestJWTValidation:
             importlib.reload(request_manager.main)
 
             # Mock a token with no user ID
-            with patch(
-                "request_manager.main.jwt.get_unverified_header"
-            ) as mock_header, patch("request_manager.main.jwt.decode") as mock_decode:
+            with (
+                patch("request_manager.main.jwt.get_unverified_header") as mock_header,
+                patch("request_manager.main.jwt.decode") as mock_decode,
+            ):
                 mock_header.return_value = {"alg": "RS256"}
                 mock_decode.return_value = {"iss": "https://test.com"}
 
@@ -318,9 +321,10 @@ class TestJWTValidation:
             importlib.reload(request_manager.main)
 
             # Mock a valid token
-            with patch(
-                "request_manager.main.jwt.get_unverified_header"
-            ) as mock_header, patch("request_manager.main.jwt.decode") as mock_decode:
+            with (
+                patch("request_manager.main.jwt.get_unverified_header") as mock_header,
+                patch("request_manager.main.jwt.decode") as mock_decode,
+            ):
                 mock_header.return_value = {"alg": "RS256"}
                 mock_decode.return_value = {
                     "iss": "https://test.com",
