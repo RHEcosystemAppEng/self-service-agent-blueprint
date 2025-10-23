@@ -51,6 +51,8 @@ COPY --from=builder /app/test /app/test
 # Set up environment
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/agent-service/src:/app/asset-manager/src:/app/shared-clients/src:/app/shared-models/src:/app/tracing-config/src:$PYTHONPATH"
+ENV OTEL_SERVICE_NAME="self-service-agent"
+ENV OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true
 
 # Drop privileges
 USER 1001

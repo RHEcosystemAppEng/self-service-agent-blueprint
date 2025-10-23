@@ -39,6 +39,10 @@ spec:
               fieldPath: metadata.namespace
         - name: LOG_LEVEL
           value: {{ .Values.requestManagement.knative.mockEventing.logLevel | default "INFO" | quote }}
+        {{- if .Values.otelExporter }}
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: {{ .Values.otelExporter }}
+        {{- end }}  
         {{- if .Values.requestManagement.knative.mockEventing.resources }}
         resources:
           {{- toYaml .Values.requestManagement.knative.mockEventing.resources | nindent 10 }}

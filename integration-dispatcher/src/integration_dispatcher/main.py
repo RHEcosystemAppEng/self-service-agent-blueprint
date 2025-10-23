@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from shared_models import (
     EventTypes,
     HealthChecker,
@@ -31,6 +32,8 @@ from shared_models.models import (
 )
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from tracing_config.auto_tracing import run as auto_tracing_run
+from tracing_config.auto_tracing import tracingIsActive
 
 from . import __version__
 from .integrations.base import BaseIntegrationHandler
@@ -50,8 +53,10 @@ from .slack_schemas import SlackChallenge, SlackInteractionPayload, SlackSlashCo
 from .slack_service import SlackService
 from .template_engine import TemplateEngine
 
-# Configure structured logging
-logger = configure_logging("integration-dispatcher")
+# Configure structured logging and auto tracing
+SERVICE_NAME = "integration-dispatcher"
+logger = configure_logging(SERVICE_NAME)
+auto_tracing_run(SERVICE_NAME, logger)
 
 
 class IntegrationDispatcher:
@@ -1319,6 +1324,9 @@ async def _record_processed_event(
             )
         await db.rollback()
 
+
+if tracingIsActive():
+    FastAPIInstrumentor.instrument_app(app)
 
 if __name__ == "__main__":
     import uvicorn

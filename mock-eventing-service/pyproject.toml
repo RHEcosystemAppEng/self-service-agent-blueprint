@@ -13,6 +13,10 @@ dependencies = [
     "httpx>=0.25.0",
     "cloudevents>=1.9.0",
     "self-service-agent-shared-models",
+    "opentelemetry-exporter-otlp-proto-http==1.37.0",
+    "opentelemetry-instrumentation-httpx==0.58b0",
+    "opentelemetry-instrumentation-fastapi>=0.58b0",
+    "tracing-config",
 ]
 requires-python = ">=3.12"
 
@@ -36,3 +40,4 @@ testpaths = ["tests"]
 
 [tool.uv.sources]
 self-service-agent-shared-models = { path = "../shared-models" }
+tracing-config = { path = "../tracing-config" }

@@ -17,9 +17,15 @@ dependencies = [
     "python-json-logger>=2.0.7",
     "pyjwt[crypto]>=2.8.0",
     "cryptography>=41.0.0",
+    "opentelemetry-exporter-otlp-proto-http==1.37.0",
+    "opentelemetry-instrumentation-httpx>=0.58b0",
+    "opentelemetry-api>=1.37.0",
+    "opentelemetry-sdk>=1.37.0",
     "self-service-agent-shared-models",
     "self-service-agent-shared-clients",
     "self-service-agent-service",
+    "opentelemetry-instrumentation-fastapi>=0.58b0",
+    "tracing-config",
 ]
 
 [project.optional-dependencies]
@@ -61,6 +67,7 @@ disallow_untyped_defs = true
 self-service-agent-shared-models = { path = "../shared-models" }
 self-service-agent-shared-clients = { path = "../shared-clients" }
 self-service-agent-service = { path = "../agent-service" }
+tracing-config = { path = "../tracing-config" }
 
 [dependency-groups]
 dev = [

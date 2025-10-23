@@ -56,6 +56,10 @@ spec:
         {{- else if eq $serviceName "integration-dispatcher" }}
         {{- include "self-service-agent.integrationDispatcherAllEnvVars" $context | nindent 8 }}
         {{- end }}
+        {{- if $context.Values.otelExporter }}
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: {{ $context.Values.otelExporter }}
+        {{- end }}
         # Service-specific environment variables
         # All environment variables are now handled by the templates above
         {{- if $serviceConfig.resources }}

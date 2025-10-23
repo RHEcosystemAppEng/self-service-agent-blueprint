@@ -11,7 +11,11 @@ RUN pip3 install --no-cache-dir uv
 
 WORKDIR /app
 
+COPY tracing-config/ ./tracing-config
+
 ARG SERVICE_NAME
+ENV OTEL_SERVICE_NAME=${SERVICE_NAME}
+ENV OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true
 COPY ${SERVICE_NAME}/ .
 RUN uv sync --frozen --no-cache
 
@@ -19,6 +23,8 @@ RUN uv sync --frozen --no-cache
 FROM registry.access.redhat.com/ubi9/python-312-minimal:latest
 
 WORKDIR /app
+
+COPY --from=builder /app/tracing-config /app/tracing-config
 
 # Copy virtual environment from builder
 COPY --from=builder /app/.venv /app/.venv
@@ -31,7 +37,7 @@ COPY ${SERVICE_NAME}/pyproject.toml ./
 
 # Set environment variables
 ENV PATH="/app/.venv/bin:$PATH"
-ENV PYTHONPATH="/app/src:$PYTHONPATH"
+ENV PYTHONPATH="/app/src:/app/tracing-config/src:$PYTHONPATH"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 

@@ -10,11 +10,16 @@ from typing import Any, Dict, List
 from cloudevents.http import CloudEvent
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from pydantic import BaseModel
 from shared_models import configure_logging, simple_health_check
+from tracing_config.auto_tracing import run as auto_tracing_run
+from tracing_config.auto_tracing import tracingIsActive
 
-# Configure structured logging
-logger = configure_logging("mock-eventing-service")
+# Configure structured logging and auto tracing
+SERVICE_NAME = "mock-eventing-service"
+logger = configure_logging(SERVICE_NAME)
+auto_tracing_run(SERVICE_NAME, logger)
 
 
 class EventSubscription(BaseModel):
@@ -483,6 +488,10 @@ async def reset_service() -> dict[str, str]:
     mock_service.event_history.clear()
     mock_service.delivery_attempts.clear()
     return {"status": "reset", "message": "Mock service reset to initial state"}
+
+
+if tracingIsActive():
+    FastAPIInstrumentor.instrument_app(app)
 
 
 if __name__ == "__main__":

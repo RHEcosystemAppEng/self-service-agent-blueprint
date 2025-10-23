@@ -21,6 +21,10 @@ dependencies = [
     "aiohttp>=3.8.0", # Required by slack-sdk for async operations
     "self-service-agent-shared-models",
     "self-service-agent-shared-clients",
+    "opentelemetry-exporter-otlp-proto-http==1.37.0",
+    "opentelemetry-instrumentation-httpx==0.58b0",
+    "opentelemetry-instrumentation-fastapi>=0.58b0",
+    "tracing-config",
 ]
 
 [project.optional-dependencies]
@@ -61,6 +65,7 @@ disallow_untyped_defs = true
 [tool.uv.sources]
 self-service-agent-shared-models = { path = "../shared-models" }
 self-service-agent-shared-clients = { path = "../shared-clients" }
+tracing-config = { path = "../tracing-config" }
 
 [dependency-groups]
 dev = [

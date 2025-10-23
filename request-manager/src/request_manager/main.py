@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import InvalidTokenError  # type: ignore
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from shared_models import (
     CloudEventHandler,
     CloudEventSender,
@@ -28,6 +29,8 @@ from shared_models import (
 from shared_models.models import ErrorResponse, ProcessedEvent
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from tracing_config.auto_tracing import run as auto_tracing_run
+from tracing_config.auto_tracing import tracingIsActive
 
 from . import __version__
 from .communication_strategy import (
@@ -46,8 +49,10 @@ from .schemas import (
     WebRequest,
 )
 
-# Configure structured logging
-logger = configure_logging("request-manager")
+# Configure structured logging and auto tracing
+SERVICE_NAME = "request-manager"
+logger = configure_logging(SERVICE_NAME)
+auto_tracing_run(SERVICE_NAME, logger)
 
 
 async def _request_manager_startup() -> None:
@@ -906,3 +911,7 @@ async def _forward_response_to_integration_dispatcher(
             session_id=event_data.get("session_id"),
         )
         return False
+
+
+if tracingIsActive():
+    FastAPIInstrumentor.instrument_app(app)

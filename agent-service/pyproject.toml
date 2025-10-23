@@ -20,6 +20,10 @@ dependencies = [
     "fire>=0.5.0",
     "requests>=2.31.0",
     "self-service-agent-shared-models",
+    "opentelemetry-exporter-otlp-proto-http==1.37.0",
+    "opentelemetry-instrumentation-httpx==0.58b0",
+    "opentelemetry-instrumentation-fastapi>=0.58b0",
+    "tracing-config",
     # Asset manager for LangGraph components
     "asset-manager",
     # LangGraph dependencies
@@ -68,6 +72,7 @@ disallow_untyped_defs = true
 self-service-agent-shared-models = { path = "../shared-models" }
 self-service-agent-shared-clients = { path = "../shared-clients" }
 asset-manager = { path = "../asset-manager" }
+tracing-config = { path = "../tracing-config" }
 
 [dependency-groups]
 dev = [

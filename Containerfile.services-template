@@ -24,6 +24,8 @@ COPY asset-manager ./asset-manager/
 # Copy agent-service (needed by request-manager and integration-dispatcher)
 COPY agent-service ./agent-service/
 
+COPY tracing-config/ ./tracing-config
+
 # Copy service files
 ARG SERVICE_NAME
 COPY ${SERVICE_NAME}/pyproject.toml ${SERVICE_NAME}/uv.lock ./${SERVICE_NAME}/
@@ -49,8 +51,12 @@ COPY --from=builder /app/asset-manager /app/asset-manager
 # Copy agent-service (needed by request-manager and integration-dispatcher)
 COPY --from=builder /app/agent-service /app/agent-service
 
+COPY --from=builder /app/tracing-config /app/tracing-config
+
 # Copy virtual environment from builder (service-specific, but ARG not needed yet)
 ARG SERVICE_NAME
+ENV OTEL_SERVICE_NAME=${SERVICE_NAME}
+ENV OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true
 COPY --from=builder /app/${SERVICE_NAME}/.venv /app/.venv
 
 # Copy application source
@@ -60,7 +66,7 @@ COPY ${SERVICE_NAME}/pyproject.toml ./
 
 # Set environment variables
 ENV PATH="/app/.venv/bin:$PATH"
-ENV PYTHONPATH="/app/agent-service/src:/app/shared-models/src:/app/shared-clients/src:/app/src:$PYTHONPATH"
+ENV PYTHONPATH="/app/agent-service/src:/app/shared-models/src:/app/shared-clients/src:/app/src:/app/tracing-config/src:$PYTHONPATH"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 

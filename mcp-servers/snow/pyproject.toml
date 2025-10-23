@@ -8,6 +8,9 @@ dependencies = [
     "httpx>=0.28.1",
     "logging>=0.4.9.6",
     "mcp[cli]>=1.6.0",
+    "opentelemetry-exporter-otlp-proto-http==1.37.0",
+    "opentelemetry-instrumentation-fastapi>=0.58b0",
+    "opentelemetry-instrumentation-httpx==0.58b0",
     "pydantic>=2.0.0",
     "requests>=2.25.0",
 ]

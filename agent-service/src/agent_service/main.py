@@ -10,6 +10,7 @@ import httpx
 from cloudevents.http import CloudEvent, to_structured
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from shared_clients.stream_processor import LlamaStackStreamProcessor
 from shared_models import (
     CloudEventBuilder,
@@ -26,13 +27,17 @@ from shared_models import (
 )
 from shared_models.models import AgentResponse, NormalizedRequest, SessionStatus
 from sqlalchemy.ext.asyncio import AsyncSession
+from tracing_config.auto_tracing import run as auto_tracing_run
+from tracing_config.auto_tracing import tracingIsActive
 
 from . import __version__
 from .schemas import SessionCreate, SessionResponse, SessionUpdate
 from .session_manager import BaseSessionManager, ResponsesSessionManager
 
-# Configure structured logging
-logger = configure_logging("agent-service")
+# Configure structured logging and auto tracing
+SERVICE_NAME = "agent-service"
+logger = configure_logging(SERVICE_NAME)
+auto_tracing_run(SERVICE_NAME, logger)
 
 
 class AgentConfig:
@@ -1168,6 +1173,9 @@ async def _update_request_log_unified(
         )
         # Don't raise exception - RequestLog update failure shouldn't stop response
 
+
+if tracingIsActive():
+    FastAPIInstrumentor.instrument_app(app)
 
 if __name__ == "__main__":
     import uvicorn

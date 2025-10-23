@@ -97,6 +97,9 @@ helm_request_management_args = \
     $(if $(SNOW_API_KEY),--set-string security.apiKeys.snowIntegration='$(SNOW_API_KEY)',) \
     $(if $(HR_API_KEY),--set-string security.apiKeys.hrSystem='$(HR_API_KEY)',)
 
+helm_generic_args = \
+	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set otelExporter=$(OTEL_EXPORTER_OTLP_ENDPOINT),)
+
 # Version target
 .PHONY: version
 version:
@@ -746,6 +749,7 @@ define helm_install_common
 	@$(eval LLAMA_STACK_ARGS := $(helm_llama_stack_args))
 	@$(eval REQUEST_MANAGEMENT_ARGS := $(helm_request_management_args))
 	@$(eval LOG_LEVEL_ARGS := $(if $(LOG_LEVEL),--set logLevel=$(LOG_LEVEL),))
+	@$(eval GENERIC_ARGS := $(helm_generic_args))
 
 	@if [ "$(USE_REAL_SERVICENOW)" = "true" ]; then \
 		echo "Creating ServiceNow credentials secret..."; \
@@ -785,6 +789,7 @@ define helm_install_common
 		$(if $(filter true,$(USE_REAL_SERVICENOW)),--set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_INSTANCE_URL.name=$(MAIN_CHART_NAME)-servicenow-credentials --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_INSTANCE_URL.key=servicenow-instance-url --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_USERNAME.name=$(MAIN_CHART_NAME)-servicenow-credentials --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_USERNAME.key=servicenow-username --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_PASSWORD.name=$(MAIN_CHART_NAME)-servicenow-credentials --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_PASSWORD.key=servicenow-password,) \
 		$(REQUEST_MANAGEMENT_ARGS) \
 		$(LOG_LEVEL_ARGS) \
+		$(GENERIC_ARGS) \
 		$(if $(filter-out "",$(2)),$(2),) \
 		$(EXTRA_HELM_ARGS)
 	@echo "Waiting for main chart deployment..."

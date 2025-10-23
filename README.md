@@ -1189,3 +1189,12 @@ By completing this quickstart, you have:
 ---
 
 **Thank you for using the Self-Service Agent Quickstart!** We hope this guide helps you successfully deploy AI-driven IT process automation in your organization.
+
+## Tracing
+
+To enable tracing, it is possible to specify a remote OpenTelemetry collector,
+with the `OTEL_EXPORTER_OTLP_ENDPOINT` environement variable.
+
+```bash
+make helm-install-test EXTRA_HELM_ARGS="--set requestManagement.externalAccess.enabled=false" LLM=llama-3-3-70b-instruct-w8a8 LLM_ID=llama-3-3-70b-instruct-w8a8 LLM_URL=$YOUR_LLM_URL LLM_API_TOKEN=$YOUR_LLM_API_TOKEN OTEL_EXPORTER_OTLP_ENDPOINT="http://jaeger-collector.obs.svc.cluster.local:4318"
+```
