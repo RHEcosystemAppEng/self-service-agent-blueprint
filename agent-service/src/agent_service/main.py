@@ -41,13 +41,12 @@ class AgentConfig:
     def __init__(self) -> None:
         self.llama_stack_url = os.getenv("LLAMA_STACK_URL", "http://llamastack:8321")
         self.broker_url = os.getenv("BROKER_URL")
-        self.eventing_enabled = os.getenv("EVENTING_ENABLED", "true").lower() == "true"
 
-        # If eventing is disabled, we don't need a broker URL
-        if self.eventing_enabled and not self.broker_url:
+        # BROKER_URL is required for eventing-based communication
+        if not self.broker_url:
             raise ValueError(
-                "BROKER_URL environment variable is required when eventing is enabled. "
-                "Set EVENTING_ENABLED=false to disable eventing or configure BROKER_URL."
+                "BROKER_URL environment variable is required. "
+                "Configure BROKER_URL to point to your Knative broker or mock eventing service."
             )
 
 
@@ -213,11 +212,6 @@ class AgentService:
 
     async def publish_response(self, response: AgentResponse) -> bool:
         """Publish agent response as CloudEvent and update database."""
-        # Skip event publishing if eventing is disabled
-        if not self.config.eventing_enabled:
-            logger.debug("Eventing disabled, skipping response event publication")
-            return True
-
         try:
             # Debug log the response object to see what values it has
             logger.debug(
@@ -459,11 +453,6 @@ class AgentService:
 
     async def _publish_processing_event(self, request: NormalizedRequest) -> bool:
         """Publish processing started event for user notification."""
-        # Skip event publishing if eventing is disabled
-        if not self.config.eventing_enabled:
-            logger.debug("Eventing disabled, skipping processing event publication")
-            return True
-
         try:
             event_data = {
                 "request_id": request.request_id,
@@ -529,8 +518,7 @@ class AgentService:
     ) -> None:
         """Handle session management including request count increment.
 
-        This method is called for both eventing and direct HTTP modes to ensure
-        consistent session management across all communication strategies.
+        This method ensures consistent session management across all requests.
         """
         try:
             # Get database session for session management
@@ -842,13 +830,9 @@ async def _handle_request_event_from_data(
             response_type=type(response).__name__ if response else "None",
         )
 
-        # Publish response event only if eventing is enabled
-        success = True
-        if agent_service.config.eventing_enabled:
-            logger.debug("Eventing enabled - publishing response")
-            success = await agent_service.publish_response(response)
-        else:
-            logger.debug("Skipping response event publishing - eventing disabled")
+        # Publish response event
+        logger.debug("Publishing response event")
+        success = await agent_service.publish_response(response)
 
         logger.info(
             "Request processed",

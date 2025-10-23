@@ -33,20 +33,19 @@ def is_transient_error(error: Exception) -> bool:
 
 
 class EventConfig:
-    """Configuration for event handling."""
+    """Configuration for event handling (eventing-based)."""
 
     def __init__(self) -> None:
-        # Knative Broker endpoint - can be optional for fallback mode
+        # Knative Broker endpoint (required for eventing)
         import os
 
         self.broker_url = os.getenv("BROKER_URL")
-        self.eventing_enabled = os.getenv("EVENTING_ENABLED", "true").lower() == "true"
 
-        # If eventing is disabled, we don't need a broker URL
-        if self.eventing_enabled and not self.broker_url:
+        # Broker URL is required for eventing mode
+        if not self.broker_url:
             raise ValueError(
-                "BROKER_URL environment variable is required when eventing is enabled. "
-                "Set EVENTING_ENABLED=false to disable eventing or configure BROKER_URL."
+                "BROKER_URL environment variable is required for eventing mode. "
+                "Configure BROKER_URL to point to your Knative broker or mock eventing service."
             )
 
         self.source = "request-manager"
@@ -68,14 +67,6 @@ class CloudEventPublisher:
 
     async def publish_database_update_event(self, update_data: Dict[str, Any]) -> bool:
         """Publish database update event to Agent Service."""
-        # If eventing is disabled, return success without publishing
-        if not self.config.eventing_enabled:
-            logger.info(
-                "Eventing disabled - skipping database update event publication",
-                request_id=update_data.get("request_id"),
-            )
-            return True
-
         event = CloudEvent(
             {
                 "specversion": "1.0",

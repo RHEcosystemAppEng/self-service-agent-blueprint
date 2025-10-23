@@ -1,4 +1,4 @@
-"""Communication strategy abstraction for eventing vs direct HTTP modes."""
+"""Communication strategy abstraction for eventing mode."""
 
 import asyncio
 import os
@@ -8,9 +8,8 @@ from typing import Any, Dict, Optional
 
 from agent_service.schemas import SessionResponse
 from fastapi import HTTPException, status
-from shared_clients import get_agent_client, get_integration_dispatcher_client
 from shared_models import CloudEventSender, configure_logging
-from shared_models.models import AgentResponse, NormalizedRequest
+from shared_models.models import NormalizedRequest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .normalizer import RequestNormalizer
@@ -172,8 +171,8 @@ class CommunicationStrategy(ABC):
         pass
 
     @abstractmethod
-    async def deliver_response(self, agent_response: AgentResponse) -> bool:
-        """Deliver the response to the integration dispatcher."""
+    async def wait_for_response(self, request_id: str, timeout: int) -> Dict[str, Any]:
+        """Wait for response from the agent service."""
         pass
 
 
@@ -208,27 +207,6 @@ class EventingStrategy(CommunicationStrategy):
             "Request sent via eventing",
             request_id=normalized_request.request_id,
             session_id=normalized_request.session_id,
-        )
-        return True
-
-    async def deliver_response(self, agent_response: AgentResponse) -> bool:
-        """Deliver response via CloudEvent."""
-        response_event_data = agent_response.model_dump(mode="json")
-        success = await self.event_sender.send_response_event(
-            response_event_data,
-            agent_response.request_id,
-            agent_response.agent_id,
-            agent_response.session_id,
-        )
-
-        if not success:
-            logger.error("Failed to publish response event")
-            return False
-
-        logger.info(
-            "Response delivered via eventing",
-            request_id=agent_response.request_id,
-            session_id=agent_response.session_id,
         )
         return True
 
@@ -304,102 +282,32 @@ class EventingStrategy(CommunicationStrategy):
                     )
 
 
-class DirectHttpStrategy(CommunicationStrategy):
-    """Communication strategy using direct HTTP calls."""
-
-    def __init__(self) -> None:
-        self.agent_client = get_agent_client()
-        self.integration_client = get_integration_dispatcher_client()
-
-    async def send_request(self, normalized_request: NormalizedRequest) -> bool:
-        """
-        Send request via direct HTTP.
-
-        Note: In direct HTTP mode, this method just validates the client is ready.
-        The actual request processing happens synchronously in the main flow.
-        """
-        if not self.agent_client:
-            logger.error("Agent client not initialized")
-            return False
-
-        logger.info(
-            "Direct HTTP mode: Request will be processed synchronously",
-            request_id=normalized_request.request_id,
-            session_id=normalized_request.session_id,
-        )
-        return True  # Client is ready, request will be processed synchronously
-
-    async def deliver_response(self, agent_response: AgentResponse) -> bool:
-        """Deliver response via direct HTTP."""
-        if not self.integration_client:
-            logger.error("Integration client not initialized")
-            return False
-
-        success = await self.integration_client.deliver_response(
-            agent_response.model_dump(mode="json")
-        )
-
-        if not success:
-            logger.error("Failed to deliver response via direct HTTP")
-            return False
-
-        logger.info(
-            "Response delivered via direct HTTP",
-            request_id=agent_response.request_id,
-            session_id=agent_response.session_id,
-        )
-        return True
-
-
 def get_communication_strategy() -> CommunicationStrategy:
-    """Get the appropriate communication strategy based on configuration."""
-    eventing_enabled = os.getenv("EVENTING_ENABLED", "true").lower() == "true"
-
-    if eventing_enabled:
-        return EventingStrategy()
-    else:
-        return DirectHttpStrategy()
+    """Get the communication strategy (eventing-based)."""
+    return EventingStrategy()
 
 
 async def check_communication_strategy() -> bool:
-    """Check the health of the current communication strategy configuration."""
+    """Check the health of the eventing communication strategy configuration."""
     try:
-        eventing_enabled = os.getenv("EVENTING_ENABLED", "true").lower() == "true"
         broker_url = os.getenv("BROKER_URL", "http://knative-broker:8080")
 
-        if eventing_enabled:
-            # In eventing mode, check if we can create a CloudEventSender
-            # This works for both mock eventing and real Knative eventing
-            from shared_models import CloudEventSender
+        # Check if we can create a CloudEventSender
+        # This works for both mock eventing and real Knative eventing
+        from shared_models import CloudEventSender
 
-            event_sender = CloudEventSender(broker_url, "request-manager")
-            return event_sender is not None
-        else:
-            # In direct HTTP mode, check if we can reach the agent service
-            from shared_clients import get_agent_client
-
-            agent_client = get_agent_client()
-            if not agent_client:
-                return False
-
-            try:
-                response = await agent_client.get("/health", timeout=5.0)
-                return response.status_code == 200
-            except Exception:
-                return False
+        event_sender = CloudEventSender(broker_url, "request-manager")
+        return event_sender is not None
     except Exception as e:
         logger.error("Communication strategy health check failed", error=str(e))
         return False
 
 
 class UnifiedRequestProcessor:
-    """Unified request processor that works with any communication strategy."""
+    """Unified request processor for eventing-based communication."""
 
-    def __init__(
-        self, strategy: CommunicationStrategy, agent_client: Any = None
-    ) -> None:
+    def __init__(self, strategy: CommunicationStrategy) -> None:
         self.strategy = strategy
-        self.agent_client = agent_client
 
     def _extract_session_data(self, session: Any) -> tuple[str, str]:
         """Extract session_id and current_agent_id from session data.
@@ -412,154 +320,36 @@ class UnifiedRequestProcessor:
     async def process_request_sync(
         self, request: Any, db: AsyncSession, timeout: int = 120
     ) -> Dict[str, Any]:
-        """Process a request synchronously and wait for response."""
+        """Process a request synchronously and wait for response via eventing."""
         # Common request preparation
         normalized_request, session_id, current_agent_id = await self._prepare_request(
             request, db
         )
 
-        # Handle different strategies
-        if isinstance(self.strategy, EventingStrategy):
-            # Eventing mode: send request and wait for response event
-            logger.info(
-                "Processing request in eventing mode",
-                request_id=normalized_request.request_id,
-            )
+        # Send request via eventing and wait for response event
+        logger.info(
+            "Processing request in eventing mode",
+            request_id=normalized_request.request_id,
+        )
 
-            # Send async request
-            success = await self.strategy.send_request(normalized_request)
-            if not success:
-                raise Exception("Failed to send request")
+        # Send async request
+        success = await self.strategy.send_request(normalized_request)
+        if not success:
+            raise Exception("Failed to send request")
 
-            # Wait for response event instead of polling
-            return await self.strategy.wait_for_response(
-                normalized_request.request_id, timeout
-            )
-
-        elif isinstance(self.strategy, DirectHttpStrategy):
-            # Direct HTTP mode: process synchronously
-            agent_client = get_agent_client()
-            if not agent_client:
-                raise Exception("Agent client not initialized")
-
-            # Note: Session management is now handled by the Agent Service automatically
-
-            # Use streaming for better performance and user experience
-            stream_response = await agent_client.process_request_stream(
-                normalized_request
-            )
-            if not stream_response:
-                raise Exception("Agent service failed to process request")
-
-            # Process the streaming response to extract the final AgentResponse
-            agent_response = await self._process_streaming_response(
-                stream_response, normalized_request
-            )
-            if not agent_response:
-                raise Exception("Failed to process streaming response")
-
-            # NOTE: Agent routing is now handled by the Agent Service
-            # No additional routing logic needed in Request Manager
-
-            # Note: Request logging is now handled by the Agent Service
-
-            # For sync requests, return response directly; for async requests, deliver via integration dispatcher
-            if normalized_request.request_type.upper() != "SYNC":
-                # Deliver response for async requests (Slack, email, etc.)
-                delivery_success = await self.strategy.deliver_response(agent_response)
-                if not delivery_success:
-                    logger.warning("Failed to deliver response")
-
-            # Prepare response data (always returned for sync requests)
-            response_data = {
-                "content": agent_response.content,
-                "agent_id": agent_response.agent_id,
-                "metadata": agent_response.metadata,
-                "processing_time_ms": agent_response.processing_time_ms,
-                "requires_followup": agent_response.requires_followup,
-                "followup_actions": agent_response.followup_actions,
-            }
-
-        else:
-            raise Exception("Unknown communication strategy")
+        # Wait for response event
+        response = await self.strategy.wait_for_response(
+            normalized_request.request_id, timeout
+        )
 
         logger.info(
-            "Request processed synchronously",
+            "Request processed successfully",
             request_id=normalized_request.request_id,
             session_id=session_id,
             user_id=request.user_id,
         )
 
-        return {
-            "request_id": normalized_request.request_id,
-            "session_id": session_id,
-            "status": "completed",
-            "response": response_data,
-        }
-
-    async def _process_streaming_response(
-        self, stream_context_manager: Any, normalized_request: Any
-    ) -> Optional[AgentResponse]:
-        """Process a streaming response and extract the final AgentResponse."""
-        import json
-
-        from shared_models.models import AgentResponse
-
-        try:
-            content = ""
-            agent_id = None
-            processing_time_ms = None
-            metadata: Dict[str, Any] = {}
-            requires_followup = False
-            followup_actions: list[Any] = []
-
-            # Use the async context manager to get the response
-            async with stream_context_manager as response:
-                # Process the streaming response
-                async for line in response.aiter_lines():
-                    if line.startswith("data: "):
-                        try:
-                            data = json.loads(line[6:])  # Remove "data: " prefix
-                            event_type = data.get("type", "unknown")
-
-                            if event_type == "content":
-                                content += data.get("chunk", "")
-                            elif event_type == "complete":
-                                agent_id = data.get("agent_id")
-                                processing_time_ms = data.get("processing_time_ms")
-                            elif event_type == "error":
-                                logger.error(
-                                    "Streaming error", message=data.get("message")
-                                )
-                                return None
-                        except json.JSONDecodeError:
-                            logger.warning("Failed to parse streaming data", line=line)
-                            continue
-
-            # Create AgentResponse from collected data
-            if content and agent_id:
-                return AgentResponse(
-                    request_id=normalized_request.request_id,
-                    session_id=normalized_request.session_id,
-                    user_id=normalized_request.user_id,
-                    agent_id=agent_id,
-                    content=content,
-                    metadata=metadata,
-                    processing_time_ms=processing_time_ms,
-                    requires_followup=requires_followup,
-                    followup_actions=followup_actions,
-                )
-            else:
-                logger.error(
-                    "Incomplete streaming response",
-                    content_length=len(content),
-                    agent_id=agent_id,
-                )
-                return None
-
-        except Exception as e:
-            logger.error("Error processing streaming response", error=str(e))
-            return None
+        return response
 
     async def _prepare_request(
         self, request: Any, db: AsyncSession

@@ -1,6 +1,6 @@
 # Makefile for RAG Deployment
 ifeq ($(NAMESPACE),)
-ifneq (,$(filter namespace helm-install-dev helm-install-test helm-install-prod helm-uninstall helm-status helm-cleanup-eventing helm-cleanup-jobs,$(MAKECMDGOALS)))
+ifneq (,$(filter namespace helm-install-test helm-install-prod helm-uninstall helm-status helm-cleanup-eventing helm-cleanup-jobs,$(MAKECMDGOALS)))
 $(error NAMESPACE is not set)
 endif
 endif
@@ -52,9 +52,9 @@ SLACK_ENABLED := $(if $(and $(SLACK_BOT_TOKEN),$(SLACK_SIGNING_SECRET)),true,fal
 # Can be set either way:
 #   1. Environment variable (required for passwords with $ or other special chars):
 #      export SERVICENOW_PASSWORD='P@ssw0rd$r123'
-#      make helm-install-dev ...
+#      make helm-install-test ...
 #   2. Make argument (for simple passwords without special chars):
-#      make helm-install-dev SERVICENOW_PASSWORD=simple123 ...
+#      make helm-install-test SERVICENOW_PASSWORD=simple123 ...
 SERVICENOW_INSTANCE_URL ?=
 SERVICENOW_USERNAME ?=
 SERVICENOW_PASSWORD ?=
@@ -117,8 +117,7 @@ help:
 	@echo "  build-request-mgr-image              - Build the request manager container image (checks lockfiles first)"
 	@echo ""
 	@echo "Helm Commands:"
-	@echo "  helm-install-dev                    - Install with direct HTTP communication (development)"
-	@echo "  helm-install-test                   - Install with mock eventing service (testing/CI)"
+	@echo "  helm-install-test                   - Install with mock eventing service (testing/development/CI - default)"
 	@echo "  helm-install-prod                   - Install with full Knative eventing (production)"
 	@echo "  helm-cleanup-eventing               - Manually clean up leftover Knative Eventing resources (Triggers, Brokers)"
 	@echo "  helm-cleanup-jobs                   - Clean up leftover jobs from failed deployments"
@@ -219,10 +218,10 @@ help:
 	@echo ""
 	@echo "  Note: Passwords with special characters like \$$ must be set via environment variable:"
 	@echo "    export SERVICENOW_PASSWORD='P@ssw0rd\$$r123'  # Required for special chars"
-	@echo "    make helm-install-dev NAMESPACE=my-ns USE_REAL_SERVICENOW=true"
+	@echo "    make helm-install-test NAMESPACE=my-ns USE_REAL_SERVICENOW=true"
 	@echo ""
 	@echo "  Simple passwords can use either method:"
-	@echo "    make helm-install-dev SERVICENOW_PASSWORD=simple123  # No special chars"
+	@echo "    make helm-install-test SERVICENOW_PASSWORD=simple123  # No special chars"
 	@echo ""
 	@echo "  Request Management Layer:"
 	@echo "    KNATIVE_EVENTING                  - Enable Knative Eventing (default: true)"
@@ -799,15 +798,7 @@ define helm_install_common
 	@echo "$(MAIN_CHART_NAME) $(1) installed successfully"
 endef
 
-# Install with direct HTTP communication (development mode)
-.PHONY: helm-install-dev
-helm-install-dev: namespace helm-depend
-	$(call helm_install_common,"with direct HTTP communication - development",\
-		"",\
-		false)
-	@$(MAKE) print-urls
-
-# Install with mock eventing service (testing/CI mode)
+# Install with mock eventing service (testing/development/CI mode - default)
 .PHONY: helm-install-test
 helm-install-test: namespace helm-depend
 	$(call helm_install_common,"with mock eventing service - testing/CI",\

@@ -58,23 +58,14 @@ Generate common environment variables for all services
   value: "false"
 - name: EXPECTED_MIGRATION_VERSION
   value: {{ .Values.database.expectedMigrationVersion | default "001" | quote }}
-{{/* Eventing Configuration */}}
+{{/* Eventing Configuration - Always enabled (mock or full Knative) */}}
 - name: BROKER_URL
   value: {{ if .Values.requestManagement.knative.eventing.enabled }}{{ printf "%s/%s/%s" .Values.requestManagement.knative.broker.url .Release.Namespace .Values.requestManagement.knative.broker.name | quote }}{{ else }}{{ printf "http://%s-mock-eventing.%s.svc.cluster.local:8080/%s/%s" (include "self-service-agent.fullname" .) .Release.Namespace .Release.Namespace .Values.requestManagement.knative.broker.name | quote }}{{ end }}
-- name: EVENTING_ENABLED
-  value: {{ or .Values.requestManagement.knative.eventing.enabled .Values.requestManagement.knative.mockEventing.enabled | quote }}
 {{/* Server Configuration */}}
 - name: PORT
   value: "8080"
 - name: HOST
   value: "0.0.0.0"
-{{/* Service URLs (when eventing is disabled) */}}
-{{- if not .Values.requestManagement.knative.eventing.enabled }}
-- name: AGENT_SERVICE_URL
-  value: {{ printf "http://%s-agent-service.%s.svc.cluster.local:80" (include "self-service-agent.fullname" .) .Release.Namespace | quote }}
-- name: INTEGRATION_DISPATCHER_URL
-  value: {{ printf "http://%s-integration-dispatcher.%s.svc.cluster.local:80" (include "self-service-agent.fullname" .) .Release.Namespace | quote }}
-{{- end }}
 {{- end }}
 
 {{/*

@@ -38,7 +38,6 @@ class SlackService:
         # Simple rate limiting: track last request time per user
         self._last_request_time: Dict[str, float] = {}
         # Eventing configuration
-        self.eventing_enabled = os.getenv("EVENTING_ENABLED", "true").lower() == "true"
         self.broker_url = os.getenv("BROKER_URL")
         # Slack client for API calls
         self.bot_token = os.getenv("SLACK_BOT_TOKEN")
@@ -80,8 +79,8 @@ class SlackService:
         self, event_data: Dict[str, Any], event_type: str
     ) -> bool:
         """Send a CloudEvent to the broker."""
-        if not self.eventing_enabled or not self.broker_url:
-            logger.info("Eventing disabled or no broker URL - skipping CloudEvent")
+        if not self.broker_url:
+            logger.warning("No broker URL configured - skipping CloudEvent")
             return False
 
         try:
