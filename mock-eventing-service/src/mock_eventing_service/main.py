@@ -188,14 +188,6 @@ class MockEventingService:
             if attempt_count < 3 and "timeout" in str(e).lower():
                 logger.info("Simulating retry for testing purposes")
 
-    async def _deliver_event(
-        self, event: CloudEvent, subscription: EventSubscription
-    ) -> bool:
-        """Deliver an event to a specific subscriber (legacy method for compatibility)."""
-        # This method is kept for compatibility but now just creates an async task
-        asyncio.create_task(self._deliver_event_async(event, subscription))
-        return True
-
 
 # Initialize the mock service
 mock_service = MockEventingService()
