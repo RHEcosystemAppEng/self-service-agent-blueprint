@@ -1,6 +1,5 @@
 """FastAPI utilities for shared patterns across services."""
 
-import os
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, Optional
 
@@ -151,36 +150,12 @@ async def create_shared_lifespan(
         logger.error("Failed to verify database migration", error=str(e))
         raise
 
-    # Initialize service clients if requested
+    # Service client initialization removed - services use eventing for communication
+    # Direct HTTP client initialization is no longer supported
     if service_client_init:
-        try:
-            from shared_clients import initialize_service_clients
-
-            # Get service URLs from environment
-            agent_service_url = os.getenv(
-                "AGENT_SERVICE_URL", "http://self-service-agent-agent-service:80"
-            )
-            request_manager_url = os.getenv(
-                "REQUEST_MANAGER_URL",
-                "http://self-service-agent-request-manager:8080",
-            )
-            integration_dispatcher_url = os.getenv(
-                "INTEGRATION_DISPATCHER_URL",
-                "http://self-service-agent-integration-dispatcher:8080",
-            )
-
-            initialize_service_clients(
-                agent_service_url=agent_service_url,
-                request_manager_url=request_manager_url,
-                integration_dispatcher_url=integration_dispatcher_url,
-            )
-            logger.debug("Initialized service clients")
-        except ImportError:
-            logger.warning(
-                "shared_clients not available, skipping service client initialization"
-            )
-        except Exception as e:
-            logger.error("Failed to initialize service clients", error=str(e))
+        logger.debug(
+            "Service client initialization skipped - using eventing for inter-service communication"
+        )
 
     # Call custom startup function if provided
     if custom_startup:
@@ -205,18 +180,6 @@ async def create_shared_lifespan(
             logger.info("Custom shutdown completed")
         except Exception as e:
             logger.error("Custom shutdown failed", error=str(e))
-
-    # Close service clients if they were initialized
-    if service_client_init:
-        try:
-            from shared_clients import cleanup_service_clients
-
-            await cleanup_service_clients()
-            logger.info("Service clients cleaned up")
-        except ImportError:
-            pass  # shared_clients not available
-        except Exception as e:
-            logger.error("Failed to cleanup service clients", error=str(e))
 
     # Close database connections
     await db_manager.close()

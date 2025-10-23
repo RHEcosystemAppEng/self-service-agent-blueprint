@@ -1,4 +1,4 @@
-"""Shared response handling logic for both eventing and direct HTTP modes."""
+"""Shared response handling logic for eventing-based communication."""
 
 from typing import Any, Dict, Optional
 
@@ -9,7 +9,7 @@ logger = configure_logging("request-manager")
 
 
 class UnifiedResponseHandler:
-    """Unified response handler that works for both communication modes."""
+    """Unified response handler for eventing-based communication."""
 
     def __init__(self, db: AsyncSession):
         self.db = db

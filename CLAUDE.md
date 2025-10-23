@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a self-service agent blueprint implementing a complete AI agent management system with LlamaStack integration, flexible communication modes (Knative eventing, Mock eventing, Direct HTTP), and multi-channel support (Slack, API, CLI). The project consists of:
+This is a self-service agent blueprint implementing a complete AI agent management system with LlamaStack integration, eventing-based communication (Knative eventing or Mock eventing), and multi-channel support (Slack, API, CLI). The project consists of:
 
 - **agent-service/**: AI agent processing service that handles LlamaStack interactions
 - **request-manager/**: Request routing, session management, and unified communication processing
@@ -58,22 +58,16 @@ make push-all-images
 
 ### Helm Deployment
 
-The system supports three deployment modes:
+The system supports two deployment modes:
 
 ```bash
-# 1. Development Mode (Direct HTTP)
-make helm-install-dev NAMESPACE=your-namespace \
-  LLM=llama-3-2-1b-instruct \
-  SLACK_SIGNING_SECRET="your-secret" \
-  SNOW_API_KEY="your-key"
-
-# 2. Testing Mode (Mock Eventing)
+# 1. Testing/Development Mode (Mock Eventing - Default)
 make helm-install-test NAMESPACE=your-namespace \
   LLM=llama-3-2-1b-instruct \
   SLACK_SIGNING_SECRET="your-secret" \
   SNOW_API_KEY="your-key"
 
-# 3. Production Mode (Full Knative Eventing)
+# 2. Production Mode (Full Knative Eventing)
 make helm-install-prod NAMESPACE=your-namespace \
   LLM=llama-3-2-1b-instruct \
   SLACK_SIGNING_SECRET="your-secret" \
@@ -100,21 +94,16 @@ make helm-uninstall NAMESPACE=your-namespace
 
 ### Communication Architecture
 
-The system supports three communication modes:
+The system supports two communication modes (both eventing-based):
 
-#### **1. Development Mode (Direct HTTP)**
-- **Direct HTTP Calls**: Services communicate directly via HTTP requests
-- **Unified Architecture**: Same core logic with different communication strategy
-- **No Eventing Infrastructure**: Minimal dependencies for simple deployments
-- **Strategy Pattern**: `CommunicationStrategy` abstraction ensures code consistency
-
-#### **2. Testing Mode (Mock Eventing)**
+#### **1. Testing/Development Mode (Mock Eventing - Default)**
 - **Mock Eventing Service**: Lightweight service that mimics Knative broker behavior
-- **Same Request Flow**: API → Request Manager → Agent Service → Integration Dispatcher
-- **No Knative Infrastructure**: Perfect for testing and CI/CD without full Knative setup
-- **Identical Behavior**: Same event-driven patterns with mock infrastructure
+- **Request Flow**: API → Request Manager → Agent Service → Integration Dispatcher
+- **No Knative Infrastructure**: Perfect for testing, development, and CI/CD without full Knative setup
+- **Identical Behavior**: Same event-driven patterns as production with mock infrastructure
+- **Low Resource Usage**: Minimal dependencies for simple deployments
 
-#### **3. Production Mode (Full Knative Eventing)**
+#### **2. Production Mode (Full Knative Eventing)**
 - **Knative Eventing**: CloudEvent routing via Kafka brokers and triggers
 - **Request Flow**: API → Request Manager → Agent Service → Integration Dispatcher
 - **Session Management**: Persistent conversation context across multiple interactions
@@ -140,10 +129,7 @@ The system uses an **Integration Defaults** approach with **User Overrides** to 
 ### Key Environment Variables
 
 - `LLAMA_STACK_URL`: LlamaStack service endpoint (default: http://llamastack:8321)
-- `BROKER_URL`: Knative broker endpoint for CloudEvents (or mock eventing service URL)
-- `EVENTING_ENABLED`: Boolean flag to enable/disable eventing (true/false)
-- `AGENT_SERVICE_URL`: Direct HTTP URL to agent service (only when eventing disabled)
-- `INTEGRATION_DISPATCHER_URL`: Direct HTTP URL to integration dispatcher (only when eventing disabled)
+- `BROKER_URL`: Knative broker endpoint for CloudEvents (or mock eventing service URL) - required for eventing
 - `DATABASE_URL`: PostgreSQL connection string
 - `SLACK_SIGNING_SECRET`: Slack webhook verification
 - `SNOW_API_KEY`, `HR_API_KEY`: External service API keys
@@ -189,8 +175,8 @@ make format
 make build-all-images
 make test-all
 
-# 4. Deploy to OpenShift (development mode)
-make helm-install-dev NAMESPACE=dev
+# 4. Deploy to OpenShift (testing/development mode with mock eventing)
+make helm-install-test NAMESPACE=dev
 ```
 
 ## Documentation
@@ -209,11 +195,10 @@ make helm-install-dev NAMESPACE=dev
 - **`mcp-servers/snow/README.md`**: ServiceNow integration documentation
 
 ### Unified Architecture
-The system uses a **Strategy Pattern** to ensure code consistency across communication modes:
+The system uses eventing-based communication with the following core components:
 - **`CommunicationStrategy`**: Abstract base class for communication mechanisms
-- **`EventingStrategy`**: Handles CloudEvent-based communication
-- **`DirectHttpStrategy`**: Handles direct HTTP communication
-- **`UnifiedRequestProcessor`**: Central request processing logic
+- **`EventingStrategy`**: Handles CloudEvent-based communication (default and only strategy)
+- **`UnifiedRequestProcessor`**: Central request processing logic for eventing
 - **`UnifiedResponseHandler`**: Central response handling logic
 
 ## Security & Authentication

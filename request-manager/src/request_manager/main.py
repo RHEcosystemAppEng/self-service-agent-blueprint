@@ -56,15 +56,10 @@ async def _request_manager_startup() -> None:
     global unified_processor
     communication_strategy = get_communication_strategy()
 
-    # Get agent client for session operations (only available in direct HTTP mode)
-    from shared_clients import get_agent_client
-
-    agent_client = get_agent_client()
-    unified_processor = UnifiedRequestProcessor(communication_strategy, agent_client)
+    unified_processor = UnifiedRequestProcessor(communication_strategy)
     logger.info(
         "Initialized unified request processor",
         strategy_type=type(communication_strategy).__name__,
-        has_agent_client=agent_client is not None,
     )
 
 
@@ -784,12 +779,6 @@ async def _forward_response_to_integration_dispatcher(
 ) -> bool:
     """Forward agent response to Integration Dispatcher for delivery to user."""
     try:
-        # Check if eventing is enabled
-        eventing_enabled = os.getenv("EVENTING_ENABLED", "true").lower() == "true"
-        if not eventing_enabled:
-            logger.info("Eventing disabled, skipping Integration Dispatcher forwarding")
-            return True
-
         # Don't forward pure routing responses (just agent names) to users
         if is_routing_response:
             logger.info(
