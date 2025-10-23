@@ -132,7 +132,7 @@ class BaseSessionManager:
         updated_session = result.scalar_one_or_none()
 
         if updated_session:
-            return SessionResponse.from_orm(updated_session)
+            return SessionResponse.model_validate(updated_session)
         return None
 
     async def increment_request_count(self, session_id: str, request_id: str) -> None:
