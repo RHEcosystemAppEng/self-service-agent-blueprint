@@ -1,4 +1,4 @@
-name: Pull Request - Integration + End to End Tests
+name: Pull Request - Nightly 20 conversation test
 
 on:
   workflow_dispatch:
