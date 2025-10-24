@@ -1,0 +1,71 @@
+name: Pull Request - Integration + End to End Tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * *'  # Run daily at 3 AM UTC
+  
+jobs:
+  e2e-tests:
+    name: Run e2e tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate LLM_API_TOKEN_EVAL_70B secret
+        shell: bash
+        env:
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL_70B }}
+        run: |
+          if [ -z "${LLM_API_TOKEN}" ]; then
+            echo "LLM_API_TOKEN_EVAL_70B secret is missing or empty. Set it in repository or organization secrets."
+            exit 1
+          fi
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.6.17"
+          python-version: "3.12"
+
+      - name: Install Local Dependencies
+        shell: bash
+        run: |
+          make oc
+          echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
+
+      - name: Initialize cluster and deploy application
+        uses: ./.github/actions/kind
+        with:
+          llm: ${{ vars.LLM_INFERENCE }}
+          llm_id: ${{ vars.LLM_ID_INFERENCE }}
+          llm_url: ${{ vars.LLM_URL_INFERENCE }}
+        env:
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_INFERENCE }}
+
+      - name: Set `test` as default namespace on Kind
+        shell: bash
+        run: |
+          kubectl config set-context --current --namespace=test
+
+      - name: Install evaluations dependencies
+        shell: bash
+        run: |
+          make sync-evaluations
+
+      - name: Run responses evaluations (Request Manager)
+        if: always()
+        shell: bash
+        run: |
+          make test-long-resp-integration-request-mgr
+        env:
+          LLM_URL: ${{ vars.LLM_URL_EVAL_70B }}
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL_70B }}
+
+      - name: Inspect Cluster - Self-Service Agent
+        if: failure()
+        uses: ./.github/actions/inspect
+        with:
+          artifactPrefix: self-service-agent
