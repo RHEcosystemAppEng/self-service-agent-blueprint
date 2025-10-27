@@ -10,6 +10,12 @@
 
 3. Click on "Instance URL" in order to log in to your new instance as a admin (you can always go back to this link in case you forget your instance credentials).
 
+## Step 2 - Create a new "PC Refresh" Service Catalog
+TODO use Catalog Builder 
+
+## Step 3 - Create a Service Account user + Setup API Key
+TODO snc_internal, cmdb_read roles
+TODO API Key, API Profile, API Key Access
 
 
 
