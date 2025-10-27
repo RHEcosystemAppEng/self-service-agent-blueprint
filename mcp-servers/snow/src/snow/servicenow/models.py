@@ -37,7 +37,7 @@ class ApiKeyConfig(BaseModel):
     """Configuration for API key authentication."""
 
     api_key: str
-    header_name: str = "X-ServiceNow-API-Key"
+    header_name: str = "x-sn-apikey"
 
 
 class AuthConfig(BaseModel):
