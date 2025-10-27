@@ -405,8 +405,8 @@ If you have questions about contributing:
 - [GUIDELINES.md](GUIDELINES.md) - Code practices and project structure guidelines
 - [API_REFERENCE.md](API_REFERENCE.md) - Complete API documentation
 - [ARCHITECTURE_DIAGRAMS.md](ARCHITECTURE_DIAGRAMS.md) - System architecture diagrams
-- [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) - Integration patterns and guides
-- [AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md) - Authentication setup
+- [INTEGRATION_GUIDE.md](../guides/INTEGRATION_GUIDE.md) - Integration patterns and guides
+- [AUTHENTICATION_GUIDE.md](../guides/AUTHENTICATION_GUIDE.md) - Authentication setup
 - Component READMEs in each service directory
 
 ---

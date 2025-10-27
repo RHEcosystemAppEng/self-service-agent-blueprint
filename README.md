@@ -767,7 +767,7 @@ Slack integration enables real-world testing with actual users in your workspace
 
 #### Step 1: Set Up Slack App
 
-See [`SLACK_SETUP.md`](SLACK_SETUP.md) for detailed instructions.
+See [`SLACK_SETUP.md`](guides/SLACK_SETUP.md) for detailed instructions.
 
 **Summary:**
 1. Create Slack app at [api.slack.com/apps](https://api.slack.com/apps)
@@ -1057,7 +1057,7 @@ Now that you have the system running, dive deeper into each component.
 ### 6.3 External Integrations
 
 **Slack Setup**
-- Full documentation: [`SLACK_SETUP.md`](SLACK_SETUP.md)
+- Full documentation: [`SLACK_SETUP.md`](guides/SLACK_SETUP.md)
 - Topics: App creation, OAuth, event subscriptions
 
 **ServiceNow Integration**
@@ -1163,7 +1163,7 @@ By completing this quickstart, you have:
 ### 8.2 Recommended Next Steps
 
 **For Development Teams:**
-1. Review the [Contributing Guide](CONTRIBUTING.md) for development setup and workflow
+1. Review the [Contributing Guide](docs/CONTRIBUTING.md) for development setup and workflow
 2. Explore the component documentation in Section 6 for deeper technical details
 3. Review the evaluation framework to understand quality metrics
 4. Experiment with customizing the laptop refresh agent prompts

@@ -179,12 +179,12 @@ make helm-install-test NAMESPACE=dev
 ## Documentation
 
 ### Core Documentation
-- **`API_REFERENCE.md`**: Complete API documentation and endpoints
-- **`INTEGRATION_GUIDE.md`**: Complete integration and request management guide
-- **`ARCHITECTURE_DIAGRAMS.md`**: System architecture and flow diagrams
-- **`AUTHENTICATION_GUIDE.md`**: Enhanced security and authentication setup with production readiness warnings
-- **`SLACK_SETUP.md`**: Slack app configuration guide
-- **`TOOL_INTEGRATION_GUIDE.md`**: Tool integration patterns
+- **`docs/API_REFERENCE.md`**: Complete API documentation and endpoints
+- **`guides/INTEGRATION_GUIDE.md`**: Complete integration and request management guide
+- **`docs/ARCHITECTURE_DIAGRAMS.md`**: System architecture and flow diagrams
+- **`guides/AUTHENTICATION_GUIDE.md`**: Enhanced security and authentication setup with production readiness warnings
+- **`guides/SLACK_SETUP.md`**: Slack app configuration guide
+- **`guides/TOOL_INTEGRATION_GUIDE.md`**: Tool integration patterns
 
 ### Component Documentation
 - **`agent-service/`**: Agent service with knowledge base management and LangGraph

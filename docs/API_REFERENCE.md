@@ -876,6 +876,6 @@ The system automatically determines which integrations are available based on:
 
 ## Related Documentation
 
-- [Integration Guide](INTEGRATION_GUIDE.md) - Complete integration and request management guide
+- [Integration Guide](../guides/INTEGRATION_GUIDE.md) - Complete integration and request management guide
 - [Architecture Diagrams](ARCHITECTURE_DIAGRAMS.md) - System architecture and flow diagrams
-- [Authentication Guide](AUTHENTICATION_GUIDE.md) - Authentication setup and configuration
+- [Authentication Guide](../guides/AUTHENTICATION_GUIDE.md) - Authentication setup and configuration

@@ -639,8 +639,8 @@ curl -X POST http://localhost:8080/api/v1/users/john.doe/integration-defaults/re
 
 ## Related Documentation
 
-- [Architecture Diagrams](ARCHITECTURE_DIAGRAMS.md) - System architecture and flows
+- [Architecture Diagrams](../docs/ARCHITECTURE_DIAGRAMS.md) - System architecture and flows
 - [Authentication Guide](AUTHENTICATION_GUIDE.md) - Authentication setup and configuration
-- [API Reference](API_REFERENCE.md) - Complete API documentation
+- [API Reference](../docs/API_REFERENCE.md) - Complete API documentation
 - [Slack Setup](SLACK_SETUP.md) - Slack-specific configuration
 - [Tool Integration Guide](TOOL_INTEGRATION_GUIDE.md) - Tool integration patterns

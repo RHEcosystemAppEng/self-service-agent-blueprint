@@ -285,5 +285,5 @@ kubectl logs deployment/self-service-agent-integration-dispatcher -n ${NAMESPACE
 ## Related Documentation
 
 - [Integration Guide](INTEGRATION_GUIDE.md) - Complete integration and request management guide
-- [API Reference](API_REFERENCE.md) - API endpoints and usage
+- [API Reference](../docs/API_REFERENCE.md) - API endpoints and usage
 - [Authentication Guide](AUTHENTICATION_GUIDE.md) - Authentication setup

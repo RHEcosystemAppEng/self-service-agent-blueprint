@@ -588,5 +588,5 @@ Enable detailed logging in your tool to track:
 
 ### Documentation
 - [Integration Guide](INTEGRATION_GUIDE.md) - Complete integration and request management guide
-- [API Reference](API_REFERENCE.md) - Complete API documentation and endpoints
-- [Architecture Diagrams](ARCHITECTURE_DIAGRAMS.md) - System architecture and flow diagrams
+- [API Reference](../docs/API_REFERENCE.md) - Complete API documentation and endpoints
+- [Architecture Diagrams](../docs/ARCHITECTURE_DIAGRAMS.md) - System architecture and flow diagrams
