@@ -1,7 +1,7 @@
 # ServiceNow PDI (Personal Development Instance) Setup Guide
 
 - This guide describes the steps required in order to create a PDI (Personal Development Instance) that can be used in order to test the Blueprint's integration with ServiceNow.
-- Creating a PDI is an offered for free (at for the time of writing this doc).
+- Creating a PDI is an offered for free (at least for the time of writing this doc).
 
 ## Step 1 - Signup + PDI New Instance
 1. First you should [sign up](https://signon.servicenow.com/x_snc_sso_auth.do?pageId=sign-up) to ServiceNow's Developer hub.
