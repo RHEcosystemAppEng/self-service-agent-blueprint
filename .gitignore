@@ -204,7 +204,7 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Helm Chart deployment tgz files
-helm/charts/*
+helm/charts/*.tgz
 helm/tmpcharts*
 evaluations/.deepeval/*
 evaluations/results/deep_eval_results/*.json
