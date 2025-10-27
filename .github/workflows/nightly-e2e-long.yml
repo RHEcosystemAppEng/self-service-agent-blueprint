@@ -69,3 +69,27 @@ jobs:
         uses: ./.github/actions/inspect
         with:
           artifactPrefix: self-service-agent
+
+      - name: Create evaluations tarball
+        if: always()
+        shell: bash
+        run: |
+          if [ -d "evaluations/results" ]; then
+            tar -czf evaluations-results-${{ github.run_id }}.tar.gz -C evaluations results/
+            echo "Tarball created successfully from evaluations/results/"
+            ls -lh evaluations-results-${{ github.run_id }}.tar.gz
+          else
+            echo "evaluations/results directory not found, creating empty marker"
+            mkdir -p evaluations/results
+            echo "No evaluation results were generated" > evaluations/results/README.txt
+            tar -czf evaluations-results-${{ github.run_id }}.tar.gz -C evaluations results/
+          fi
+
+      - name: Upload evaluations artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluations-results-${{ github.run_id }}
+          path: evaluations-results-${{ github.run_id }}.tar.gz
+          retention-days: 30
+          if-no-files-found: warn
