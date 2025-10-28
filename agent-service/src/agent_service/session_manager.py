@@ -271,12 +271,35 @@ class ResponsesSessionManager(BaseSessionManager):
                         return "Error: Failed to create session"
 
             # Check if we need to return to routing agent after task completion
-            if self.current_session and self.current_session.get("_pending_reset"):
+            # Check the thread state for the _should_return_to_routing flag
+            should_reset = False
+            if self.conversation_session:
+                try:
+                    state = self.conversation_session.app.get_state(
+                        self.conversation_session.thread_config
+                    )
+                    # Check for the _should_return_to_routing flag in state
+                    if hasattr(state, "values"):
+                        should_return = state.values.get(
+                            "_should_return_to_routing", False
+                        )
+                        if should_return:
+                            should_reset = True
+                            logger.info(
+                                "Found _should_return_to_routing flag in state - routing back to routing agent"
+                            )
+                except Exception as e:
+                    logger.debug(f"Could not check conversation state: {e}")
+
+            if should_reset:
                 logger.info(
                     f"Specialist task complete, returning to routing agent - user_id: {self.user_id}, current_agent: {self.current_agent_name}"
                 )
                 await self._reset_conversation_state()
-                return await self.handle_responses_message("hi")
+                # Recursively call with the actual user message to create new routing session
+                return await self.handle_responses_message(
+                    text, request_manager_session_id, session_name
+                )
 
             # Send message to current session
             logger.debug(
@@ -661,36 +684,55 @@ class ResponsesSessionManager(BaseSessionManager):
             if (
                 "conversation completed" in response_lower
                 or "starting new conversation" in response_lower
+                or "task_complete_return_to_router" in response_lower
             ):
                 logger.info(
-                    "Specialist session termination detected",
+                    "Specialist session termination detected - cleaning response and checking for content",
                     user_id=self.user_id,
                     current_agent=self.current_agent_name,
-                    termination_phrases=[
-                        phrase
-                        for phrase in [
-                            "conversation completed",
-                            "starting new conversation",
-                        ]
-                        if phrase in response_lower
-                    ],
                 )
 
-                self.current_session["_pending_reset"] = True
-
-                # Clean up the response - remove termination markers
+                # Clean up the response - remove lines with termination markers
+                cleaned_response = ""
                 if "\n" in processed_response:
                     lines = processed_response.strip().split("\n")
-                    clean_lines = []
-                    for line in lines:
-                        line_lower = line.lower()
-                        if not (
-                            "conversation completed" in line_lower
-                            or "starting new conversation" in line_lower
-                        ):
-                            clean_lines.append(line)
-                    if clean_lines:
-                        return "\n".join(clean_lines).strip()
+                    clean_lines = [
+                        line
+                        for line in lines
+                        if not any(
+                            marker in line.lower()
+                            for marker in [
+                                "conversation completed",
+                                "starting new conversation",
+                                "task_complete_return_to_router",
+                            ]
+                        )
+                    ]
+                    cleaned_response = "\n".join(clean_lines).strip()
+                # For single line with termination marker, treat as no content (cleaned_response = "")
+
+                # If there's actual content after cleaning, return it
+                # The _should_return_to_routing flag in LangGraph state will trigger reset on next message
+                if cleaned_response:
+                    logger.info(
+                        "Termination marker found but response has content - returning content, will reset on next message",
+                        user_id=self.user_id,
+                        cleaned_response_preview=cleaned_response[:100],
+                    )
+                    return cleaned_response
+                else:
+                    # Response was only termination markers - reset immediately and return to router
+                    logger.info(
+                        "Response contains only termination markers - resetting and routing to router",
+                        user_id=self.user_id,
+                    )
+                    await self._reset_conversation_state()
+
+                    # Send placeholder message - ConversationSession will override with routing agent's
+                    # configured initial_user_message from YAML (routing.yaml: settings.initial_user_message)
+                    return await self.handle_responses_message(
+                        "hi", self.request_manager_session_id, None
+                    )
 
         return processed_response
 
@@ -922,7 +964,8 @@ class ResponsesSessionManager(BaseSessionManager):
                 .values(
                     current_agent_id=None,
                     conversation_thread_id=None,
-                    status=SessionStatus.INACTIVE.value,
+                    # Keep status ACTIVE so the session can be resumed/reused
+                    # status=SessionStatus.INACTIVE.value,
                     updated_at=datetime.now(timezone.utc),
                 )
             )

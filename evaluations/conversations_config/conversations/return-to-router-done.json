@@ -1,0 +1,32 @@
+{
+    "metadata": {
+        "authoritative_user_id": "alice.johnson@company.com",
+        "description": "Successful laptop refresh flow"
+    },
+    "conversation": [
+        {
+            "role": "user",
+            "content": "refresh"
+        },
+        {
+            "role": "user",
+            "content": "I would like to see the options"
+        },
+        {
+            "role": "user",
+            "content": "3"
+        },
+        {
+            "role": "user",
+            "content": "proceed"
+        },
+        {
+            "role": "user",
+            "content": "no"
+        },
+        {
+            "role": "user",
+            "content": "DONEDONEDONE"
+        }
+    ]
+}

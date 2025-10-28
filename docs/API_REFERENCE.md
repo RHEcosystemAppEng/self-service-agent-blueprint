@@ -877,5 +877,6 @@ The system automatically determines which integrations are available based on:
 ## Related Documentation
 
 - [Integration Guide](../guides/INTEGRATION_GUIDE.md) - Complete integration and request management guide
+- [Safety Shields Guide](../guides/SAFETY_SHIELDS_GUIDE.md) - Content moderation and safety configuration
 - [Architecture Diagrams](ARCHITECTURE_DIAGRAMS.md) - System architecture and flow diagrams
 - [Authentication Guide](../guides/AUTHENTICATION_GUIDE.md) - Authentication setup and configuration

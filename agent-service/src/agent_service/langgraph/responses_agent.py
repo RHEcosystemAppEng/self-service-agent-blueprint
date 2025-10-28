@@ -45,9 +45,48 @@ class Agent:
         mcp_server_configs = self.config.get("mcp_servers", [])
         self.tools = self._get_mcp_tools_to_use(mcp_server_configs)
 
+        # Load shield configuration for input/output moderation
+        # Check if SAFETY environment variables are configured
+        safety_model = os.getenv("SAFETY")
+        safety_url = os.getenv("SAFETY_URL")
+        shields_available = bool(safety_model and safety_url)
+
+        if shields_available:
+            self.input_shields = self.config.get("input_shields", [])
+            self.output_shields = self.config.get("output_shields", [])
+        else:
+            # Disable shields if SAFETY environment not configured
+            self.input_shields = []
+            self.output_shields = []
+            if self.config.get("input_shields") or self.config.get("output_shields"):
+                logger.warning(
+                    f"Shields configured in agent '{agent_name}' but SAFETY/SAFETY_URL "
+                    "environment variables not set. Shields will be disabled."
+                )
+
+        # Load categories to ignore (for handling false positives)
+        self.ignored_input_categories = set(
+            self.config.get("ignored_input_shield_categories", [])
+        )
+        self.ignored_output_categories = set(
+            self.config.get("ignored_output_shield_categories", [])
+        )
+
         logger.info(
             f"Initialized Agent '{agent_name}' with model '{self.model}' and {len(self.tools)} tools"
         )
+        if self.input_shields:
+            logger.info(f"Input shields configured: {self.input_shields}")
+            if self.ignored_input_categories:
+                logger.info(
+                    f"Ignored input categories: {self.ignored_input_categories}"
+                )
+        if self.output_shields:
+            logger.info(f"Output shields configured: {self.output_shields}")
+            if self.ignored_output_categories:
+                logger.info(
+                    f"Ignored output categories: {self.ignored_output_categories}"
+                )
 
     def _get_model_for_agent(self) -> str:
         """Get the model to use for the agent from configuration."""
@@ -210,6 +249,117 @@ class Agent:
         logger.info(f"Built tools array with {len(tools_to_use)} tools")
 
         return tools_to_use
+
+    def _run_moderation_shields(
+        self,
+        content: Any,
+        shield_models: list[str],
+        check_type: str = "input",
+    ) -> tuple[bool, Optional[str]]:
+        """
+        Run moderation checks using OpenAI-compatible moderation API.
+
+        Args:
+            content: Either a string (for output) or list of message dicts (for input)
+            shield_models: List of moderation model names (e.g., ["llama-guard-3"])
+            check_type: "input" or "output" for logging purposes
+
+        Returns:
+            Tuple of (is_safe, error_message)
+            - is_safe: True if content passes all shields
+            - error_message: User-facing message if blocked, None if safe
+        """
+        if not shield_models or len(shield_models) == 0:
+            return True, None
+
+        # Use configured ignored categories from agent config based on check type
+        if check_type == "input":
+            ignored_categories = self.ignored_input_categories
+        elif check_type == "output":
+            ignored_categories = self.ignored_output_categories
+        else:
+            ignored_categories = set()
+
+        # Prepare input for moderation API
+        moderation_input: Any
+        log_preview: str
+
+        if isinstance(content, str):
+            # Output shield: single string
+            moderation_input = content
+            log_preview = content[:100]
+        elif isinstance(content, list):
+            # Input shield: list of messages
+            # Only check the last message (most recent user input)
+            if len(content) == 0:
+                return True, None
+
+            last_msg = content[-1]
+            if isinstance(last_msg, dict) and "content" in last_msg:
+                moderation_input = str(last_msg["content"])
+            elif isinstance(last_msg, str):
+                moderation_input = last_msg
+            else:
+                logger.warning(f"Invalid last message format for moderation: {type(last_msg)}")
+                return True, None
+
+            log_preview = f"last message, {len(moderation_input)} chars"
+        else:
+            logger.warning(f"Invalid content type for moderation: {type(content)}")
+            return True, None
+
+        for shield_model in shield_models:
+            try:
+                logger.debug(
+                    f"Running {check_type} shield '{shield_model}' on content: {log_preview}..."
+                )
+
+                # Call OpenAI-compatible moderation API
+                moderation_response = self.llama_client.moderations.create(
+                    input=moderation_input, model=shield_model
+                )
+
+                # Check if content was flagged
+                if moderation_response.results and len(moderation_response.results) > 0:
+                    result = moderation_response.results[0]
+
+                    if result.flagged:
+                        # Check if any flagged categories are NOT in the ignored list
+                        flagged_categories = {
+                            cat
+                            for cat, is_flagged in (result.categories or {}).items()
+                            if is_flagged and cat not in ignored_categories
+                        }
+
+                        if flagged_categories:
+                            # Log the violation with details including full content
+                            logger.warning(
+                                f"Content flagged by {check_type} shield '{shield_model}': "
+                                f"categories={result.categories}, "
+                                f"scores={result.category_scores}, "
+                                f"content={moderation_input!r}"
+                            )
+
+                            # Return user-facing message
+                            user_message = (
+                                result.user_message
+                                or "I apologize, but I cannot process that request due to safety concerns."
+                            )
+                            return False, user_message
+                        else:
+                            # Only ignored categories were flagged - allow content
+                            logger.info(
+                                f"Content flagged by {check_type} shield '{shield_model}' "
+                                f"but only in ignored categories: {result.categories}"
+                            )
+
+            except Exception as e:
+                logger.error(f"Error running {check_type} shield '{shield_model}': {e}")
+                # Fail open - continue to next shield or allow if last shield
+                continue
+
+        # All shields passed
+        return True, None
 
     def create_response_with_retry(
         self,
@@ -402,6 +552,21 @@ class Agent:
             current_state_name: Optional name of the current state from the state machine YAML
         """
         try:
+            # INPUT SHIELD: Check user input before processing
+            if self.input_shields and messages and len(messages) > 0:
+                # Check only the last message (most recent user input)
+                is_safe, error_message = self._run_moderation_shields(
+                    messages, self.input_shields, "input"
+                )
+                if not is_safe:
+                    logger.info(
+                        f"Input blocked by shield for agent '{self.agent_name}', messages={messages!r}"
+                    )
+                    return (
+                        error_message
+                        or "I apologize, but I cannot process that request due to safety concerns."
+                    )
+
             # Start with the main system message
             messages_with_system = [{"role": "system", "content": self.system_message}]
 
@@ -473,6 +638,7 @@ class Agent:
                 return ""  # Return empty to trigger retry logic
 
             # Extract content from LlamaStack responses API format
+            response_text = ""
             try:
                 # Try output_text first (most common case)
                 if (
@@ -480,10 +646,10 @@ class Agent:
                     and response.output_text
                     and response.output_text.strip()
                 ):
-                    return response.output_text
+                    response_text = response.output_text
 
                 # Try to find message in output array (handles MCP tool discovery responses)
-                if hasattr(response, "output") and response.output:
+                elif hasattr(response, "output") and response.output:
                     for output_item in response.output:
                         if (
                             hasattr(output_item, "type")
@@ -494,37 +660,57 @@ class Agent:
                                     if hasattr(content_item, "text"):
                                         content = content_item.text
                                         if content and content.strip():
-                                            return content
+                                            response_text = content
+                                            break
                             # Found message but it was empty, break to check fallbacks
                             break
 
                 # Try other fallback fields
-                if hasattr(response, "completion_message") and hasattr(
-                    response.completion_message, "content"
+                if (
+                    not response_text
+                    and hasattr(response, "completion_message")
+                    and hasattr(response.completion_message, "content")
                 ):
                     content = response.completion_message.content
                     if isinstance(content, str) and content.strip():
-                        return content
+                        response_text = content
 
-                if hasattr(response, "content"):
+                if not response_text and hasattr(response, "content"):
                     content = response.content
                     if isinstance(content, str) and content.strip():
-                        return content
+                        response_text = content
 
                 # No valid content found - print detailed debug info
-                self._print_empty_response_debug_info(
-                    response,
-                    current_state_name,
-                    skip_all_tools,
-                    skip_mcp_servers_only,
-                    tools_to_use,
-                )
-                logger.warning("No valid content found in response")
-                return ""  # Return empty to trigger retry logic
+                if not response_text:
+                    self._print_empty_response_debug_info(
+                        response,
+                        current_state_name,
+                        skip_all_tools,
+                        skip_mcp_servers_only,
+                        tools_to_use,
+                    )
+                    logger.warning("No valid content found in response")
+                    return ""  # Return empty to trigger retry logic
 
             except Exception as e:
                 logger.error(f"Error extracting content from response: {e}")
                 return f"Error processing response: {e}"
+
+            # OUTPUT SHIELD: Check agent response before returning
+            if self.output_shields and response_text:
+                is_safe, error_message = self._run_moderation_shields(
+                    response_text, self.output_shields, "output"
+                )
+                if not is_safe:
+                    logger.info(
+                        f"Output blocked by shield for agent '{self.agent_name}', response_text={response_text!r}"
+                    )
+                    return (
+                        error_message
+                        or "I apologize, but I cannot provide that response due to safety concerns."
+                    )
+
+            return response_text
 
         except TimeoutError as e:
             logger.warning(f"Timeout calling LlamaStack responses API: {e}")

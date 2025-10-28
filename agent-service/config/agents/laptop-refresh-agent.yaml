@@ -1,8 +1,17 @@
 name: "laptop-refresh"
 description: "An agent that can help with laptop refresh requests."
 system_message: "You are a helpful laptop refresh assistant. Speak directly to users in a conversational and professional manner. CRITICAL do not share your internal thinking"
-input_shields: []
+input_shields: ["meta-llama/Llama-Guard-3-8B"]
 output_shields: []
+# Categories to ignore for false positives (too aggressive for business workflows)
+# Input shield ignores: categories to allow in user input
+ignored_input_shield_categories:
+  - "Code Interpreter Abuse"  # Normal tool/MCP usage flagged incorrectly
+  - "Specialized Advice"  # IT support requests flagged as specialized advice
+  - "Privacy"  # Employee info requests are legitimate in IT support context
+  - "Self-Harm"  # False positives on common words like "yes"
+# Output shield ignores: categories to allow in agent responses
+ignored_output_shield_categories: []
 model-no-used: appeng-ai-quickstarts-vertexai/vertex_ai/gemini-2.5-flash
 lg_state_machine_config: "config/lg-prompts/lg-prompt-big.yaml"
 sampling_params:

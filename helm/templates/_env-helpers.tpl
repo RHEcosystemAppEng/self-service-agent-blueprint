@@ -148,6 +148,46 @@ Generate Agent Service specific environment variables
   value: {{ if hasKey .Values "agent" }}{{ .Values.agent.timeout | default "120" | quote }}{{ else }}"120"{{ end }}
 - name: ALWAYS_REFRESH_AGENT_MAPPING
   value: {{ if hasKey .Values "agent" }}{{ .Values.agent.alwaysRefreshMapping | default "true" | quote }}{{ else }}"true"{{ end }}
+{{/* LangGraph Prompt Configuration Overrides */}}
+{{- if .Values.requestManagement.agentService.promptOverrides }}
+{{- range $key, $value := .Values.requestManagement.agentService.promptOverrides }}
+- name: {{ $key | upper | replace "-" "_" }}
+  value: {{ $value | quote }}
+{{- end }}
+{{- end }}
+{{/* Safety/Shield Configuration */}}
+{{- $safetyModel := "" }}
+{{- $safetyUrl := "" }}
+{{/* Check if safety is configured in values.yaml */}}
+{{- if hasKey .Values "safety" }}
+{{- if .Values.safety.model }}
+{{- $safetyModel = .Values.safety.model }}
+{{- end }}
+{{- if .Values.safety.url }}
+{{- $safetyUrl = .Values.safety.url }}
+{{- end }}
+{{- end }}
+{{/* Check for enabled models in global.models (from Makefile) */}}
+{{- if hasKey .Values "global" }}
+{{- if hasKey .Values.global "models" }}
+{{- range $modelName, $modelConfig := .Values.global.models }}
+{{- if and (hasKey $modelConfig "enabled") $modelConfig.enabled (hasKey $modelConfig "url") }}
+{{/* Check if this looks like a safety/guard model */}}
+{{- if or (contains "guard" ($modelName | lower)) (contains "safety" ($modelName | lower)) }}
+{{- $safetyModel = $modelName }}
+{{- $safetyUrl = $modelConfig.url }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{/* Only set environment variables if both model and URL are configured */}}
+{{- if and $safetyModel $safetyUrl }}
+- name: SAFETY
+  value: {{ $safetyModel | quote }}
+- name: SAFETY_URL
+  value: {{ $safetyUrl | quote }}
+{{- end }}
 {{- end }}
 
 {{/*

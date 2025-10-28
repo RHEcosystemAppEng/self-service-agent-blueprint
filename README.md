@@ -33,8 +33,9 @@
    - [Interact with the CLI](#52-interact-with-the-cli)
    - [Use Slack Integration (Optional)](#53-use-slack-integration-optional)
    - [Integration with Real ServiceNow (Optional)](#54-integration-with-real-servicenow-optional)
-   - [Run Evaluations](#55-run-evaluations)
-   - [Follow the Flow with Observability](#56-follow-the-flow-with-observability)
+   - [Setting up Safety Shields (Optional)](#55-setting-up-safety-shields-optional)
+   - [Run Evaluations](#56-run-evaluations)
+   - [Follow the Flow with Observability](#57-follow-the-flow-with-observability)
 
 6. [Going Deeper: Component Documentation](#6-going-deeper-component-documentation)
    - [Core Platform](#61-core-platform)
@@ -399,6 +400,7 @@ The blueprint consists of reusable **core platform components** and **use-case-s
 **Key Capabilities:**
 - **Agent Registration:** Reads YAML files from `agent-service/config/agents/`, registers agents with their instructions, tools, and knowledge bases
 - **Knowledge Base Creation:** Processes text documents, creates embeddings, builds vector databases, registers for RAG queries
+- **Safety Shields:** Content moderation for input/output using Llama Guard 3 or compatible models, with configurable category filtering for false positive handling (see [Safety Shields Guide](guides/SAFETY_SHIELDS_GUIDE.md))
 
 ---
 
@@ -889,7 +891,107 @@ Log into your ServiceNow instance and verify:
 
 ---
 
-### 5.5 Run Evaluations
+### 5.5 Setting up Safety Shields (Optional)
+
+Safety shields provide content moderation for AI agent interactions, validating user input and agent responses against safety policies using Llama Guard 3 or compatible models.
+
+#### When to Enable Safety Shields
+
+Consider enabling safety shields for:
+- **Customer-facing agents**: Public or external user interactions
+- **Compliance requirements**: Organizations with strict content policies
+- **High-risk applications**: Agents handling sensitive topics
+
+**Note:** Safety shields come with the possibility of false positives. False positives that result in
+blocking input or output messages can mess up the IT process flow resulting in process failures.
+Common safety models like llama-guard that are desired for interaction with external users may not
+be suited for the content of common IT processes. We have disabled a number of the categories
+for which we regularly saw false positives.
+
+For development and testing, shields can be disabled for faster iteration.
+
+#### Step 1: Deploy with Safety Shield Configuration
+
+Safety shields require an OpenAI-compatible moderation API endpoint:
+
+```bash
+# Deploy with safety shields enabled
+make helm-install-test NAMESPACE=$NAMESPACE \
+  LLM=llama-3-2-1b-instruct \
+  SAFETY=meta-llama/Llama-Guard-3-8B \
+  SAFETY_URL=https://api.example.com/v1
+```
+
+**Note**:
+- Replace `https://api.example.com/v1` with your actual moderation API endpoint
+- The endpoint must support the OpenAI-compatible `/v1/moderations` API
+- For in-cluster deployments, you can use a vLLM instance (e.g., `http://vllm-service:8000/v1`)
+- If `SAFETY` and `SAFETY_URL` are not set, shields will be automatically disabled even if configured in agent YAML files
+
+#### Step 2: Configure Agent-Level Shields
+
+Edit your agent configuration file (e.g., `agent-service/config/agents/laptop-refresh-agent.yaml`):
+
+```yaml
+name: "laptop-refresh"
+description: "An agent that can help with laptop refresh requests."
+
+# Input shields - validate user input before processing
+input_shields: ["meta-llama/Llama-Guard-3-8B"]
+
+# Output shields - validate agent responses before delivery
+output_shields: []
+```
+
+**Shield Configuration Options:**
+- **`input_shields`**: List of models to validate user messages (recommended)
+- **`output_shields`**: List of models to validate agent responses (optional, impacts performance)
+- **`ignored_input_shield_categories`**: Categories to allow in user input (handles false positives)
+- **`ignored_output_shield_categories`**: Categories to allow in agent responses
+
+#### Step 3: Test Safety Shields
+
+After deploying with shields enabled, test that they're working:
+
+```bash
+# Check agent service logs for shield initialization
+oc logs deployment/self-service-agent-agent-service -n $NAMESPACE | grep -i shield
+
+# Expected output:
+# INFO: Input shields configured: ['meta-llama/Llama-Guard-3-8B']
+# INFO: Ignored input categories: {'Code Interpreter Abuse', 'Privacy', ...}
+```
+
+#### Common Shield Categories
+
+Llama Guard 3 checks for these categories:
+- Violent Crimes
+- Non-Violent Crimes
+- Sex-Related Crimes
+- Child Sexual Exploitation
+- Defamation
+- Specialized Advice (Financial, Medical, Legal)
+- Privacy Violations
+- Intellectual Property
+- Indiscriminate Weapons
+- Hate Speech
+- Suicide & Self-Harm
+- Sexual Content
+- Elections
+- Code Interpreter Abuse
+
+For comprehensive safety shields documentation, see the [Safety Shields Guide](guides/SAFETY_SHIELDS_GUIDE.md).
+
+**You should now be able to:**
+- ✓ Configure safety shields for content moderation
+- ✓ Customize shield behavior per agent
+- ✓ Handle false positives with ignored categories
+- ✓ Monitor and troubleshoot shield operations
+- ✓ Balance safety and usability for your use case
+
+---
+
+### 5.6 Run Evaluations
 
 The evaluation framework validates agent behavior against business requirements and quality metrics.
 
@@ -999,7 +1101,7 @@ python evaluate.py --num-conversations 5
 
 ---
 
-### 5.6 Follow the Flow with Observability
+### 5.7 Follow the Flow with Observability
 
 (Documentation TBD)
 

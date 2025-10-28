@@ -88,6 +88,14 @@ affinity: {}
 
 llama_stack_url: http://llamastack:8321
 
+# Safety/Shield Configuration (Llama Guard)
+safety:
+  # Model name for safety checks (e.g., llama-guard-3-8b)
+  # Leave empty to disable shields
+  model: ""
+  # URL for safety model endpoint
+  # Leave empty to disable shields
+  url: ""
 
 # PostgreSQL configuration for llama-stack agent persistence
 pgvector:
@@ -340,6 +348,10 @@ requestManagement:
   agentService:
     replicas: 1
     resources: {}
+    # Override LangGraph prompt configuration for specific agents
+    # Format: lg-prompt-<agent-name>: "path/to/prompt.yaml"
+    # Example: lg-prompt-laptop-refresh: "config/lg-prompts/my-custom-prompt.yaml"
+    promptOverrides: {}
     # Health check configuration (dev-optimized for resource-constrained environments)
     healthChecks:
       livenessProbe:

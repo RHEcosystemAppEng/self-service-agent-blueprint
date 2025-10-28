@@ -1,0 +1,36 @@
+{
+    "metadata": {
+        "authoritative_user_id": "alice.johnson@company.com",
+        "description": "Test return to routing agent from specialist after out-of-scope question"
+    },
+    "conversation": [
+        {
+            "role": "user",
+            "content": "I would like to refresh my laptop"
+        },
+        {
+            "role": "user",
+            "content": "What is the fastest bird in the world?"
+        },
+        {
+            "role": "user",
+            "content": "please return me to the router"
+        },
+        {
+            "role": "user",
+            "content": "I would like to refresh my laptop"
+        },
+        {
+            "role": "user",
+            "content": "yes"
+        },
+        {
+            "role": "user",
+            "content": "2"
+        },
+        {
+            "role": "user",
+            "content": "proceed"
+        }
+    ]
+}

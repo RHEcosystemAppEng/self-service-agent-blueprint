@@ -237,6 +237,15 @@ help:
 	@echo "  Request Management Layer:"
 	@echo "    KNATIVE_EVENTING                  - Enable Knative Eventing (default: true)"
 	@echo "    REQUEST_MANAGEMENT                - Enable Request Management Layer (default: true)"
+	@echo ""
+	@echo "  Agent Prompt Configuration:"
+	@echo "    LG_PROMPT_<AGENT_NAME>            - Override prompt config for any agent (generic pattern)"
+	@echo "                                        Replace <AGENT_NAME> with uppercase agent name (use _ for -)"
+	@echo "    Examples:"
+	@echo "      LG_PROMPT_LAPTOP_REFRESH        - Override laptop-refresh agent"
+	@echo "      LG_PROMPT_ROUTING               - Override routing agent"
+	@echo "      LG_PROMPT_EMAIL_UPDATE          - Override email-update agent"
+	@echo "    Usage: make helm-install-test LG_PROMPT_LAPTOP_REFRESH=config/lg-prompts/custom.yaml"
 
 # Build function: $(call build_image,IMAGE_NAME,DESCRIPTION,CONTAINERFILE_PATH,BUILD_CONTEXT)
 define build_image
@@ -841,12 +850,16 @@ define helm_install_common
 endef
 
 # Install with mock eventing service (testing/development/CI mode - default)
+# Extract all LG_PROMPT_* variables and convert them to Helm --set arguments
+PROMPT_OVERRIDES := $(foreach var,$(filter LG_PROMPT_%,$(.VARIABLES)),--set requestManagement.agentService.promptOverrides.lg-prompt-$(shell echo $(var:LG_PROMPT_%=%) | tr '[:upper:]' '[:lower:]' | tr '_' '-')=$($(var)))
+
 .PHONY: helm-install-test
 helm-install-test: namespace helm-depend
 	$(call helm_install_common,"with mock eventing service - testing/CI",\
 		-f helm/values-test.yaml \
 		--set requestManagement.knative.mockEventing.enabled=true \
-		--set testIntegrationEnabled=true,\
+		--set testIntegrationEnabled=true \
+		$(PROMPT_OVERRIDES),\
 		true)
 	@$(MAKE) print-urls
 

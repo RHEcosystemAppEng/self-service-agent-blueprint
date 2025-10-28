@@ -3,7 +3,18 @@ description: "A routing agent to get the user to the right agent"
 model: ""
 system_message: "You are a routing agent specializing in getting users to the correct specialist agent. Be helpful, friendly, and efficient in determining their needs."
 lg_state_machine_config: "config/lg-prompts/routing.yaml"
-input_shields: []
+input_shields: ["meta-llama/Llama-Guard-3-8B"]
 output_shields: []
+# Categories to ignore for false positives (routing agent has minimal tool usage)
+# Input shield ignores: categories to allow in user input
+ignored_input_shield_categories:
+  - "Code Interpreter Abuse"  # Normal tool/MCP usage flagged incorrectly
+  - "Specialized Advice"  # IT support requests flagged as specialized advice
+# Output shield ignores: categories to allow in agent responses
+ignored_output_shield_categories:
+  - "Code Interpreter Abuse"  # Normal tool/MCP usage flagged incorrectly
+  - "Specialized Advice"  # IT support routing flagged as specialized advice
+  - "Privacy"  # Routing responses may mention employee/IT topics
+  - "Non-Violent Crimes"  # IT support routing falsely flagged
 mcp_servers: []
 knowledge_bases: []

@@ -41,10 +41,18 @@ state_schema:
       type: "boolean"
       description: "Whether ServiceNow ticket was created"
       default: false
+    ticket_number:
+      type: "string"
+      description: "ServiceNow ticket number that was created"
+      default: null
     user_wants_to_proceed:
       type: "boolean"
       description: "User's decision to proceed with process"
       default: null
+    _should_return_to_routing:
+      type: "boolean"
+      description: "Flag to indicate task completion and return to routing agent"
+      default: false
 
 # State definitions
 states:
@@ -184,12 +192,18 @@ states:
       Context: This user is NOT currently eligible for a laptop replacement under standard policy.
 
       Classify the user's intent as one of the following:
-      1. FAREWELL - User wants to end the conversation (goodbye, bye, thanks, etc.)
-      2. PROCEED_ANYWAY - User wants to see laptop options despite being ineligible (proceed, show options, I want to see, etc.)
-      3. GENERAL_QUESTION - User has questions about policy or general assistance
+      1. RETURN_TO_ROUTER - User wants to return to the routing agent or stop laptop refresh process (e.g., "return to router", "go back", "stop", "cancel laptop refresh")
+      2. FAREWELL - User wants to end the conversation (goodbye, bye, thanks, etc.)
+      3. PROCEED_ANYWAY - User wants to see laptop options despite being ineligible (proceed, show options, I want to see, etc.)
+      4. GENERAL_QUESTION - User has questions about policy or general assistance
 
-      Respond with only the classification: FAREWELL, PROCEED_ANYWAY, or GENERAL_QUESTION
+      Respond with only the classification: RETURN_TO_ROUTER, FAREWELL, PROCEED_ANYWAY, or GENERAL_QUESTION
     intent_actions:
+      RETURN_TO_ROUTER:
+        response: "task_complete_return_to_router"
+        data_storage:
+          _should_return_to_routing: true
+        next_state: "end"
       FAREWELL:
         response: "Thank you for using the laptop refresh service. Have a great day!"
         next_state: "end"
@@ -220,12 +234,18 @@ states:
       The user was asked if they want to proceed with reviewing laptop options. They responded: "{user_input}"
 
       Classify their response as one of the following:
-      1. YES - User wants to proceed (yes, sure, okay, proceed, continue, etc.)
-      2. NO - User does not want to proceed or wants to end conversation (no, cancel, stop, bye, etc.)
-      3. UNCLEAR - Response is ambiguous or unclear
+      1. RETURN_TO_ROUTER - User wants to return to the routing agent or stop laptop refresh process (e.g., "return to router", "go back", "stop", "cancel laptop refresh")
+      2. YES - User wants to proceed (yes, sure, okay, proceed, continue, etc.)
+      3. NO - User does not want to proceed or wants to end conversation (no, cancel, stop, bye, etc.)
+      4. UNCLEAR - Response is ambiguous or unclear
 
-      Respond with only the classification: YES, NO, or UNCLEAR
+      Respond with only the classification: RETURN_TO_ROUTER, YES, NO, or UNCLEAR
     intent_actions:
+      RETURN_TO_ROUTER:
+        response: "task_complete_return_to_router"
+        data_storage:
+          _should_return_to_routing: true
+        next_state: "end"
       "YES":
         next_state: "select_laptop"
         data_storage:
@@ -281,13 +301,19 @@ states:
     intent_prompt: |
       The user said: "{user_input}"
 
-      Based on the laptop options "{laptop_options.response}", determine if they made a valid laptop selection:
+      Based on the laptop options "{laptop_options.response}", determine their intent:
+      - RETURN_TO_ROUTER: User wants to return to the routing agent or stop laptop refresh process (e.g., "return to router", "go back", "stop", "cancel laptop refresh")
       - VALID_SELECTION: User mentioned a specific laptop model, number, or clear selection
       - INVALID_SELECTION: User's choice is clearly invalid or nonsensical
       - UNCLEAR: User's response is unclear or doesn't contain a laptop selection
 
-      Respond with only: VALID_SELECTION, INVALID_SELECTION, or UNCLEAR
+      Respond with only: RETURN_TO_ROUTER, VALID_SELECTION, INVALID_SELECTION, or UNCLEAR
     intent_actions:
+      RETURN_TO_ROUTER:
+        response: "task_complete_return_to_router"
+        data_storage:
+          _should_return_to_routing: true
+        next_state: "end"
       "VALID_SELECTION":
         next_state: "confirm_laptop_selection"
         data_storage:
@@ -331,20 +357,20 @@ states:
       The user was asked if they want to create a ServiceNow ticket for their laptop refresh request. They responded: "{user_input}"
 
       Classify their response as one of the following:
-      1. YES - User wants to create the ticket (yes, proceed, create, sure, okay, etc.)
-      2. NO - User does not want to create the ticket (no, cancel, stop, etc.)
-      3. UNCLEAR - Response is ambiguous or unclear
+      1. RETURN_TO_ROUTER - User wants to return to the routing agent or stop laptop refresh process (e.g., "return to router", "go back", "stop", "cancel laptop refresh")
+      2. YES - User wants to create the ticket (yes, proceed, create, sure, okay, etc.)
+      3. NO - User does not want to create the ticket (no, cancel, stop, etc.)
+      4. UNCLEAR - Response is ambiguous or unclear
 
-      Respond with only the classification: YES, NO, or UNCLEAR
+      Respond with only the classification: RETURN_TO_ROUTER, YES, NO, or UNCLEAR
     intent_actions:
-      "YES":
-        allowed_tools: [ "open_laptop_refresh_ticket" ]
-        prompt: |
-          You have the employee information: {employee_info.response}
-          Selected Laptop details: {selected_laptop_details}
-          Create a ServiceNow ticket for the authenticated user requesting laptop: {selected_laptop} by calling the open_laptop_refresh_ticket tool with "None" as the employee_id parameter, the user's name from the employee info, the laptop information, and business justification "agent submission". CRITICAL use the open_laptop_refresh_ticket tool to create the ticket.
-          Tell the user their ticket number after creation.
+      RETURN_TO_ROUTER:
+        response: "task_complete_return_to_router"
+        data_storage:
+          _should_return_to_routing: true
         next_state: "end"
+      "YES":
+        next_state: "create_ticket"
         data_storage:
           ticket_created: true
       "NO":
@@ -354,9 +380,82 @@ states:
         prompt: "The user said '{user_input}' when asked about creating a ticket. Ask them to clarify: do they want to create the ServiceNow ticket? (yes/no)"
         next_state: "waiting_ticket_confirmation"
 
+  # State 8: Create Ticket
+  create_ticket:
+    type: "llm_processor"
+    temperature: 0.3
+    allowed_tools: [ "open_laptop_refresh_ticket" ]
+    prompt: |
+      You have the employee information: {employee_info.response}
+      Selected Laptop details: {selected_laptop_details}
+
+      Create a ServiceNow ticket for the authenticated user requesting laptop: {selected_laptop} by calling the open_laptop_refresh_ticket tool with "None" as the employee_id parameter, the user's name from the employee info, the laptop information, and business justification "agent submission". CRITICAL use the open_laptop_refresh_ticket tool to create the ticket.
+
+      After creating the ticket, respond to the user using EXACTLY this format (replace XXXXXX with the actual ticket number):
+
+      A ServiceNow ticket for a laptop refresh has been created for you. The ticket number is XXXXXX. Your request will be processed by the IT Hardware Team, and you will receive updates via email as the ticket progresses.
+      Is there anything else I can help you with?
+    response_analysis:
+      conditions:
+        - name: "ticket_created"
+          trigger_phrases: ["ServiceNow ticket", "ticket number"]
+          actions:
+            - type: "extract_data"
+              pattern: "((?:REQ|INC|RITM)\\d+)"
+              field_name: "ticket_number"
+              source: "response"
+            - type: "transition"
+              target: "waiting_post_ticket_input"
+      default_transition: "waiting_post_ticket_input"
+
+  # State 9: Waiting for Post-Ticket Input
+  waiting_post_ticket_input:
+    type: "waiting"
+    transitions:
+      user_input: "classify_post_ticket_intent"
+
+  # State 9a: Classify Post-Ticket Intent
+  classify_post_ticket_intent:
+    type: "intent_classifier"
+    temperature: 0.2  # Deterministic intent classification
+    allowed_tools: [ "" ]
+    intent_prompt: |
+      The user was asked if there is anything else we can help with after creating a ticket. They responded: "{user_input}"
+
+      Classify their response as one of the following:
+      1. RETURN_TO_ROUTER - User wants to return to the routing agent or is done (e.g., "no", "no thanks", "that's all", "return to router", "go back")
+      2. TICKET_NUMBER_REQUEST - User is asking for their ticket number (e.g., "what's my ticket number", "ticket number", "what ticket")
+      3. GENERAL_QUESTION - User has additional questions or needs more help
+
+      Respond with only the classification: RETURN_TO_ROUTER, TICKET_NUMBER_REQUEST, or GENERAL_QUESTION
+    intent_actions:
+      RETURN_TO_ROUTER:
+        response: "task_complete_return_to_router"
+        data_storage:
+          _should_return_to_routing: true
+        next_state: "end"
+      TICKET_NUMBER_REQUEST:
+        prompt: |
+          The user is asking for their ticket number. Provide them with the ticket number: {ticket_number}
+
+          Then ask if there is anything else you can help with.
+        next_state: "waiting_post_ticket_input"
+      GENERAL_QUESTION:
+        prompt: |
+          The user said: "{user_input}"
+
+          Provide a helpful response to their question. You have access to the following information:
+          - Employee info: {employee_info.response}
+          - Laptop eligibility: {laptop_eligibility.response}
+          - Selected laptop: {selected_laptop}
+          - Ticket number: {ticket_number}
+
+          After answering, ask if there is anything else you can help with.
+        next_state: "waiting_post_ticket_input"
+
   # End state
   end:
     type: "terminal"
     reset_behavior:
       reset_state: "lookup_employee"  # Start with employee lookup using authoritative user ID
-      clear_data: ["messages", "employee_info", "laptop_eligibility", "selected_laptop", "selected_laptop_details", "laptop_options", "eligibility_status", "ticket_created", "current_state", "user_wants_to_proceed"]
+      clear_data: ["messages", "employee_info", "laptop_eligibility", "selected_laptop", "selected_laptop_details", "laptop_options", "eligibility_status", "ticket_created", "ticket_number", "current_state", "user_wants_to_proceed"]

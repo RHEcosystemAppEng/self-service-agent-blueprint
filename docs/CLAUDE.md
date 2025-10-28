@@ -130,6 +130,8 @@ The system uses an **Integration Defaults** approach with **User Overrides** to 
 - `DATABASE_URL`: PostgreSQL connection string
 - `SLACK_SIGNING_SECRET`: Slack webhook verification
 - `SNOW_API_KEY`, `HR_API_KEY`: External service API keys
+- `SAFETY`: Safety model for content moderation (e.g., meta-llama/Llama-Guard-3-8B)
+- `SAFETY_URL`: LlamaStack API endpoint for moderation (if shields enabled)
 
 ## Code Standards
 
@@ -181,6 +183,7 @@ make helm-install-test NAMESPACE=dev
 ### Core Documentation
 - **`docs/API_REFERENCE.md`**: Complete API documentation and endpoints
 - **`guides/INTEGRATION_GUIDE.md`**: Complete integration and request management guide
+- **`guides/SAFETY_SHIELDS_GUIDE.md`**: Safety shields and content moderation configuration
 - **`docs/ARCHITECTURE_DIAGRAMS.md`**: System architecture and flow diagrams
 - **`guides/AUTHENTICATION_GUIDE.md`**: Enhanced security and authentication setup with production readiness warnings
 - **`guides/SLACK_SETUP.md`**: Slack app configuration guide
@@ -242,6 +245,13 @@ The system uses eventing-based communication with the following core components:
 - **Persistent Sessions**: Conversation state across interaction turns
 - **Integration-Specific Context**: Platform-specific metadata preservation
 - **User Context**: User metadata and preferences tracking
+
+### Safety & Content Moderation
+- **Input Shields**: Validate user input before processing using Llama Guard 3 or compatible models
+- **Output Shields**: Check agent responses before delivery to users
+- **Category Filtering**: Configure ignored categories to handle false positives in business workflows
+- **Llama Guard Integration**: OpenAI-compatible moderation API via LlamaStack
+- **Per-Agent Configuration**: Enable shields selectively based on agent risk profile
 
 ## Related Documentation
 

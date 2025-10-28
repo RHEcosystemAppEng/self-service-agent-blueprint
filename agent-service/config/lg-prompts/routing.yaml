@@ -11,7 +11,11 @@ settings:
 
 # State structure definition
 state_schema:
-  business_fields: {}  # No business fields needed - routing is handled via message responses
+  business_fields:
+    routing_decision:
+      type: "string"
+      default: null
+      # Field to store the routing decision for session manager to detect
 
 # State definitions
 states:
@@ -64,6 +68,9 @@ states:
         - name: "laptop_refresh"
           trigger_phrases: ["LAPTOP_REFRESH"]
           actions:
+            - type: "set_field"
+              field_name: "routing_decision"
+              value: "laptop-refresh"
             - type: "add_message"
               message: "laptop-refresh"
             - type: "transition"
@@ -71,8 +78,11 @@ states:
         - name: "email_change"
           trigger_phrases: ["EMAIL_CHANGE"]
           actions:
+            - type: "set_field"
+              field_name: "routing_decision"
+              value: "email-change"
             - type: "add_message"
-              message: "EMAIL_CHANGE_AGENT"
+              message: "email-change"
             - type: "transition"
               target: "end"
         - name: "other_request"
@@ -108,6 +118,5 @@ states:
   # End state
   end:
     type: "terminal"
-    reset_behavior:
-      reset_state: "greet_and_identify_need"
-      clear_data: ["messages", "current_state"]
+    # No reset_behavior - routing agent should not auto-reset
+    # Session manager will handle routing to specialist agent or create new session if needed

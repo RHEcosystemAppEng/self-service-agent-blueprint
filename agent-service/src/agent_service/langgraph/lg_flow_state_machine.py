@@ -634,8 +634,11 @@ class StateMachine:
             from langchain_core.messages import HumanMessage
 
             state["messages"].append(HumanMessage(content=initial_user_message))
-            # Mark this kickoff message as already processed so waiting nodes don't consume it
-            state["_last_processed_human_count"] = 1
+            # Mark this kickoff message as already processed ONLY if initial state is NOT waiting
+            # Waiting states need to consume the initial message themselves
+            initial_state_name = settings.get("initial_state", "")
+            if not self.is_waiting_state(initial_state_name):
+                state["_last_processed_human_count"] = 1
 
         return state
 
@@ -992,9 +995,22 @@ class ConversationSession:
         self.authoritative_user_id = authoritative_user_id
 
         # Get state machine config path from agent configuration
-        lg_config_path = agent.config.get(
-            "lg_state_machine_config", "config/lg-prompts/chat-lg-state.yaml"
+        # First check for environment variable override: LG_PROMPT_<AGENT_NAME>
+        # Example: LG_PROMPT_LAPTOP_REFRESH for laptop-refresh agent
+        import os
+
+        agent_name = agent.config.get("name", "").replace("-", "_").upper()
+        env_var_name = f"LG_PROMPT_{agent_name}"
+        lg_config_path = os.environ.get(
+            env_var_name,
+            agent.config.get(
+                "lg_state_machine_config", "config/lg-prompts/chat-lg-state.yaml"
+            ),
         )
+        if env_var_name in os.environ:
+            logger.info(
+                f"Using LangGraph prompt override from {env_var_name}: {lg_config_path}"
+            )
 
         # Convert to absolute path using centralized path resolution
         if not Path(lg_config_path).is_absolute():
@@ -1235,24 +1251,23 @@ class ConversationSession:
                 # First message - initialize with empty state and let the graph handle initialization
                 initial_state = self.state_machine.create_initial_state()
 
-                # Check for initial_user_message override in settings
-                settings = self.state_machine.config.get("settings", {})
-                initial_user_message = settings.get("initial_user_message")
-
-                # Use override message if configured, otherwise use the passed message
-                message_to_use = (
-                    initial_user_message if initial_user_message else message
-                )
-
-                # Add the user message to initial state
-                initial_state["messages"].append(HumanMessage(content=message_to_use))
+                # Check if create_initial_state() already added the initial_user_message
+                # If not, we need to add the passed message
+                if not initial_state.get("messages"):
+                    # No initial message was added by create_initial_state()
+                    # Add the passed message to initial state
+                    initial_state["messages"].append(HumanMessage(content=message))
 
                 # Only mark as consumed if initial_state is NOT a waiting state
                 # Waiting states need to consume the first message themselves
+                settings = self.state_machine.config.get("settings", {})
                 initial_state_name = settings.get("initial_state", "")
                 if not self.state_machine.is_waiting_state(initial_state_name):
                     # Mark this kickoff message as already processed so waiting nodes don't consume it
                     initial_state["_last_processed_human_count"] = 1
+
+                # Reset consumed flag for initial invocation
+                initial_state["_consumed_this_invoke"] = False
 
                 # Store token_context for access during processing
                 if token_context:
