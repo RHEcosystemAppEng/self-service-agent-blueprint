@@ -173,18 +173,31 @@ Before creating the API key, you need a service account user that will be associ
      - `cmdb_read` - Allows reading configuration management database (CMDB) data
    - Click **Save**
 
-### Step 1: Create Inbound Authentication Profile
 
-This profile defines how ServiceNow will accept and validate API key authentication.
+
+### Step 1: Create API KEY Authentication Profile
 
 1. Navigate to **All > System Web Services > API Access Policies > Inbound Authentication Profile**
 2. Click **New**
 3. Click **Create API Key authentication profiles**
 4. Fill in the form:
-   - **Name**: `MCP Agent - API Key Authentication`
+   - **Name**: `API Key`
    - **Auth Parameter**: Auth Header
      - From the dropdown, select: `x-sn-apikey`
      - This is the header name used by default and matches the MCP server configuration
+5. Click **Submit**
+
+
+### Step 1b: Create Basic Authentication Profile
+
+To support both API key and basic authentication methods, create a Basic Authentication profile:
+
+1. Navigate to **All > System Web Services > API Access Policies > Inbound Authentication Profile**
+2. Click **New**
+3. Click **Create Basic authentication profiles**
+4. Fill in the form:
+   - **Name**: `Basic Auth`
+   - **Type**: `Basic Auth`
 5. Click **Submit**
 
 > **Tip**: The complete list of Auth Parameters is available at **All > System Web Services > API Access Policies > REST API Auth Parameter**
@@ -218,7 +231,7 @@ This policy controls which REST APIs your API key can access and how it can inte
    - Specify the REST API path
    - Add any table restrictions if needed
    - Configure method, resource, and version restrictions
-5. Add your Inbound Authentication Profile from Step 1 to the **Authentication** section
+5. Add the Authentication Profiles from Step 1 to the **Authentication** section
 6. Click **Submit**
 
 > **Note**: Create separate policies for different APIs. For example, one for Service Catalog (ticket creation) and another for Table API (data queries).
@@ -233,7 +246,9 @@ For creating and managing ServiceNow tickets via the Service Catalog:
 - **Methods**: Apply to all methods
 - **Resources**: Apply to all resources
 - **Versions**: Apply to all versions
-- **Authentication**: Select your "API Key" Inbound Authentication Profile
+- **Authentication profile**: Add both authentication profiles:
+  - Select your "API Key" and "Basic Auth" Authentication Profiles
+- Set to active
 
 #### Configuration 2: Table API for Laptop Queries
 
@@ -242,11 +257,13 @@ For querying ServiceNow tables to retrieve laptop information:
 - **Name**: `Service Now - API Key Tables`
 - **REST API**: Table API
 - **REST API Path**: `now/table`
-- **Tables**: `cmdb_ci_computer,sys_user` (specify tables you need access to)
 - **Methods**: Apply to all methods
 - **Resources**: Apply to all resources
 - **Versions**: Apply to all versions
-- **Authentication**: Select your "API Key" Inbound Authentication Profile 
+- **Tables**: Apply to all tables
+- **Authentication profile**: Add both authentication profiles:
+  - Select your "API Key" and "Basic Auth" Authentication Profiles
+- Set to active
 
 ### Step 4: Test Your API Key
 
