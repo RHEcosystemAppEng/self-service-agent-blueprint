@@ -32,13 +32,19 @@
 - Process engine -> For "Process engine" select "Flow Designer flow" -> For "Selected flow" select "Service Catalog item request"
 ### Review and submit
 - Check all the above details are correct -> Click "Submit" (If needed you can still go back and edit later). After submitting, it may take a few moments until the catalog stats changes from "Publishing" to "Published". 
-## Step 3 - Create a AI Agent user + Setup API Key
+## Step 3 - Create a AI Agent user
 1. Click "All" in the top left corner -> Search for "Users" -> Scroll till you see "Organization", Click "Users" link directly under it
 2. Click "New" -> For "User ID" enter "mcp_agent" -> For "First Name" enter "MCP" -> For "Last Name" enter "Agent" -> For "Identity type" select "AI Agent" - Click "Submit"
 3. Click "Search" and enter "MCP" -> Click "mcp_agent" -> Click "Set Password" -> Click "Generate" -> Copy the generated password and store somewhere safe -> Click "Save Password" -> Click "Close" -> Uncheck "Password needs reset" -> Click "Update"
+## Step 4 - Create a API Key and API Configuration
+1. Click "All" in the top left corner -> Search for "API Keys" -> Click "New" -> For "Name" enter "MCP Agent API Key" -> For "User" search and select "MCP Agent" -> Click "Submit" -> After the new user is created click "MCP Agent API Key" -> On the right of the "Token" field click the Lock symbol in order to view the API Key secret (store this value some place safe).
+2. Click "All" in the top left corner -> Search for "Authentication Profiles" -> Click "New" -> Select "Create API Key authentication profiles" -> For "Name" enter "API Key" -> For "Auth Parameter" click search and select "x-sn-apikey", "Auth Header" -> Click "Submit"
+3. Click "All" in the top left corner -> Search for "Authentication Profiles" -> Click "New" -> Select "Create standard http authentication profiles" -> For "Name" enter "Basic Auth" -> Click "Submit" (Note: this step is optional if you require Basic Auth access to your APIs)
+4. Click "All" in the top left corner -> Search for "API Access Policies" -> Click "New" -> For "Name" enter "MCP Agent - SC" -> For "REST API" select "Service Catalog API" -> Double click "Insert new row..." search and select "API Key" (repeat this step and select "Basic Auth") -> Click "Submit"
+5. Click "All" in the top left corner -> Search for "API Access Policies" -> Click "New" -> For "Name" enter "MCP Agent - Tables" -> For "REST API" select "Table API" -> Double click "Insert new row..." search and select "API Key" (repeat this step and select "Basic Auth") -> Click "Submit"
+6. Click "All" in the top left corner -> Search for "API Access Policies" -> Click "New" -> For "Name" enter "MCP Agent - UI" -> For "REST API" select "UI GlideRecord API" -> Double click "Insert new row..." search and select "API Key" (repeat this step and select "Basic Auth") -> Click "Submit"
 
-TODO snc_internal, cmdb_read roles
-TODO API Key, API Profile, API Key Access
+
 
 
 
