@@ -44,7 +44,7 @@ This guide describes the steps required to create a PDI (Personal Development In
 
    ### Location
    - **Catalogs:** Browse → Select "Service Catalog" → Click "Save selection"
-   - **Categories:** Browse → Select "Laptops", "Hardware", "Hardware Asset" → Click "Save selection"
+   - **Categories:** Browse → Search for "Laptops" -> Select "Laptops" -> Click Add (Repeat this step for "Hardware", "Hardware Asset") → Click "Save selection"
 
    ### Questions
    - **First Question (Requested for):**
