@@ -152,8 +152,10 @@ snow/
 To use API key authentication with ServiceNow (recommended method), follow these steps:
 
 ### Prerequisites
-1. Ensure the **API Key and HMAC Authentication** plugin (com.glide.tokenbased_auth) is activated
-2. Navigate to **All > Admin Center > Application Manager** to verify activation
+Make sure that API Key and HMAC Authentication plugin is activated in Service Now.
+
+1. Navigate to **All > Admin Center > Application Manager** 
+2. Ensure the **API Key and HMAC Authentication** plugin (com.glide.tokenbased_auth) is activated
 
 ### Step 0: Create Service Account User
 
@@ -173,8 +175,6 @@ Before creating the API key, you need a service account user that will be associ
      - `cmdb_read` - Allows reading configuration management database (CMDB) data
    - Click **Save**
 
-
-
 ### Step 1: Create API KEY Authentication Profile
 
 1. Navigate to **All > System Web Services > API Access Policies > Inbound Authentication Profile**
@@ -186,7 +186,6 @@ Before creating the API key, you need a service account user that will be associ
      - From the dropdown, select: `x-sn-apikey`
      - This is the header name used by default and matches the MCP server configuration
 5. Click **Submit**
-
 
 ### Step 1b: Create Basic Authentication Profile
 
@@ -221,7 +220,7 @@ This generates the actual API key token that will be used for authentication. Th
 
 ### Step 3: Create API Access Policy
 
-This policy controls which REST APIs your API key can access and how it can interact with them. You'll create separate policies for each API endpoint your MCP agent needs.
+This policy controls which REST APIs your API key can access and how it can interact with them. You'll create separate policies for each API endpoint your MCP agent needs. The general process is as shown below. In the following sections we will provide specific instructions for each API you need to configure for this quickstart.
 
 1. Navigate to **All > System Web Services > API Access Policies > REST API Access Policies**
 2. Click **New**
