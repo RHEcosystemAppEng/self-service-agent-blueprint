@@ -35,7 +35,7 @@ A minimal state machine with one comprehensive prompt that guides the entire wor
 An explicit state machine with dedicated states for each process step and focused prompts.
 
 **Advantages:**
-- May works with smaller models
+- May work with smaller models
 - Precise control over workflow progression
 - Easier to enforce validation and error handling
 - Lower token usage per LLM call

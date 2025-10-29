@@ -300,7 +300,9 @@ class Agent:
             elif isinstance(last_msg, str):
                 moderation_input = last_msg
             else:
-                logger.warning(f"Invalid last message format for moderation: {type(last_msg)}")
+                logger.warning(
+                    f"Invalid last message format for moderation: {type(last_msg)}"
+                )
                 return True, None
 
             log_preview = f"last message, {len(moderation_input)} chars"

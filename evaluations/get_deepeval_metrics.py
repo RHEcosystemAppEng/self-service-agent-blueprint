@@ -204,7 +204,7 @@ def get_metrics(
                 "Check if this last meaningful agent message contains a ServiceNow ticket number (starting with REQ, INC, or RITM).",
                 "The conversation passes if: (1) The last meaningful agent message contains a ticket number, OR (2) The conversation ends with user saying 'DONEDONEDONE' and the task was completed earlier.",
                 "Note: If user says 'DONEDONEDONE', any agent response after that should be ignored for evaluation purposes - it's just the system responding to the marker.",
-                "The flow terminates successfully if a ticket was created and delivered, regardless of whether routing agent appears afterward or user sends DONEDONEDONE."
+                "The flow terminates successfully if a ticket was created and delivered, regardless of whether routing agent appears afterward or user sends DONEDONEDONE.",
             ],
         ),
         ConversationalGEval(
