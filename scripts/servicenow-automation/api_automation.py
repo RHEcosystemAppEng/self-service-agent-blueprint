@@ -103,7 +103,7 @@ class ServiceNowAPIAutomation:
         print(f"🔐 Creating authentication profile: {name}")
 
         # Check if profile already exists
-        check_url = f"{self.instance_url}/api/now/table/sys_auth_profile_basic"
+        check_url = f"{self.instance_url}/api/now/table/inbound_auth_profile"
         check_params = {'sysparm_query': f'name={name}'}
 
         try:
@@ -115,20 +115,20 @@ class ServiceNowAPIAutomation:
                 print(f"✅ Authentication profile '{name}' already exists")
                 return data['result'][0]['sys_id']
 
-            # Create authentication profile
             if auth_type == 'api_key':
+                url = "http_key_auth"
                 profile_data = {
                     'name': name,
-                    'auth_parameter': 'x-sn-apikey',
-                    'auth_header': 'true'
+                    'auth_parameter': 'Header for API Key'
                 }
-            else:  # basic auth
+            else:
+                url = "std_http_auth"
                 profile_data = {
                     'name': name,
-                    'type': 'basic'
+                    'type': 'basic_auth'
                 }
 
-            create_url = f"{self.instance_url}/api/now/table/sys_auth_profile_basic"
+            create_url = f"{self.instance_url}/api/now/table/{url}"
             response = self.session.post(create_url, json=profile_data)
             response.raise_for_status()
 
@@ -191,7 +191,6 @@ class ServiceNowAPIAutomation:
                 'rest_api': api_name,
                 'active': 'true',
                 'api_path': 'sn_sc/servicecatalog',
-                'active': 'true',
                 'apply_all_methods': 'true',
                 'apply_all_resources': 'true',
                 'apply_all_versions': 'true'
