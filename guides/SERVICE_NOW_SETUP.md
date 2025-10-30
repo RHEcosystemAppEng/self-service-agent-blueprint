@@ -130,7 +130,7 @@ Each time you add a laptop option, if you don't provide a value, one will be gen
 
 1. **Create API Key**
    - Click "All" in the top left corner
-   - Search for "API Keys"
+   - Search for "REST API Key"
    - Click "New"
    - **Name:** `MCP Agent API Key`
    - **User:** Search and select "MCP Agent"
@@ -141,7 +141,7 @@ Each time you add a laptop option, if you don't provide a value, one will be gen
 
 2. **Create API Key Authentication Profile**
    - Click "All" in the top left corner
-   - Search for "Authentication Profiles"
+   - Search for "Inbound Authentication Profile"
    - Click "New"
    - Select "Create API Key authentication profiles"
    - **Name:** `API Key`
@@ -150,7 +150,7 @@ Each time you add a laptop option, if you don't provide a value, one will be gen
 
 3. **Create Basic Auth Authentication Profile** (Optional)
    - Click "All" in the top left corner
-   - Search for "Authentication Profiles"
+   - Search for "Inbound Authentication Profile"
    - Click "New"
    - Select "Create standard http authentication profiles"
    - **Name:** `Basic Auth`
@@ -159,7 +159,7 @@ Each time you add a laptop option, if you don't provide a value, one will be gen
 
 4. **Create Service Catalog API Access Policy**
    - Click "All" in the top left corner
-   - Search for "API Access Policies"
+   - Search for "REST API Access Policies"
    - Click "New"
    - **Name:** `MCP Agent - SC`
    - **REST API:** Service Catalog API
@@ -169,7 +169,7 @@ Each time you add a laptop option, if you don't provide a value, one will be gen
 
 5. **Create Table API Access Policy**
    - Click "All" in the top left corner
-   - Search for "API Access Policies"
+   - Search for "REST API Access Policies"
    - Click "New"
    - **Name:** `MCP Agent - Tables`
    - **REST API:** Table API
@@ -179,7 +179,7 @@ Each time you add a laptop option, if you don't provide a value, one will be gen
 
 6. **Create UI GlideRecord API Access Policy**
    - Click "All" in the top left corner
-   - Search for "API Access Policies"
+   - Search for "REST API Access Policies"
    - Click "New"
    - **Name:** `MCP Agent - UI`
    - **REST API:** UI GlideRecord API
