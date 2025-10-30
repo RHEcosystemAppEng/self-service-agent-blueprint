@@ -60,6 +60,10 @@ spec:
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
           value: {{ $context.Values.otelExporter }}
         {{- end }}
+        {{- if $serviceConfig.uvicornWorkers }}
+        - name: UVICORN_WORKERS
+          value: {{ $serviceConfig.uvicornWorkers | quote }}
+        {{- end }}
         # Service-specific environment variables
         # All environment variables are now handled by the templates above
         {{- if $serviceConfig.resources }}

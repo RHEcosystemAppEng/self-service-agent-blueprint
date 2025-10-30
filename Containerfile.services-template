@@ -78,4 +78,9 @@ EXPOSE 8080
 # Run the application using absolute path to ensure virtualenv Python is used
 # While it seems to work with the minimal container without the full path, it
 # does not when using the non-minimal container for debugging
-CMD /app/.venv/bin/python -m uvicorn $MODULE_NAME:app --host 0.0.0.0 --port 8080
+# Support optional UVICORN_WORKERS environment variable for multi-process concurrency
+CMD if [ -n "$UVICORN_WORKERS" ]; then \
+      /app/.venv/bin/python -m uvicorn $MODULE_NAME:app --host 0.0.0.0 --port 8080 --workers $UVICORN_WORKERS; \
+    else \
+      /app/.venv/bin/python -m uvicorn $MODULE_NAME:app --host 0.0.0.0 --port 8080; \
+    fi

@@ -14,6 +14,7 @@ Usage:
     python evaluate.py                    # Use default (20 conversations)
     python evaluate.py -n 5              # Generate 5 conversations
     python evaluate.py --num-conversations 10  # Generate 10 conversations
+    python evaluate.py -n 10 --concurrency 4  # Generate 40 conversations (10 per worker × 4 workers)
 
 Environment Variables:
     All environment variables required by the individual scripts:
@@ -528,6 +529,21 @@ def _parse_arguments() -> argparse.Namespace:
         action="store_true",
         help="Send 'reset' message at the start of each conversation",
     )
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=1,
+        help="Number of parallel workers for generator.py (default: 1). Each worker generates num_conversations conversations. "
+        "Total conversations = concurrency * num_conversations. "
+        "Cannot exceed the number of available users.",
+    )
+    parser.add_argument(
+        "--message-timeout",
+        type=int,
+        default=60,
+        help="Timeout in seconds for individual message send/response operations in generator.py (default: 60). "
+        "Increase for slower agents or high concurrency scenarios.",
+    )
     return parser.parse_args()
 
 
@@ -802,6 +818,8 @@ def run_evaluation_pipeline(
     max_turns: int = 20,
     test_script: str = "chat-responses-request-mgr.py",
     reset_conversation: bool = False,
+    concurrency: int = 1,
+    message_timeout: int = 60,
 ) -> int:
     """
     Run the complete evaluation pipeline.
@@ -818,6 +836,8 @@ def run_evaluation_pipeline(
         max_turns: Maximum number of turns per conversation in generator.py
         test_script: Name of the test script to execute
         reset_conversation: Send 'reset' message at the start of each conversation
+        concurrency: Number of parallel workers for generator.py (default: 1)
+        message_timeout: Timeout for individual message send/response operations (default: 60)
 
     Returns:
         Exit code (0 for success, 1 for any failures)
@@ -848,16 +868,26 @@ def run_evaluation_pipeline(
     logger.info("-" * 60)
 
     # Step 2: Generate additional conversations
-    logger.info(
-        f"🤖 Step 2/3: Generating {num_conversations} additional test conversations..."
-    )
+    total_conversations = num_conversations * concurrency
+    if concurrency > 1:
+        logger.info(
+            f"🤖 Step 2/3: Generating {total_conversations} total test conversations ({num_conversations} per worker × {concurrency} workers)..."
+        )
+    else:
+        logger.info(
+            f"🤖 Step 2/3: Generating {num_conversations} additional test conversations..."
+        )
     generator_args = [
         str(num_conversations),
         "--max-turns",
         str(max_turns),
         "--test-script",
         test_script,
+        "--message-timeout",
+        str(message_timeout),
     ]
+    if concurrency > 1:
+        generator_args.extend(["--concurrency", str(concurrency)])
     if reset_conversation:
         generator_args.append("--reset-conversation")
     if not run_script("generator.py", args=generator_args, timeout=timeout):
@@ -941,6 +971,8 @@ def main() -> int:
                 max_turns=args.max_turns,
                 test_script=args.test_script,
                 reset_conversation=args.reset_conversation,
+                concurrency=args.concurrency,
+                message_timeout=args.message_timeout,
             )
     except KeyboardInterrupt:
         logger.warning("⚠️  Pipeline interrupted by user")

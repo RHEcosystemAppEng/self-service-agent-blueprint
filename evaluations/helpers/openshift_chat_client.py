@@ -20,6 +20,7 @@ class OpenShiftChatClient:
         deployment_name: str = "deploy/self-service-agent-request-manager",
         test_script: str = "chat-responses-request-mgr.py",
         reset_conversation: bool = False,
+        message_timeout: int = 60,
     ):
         """
         Initialize the OpenShift chat client.
@@ -29,11 +30,13 @@ class OpenShiftChatClient:
             deployment_name: Name of the OpenShift deployment to connect to
             test_script: Name of the test script to execute (default: "chat-responses-request-mgr.py")
             reset_conversation: If True, send "reset" message after initialization
+            message_timeout: Timeout in seconds for individual message send/response operations (default: 60)
         """
         self.deployment_name = deployment_name
         self.test_script = test_script
         self.authoritative_user_id = authoritative_user_id
         self.reset_conversation = reset_conversation
+        self.message_timeout = message_timeout
         self.process: Optional[subprocess.Popen[str]] = None
         self.session_active = False
         self.session_output: list[str] = []  # Capture all output for token parsing
@@ -138,7 +141,7 @@ class OpenShiftChatClient:
 
         return agent_message
 
-    def send_message(self, message: str, timeout: int = 30) -> str:
+    def send_message(self, message: str, timeout: Optional[int] = None) -> str:
         """
         Send a message to the agent and get the response.
 
@@ -148,7 +151,7 @@ class OpenShiftChatClient:
 
         Args:
             message: The message to send to the agent
-            timeout: Maximum time to wait for response in seconds
+            timeout: Maximum time to wait for response in seconds (default: uses self.message_timeout)
 
         Returns:
             The agent's response as a string
@@ -159,6 +162,10 @@ class OpenShiftChatClient:
         """
         if not self.session_active or not self.process:
             raise RuntimeError("Session not active. Call start_session() first.")
+
+        # Use instance timeout if not specified
+        if timeout is None:
+            timeout = self.message_timeout
 
         try:
             if self.process.stdin is not None:
@@ -173,7 +180,7 @@ class OpenShiftChatClient:
             )
 
             if not response:
-                logger.warning("Received empty response")
+                logger.warning(f"Received empty response for message: {message[:100]}")
 
             return response
 
@@ -181,7 +188,7 @@ class OpenShiftChatClient:
             logger.error(f"Error sending message: {e}, message: {message}")
             return ""
 
-    def _read_full_agent_message(self, timeout: int = 30) -> str:
+    def _read_full_agent_message(self, timeout: Optional[int] = None) -> str:
         """
         Read a complete agent message between 'agent:' and AGENT_MESSAGE_TERMINATOR markers.
 
@@ -189,15 +196,20 @@ class OpenShiftChatClient:
         Messages start with 'agent:' and end with AGENT_MESSAGE_TERMINATOR.
 
         Args:
-            timeout: Maximum time to wait for a complete message in seconds
+            timeout: Maximum time to wait for a complete message in seconds (default: uses self.message_timeout)
 
         Returns:
-            The complete agent message with markers removed
+            The complete agent message with markers removed. If timeout occurs,
+            appends a clear timeout indicator to the partial response.
         """
+        # Use instance timeout if not specified
+        if timeout is None:
+            timeout = self.message_timeout
         response_parts: List[str] = []
         start_time = time.time()
         agent_started = False
         lines_read = 0
+        timed_out = False
 
         while time.time() - start_time < timeout:
             if self.process is not None and self.process.poll() is not None:
@@ -251,11 +263,27 @@ class OpenShiftChatClient:
                 continue
 
         if time.time() - start_time >= timeout:
+            timed_out = True
+            partial_response = "\n".join(response_parts).strip()
             logger.warning(
-                f"Timeout reading agent message after {timeout}s, read {lines_read} lines, agent_started={agent_started}"
+                f"Timeout reading agent message after {timeout}s, read {lines_read} lines, agent_started={agent_started}, "
+                f"partial_response_length={len(partial_response)}, "
+                f"partial_response_preview={partial_response[:200] if partial_response else 'EMPTY'}"
             )
 
-        return "\n".join(response_parts).strip()
+        result = "\n".join(response_parts).strip()
+
+        # If timeout occurred, append a clear indicator to the response
+        # This ensures it shows up in the recorded conversation
+        if timed_out:
+            timeout_marker = f"\n\n[TIMEOUT: Response incomplete after {timeout}s timeout. This is a partial response.]"
+            result = (
+                result + timeout_marker
+                if result
+                else f"[TIMEOUT: No response received after {timeout}s timeout.]"
+            )
+
+        return result
 
     def _parse_token_output(self, line: str) -> None:
         """

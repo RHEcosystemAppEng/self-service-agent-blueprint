@@ -223,7 +223,6 @@ class EventingStrategy(CommunicationStrategy):
 
         # Store the future in the global registry so the event handler can resolve it
         _response_futures_registry[request_id] = response_future
-
         logger.info(
             "Response future registered",
             request_id=request_id,
@@ -258,10 +257,16 @@ class EventingStrategy(CommunicationStrategy):
                 "Timeout waiting for response event",
                 request_id=request_id,
                 timeout=timeout,
-                registry_size=len(_response_futures_registry),
-                active_requests=list(_response_futures_registry.keys()),
             )
             # Clean up the future on timeout
+            registry_size = len(_response_futures_registry)
+            active_requests = list(_response_futures_registry.keys())
+            logger.error(
+                "Timeout details",
+                request_id=request_id,
+                registry_size=registry_size,
+                active_requests=active_requests,
+            )
             if request_id in _response_futures_registry:
                 del _response_futures_registry[request_id]
             raise Exception(f"Timeout waiting for response after {timeout} seconds")
@@ -277,9 +282,11 @@ class EventingStrategy(CommunicationStrategy):
                     del _response_futures_registry[request_id]
                 else:
                     logger.debug(
-                        "Future was resolved, not cleaning up",
+                        "Future was resolved, cleaning up from registry",
                         request_id=request_id,
                     )
+                    # Clean up resolved futures too to prevent memory leak
+                    del _response_futures_registry[request_id]
 
 
 def get_communication_strategy() -> CommunicationStrategy:

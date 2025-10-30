@@ -7,10 +7,19 @@ with the actual self-service agent. It uses:
 - Custom LLM endpoint to simulate realistic user behavior
 - OpenShift client to test the actual deployed agent
 
-Each conversation is generated sequentially to ensure proper resource management
-and clearer progress tracking. The generated conversations are automatically
-saved to results/conversation_results/ with unique timestamped filenames in
-the same format as success-flow-1.json.
+The generator supports two execution modes:
+1. Sequential (default): Conversations are generated one at a time
+2. Concurrent: Multiple workers generate conversations in parallel
+
+In concurrent mode (--concurrency N):
+- N workers run in parallel, each with its own OpenShift client
+- Each worker uses a different subset of users (no overlap)
+- Each worker generates the requested number of conversations
+- Total conversations = N * num_conversations
+- Concurrency cannot exceed the number of available users
+
+The generated conversations are automatically saved to
+results/conversation_results/ with unique timestamped filenames.
 
 Required Environment Variables:
 - LLM_API_TOKEN: API key/token for the LLM endpoint (for user simulation)
@@ -21,10 +30,14 @@ Required Infrastructure:
 - Self-service agent deployed in OpenShift (accessible via 'oc exec')
 
 Usage:
+    # Sequential mode (default)
     export LLM_API_TOKEN="your-api-key"
     export LLM_URL="https://your-llm-endpoint.com/v1"
     export LLM_ID="your-model-name"
     python generator.py 3 --max-turns 15
+
+    # Concurrent mode (4 workers, 10 conversations each = 40 total)
+    python generator.py 10 --max-turns 15 --concurrency 4
 """
 
 import argparse
@@ -33,6 +46,7 @@ import json
 import logging
 import os
 import random
+from multiprocessing import Pool
 from pathlib import Path
 from typing import Any, List, Optional
 
@@ -46,17 +60,11 @@ from helpers.openshift_chat_client import OpenShiftChatClient
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize the OpenShift client (for agent under test) - will be updated with test_script in main
-client: Optional[OpenShiftChatClient] = None
-
-# Track app tokens separately from evaluation tokens
-total_app_tokens = {"input": 0, "output": 0, "total": 0, "calls": 0}
-
 random.seed()
 
 
-def _load_random_authoritative_user_id() -> str:
-    """Load and return a random user ID from the conversations_config/authoritative_user_ids file."""
+def _load_all_authoritative_user_ids() -> List[str]:
+    """Load all user IDs from the conversations_config/authoritative_user_ids file."""
     user_ids_file = Path("conversations_config/authoritative_user_ids")
 
     if not user_ids_file.exists():
@@ -68,7 +76,56 @@ def _load_random_authoritative_user_id() -> str:
     if not user_ids:
         raise ValueError(f"No user IDs found in {user_ids_file}")
 
+    return user_ids
+
+
+def _load_random_authoritative_user_id(user_ids: Optional[List[str]] = None) -> str:
+    """Load and return a random user ID from the given list or from file if not provided."""
+    if user_ids is None:
+        user_ids = _load_all_authoritative_user_ids()
+
+    if not user_ids:
+        raise ValueError("No user IDs available")
+
     return random.choice(user_ids)
+
+
+def _partition_user_ids(user_ids: List[str], num_partitions: int) -> List[List[str]]:
+    """
+    Partition user IDs into num_partitions groups with no overlap.
+    Each partition gets an equal or near-equal number of users.
+
+    Args:
+        user_ids: List of all user IDs
+        num_partitions: Number of partitions to create
+
+    Returns:
+        List of user ID lists, one per partition
+    """
+    if num_partitions <= 0:
+        raise ValueError("num_partitions must be positive")
+
+    if num_partitions > len(user_ids):
+        raise ValueError(
+            f"Cannot create {num_partitions} partitions from {len(user_ids)} users. "
+            f"Concurrency cannot exceed the number of available users."
+        )
+
+    # Calculate partition sizes
+    partition_size = len(user_ids) // num_partitions
+    remainder = len(user_ids) % num_partitions
+
+    partitions = []
+    start_idx = 0
+
+    for i in range(num_partitions):
+        # Give extra user to first 'remainder' partitions
+        size = partition_size + (1 if i < remainder else 0)
+        end_idx = start_idx + size
+        partitions.append(user_ids[start_idx:end_idx])
+        start_idx = end_idx
+
+    return partitions
 
 
 def _parse_arguments() -> argparse.Namespace:
@@ -81,7 +138,7 @@ def _parse_arguments() -> argparse.Namespace:
         type=int,
         nargs="?",
         default=1,
-        help="Number of conversations to generate (default: 1)",
+        help="Number of conversations to generate per worker (default: 1)",
     )
     parser.add_argument(
         "--max-turns",
@@ -100,6 +157,21 @@ def _parse_arguments() -> argparse.Namespace:
         action="store_true",
         help="Send 'reset' message at the start of each conversation",
     )
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=1,
+        help="Number of parallel workers (default: 1). Each worker generates num_conversations conversations. "
+        "Total conversations = concurrency * num_conversations. "
+        "Cannot exceed the number of available users.",
+    )
+    parser.add_argument(
+        "--message-timeout",
+        type=int,
+        default=60,
+        help="Timeout in seconds for individual message send/response operations (default: 60). "
+        "Increase for slower agents or high concurrency scenarios.",
+    )
     return parser.parse_args()
 
 
@@ -115,38 +187,210 @@ def _create_conversation_golden(conversation_number: int) -> ConversationalGolde
     return conversation_golden
 
 
-# Define chatbot callback to test the actual agent
-async def _model_callback(input: str, turns: List[Turn], thread_id: str) -> Turn:
-    try:
-        logger.info(
-            f"model_callback called with input: '{input}', turns count: {len(turns)}, thread_id: {thread_id}"
-        )
+def _run_worker(
+    worker_id: int,
+    user_ids: List[str],
+    num_conversations: int,
+    max_turns: int,
+    test_script: str,
+    reset_conversation: bool,
+    message_timeout: int = 60,
+) -> dict[str, Any]:
+    """
+    Worker function to generate conversations in parallel.
 
-        logger.info(f"Sending to agent: {input}")
+    Args:
+        worker_id: ID of this worker (0-indexed)
+        user_ids: List of user IDs assigned to this worker
+        num_conversations: Number of conversations to generate
+        max_turns: Maximum turns per conversation
+        test_script: Test script to use
+        reset_conversation: Whether to reset conversation at start
+        message_timeout: Timeout for individual message send/response operations
 
-        if client is None:
-            logger.error("OpenShift client not initialized")
-            return Turn(
-                role="assistant",
-                content="I apologize, but the system is not properly initialized.",
+    Returns:
+        Dictionary with saved_files, token_counts, and test_case_count
+    """
+    # Configure logging for this worker
+    worker_logger = logging.getLogger(f"worker-{worker_id}")
+    worker_logger.info(
+        f"Worker {worker_id} starting with {len(user_ids)} user IDs: {user_ids}"
+    )
+    worker_logger.info(
+        f"Worker {worker_id} will generate {num_conversations} conversation(s)"
+    )
+
+    # Get API configuration
+    api_key, api_endpoint, model_name = get_api_configuration()
+
+    # Validate required configuration
+    if not api_key:
+        raise ValueError("API key is required. Set LLM_API_TOKEN environment variable.")
+    if not api_endpoint:
+        raise ValueError("API endpoint is required. Set LLM_URL environment variable.")
+
+    # Initialize the custom LLM for this worker
+    custom_llm = CustomLLM(
+        api_key=api_key, base_url=api_endpoint, model_name=model_name
+    )
+
+    # Create a client variable for this worker
+    worker_client: Optional[OpenShiftChatClient] = None
+
+    # Define model callback for this worker
+    async def worker_model_callback(
+        input: str, turns: List[Turn], thread_id: str
+    ) -> Turn:
+        try:
+            worker_logger.info(
+                f"[Worker {worker_id}] model_callback called with input: '{input[:100]}...'"
             )
 
-        response = client.send_message(input)
+            if worker_client is None:
+                worker_logger.error(
+                    f"[Worker {worker_id}] OpenShift client not initialized"
+                )
+                return Turn(
+                    role="assistant",
+                    content="I apologize, but the system is not properly initialized.",
+                )
 
-        # Check if we got a valid response
-        if isinstance(response, str) and not response.strip():
-            logger.error("Agent returned empty response")
-            response = "I apologize, but I received an empty response from the system."
+            response = worker_client.send_message(input)
 
-        logger.info(f"Agent response: '{response}'")
-        return Turn(role="assistant", content=response)
+            # Enhanced validation and logging for empty responses
+            if isinstance(response, str) and not response.strip():
+                worker_logger.error(
+                    f"[Worker {worker_id}] Agent returned empty response - "
+                    f"input_length={len(input)}, turn_count={len(turns)}, thread_id={thread_id}, "
+                    f"session_active={worker_client.session_active}"
+                )
+                response = (
+                    "I apologize, but I received an empty response from the system."
+                )
+            elif not isinstance(response, str):
+                worker_logger.error(
+                    f"[Worker {worker_id}] Agent returned non-string response: type={type(response)}"
+                )
+                response = (
+                    "I apologize, but I received an invalid response from the system."
+                )
+            else:
+                worker_logger.info(
+                    f"[Worker {worker_id}] Agent response received: length={len(response)}"
+                )
 
-    except Exception as e:
-        logger.error(f"Error getting response from agent: {e}", exc_info=True)
-        return Turn(
-            role="assistant",
-            content="I apologize, but I'm experiencing technical difficulties. Please try again later.",
+            worker_logger.debug(
+                f"[Worker {worker_id}] Response preview: '{response[:200]}...'"
+            )
+            return Turn(role="assistant", content=response)
+
+        except Exception as e:
+            worker_logger.error(
+                f"[Worker {worker_id}] Error getting response: {e}", exc_info=True
+            )
+            return Turn(
+                role="assistant",
+                content="I apologize, but I'm experiencing technical difficulties.",
+            )
+
+    # Create simulator for this worker
+    simulator = ConversationSimulator(
+        model_callback=worker_model_callback,  # type: ignore[arg-type]
+        simulator_model=custom_llm,
+    )
+
+    # Track results for this worker
+    saved_files = []
+    worker_tokens = {"input": 0, "output": 0, "total": 0, "calls": 0}
+    test_case_count = 0
+
+    # Generate conversations
+    for i in range(num_conversations):
+        conversation_number = i + 1
+        worker_logger.info(
+            f"[Worker {worker_id}] Generating conversation {conversation_number}/{num_conversations}"
         )
+
+        try:
+            # Get a random user ID from this worker's assigned users
+            conversation_user_id = _load_random_authoritative_user_id(user_ids)
+            worker_logger.info(
+                f"[Worker {worker_id}] Conversation {conversation_number} using user: {conversation_user_id}"
+            )
+
+            # Create OpenShift client for this conversation
+            worker_client = OpenShiftChatClient(
+                conversation_user_id,
+                test_script=test_script,
+                reset_conversation=reset_conversation,
+                message_timeout=message_timeout,
+            )
+
+            # Start session
+            worker_client.start_session()
+            worker_client.get_agent_initialization()
+
+            # Create conversation golden
+            conversation_golden = _create_conversation_golden(conversation_number)
+
+            # Simulate conversation
+            conversational_test_cases = simulator.simulate(
+                conversational_goldens=[conversation_golden],
+                max_user_simulations=max_turns,
+            )
+
+            # Request token summary
+            try:
+                if worker_client.session_active:
+                    token_response = worker_client.send_message("**tokens**")
+                    worker_logger.info(
+                        f"[Worker {worker_id}] Token response: {token_response}"
+                    )
+            except Exception as e:
+                worker_logger.warning(
+                    f"[Worker {worker_id}] Failed to request tokens: {e}"
+                )
+
+            # Close session
+            worker_client.close_session()
+
+            # Collect tokens
+            app_tokens = worker_client.get_app_tokens()
+            worker_tokens["input"] += app_tokens["input"]
+            worker_tokens["output"] += app_tokens["output"]
+            worker_tokens["total"] += app_tokens["total"]
+            worker_tokens["calls"] += app_tokens["calls"]
+
+            # Save test cases
+            for test_case in conversational_test_cases:
+                test_case_count += 1
+                conversation = _convert_test_case_to_conversation_format(
+                    test_case, conversation_user_id
+                )
+                if conversation.get("conversation"):
+                    base_filename = (
+                        f"generated_flow_worker{worker_id}_{test_case_count}"
+                    )
+                    saved_file = _save_conversation_to_file(conversation, base_filename)
+                    saved_files.append(saved_file)
+
+        except Exception as e:
+            worker_logger.error(
+                f"[Worker {worker_id}] Error in conversation {conversation_number}: {e}",
+                exc_info=True,
+            )
+            continue
+
+    worker_logger.info(
+        f"[Worker {worker_id}] Completed. Generated {test_case_count} test cases"
+    )
+
+    return {
+        "worker_id": worker_id,
+        "saved_files": saved_files,
+        "tokens": worker_tokens,
+        "test_case_count": test_case_count,
+    }
 
 
 def _convert_test_case_to_conversation_format(
@@ -213,9 +457,6 @@ if __name__ == "__main__":
     # Parse command line arguments
     args = _parse_arguments()
 
-    # OpenShift client will be created per conversation with different user IDs
-    client = None
-
     # Get API configuration from environment variables
     api_key, api_endpoint, model_name = get_api_configuration()
 
@@ -227,153 +468,96 @@ if __name__ == "__main__":
         logger.error("No API endpoint found. Set LLM_URL environment variable.")
         exit(1)
 
-    # Initialize the custom LLM (for user simulation)
-    custom_llm = CustomLLM(
-        api_key=api_key, base_url=api_endpoint, model_name=model_name
+    logger.info(
+        f"Starting conversation simulation with model: {model_name or 'default'}"
     )
 
-    logger.info(
-        f"Starting conversation simulation with model: {custom_llm.get_model_name()}"
-    )
-    logger.info(f"Generating {args.num_conversations} conversation(s) sequentially")
+    # Load and partition user IDs
+    all_user_ids = _load_all_authoritative_user_ids()
+    logger.info(f"Loaded {len(all_user_ids)} user IDs")
+
+    # Validate concurrency doesn't exceed available users
+    if args.concurrency > len(all_user_ids):
+        logger.error(
+            f"Concurrency ({args.concurrency}) cannot exceed number of users ({len(all_user_ids)})"
+        )
+        exit(1)
+
+    # Log execution mode
+    if args.concurrency > 1:
+        logger.info(f"Running in CONCURRENT mode with {args.concurrency} workers")
+        logger.info(
+            f"Each worker will generate {args.num_conversations} conversation(s)"
+        )
+        logger.info(f"Total conversations: {args.concurrency * args.num_conversations}")
+    else:
+        logger.info("Running in SEQUENTIAL mode")
+        logger.info(f"Generating {args.num_conversations} conversation(s) sequentially")
     logger.info(f"Maximum user simulations per conversation: {args.max_turns}")
 
     try:
+        # Partition users across workers (even if only 1 worker for sequential mode)
+        user_partitions = _partition_user_ids(all_user_ids, args.concurrency)
+        if args.concurrency > 1:
+            logger.info(f"Partitioned users into {len(user_partitions)} groups:")
+            for i, partition in enumerate(user_partitions):
+                logger.info(f"  Worker {i}: {len(partition)} users - {partition}")
 
-        # Use custom LLM for user simulation, OpenShift client for agent responses
-        logger.info("Creating ConversationSimulator...")
-        simulator = ConversationSimulator(
-            model_callback=_model_callback,  # type: ignore[arg-type]  # Uses OpenShift client to test actual agent
-            simulator_model=custom_llm,  # Uses custom LLM to simulate user behavior
-        )
-
-        # Generate conversations sequentially
-        saved_files = []
-        all_test_cases: List[Any] = []
-
-        for i in range(args.num_conversations):
-            conversation_number = i + 1
-            logger.info(
-                f"Generating conversation {conversation_number} of {args.num_conversations}..."
+        # Create worker arguments
+        worker_args = [
+            (
+                i,
+                user_partitions[i],
+                args.num_conversations,
+                args.max_turns,
+                args.test_script,
+                args.reset_conversation,
+                args.message_timeout,
             )
+            for i in range(args.concurrency)
+        ]
 
-            try:
-                # Get a new authoritative user ID for this conversation
-                conversation_user_id = _load_random_authoritative_user_id()
-                logger.info(
-                    f"Conversation {conversation_number} using authoritative user ID: {conversation_user_id}"
-                )
+        # Run workers (in parallel or sequentially)
+        if args.concurrency > 1:
+            logger.info(f"Starting {args.concurrency} parallel workers...")
+            with Pool(processes=args.concurrency) as pool:
+                results = pool.starmap(_run_worker, worker_args)
+        else:
+            # Sequential mode: just run the single worker directly
+            results = [_run_worker(*worker_args[0])]
 
-                # Create a new OpenShift client for this conversation with unique user ID
-                client = OpenShiftChatClient(
-                    conversation_user_id,
-                    test_script=args.test_script,
-                    reset_conversation=args.reset_conversation,
-                )
+        # Aggregate results from all workers
+        all_saved_files = []
+        total_app_tokens = {"input": 0, "output": 0, "total": 0, "calls": 0}
+        total_test_cases = 0
 
-                # Create a single conversation golden for this iteration
-                conversation_golden = _create_conversation_golden(conversation_number)
+        for result in results:
+            all_saved_files.extend(result["saved_files"])
+            total_app_tokens["input"] += result["tokens"]["input"]
+            total_app_tokens["output"] += result["tokens"]["output"]
+            total_app_tokens["total"] += result["tokens"]["total"]
+            total_app_tokens["calls"] += result["tokens"]["calls"]
+            total_test_cases += result["test_case_count"]
 
-                # Start the OpenShift client session for agent interaction
-                try:
-                    client.start_session()
-                    client.get_agent_initialization()
-                except Exception as e:
-                    logger.error(
-                        f"Failed to start OpenShift client session: {e}", exc_info=True
-                    )
-                    raise
-
-                # Simulate this single conversation
-                logger.info(
-                    f"Running simulation for conversation {conversation_number}..."
-                )
-                conversational_test_cases = simulator.simulate(
-                    conversational_goldens=[conversation_golden],
-                    max_user_simulations=args.max_turns,
-                )
-                logger.info(
-                    f"Conversation {conversation_number} simulation completed successfully"
-                )
-
-                # Request token summary before closing
-                try:
-                    if client.session_active:
-                        logger.info("Requesting token summary from agent...")
-                        token_response = client.send_message("**tokens**")
-                        logger.info(f"Token request response: {token_response}")
-                except Exception as e:
-                    logger.warning(f"Failed to request tokens: {e}")
-
-                client.close_session()
-
-                # Collect app tokens from this conversation
-                app_tokens = client.get_app_tokens()
-                total_app_tokens["input"] += app_tokens["input"]
-                total_app_tokens["output"] += app_tokens["output"]
-                total_app_tokens["total"] += app_tokens["total"]
-                total_app_tokens["calls"] += app_tokens["calls"]
-
-                logger.info(
-                    f"App tokens from conversation {conversation_number}: {app_tokens}"
-                )
-
-                # Process the generated test case(s) for this conversation
-                for j, test_case in enumerate(conversational_test_cases):
-                    test_case_number = len(all_test_cases) + 1
-                    all_test_cases.append(test_case)
-
-                    print(
-                        f"\n=== Test Case {test_case_number} (Conversation {conversation_number}) ==="
-                    )
-                    print(test_case)
-
-                    # Convert to conversation format and save
-                    conversation = _convert_test_case_to_conversation_format(
-                        test_case, conversation_user_id
-                    )
-                    if conversation.get(
-                        "conversation"
-                    ):  # Only save if we have actual conversation turns
-                        base_filename = f"generated_flow_{test_case_number}"
-                        saved_file = _save_conversation_to_file(
-                            conversation, base_filename
-                        )
-                        saved_files.append(saved_file)
-                        logger.info(
-                            f"Test case {test_case_number} saved to: {saved_file}"
-                        )
-                    else:
-                        logger.warning(
-                            f"Test case {test_case_number} had no conversation turns to save"
-                        )
-
-            except Exception as e:
-                logger.error(
-                    f"Error during conversation {conversation_number} simulation: {e}",
-                    exc_info=True,
-                )
-                # Continue with the next conversation instead of failing completely
-                continue
-
+        # Log completion
+        mode = "Parallel" if args.concurrency > 1 else "Sequential"
         logger.info(
-            f"Sequential generation completed. Generated {len(all_test_cases)} total test cases"
+            f"{mode} generation completed. Generated {total_test_cases} total test cases"
         )
 
-        if saved_files:
+        # Print saved files
+        if all_saved_files:
             print("\n=== Saved Conversations ===")
-            for file_path in saved_files:
+            for file_path in all_saved_files:
                 print(f"- {file_path}")
         else:
             logger.warning("No conversation files were saved")
 
     except Exception as e:
         logger.error(f"Error during simulation: {e}", exc_info=True)
+        exit(1)
     finally:
-        # Client sessions are closed per conversation, no global cleanup needed
-        logger.info("All conversations completed")
-
-        # Final token summary even if there were errors
+        # Final token summary
         from helpers.token_counter import print_token_summary
 
         print_token_summary(app_tokens=total_app_tokens, save_file_prefix="generator")

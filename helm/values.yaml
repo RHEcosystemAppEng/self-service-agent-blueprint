@@ -211,6 +211,7 @@ requestManagement:
     mockEventing:
       enabled: true  # Default to mock eventing service (disable for full Knative eventing)
       logLevel: "INFO"
+      uvicornWorkers: 4  # Number of uvicorn worker processes for handling concurrent requests
       resources: {}
       # Health check configuration (dev-optimized for resource-constrained environments)
       healthChecks:
@@ -283,6 +284,7 @@ requestManagement:
   # Request Manager Service
   requestManager:
     replicas: 1
+    # uvicornWorkers: 4  # commented out since request manager cannot handle more than one due in memory Futures registry)
     resources: {}
     # External Access Configuration
     externalAccess:
@@ -318,6 +320,7 @@ requestManagement:
   # Integration Dispatcher Service
   integrationDispatcher:
     replicas: 1
+    uvicornWorkers: 4  # Number of uvicorn worker processes for handling concurrent requests
     resources: {}
     # External Access Configuration
     externalAccess:
@@ -363,6 +366,7 @@ requestManagement:
   # Agent Service
   agentService:
     replicas: 1
+    uvicornWorkers: 4  # Number of uvicorn worker processes for handling concurrent requests
     resources: {}
     # Override LangGraph prompt configuration for specific agents
     # Format: lg-prompt-<agent-name>: "path/to/prompt.yaml"
