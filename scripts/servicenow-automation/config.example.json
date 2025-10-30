@@ -1,0 +1,33 @@
+{
+  "servicenow": {
+    "instance_url": "https://your-instance.service-now.com",
+    "admin_username": "admin",
+    "admin_password": "your-admin-password",
+    "agent_user": {
+      "user_id": "mcp_agent",
+      "first_name": "MCP",
+      "last_name": "Agent",
+      "password": "generated-password-will-be-set-here"
+    },
+    "api_key_name": "MCP Agent API Key"
+  },
+  "catalog": {
+    "name": "PC Refresh",
+    "short_description": "Flow to request a PC refresh",
+    "laptop_choices": [
+      "Apple MacBook Air M3",
+      "Apple MacBook Pro 14 M3 Pro",
+      "Lenovo ThinkPad T14 Gen 5 Intel",
+      "Lenovo ThinkPad P1 Gen 7",
+      "Apple MacBook Air M2",
+      "Apple MacBook Pro 14 M3",
+      "Lenovo ThinkPad T14 Gen 4 Intel",
+      "Lenovo ThinkPad P16s Gen 2",
+      "Apple MacBook Pro 16 M3 Max",
+      "Lenovo ThinkPad T14s Gen 5 AMD",
+      "Lenovo ThinkPad P16 Gen 2",
+      "Lenovo ThinkPad T14 Gen 5 AMD",
+      "Lenovo ThinkPad P1 Gen 6"
+    ]
+  }
+}
