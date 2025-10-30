@@ -519,11 +519,29 @@ MCP servers allow agents to interact with external systems through standardized 
 
 **Laptop Refresh Knowledge Base:**
 - `refresh_policy.txt`: Eligibility criteria, approval process, special cases, policy rationale
-- `laptop_offerings.txt`: Available models by region, specifications, pricing, target user groups
+- `NA_laptop_offerings.txt`: Available models for North America region with specifications, pricing, target user groups
+- `EMEA_laptop_offerings.txt`: Available models for Europe, Middle East, and Africa region
+- `APAC_laptop_offerings.txt`: Available models for Asia-Pacific region
+- `LATAM_laptop_offerings.txt`: Available models for Latin America region
 
 **Conversational Policy Explanation:** User asks "Why am I not eligible?" → Agent retrieves and explains specific unmet criteria
 
+**Region-Specific Options:** User in EMEA region requests laptop options → Agent queries knowledge base for EMEA-specific offerings and presents only models available in that region with complete specifications
+
 **Pattern:** Create directory under `agent-service/config/knowledge_bases/`, add .txt files, Agent Service handles chunking, embeddings, vector database creation, and LlamaStack registration.
+
+**Knowledge Base Updates:**
+
+This quickstart uses an implementation where knowledge base documents are static text files loaded and ingested during agent service initialization. This approach allows you to get started quickly without complex infrastructure and is used as knowledge base creation and ongoing management is not the focus of this quickstart.
+
+However, production deployments typically require a more sophisticated approach for updating knowledge bases as policies and documentation change. For production use cases, consider implementing a dedicated ingestion pipeline that can:
+- Process updates from multiple source systems (SharePoint, Confluence, document management systems)
+- Handle incremental updates without full redeployment
+- Support various document formats (PDF, Word, HTML, etc.)
+- Provide automated document processing and chunking
+- Enable continuous synchronization of knowledge bases
+
+For a complete ingestion pipeline architecture and implementation guidance, see the **[Ingestion Pipeline](https://github.com/rh-ai-quickstart/ai-architecture-charts/tree/main/ingestion-pipeline)** in the AI Architecture Charts repository. This architecture provides a production-ready approach to knowledge base management that can scale with your organization's needs. This quickstart could easily be adapted to use pre-existing knowledge bases managed by the ingestion pipeline by simply removing the knowledge base registration step from the init-job (`helm/templates/init-job.yaml`) and updating agent configurations to reference the existing vector store IDs created by your ingestion pipeline. 
 
 ---
 

@@ -141,6 +141,25 @@ Generate Agent Service specific environment variables
 {{/* LLM Service Configuration */}}
 - name: LLAMA_STACK_URL
   value: {{ .Values.llama_stack_url | default "http://llamastack:8321" | quote }}
+{{/* LlamaStack OpenAI Client Configuration */}}
+{{- if hasKey .Values "llamastack" }}
+{{- if .Values.llamastack.port }}
+- name: LLAMASTACK_CLIENT_PORT
+  value: {{ .Values.llamastack.port | quote }}
+{{- end }}
+{{- if .Values.llamastack.apiKey }}
+- name: LLAMASTACK_API_KEY
+  value: {{ .Values.llamastack.apiKey | quote }}
+{{- end }}
+{{- if .Values.llamastack.openaiBasePath }}
+- name: LLAMASTACK_OPENAI_BASE_PATH
+  value: {{ .Values.llamastack.openaiBasePath | quote }}
+{{- end }}
+{{- if .Values.llamastack.timeout }}
+- name: LLAMASTACK_TIMEOUT
+  value: {{ .Values.llamastack.timeout | quote }}
+{{- end }}
+{{- end }}
 {{/* Agent Configuration */}}
 - name: DEFAULT_AGENT_ID
   value: {{ if hasKey .Values "agent" }}{{ .Values.agent.defaultAgentId | default "routing-agent" | quote }}{{ else }}"routing-agent"{{ end }}

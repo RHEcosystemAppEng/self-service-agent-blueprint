@@ -3,7 +3,7 @@ import os
 from typing import Any, Dict, Optional
 
 import yaml
-from llama_stack_client import LlamaStackClient
+from agent_service.utils import create_llamastack_client
 
 from .util import load_config_from_path, resolve_agent_service_path
 
@@ -29,16 +29,12 @@ class Agent:
         self.global_config = global_config or {}
 
         # Initialize LlamaStack client once for this agent
-        llama_stack_host = os.environ["LLAMASTACK_SERVICE_HOST"]
+        # This client provides both native APIs and OpenAI-compatible APIs
         timeout = self.global_config.get("timeout", 120.0)
-        self.llama_client = LlamaStackClient(
-            base_url=f"http://{llama_stack_host}:8321",
-            timeout=timeout,
-        )
+        self.llama_client = create_llamastack_client(timeout=timeout)
 
         self.model = self._get_model_for_agent()
         self.default_response_config = self._get_response_config()
-        self.openai_client = self._create_openai_client()
         self.system_message = system_message or self._get_default_system_message()
 
         # Build tools once during initialization (without authoritative_user_id)
@@ -100,7 +96,7 @@ class Agent:
             model_id = next(m.identifier for m in models if m.api_model_type == "llm")
             if model_id:
                 logger.info(f"Using first available LLM model: {model_id}")
-                return model_id
+                return str(model_id)
         except Exception as e:
             logger.error(f"Error getting models from LlamaStack: {e}")
 
@@ -132,21 +128,11 @@ class Agent:
 
         return ""
 
-    def _create_openai_client(self) -> Any:
-        """Create OpenAI client pointing to LlamaStack instance."""
-        import openai
-
-        llama_stack_host = os.environ["LLAMASTACK_SERVICE_HOST"]
-        return openai.OpenAI(
-            api_key="dummy-key",
-            base_url=f"http://{llama_stack_host}:8321/v1/openai/v1",
-            timeout=120,
-        )
-
     def _get_vector_store_id(self, kb_name: str) -> str:
         """Get the vector store ID for a specific knowledge base."""
         try:
-            vector_stores = self.openai_client.vector_stores.list()
+            # Use LlamaStack's OpenAI-compatible vector store API
+            vector_stores = self.llama_client.vector_stores.list()
             matching_stores = []
             for vs in vector_stores.data:
                 if vs.name and kb_name in vs.name:
@@ -608,14 +594,14 @@ class Agent:
             # Only pass tools if tools_to_use is not empty
             if tools_to_use:
                 response = self.llama_client.responses.create(
-                    input=messages_with_system,  # type: ignore[arg-type]
+                    input=messages_with_system,
                     model=self.model,
                     **response_config,
                     tools=tools_to_use,
                 )
             else:
                 response = self.llama_client.responses.create(
-                    input=messages_with_system,  # type: ignore[arg-type]
+                    input=messages_with_system,
                     model=self.model,
                     **response_config,
                 )

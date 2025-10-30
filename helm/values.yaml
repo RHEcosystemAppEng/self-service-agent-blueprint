@@ -88,6 +88,17 @@ affinity: {}
 
 llama_stack_url: http://llamastack:8321
 
+# LlamaStack Client Configuration
+# These settings configure both the native LlamaStack client and OpenAI-compatible client
+# By default, clients use Kubernetes auto-injected service discovery environment variables
+# (LLAMASTACK_SERVICE_HOST and LLAMASTACK_SERVICE_PORT). Only override if needed.
+llamastack: {}
+# Uncomment to override Kubernetes auto-discovery:
+# port: 8321                          # Port override (sets LLAMASTACK_CLIENT_PORT, default uses LLAMASTACK_SERVICE_PORT)
+# apiKey: "dummy-key"                 # API key for authentication (default: "dummy-key")
+# openaiBasePath: "/v1/openai/v1"    # Base path for OpenAI-compatible API (default: "/v1/openai/v1")
+# timeout: 120                        # Request timeout in seconds (default: 120)
+
 # Safety/Shield Configuration (Llama Guard)
 safety:
   # Model name for safety checks (e.g., llama-guard-3-8b)

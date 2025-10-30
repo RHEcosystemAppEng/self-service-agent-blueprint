@@ -34,6 +34,24 @@ spec:
               value: {{ .Values.llama_stack_url }}
             - name: LLAMASTACK_SERVICE_HOST
               value: "llamastack"
+            {{- if hasKey .Values "llamastack" }}
+            {{- if .Values.llamastack.port }}
+            - name: LLAMASTACK_CLIENT_PORT
+              value: {{ .Values.llamastack.port | quote }}
+            {{- end }}
+            {{- if .Values.llamastack.apiKey }}
+            - name: LLAMASTACK_API_KEY
+              value: {{ .Values.llamastack.apiKey | quote }}
+            {{- end }}
+            {{- if .Values.llamastack.openaiBasePath }}
+            - name: LLAMASTACK_OPENAI_BASE_PATH
+              value: {{ .Values.llamastack.openaiBasePath | quote }}
+            {{- end }}
+            {{- if .Values.llamastack.timeout }}
+            - name: LLAMASTACK_TIMEOUT
+              value: {{ .Values.llamastack.timeout | quote }}
+            {{- end }}
+            {{- end }}
           command:
             - /bin/bash
             - -c

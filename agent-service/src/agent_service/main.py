@@ -50,7 +50,6 @@ class AgentConfig:
     """Configuration for agent service."""
 
     def __init__(self) -> None:
-        self.llama_stack_url = os.getenv("LLAMA_STACK_URL", "http://llamastack:8321")
         self.broker_url = os.getenv("BROKER_URL")
 
         # BROKER_URL is required for eventing-based communication
