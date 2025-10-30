@@ -189,7 +189,12 @@ class ServiceNowAPIAutomation:
             policy_data = {
                 'name': policy_name,
                 'rest_api': api_name,
-                'active': 'true'
+                'active': 'true',
+                'api_path': 'sn_sc/servicecatalog',
+                'active': 'true',
+                'apply_all_methods': 'true',
+                'apply_all_resources': 'true',
+                'apply_all_versions': 'true'
             }
 
             create_url = f"{self.instance_url}/api/now/table/sys_api_access_policy"
