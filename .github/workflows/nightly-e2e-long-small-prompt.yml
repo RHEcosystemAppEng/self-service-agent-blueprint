@@ -1,0 +1,105 @@
+name: (Small Prompt) Nightly 20 conversation test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * *'  # Run daily at 4 AM UTC
+
+jobs:
+  e2e-tests:
+    name: Run e2e tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate LLM_API_TOKEN_INFERENCE secret
+        shell: bash
+        env:
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_INFERENCE }}
+        run: |
+          if [ -z "${LLM_API_TOKEN}" ]; then
+            echo "LLM_API_TOKEN_INFERENCE secret is missing or empty. Set it in repository or organization secrets."
+            exit 1
+          fi
+      - name: Validate LLM_API_TOKEN_EVAL_70B secret
+        shell: bash
+        env:
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL_70B }}
+        run: |
+          if [ -z "${LLM_API_TOKEN}" ]; then
+            echo "LLM_API_TOKEN_EVAL_70B secret is missing or empty. Set it in repository or organization secrets."
+            exit 1
+          fi
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.6.17"
+          python-version: "3.12"
+
+      - name: Install Local Dependencies
+        shell: bash
+        run: |
+          make oc
+          echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
+
+      - name: Initialize cluster and deploy application
+        uses: ./.github/actions/kind
+        with:
+          llm: ${{ vars.LLM_INFERENCE }}
+          llm_id: ${{ vars.LLM_ID_INFERENCE }}
+          llm_url: ${{ vars.LLM_URL_INFERENCE }}
+        env:
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_INFERENCE }}
+          LG_PROMPT_LAPTOP_REFRESH: /app/agent-service/config/lg-prompts/lg-prompt-small.yaml
+
+      - name: Set `test` as default namespace on Kind
+        shell: bash
+        run: |
+          kubectl config set-context --current --namespace=test
+
+      - name: Install evaluations dependencies
+        shell: bash
+        run: |
+          make sync-evaluations
+
+      - name: Run responses evaluations (Request Manager)
+        if: always()
+        shell: bash
+        run: |
+          make test-long-resp-integration-request-mgr
+        env:
+          LLM_URL: ${{ vars.LLM_URL_EVAL_70B }}
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL_70B }}
+
+      - name: Inspect Cluster - Self-Service Agent
+        if: failure()
+        uses: ./.github/actions/inspect
+        with:
+          artifactPrefix: self-service-agent
+
+      - name: Create evaluations tarball
+        if: always()
+        shell: bash
+        run: |
+          if [ -d "evaluations/results" ]; then
+            tar -czf evaluations-results-${{ github.run_id }}.tar.gz -C evaluations results/
+            echo "Tarball created successfully from evaluations/results/"
+            ls -lh evaluations-results-${{ github.run_id }}.tar.gz
+          else
+            echo "evaluations/results directory not found, creating empty marker"
+            mkdir -p evaluations/results
+            echo "No evaluation results were generated" > evaluations/results/README.txt
+            tar -czf evaluations-results-${{ github.run_id }}.tar.gz -C evaluations results/
+          fi
+
+      - name: Upload evaluations artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluations-results-${{ github.run_id }}
+          path: evaluations-results-${{ github.run_id }}.tar.gz
+          retention-days: 30
+          if-no-files-found: warn
