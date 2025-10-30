@@ -78,6 +78,8 @@ This guide describes the steps required to create a PDI (Personal Development In
        - Lenovo ThinkPad T14 Gen 5 AMD
        - Lenovo ThinkPad P1 Gen 6
      - Click "Insert question"
+     
+Each time you add a laptop option, if you don't provide a value, one will be generated from the name. The values must match the `ServiceNow Code` value specified in the knowledge base. The default values generated will match what was used in the knowledge based in [agent-service/config/knowledge_bases/](https://github.com/RHEcosystemAppEng/self-service-agent-blueprint/tree/main/agent-service/config/knowledge_bases/laptop-refresh)
 
    ### Settings
    - **Submit button label:** Choose "Request"
