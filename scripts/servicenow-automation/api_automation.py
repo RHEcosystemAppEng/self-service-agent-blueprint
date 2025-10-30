@@ -167,7 +167,7 @@ class ServiceNowAPIAutomation:
         print(f"🛡️  Creating API access policy: {policy_name}")
 
         # Check if policy already exists
-        check_url = f"{self.instance_url}/api/now/table/std_http_auth"
+        check_url = f"{self.instance_url}/api/now/table/sys_api_access_policy"
         check_params = {'sysparm_query': f'name={policy_name}'}
 
         try:
@@ -180,19 +180,19 @@ class ServiceNowAPIAutomation:
                 return data['result'][0]['sys_id']
 
             # Get REST API sys_id
-            api_sys_id = self.get_rest_api_sys_id(api_name)
-            if not api_sys_id:
-                print(f"⚠️  REST API '{api_name}' not found, skipping policy creation")
-                return ""
+#             api_sys_id = self.get_rest_api_sys_id(api_name)
+#             if not api_sys_id:
+#                 print(f"⚠️  REST API '{api_name}' not found, skipping policy creation")
+#                 return ""
 
             # Create access policy
             policy_data = {
                 'name': policy_name,
-                'rest_api': api_sys_id,
+                'rest_api': api_name,
                 'active': 'true'
             }
 
-            create_url = f"{self.instance_url}/api/now/table/std_http_auth"
+            create_url = f"{self.instance_url}/api/now/table/sys_api_access_policy"
             response = self.session.post(create_url, json=policy_data)
             response.raise_for_status()
 
@@ -200,16 +200,16 @@ class ServiceNowAPIAutomation:
             policy_sys_id = result['result']['sys_id']
 
             # Add authentication profiles to the policy
-            for auth_profile_sys_id in auth_profiles:
-                if auth_profile_sys_id:  # Only add if we have a valid sys_id
-                    auth_data = {
-                        'api_access_policy': policy_sys_id,
-                        'auth_profile': auth_profile_sys_id
-                    }
-
-                    auth_url = f"{self.instance_url}/api/now/table/std_http_auth_auth"
-                    auth_response = self.session.post(auth_url, json=auth_data)
-                    auth_response.raise_for_status()
+#             for auth_profile_sys_id in auth_profiles:
+#                 if auth_profile_sys_id:  # Only add if we have a valid sys_id
+#                     auth_data = {
+#                         'api_access_policy': policy_sys_id,
+#                         'auth_profile': auth_profile_sys_id
+#                     }
+#
+#                     auth_url = f"{self.instance_url}/api/now/table/sys_api_access_policy"
+#                     auth_response = self.session.post(auth_url, json=auth_data)
+#                     auth_response.raise_for_status()
 
             print(f"✅ API access policy '{policy_name}' created successfully!")
             return policy_sys_id
