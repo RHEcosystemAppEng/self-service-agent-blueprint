@@ -146,7 +146,7 @@ class ServiceNowAPIAutomation:
 
     def get_rest_api_sys_id(self, api_name: str) -> Optional[str]:
         """Get sys_id for a REST API by name."""
-        url = f"{self.instance_url}/api/now/table/sys_rest_api"
+        url = f"{self.instance_url}/api/now/table/api_key"
         params = {'sysparm_query': f'name={api_name}', 'sysparm_fields': 'sys_id'}
 
         try:
