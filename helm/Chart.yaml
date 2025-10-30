@@ -20,5 +20,6 @@ dependencies:
     version: 0.2.22
     repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
   - name: mcp-servers
-    version: 0.1.0
-    repository: file://charts/mcp-servers
+    version: 0.5.6
+    repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
+    condition: mcp-servers.enabled

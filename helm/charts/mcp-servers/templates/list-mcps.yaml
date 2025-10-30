@@ -1,6 +1,0 @@
-{{- $mcps := include "mcp-servers.mergeMcpServers" . | fromJson }}
-{{- if .Values._debugListMcps }}
-{{- range $key, $model := $mcps }}
-MCP server: {{ $key }} ({{ $model.uri }})
-{{- end }}
-{{- end }}

@@ -148,24 +148,29 @@ slack:
       termination: edge
 
 mcp-servers:
+  enabled: true
   mcp-servers:
+    # Custom self-service-agent ServiceNow MCP server
     self-service-agent-snow:
-      deploy: true
-      imageRepository: quay.io/ecosystem-appeng/self-service-agent-snow-mcp
-      pullPolicy: Always
-      uri: http://self-service-agent-snow:8000/sse/
-      imageTag: 0.0.2
+      enabled: true
+      deploymentMode: deployment  # Use standard Deployment (no Toolhive)
+      image:
+        repository: quay.io/ecosystem-appeng/self-service-agent-snow-mcp
+        tag: "0.0.2"
+      port: 8000
+      targetPort: 8000
+      transport: sse
+      imagePullPolicy: Always
       env:
         SERVICENOW_AUTH_TYPE: "basic"
         USE_REAL_SERVICENOW: "false"
 
-    mcp-weather:
-      mcpserver:
-        enabled: false
+    # Disable default servers from architecture chart
+    weather:
+      enabled: false
 
     oracle-sqlcl:
-      mcpserver:
-        enabled: false
+      enabled: false
 
 # Enable/disable the llm-service dependency
 llm-service:
