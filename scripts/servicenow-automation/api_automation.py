@@ -144,24 +144,6 @@ class ServiceNowAPIAutomation:
                 print(f"Response: {e.response.text}")
             raise
 
-    def get_rest_api_sys_id(self, api_name: str) -> Optional[str]:
-        """Get sys_id for a REST API by name."""
-        url = f"{self.instance_url}/api/now/table/api_key"
-        params = {'sysparm_query': f'name={api_name}', 'sysparm_fields': 'sys_id'}
-
-        try:
-            response = self.session.get(url, params=params)
-            response.raise_for_status()
-            data = response.json()
-
-            if data.get('result'):
-                return data['result'][0]['sys_id']
-            return None
-
-        except requests.RequestException as e:
-            print(f"Error getting REST API sys_id for '{api_name}': {e}")
-            return None
-
     def create_api_access_policy(self, policy_name: str, api_name: str, auth_profiles: list) -> str:
         """Create API access policy."""
         print(f"🛡️  Creating API access policy: {policy_name}")
@@ -179,22 +161,26 @@ class ServiceNowAPIAutomation:
                 print(f"✅ API access policy '{policy_name}' already exists")
                 return data['result'][0]['sys_id']
 
-            # Get REST API sys_id
-#             api_sys_id = self.get_rest_api_sys_id(api_name)
-#             if not api_sys_id:
-#                 print(f"⚠️  REST API '{api_name}' not found, skipping policy creation")
-#                 return ""
-
-            # Create access policy
+            # Create access policy with fields matching the working structure
             policy_data = {
                 'name': policy_name,
-                'rest_api': api_name,
                 'active': 'true',
-                'api_path': 'sn_sc/servicecatalog',
                 'apply_all_methods': 'true',
                 'apply_all_resources': 'true',
-                'apply_all_versions': 'true'
+                'apply_all_versions': 'true',
             }
+
+            # For some reason service now is ignoring this value
+            # The following example values haven't worked: b4558e83c3a302006f333b0ac3d3ae8e, Service Catalog API, servicecatalog, service_catalog_api, service-catalog-api
+            policy_data['api'] = api_name
+
+            # Add specific API paths based on the API type
+            if 'SC' in policy_name or 'Service Catalog' in api_name:
+                policy_data['api_path'] = 'sn_sc/servicecatalog'
+            elif 'Table' in api_name:
+                policy_data['api_path'] = 'api/now/table'
+            elif 'UI' in api_name:
+                policy_data['api_path'] = 'api/now/ui'
 
             create_url = f"{self.instance_url}/api/now/table/sys_api_access_policy"
             response = self.session.post(create_url, json=policy_data)
