@@ -11,6 +11,8 @@ This guide describes the steps required to create a PDI (Personal Development In
 
 ## Step 1 - Signup + PDI New Instance
 
+This step establishes your development environment by creating a free ServiceNow Personal Development Instance (PDI). A PDI provides you with a fully functional ServiceNow instance that you can use for testing, development, and learning without affecting any production systems. This is essential for the self-service agent blueprint as it gives you a sandboxed environment where you can safely configure catalogs, users, and API access without any risk or cost.
+
 1. **Sign up for ServiceNow Developer Hub**
    - First, [sign up](https://signon.servicenow.com/x_snc_sso_auth.do?pageId=sign-up) to ServiceNow's Developer Hub.
 
@@ -25,6 +27,8 @@ This guide describes the steps required to create a PDI (Personal Development In
    - **Tip:** You can always return to this link if you forget your instance credentials.
 
 ## Step 2 - Create a new "PC Refresh" Service Catalog
+
+This step creates the service catalog that your AI agent will interact with to fulfill laptop refresh requests. The service catalog acts as the user-facing interface where employees can request new laptops, and it defines the workflow that gets triggered when requests are submitted. By configuring specific laptop choices and request fields, you're essentially creating the structured data that the AI agent can understand and process, enabling it to automatically handle laptop refresh requests according to your organization's hardware options and approval processes.
 
 1. **Open Catalog Builder**
    - Click "All" in the top left corner
@@ -101,6 +105,8 @@ Each time you add a laptop option, if you don't provide a value, one will be gen
 
 ## Step 3 - Create an AI Agent user
 
+This step creates a dedicated service account for your AI agent to authenticate and interact with ServiceNow APIs. By creating a specific user with the "AI Agent" identity type, you're establishing proper security boundaries and audit trails for all automated actions performed by the blueprint. This user account will be used by the MCP (Model Context Protocol) server to authenticate API calls, ensuring that all AI-driven interactions with ServiceNow are properly tracked and attributed to the automated system rather than a human user.
+
 1. **Navigate to Users**
    - Click "All" in the top left corner
    - Search for "Users"
@@ -127,6 +133,8 @@ Each time you add a laptop option, if you don't provide a value, one will be gen
    - Click "Update"
 
 ## Step 4 - Create API Key and API Configuration
+
+This final step establishes the authentication and authorization framework that allows your AI agent to securely access ServiceNow's REST APIs. You'll create API keys for authentication, configure authentication profiles to define how the system validates incoming requests, and set up access policies that specify which APIs the agent can use. This layered security approach ensures that your AI agent has precisely the permissions it needs to read service catalogs, submit requests, and query tables, while preventing unauthorized access to sensitive ServiceNow functionality.
 
 1. **Create API Key**
    - Click "All" in the top left corner
