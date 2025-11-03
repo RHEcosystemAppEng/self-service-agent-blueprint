@@ -17,6 +17,12 @@ from snow.data.data import (
 from snow.servicenow.client import ServiceNowClient
 from snow.servicenow.models import OpenServiceNowLaptopRefreshRequestParams
 from starlette.responses import JSONResponse
+from tracing_config.auto_tracing import run as auto_tracing_run
+from tracing_config.auto_tracing import tracingIsActive
+
+SERVICE_NAME = "snow-mcp-server"
+logger = logging.getLogger(SERVICE_NAME)
+auto_tracing_run(SERVICE_NAME, logger)
 
 MCP_TRANSPORT: Literal["stdio", "sse", "streamable-http"] = os.environ.get("MCP_TRANSPORT", "sse")  # type: ignore[assignment]
 MCP_PORT = int(
@@ -287,6 +293,11 @@ def get_employee_laptop_info(
     )
 
     return result
+
+
+if tracingIsActive():
+    # TODO: trace the MCP requests
+    pass
 
 
 def main() -> None:

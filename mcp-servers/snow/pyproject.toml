@@ -13,6 +13,7 @@ dependencies = [
     "opentelemetry-instrumentation-httpx==0.58b0",
     "pydantic>=2.5.0",
     "requests>=2.25.0",
+    "tracing-config",
 ]
 
 [project.scripts]
@@ -51,3 +52,15 @@ testpaths = ["tests"]
 
 [tool.mypy]
 python_version = "3.12"
+
+# Configure mypy to use source directories for local packages
+mypy_path = "../../tracing-config/src"
+
+[[tool.mypy.overrides]]
+module = [
+    "opentelemetry.*",
+]
+follow_imports = "skip"
+
+[tool.uv.sources]
+tracing-config = { path = "../../tracing-config" }
