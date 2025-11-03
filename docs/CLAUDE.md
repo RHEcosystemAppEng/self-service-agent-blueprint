@@ -184,6 +184,7 @@ make helm-install-test NAMESPACE=dev
 - **`docs/API_REFERENCE.md`**: Complete API documentation and endpoints
 - **`guides/INTEGRATION_GUIDE.md`**: Complete integration and request management guide
 - **`guides/SAFETY_SHIELDS_GUIDE.md`**: Safety shields and content moderation configuration
+- **`guides/PERFORMANCE_SCALING_GUIDE.md`**: Performance characteristics, scaling strategies, and optimization approaches
 - **`docs/ARCHITECTURE_DIAGRAMS.md`**: System architecture and flow diagrams
 - **`guides/AUTHENTICATION_GUIDE.md`**: Enhanced security and authentication setup with production readiness warnings
 - **`guides/SLACK_SETUP.md`**: Slack app configuration guide

@@ -37,18 +37,20 @@
    - [Run Evaluations](#56-run-evaluations)
    - [Follow the Flow with Observability](#57-follow-the-flow-with-observability)
 
-6. [Going Deeper: Component Documentation](#6-going-deeper-component-documentation)
-   - [Core Platform](#61-core-platform)
-   - [Agent Configuration](#62-agent-configuration)
-   - [External Integrations](#63-external-integrations)
-   - [Quality & Operations](#64-quality--operations)
+6. [Performance & Scaling](#6-performance--scaling)
 
-7. [Customizing for Your Use Case](#7-customizing-for-your-use-case)
-   - [Planning Your Use Case](#71-planning-your-use-case)
+7. [Going Deeper: Component Documentation](#7-going-deeper-component-documentation)
+   - [Core Platform](#71-core-platform)
+   - [Agent Configuration](#72-agent-configuration)
+   - [External Integrations](#73-external-integrations)
+   - [Quality & Operations](#74-quality--operations)
 
-8. [Next Steps and Additional Resources](#8-next-steps-and-additional-resources)
-   - [What You've Accomplished](#81-what-youve-accomplished)
-   - [Recommended Next Steps](#82-recommended-next-steps)
+8. [Customizing for Your Use Case](#8-customizing-for-your-use-case)
+   - [Planning Your Use Case](#81-planning-your-use-case)
+
+9. [Next Steps and Additional Resources](#9-next-steps-and-additional-resources)
+   - [What You've Accomplished](#91-what-youve-accomplished)
+   - [Recommended Next Steps](#92-recommended-next-steps)
 
 ---
 
@@ -315,7 +317,7 @@ Helpful but not required:
 
 ### 3.1 Deployment Modes
 
-The blueprint supports two deployment modes that share the same codebase but use different communication infrastructure. You can start with testing mode and transition to production without code changes—only configuration.
+The quickstart supports two deployment modes that share the same codebase but use different communication infrastructure. You can start with testing mode and transition to production without code changes—only configuration.
 
 **Testing Mode (Mock Eventing)**
 
@@ -357,7 +359,7 @@ The system maintains conversational context across multiple interactions regardl
 
 ## 4. COMPONENT OVERVIEW
 
-The blueprint consists of reusable **core platform components** and **use-case-specific components** (demonstrated through the laptop refresh example). Core components work across any IT process without modification, while use-case components show how to customize for specific workflows.
+The quickstart consists of reusable **core platform components** and **use-case-specific components** (demonstrated through the laptop refresh example). Core components work across any IT process without modification, while use-case components show how to customize for specific workflows.
 
 ### 4.1 Core Platform Components (Reusable Across Use Cases)
 
@@ -1125,11 +1127,25 @@ python evaluate.py --num-conversations 5
 
 ---
 
-## 6. GOING DEEPER: COMPONENT DOCUMENTATION
+## 6. PERFORMANCE & SCALING
+
+The Self-Service Agent quickstart is designed for scalability using standard Kubernetes and cloud-native patterns. All core components can be scaled using familiar Kubernetes techniques—horizontal pod autoscaling, replica sets, and resource limits—without requiring custom scaling logic or architectural changes.
+
+**Component Scaling:** The quickstart's services follow standard cloud-native design principles. Most services (mock-eventing, agent-service, integration-dispatcher) can scale both vertically (multiple uvicorn workers per pod) and horizontally (multiple pod replicas) to handle increased load. MCP servers use the FastMCP framework with Server-Sent Events (SSE) transport, which requires single-worker deployments but scales effectively through horizontal replication.
+
+**Infrastructure Scaling:** For supporting infrastructure components, apply industry-standard scaling techniques. PostgreSQL databases can leverage connection pooling, read replicas, and vertical scaling following standard PostgreSQL best practices. When using production mode with Knative Eventing, Apache Kafka benefits from standard Kafka scaling strategies including partitioning, consumer groups, and multi-broker clusters. These are well-documented patterns with extensive ecosystem support.
+
+**Performance Optimization:** Analysis of some evaluation runs shows that 99.7% of request processing time is spent in Llama Stack inference, with the request-manager and event delivery adding only negligible overhead (~12ms total). This means performance optimization efforts should focus primarily on LLM inference scaling—using GPU acceleration, deploying multiple Llama Stack replicas, and selecting appropriately-sized models. The quickstart's architecture ensures that scaling Llama Stack directly translates to end-to-end performance improvements without infrastructure bottlenecks.
+
+For comprehensive scaling guidance, detailed performance characteristics, component-by-component scaling analysis, configuration examples for different deployment sizes, and links to Red Hat and Llama Stack documentation, see the **[Performance and Scaling Guide](guides/PERFORMANCE_SCALING_GUIDE.md)**.
+
+---
+
+## 7. GOING DEEPER: COMPONENT DOCUMENTATION
 
 Now that you have the system running, dive deeper into each component.
 
-### 6.1 Core Platform
+### 7.1 Core Platform
 
 **Request Manager**
 - Full documentation: `request-manager/README.md`
@@ -1150,7 +1166,7 @@ Now that you have the system running, dive deeper into each component.
 
 ---
 
-### 6.2 Agent Configuration
+### 7.2 Agent Configuration
 
 **Agent Service**
 - Topics: Agent registration, knowledge base creation, LangGraph state machine
@@ -1174,7 +1190,7 @@ Now that you have the system running, dive deeper into each component.
 
 ---
 
-### 6.3 External Integrations
+### 7.3 External Integrations
 
 **Slack Setup**
 - Full documentation: [`SLACK_SETUP.md`](guides/SLACK_SETUP.md)
@@ -1185,7 +1201,7 @@ Now that you have the system running, dive deeper into each component.
 
 ---
 
-### 6.4 Quality & Operations
+### 7.4 Quality & Operations
 
 **Evaluation Framework**
 - Full documentation: [`evaluations/README.md`](evaluations/README.md)
@@ -1197,11 +1213,11 @@ Now that you have the system running, dive deeper into each component.
 
 ---
 
-## 7. CUSTOMIZING FOR YOUR USE CASE
+## 8. CUSTOMIZING FOR YOUR USE CASE
 
-The laptop refresh example demonstrates all components. This section guides you in adapting the blueprint for your own IT process.
+The laptop refresh example demonstrates all components. This section guides you in adapting the quickstart for your own IT process.
 
-### 7.1 Planning Your Use Case
+### 8.1 Planning Your Use Case
 
 #### Step 1: Define Your IT Process
 
@@ -1268,9 +1284,9 @@ How will you evaluate the agent?
 - Did generated PIA meet compliance standards?
 - Was submission successful?
 
-## 8. NEXT STEPS AND ADDITIONAL RESOURCES
+## 9. NEXT STEPS AND ADDITIONAL RESOURCES
 
-### 8.1 What You've Accomplished
+### 9.1 What You've Accomplished
 
 By completing this quickstart, you have:
 
@@ -1280,11 +1296,11 @@ By completing this quickstart, you have:
 - ✓ Run evaluations to validate agent behavior
 - ✓ Learned how to customize the system for your own use cases
 
-### 8.2 Recommended Next Steps
+### 9.2 Recommended Next Steps
 
 **For Development Teams:**
 1. Review the [Contributing Guide](docs/CONTRIBUTING.md) for development setup and workflow
-2. Explore the component documentation in Section 6 for deeper technical details
+2. Explore the component documentation in Section 7 for deeper technical details
 3. Review the evaluation framework to understand quality metrics
 4. Experiment with customizing the laptop refresh agent prompts
 5. Set up observability and monitoring for your deployment
@@ -1296,7 +1312,7 @@ By completing this quickstart, you have:
 4. Plan integration with your existing IT service management systems
 
 **For Customizing to Your Use Case:**
-1. Follow the planning guide in Section 7.1
+1. Follow the planning guide in Section 8.1
 2. Review the laptop refresh implementation as a reference (Section 4.2)
 3. Start with agent configuration and knowledge base development
 4. Build MCP servers for your external systems
