@@ -197,13 +197,14 @@ Examples:
             api_results = api_automation.setup_api_configuration()
             results["api"] = api_results
 
+            # TODO fix/investigate the api token field requires decryption
             # Update config with API key token
-            if (
-                api_results.get("api_key", {}).get("token")
-                and api_results["api_key"]["token"] != "hidden"
-            ):
-                config["servicenow"]["api_key_token"] = api_results["api_key"]["token"]
-                config_updated = True
+#             if (
+#                 api_results.get("api_key", {}).get("token")
+#                 and api_results["api_key"]["token"] != "hidden"
+#             ):
+#                 config["servicenow"]["api_key_token"] = api_results["api_key"]["token"]
+#                 config_updated = True
 
         # Step 3: Create catalog
         if not args.skip_catalog:
@@ -229,8 +230,9 @@ Examples:
 
         if results.get("api", {}).get("api_key"):
             print(f"🔑 API Key created: {config['servicenow']['api_key_name']}")
-            if results["api"]["api_key"].get("token") != "hidden":
-                print(f"🔐 Token: {results['api']['api_key']['token']}")
+            print(f"🔐 Token: login into Service Account -> All -> Search for 'REST API Key' for this info")
+            # if results["api"]["api_key"].get("token") != "hidden":
+                # print(f"🔐 Token: {results['api']['api_key']['token']}")
 
         if results.get("catalog"):
             print(f"📦 Catalog item created: {config['catalog']['name']}")
