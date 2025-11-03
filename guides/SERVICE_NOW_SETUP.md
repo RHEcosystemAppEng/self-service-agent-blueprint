@@ -163,7 +163,7 @@ Each time you add a laptop option, if you don't provide a value, one will be gen
    - Click "New"
    - **Name:** `MCP Agent - SC`
    - **REST API:** Service Catalog API
-   - Double click "Insert new row..." and search/select "API Key"
+   - Double click "Insert new row..." and search/select "API Key", and click the green checkmark to add
    - Repeat and select "Basic Auth" (if created in step 3)
    - Click "Submit"
 
@@ -173,7 +173,7 @@ Each time you add a laptop option, if you don't provide a value, one will be gen
    - Click "New"
    - **Name:** `MCP Agent - Tables`
    - **REST API:** Table API
-   - Double click "Insert new row..." and search/select "API Key"
+   - Double click "Insert new row..." and search/select "API Key", and click the green checkmark to add
    - Repeat and select "Basic Auth" (if created in step 3)
    - Click "Submit"
 
@@ -183,7 +183,7 @@ Each time you add a laptop option, if you don't provide a value, one will be gen
    - Click "New"
    - **Name:** `MCP Agent - UI`
    - **REST API:** UI GlideRecord API
-   - Double click "Insert new row..." and search/select "API Key"
+   - Double click "Insert new row..." and search/select "API Key", and click the green checkmark to add
    - Repeat and select "Basic Auth" (if created in step 3)
    - Click "Submit"
 
