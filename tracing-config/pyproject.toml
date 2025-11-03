@@ -54,4 +54,8 @@ python_version = "3.12"
 module = [
     "opentelemetry.*",
 ]
-follow_imports = "skip"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tracing_config.*"
+disable_error_code = ["attr-defined"]
