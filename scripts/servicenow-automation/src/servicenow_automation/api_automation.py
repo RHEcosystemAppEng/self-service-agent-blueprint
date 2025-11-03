@@ -85,7 +85,7 @@ class ServiceNowAPIAutomation:
 
             print(f"✅ API key '{self.api_key_name}' created successfully!")
             print(
-                f"🔐 API Key Token: {api_key_info.get('token', 'Check ServiceNow instance for token')}"
+                f"🔐 API Key Token: login into Service Account -> All -> Search for 'REST API Key' for this info"
             )
             print("⚠️  Please save this token securely!")
 
@@ -266,19 +266,6 @@ def main():
 
         automation = ServiceNowAPIAutomation(config)
         results = automation.setup_api_configuration()
-
-        # Update config with API key token if available
-        if (
-            "token" in results.get("api_key", {})
-            and results["api_key"]["token"] != "hidden"
-        ):
-            config["servicenow"]["api_key_token"] = results["api_key"]["token"]
-
-            # Write updated config back
-            config_path = args.config.replace(".example.json", ".json")
-            with open(config_path, "w") as f:
-                json.dump(config, f, indent=2)
-            print(f"💾 Updated configuration saved to: {config_path}")
 
         print(
             "\n🎉 Setup completed! You can now use the ServiceNow instance with your automation."
