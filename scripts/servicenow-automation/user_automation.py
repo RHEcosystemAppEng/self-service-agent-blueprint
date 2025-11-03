@@ -66,7 +66,7 @@ class ServiceNowUserAutomation:
             'password_needs_reset': 'false',
             'active': 'true',
             'locked_out': 'false',
-            'identity_type': 'ai_agent'
+            'identity_type': 'machine'
         }
 
         url = f"{self.instance_url}/api/now/table/sys_user"
