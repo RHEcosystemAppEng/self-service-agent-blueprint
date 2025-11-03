@@ -127,53 +127,69 @@ class AgentService:
             )
 
     async def _handle_tokens_command(self, request: NormalizedRequest) -> AgentResponse:
-        """Handle tokens command by fetching token statistics from langgraph."""
+        """Handle tokens command by fetching token statistics from database."""
         try:
-            from .langgraph.token_counter import get_token_stats
+            from shared_models.database import get_db_session
+            from shared_models.session_token_service import SessionTokenService
 
-            # Use session-specific token stats, with fallback to global stats
-            # The get_stats method now falls back to global stats when context doesn't exist
-            from .session_manager import get_session_token_context
-
-            token_context = get_session_token_context(request.session_id)
-
-            # Debug logging to see what context is being used
+            # Debug logging
             logger.debug(
-                "Retrieving token stats",
+                "Retrieving token stats from database",
                 session_id=request.session_id,
-                token_context=token_context,
             )
 
-            context_stats = get_token_stats(context=token_context)
+            # Query database for token counts
+            async with get_db_session() as db:
+                token_counts = await SessionTokenService.get_token_counts(
+                    db, request.session_id
+                )
 
-            # Format the response similar to the original chat.py
-            token_summary = f"TOKEN_SUMMARY:INPUT:{context_stats.total_input_tokens}:OUTPUT:{context_stats.total_output_tokens}:TOTAL:{context_stats.total_tokens}:CALLS:{context_stats.call_count}:MAX_SINGLE_INPUT:{context_stats.max_input_tokens}:MAX_SINGLE_OUTPUT:{context_stats.max_output_tokens}:MAX_SINGLE_TOTAL:{context_stats.max_total_tokens}"
+            if token_counts:
+                # Format the response with all token metrics including max values
+                token_summary = f"TOKEN_SUMMARY:INPUT:{token_counts['total_input_tokens']}:OUTPUT:{token_counts['total_output_tokens']}:TOTAL:{token_counts['total_tokens']}:CALLS:{token_counts['llm_call_count']}:MAX_SINGLE_INPUT:{token_counts['max_input_tokens']}:MAX_SINGLE_OUTPUT:{token_counts['max_output_tokens']}:MAX_SINGLE_TOTAL:{token_counts['max_total_tokens']}"
 
-            logger.info(
-                "Token statistics retrieved with fallback",
-                request_id=request.request_id,
-                session_id=request.session_id,
-                token_context=token_context,
-                total_tokens=context_stats.total_tokens,
-                call_count=context_stats.call_count,
-            )
+                logger.info(
+                    "Token statistics retrieved from database",
+                    request_id=request.request_id,
+                    session_id=request.session_id,
+                    total_tokens=token_counts["total_tokens"],
+                    call_count=token_counts["llm_call_count"],
+                )
 
-            return self._create_agent_response(
-                request=request,
-                content=token_summary,
-                agent_id="system",
-                response_type="tokens",
-                metadata={
-                    "total_input_tokens": context_stats.total_input_tokens,
-                    "total_output_tokens": context_stats.total_output_tokens,
-                    "total_tokens": context_stats.total_tokens,
-                    "call_count": context_stats.call_count,
-                    "max_input_tokens": context_stats.max_input_tokens,
-                    "max_output_tokens": context_stats.max_output_tokens,
-                    "max_total_tokens": context_stats.max_total_tokens,
-                },
-                processing_time_ms=0,
-            )
+                return self._create_agent_response(
+                    request=request,
+                    content=token_summary,
+                    agent_id="system",
+                    response_type="tokens",
+                    metadata={
+                        "total_input_tokens": token_counts["total_input_tokens"],
+                        "total_output_tokens": token_counts["total_output_tokens"],
+                        "total_tokens": token_counts["total_tokens"],
+                        "call_count": token_counts["llm_call_count"],
+                        "max_input_tokens": token_counts["max_input_tokens"],
+                        "max_output_tokens": token_counts["max_output_tokens"],
+                        "max_total_tokens": token_counts["max_total_tokens"],
+                    },
+                    processing_time_ms=0,
+                )
+            else:
+                # Session not found or no token counts yet
+                return self._create_agent_response(
+                    request=request,
+                    content="TOKEN_SUMMARY:INPUT:0:OUTPUT:0:TOTAL:0:CALLS:0:MAX_SINGLE_INPUT:0:MAX_SINGLE_OUTPUT:0:MAX_SINGLE_TOTAL:0",
+                    agent_id="system",
+                    response_type="tokens",
+                    metadata={
+                        "total_input_tokens": 0,
+                        "total_output_tokens": 0,
+                        "total_tokens": 0,
+                        "call_count": 0,
+                        "max_input_tokens": 0,
+                        "max_output_tokens": 0,
+                        "max_total_tokens": 0,
+                    },
+                    processing_time_ms=0,
+                )
 
         except Exception as e:
             logger.error(

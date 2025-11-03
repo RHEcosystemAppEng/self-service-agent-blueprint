@@ -278,8 +278,33 @@ def count_tokens_from_response(
                 pass
 
         if input_tokens > 0 or output_tokens > 0:
-            counter = TokenCounter()
-            counter.add_tokens(input_tokens, output_tokens, model, context)
+            # Save to database if context is a session ID
+            if context and context.startswith("session_"):
+                # Extract session_id from context (format: "session_{session_id}")
+                session_id = context[8:]  # Remove "session_" prefix
+
+                # Schedule database save asynchronously (fire and forget)
+                import asyncio
+
+                async def _save_tokens() -> None:
+                    try:
+                        from shared_models.database import get_db_session
+                        from shared_models.session_token_service import (
+                            SessionTokenService,
+                        )
+
+                        async with get_db_session() as db:
+                            await SessionTokenService.update_token_counts(
+                                db, session_id, input_tokens, output_tokens
+                            )
+                    except Exception as e:
+                        import logging
+
+                        logging.getLogger(__name__).warning(
+                            f"Failed to save token counts to database for session {session_id}: {e}"
+                        )
+
+                asyncio.create_task(_save_tokens())
 
         return input_tokens, output_tokens
     except Exception:

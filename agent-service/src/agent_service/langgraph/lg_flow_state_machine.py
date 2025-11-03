@@ -1226,19 +1226,6 @@ class ConversationSession:
         if message.lower() in ["quit", "exit", "q"]:
             return "Session ended."
 
-        if message.lower() == "**tokens**":
-            try:
-                # Try to import token stats, but handle gracefully if not available
-                try:
-                    from .token_counter import get_token_stats
-
-                    stats = get_token_stats()
-                    return f"CURRENT_TOKEN_SUMMARY:INPUT:{stats.total_input_tokens}:OUTPUT:{stats.total_output_tokens}:TOTAL:{stats.total_tokens}:CALLS:{stats.call_count}:MAX_SINGLE_INPUT:{stats.max_input_tokens}:MAX_SINGLE_OUTPUT:{stats.max_output_tokens}:MAX_SINGLE_TOTAL:{stats.max_total_tokens}"
-                except ImportError:
-                    return "Token stats not available"
-            except Exception:
-                return "Token stats not available"
-
         if not message.strip():
             return "Please provide a valid message."
 

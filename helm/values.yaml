@@ -27,7 +27,7 @@ testIntegrationEnabled: false
 # Database Configuration
 database:
   # Expected migration version that services should wait for
-  expectedMigrationVersion: "003"
+  expectedMigrationVersion: "004"
   
   # Database connection URL - leave empty to use default pgvector service
   # Format: postgresql://username:password@host:port/database

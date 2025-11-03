@@ -301,6 +301,13 @@ class ResponsesSessionManager(BaseSessionManager):
                     text, request_manager_session_id, session_name
                 )
 
+            # Intercept special commands before passing to conversation
+            if text.strip().lower() == "**tokens**":
+                logger.debug(
+                    f"Intercepting **tokens** command - user_id: {self.user_id}, request_manager_session_id: {self.request_manager_session_id}"
+                )
+                return await self._handle_tokens_query()
+
             # Send message to current session
             logger.debug(
                 f"Sending message to LangGraph session - user_id: {self.user_id}, current_agent: {self.current_agent_name}, thread_id: {self.conversation_session.thread_id if self.conversation_session else None}"
@@ -489,6 +496,48 @@ class ResponsesSessionManager(BaseSessionManager):
                 exc_info=e,
             )
             return False
+
+    async def _handle_tokens_query(self) -> str:
+        """Handle **tokens** command by querying database for session token counts."""
+        try:
+            if not self.request_manager_session_id:
+                return "Token stats not available (no session ID)"
+
+            from shared_models.database import get_db_session
+            from shared_models.session_token_service import SessionTokenService
+
+            logger.debug(
+                "Querying token counts from database",
+                session_id=self.request_manager_session_id,
+                user_id=self.user_id,
+            )
+
+            async with get_db_session() as db:
+                token_counts = await SessionTokenService.get_token_counts(
+                    db, self.request_manager_session_id
+                )
+
+            if token_counts:
+                logger.info(
+                    "Token counts retrieved from database",
+                    session_id=self.request_manager_session_id,
+                    total_tokens=token_counts["total_tokens"],
+                    call_count=token_counts["llm_call_count"],
+                )
+                return f"CURRENT_TOKEN_SUMMARY:INPUT:{token_counts['total_input_tokens']}:OUTPUT:{token_counts['total_output_tokens']}:TOTAL:{token_counts['total_tokens']}:CALLS:{token_counts['llm_call_count']}:MAX_SINGLE_INPUT:{token_counts['max_input_tokens']}:MAX_SINGLE_OUTPUT:{token_counts['max_output_tokens']}:MAX_SINGLE_TOTAL:{token_counts['max_total_tokens']}"
+            else:
+                logger.debug(
+                    "No token counts found for session",
+                    session_id=self.request_manager_session_id,
+                )
+                return "CURRENT_TOKEN_SUMMARY:INPUT:0:OUTPUT:0:TOTAL:0:CALLS:0:MAX_SINGLE_INPUT:0:MAX_SINGLE_OUTPUT:0:MAX_SINGLE_TOTAL:0"
+
+        except Exception as e:
+            logger.error(
+                f"Failed to retrieve token counts - error: {str(e)}, session_id: {self.request_manager_session_id}",
+                exc_info=e,
+            )
+            return "Token stats not available (error retrieving counts)"
 
     def _create_session_for_agent(
         self,

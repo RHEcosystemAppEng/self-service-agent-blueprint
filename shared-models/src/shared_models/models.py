@@ -118,6 +118,15 @@ class RequestSession(Base, TimestampMixin):  # type: ignore[misc]
     last_request_at = Column(TIMESTAMP(timezone=True))
     expires_at = Column(TIMESTAMP(timezone=True))
 
+    # Token usage tracking
+    total_input_tokens = Column(Integer, default=0, nullable=False)
+    total_output_tokens = Column(Integer, default=0, nullable=False)
+    total_tokens = Column(Integer, default=0, nullable=False)
+    llm_call_count = Column(Integer, default=0, nullable=False)
+    max_input_tokens_per_call = Column(Integer, default=0, nullable=False)
+    max_output_tokens_per_call = Column(Integer, default=0, nullable=False)
+    max_total_tokens_per_call = Column(Integer, default=0, nullable=False)
+
     # Relationships
     request_logs = relationship(
         "RequestLog", back_populates="session", cascade="all, delete-orphan"
