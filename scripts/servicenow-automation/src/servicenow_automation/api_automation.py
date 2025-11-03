@@ -176,9 +176,9 @@ class ServiceNowAPIAutomation:
             if "SC" in policy_name or "Service Catalog" in api_name:
                 policy_data["api_path"] = "sn_sc/servicecatalog"
             elif "Table" in api_name:
-                policy_data["api_path"] = "api/now/table"
+                policy_data["api_path"] = "now/table"
             elif "UI" in api_name:
-                policy_data["api_path"] = "api/now/ui"
+                policy_data["api_path"] = "now/ui"
 
             create_url = f"{self.instance_url}/api/now/table/sys_api_access_policy"
             response = self.session.post(create_url, json=policy_data)
