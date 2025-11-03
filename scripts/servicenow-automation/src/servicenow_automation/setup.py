@@ -4,24 +4,20 @@ ServiceNow PDI Setup Orchestration Script
 Main script that orchestrates the complete ServiceNow PDI setup process.
 """
 
-import json
 import argparse
+import json
 import sys
-import os
 from pathlib import Path
 
-# Add the current directory to the path so we can import our modules
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-from user_automation import ServiceNowUserAutomation
-from api_automation import ServiceNowAPIAutomation
-from catalog_automation import ServiceNowCatalogAutomation
+from .api_automation import ServiceNowAPIAutomation
+from .catalog_automation import ServiceNowCatalogAutomation
+from .user_automation import ServiceNowUserAutomation
 
 
 def load_config(config_path: str) -> dict:
     """Load configuration from JSON file."""
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             return json.load(f)
     except FileNotFoundError:
         print(f"❌ Configuration file not found: {config_path}")
@@ -34,7 +30,7 @@ def load_config(config_path: str) -> dict:
 def save_config(config: dict, config_path: str):
     """Save updated configuration to JSON file."""
     try:
-        with open(config_path, 'w') as f:
+        with open(config_path, "w") as f:
             json.dump(config, f, indent=2)
         print(f"💾 Configuration saved to: {config_path}")
     except Exception as e:
@@ -44,21 +40,21 @@ def save_config(config: dict, config_path: str):
 def validate_config(config: dict) -> bool:
     """Validate that required configuration fields are present."""
     required_fields = [
-        'servicenow.instance_url',
-        'servicenow.admin_username',
-        'servicenow.admin_password',
-        'servicenow.agent_user.user_id',
-        'servicenow.agent_user.first_name',
-        'servicenow.agent_user.last_name',
-        'catalog.name',
-        'catalog.short_description',
-        'catalog.laptop_choices'
+        "servicenow.instance_url",
+        "servicenow.admin_username",
+        "servicenow.admin_password",
+        "servicenow.agent_user.user_id",
+        "servicenow.agent_user.first_name",
+        "servicenow.agent_user.last_name",
+        "catalog.name",
+        "catalog.short_description",
+        "catalog.laptop_choices",
     ]
 
     missing_fields = []
 
     for field in required_fields:
-        keys = field.split('.')
+        keys = field.split(".")
         current = config
 
         try:
@@ -95,9 +91,9 @@ def confirm_proceed(message: str) -> bool:
     """Ask user for confirmation before proceeding."""
     while True:
         response = input(f"{message} (y/n): ").lower().strip()
-        if response in ['y', 'yes']:
+        if response in ["y", "yes"]:
             return True
-        elif response in ['n', 'no']:
+        elif response in ["n", "no"]:
             return False
         else:
             print("Please enter 'y' or 'n'")
@@ -105,21 +101,29 @@ def confirm_proceed(message: str) -> bool:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Complete ServiceNow PDI setup automation',
+        description="Complete ServiceNow PDI setup automation",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python setup_servicenow.py --config config.json
-  python setup_servicenow.py --config config.json --skip-user
-  python setup_servicenow.py --config config.json --skip-api --skip-catalog
-        """
+  setup-servicenow --config config.json
+  setup-servicenow --config config.json --skip-user
+  setup-servicenow --config config.json --skip-api --skip-catalog
+        """,
     )
 
-    parser.add_argument('--config', required=True, help='Path to configuration file')
-    parser.add_argument('--skip-user', action='store_true', help='Skip user creation step')
-    parser.add_argument('--skip-api', action='store_true', help='Skip API configuration step')
-    parser.add_argument('--skip-catalog', action='store_true', help='Skip catalog creation step')
-    parser.add_argument('--no-confirm', action='store_true', help='Skip confirmation prompts')
+    parser.add_argument("--config", required=True, help="Path to configuration file")
+    parser.add_argument(
+        "--skip-user", action="store_true", help="Skip user creation step"
+    )
+    parser.add_argument(
+        "--skip-api", action="store_true", help="Skip API configuration step"
+    )
+    parser.add_argument(
+        "--skip-catalog", action="store_true", help="Skip catalog creation step"
+    )
+    parser.add_argument(
+        "--no-confirm", action="store_true", help="Skip confirmation prompts"
+    )
 
     args = parser.parse_args()
 
@@ -174,11 +178,16 @@ Examples:
             print_step(1, "Create MCP Agent User")
             user_automation = ServiceNowUserAutomation(config)
             user_results = user_automation.setup_user()
-            results['user'] = user_results
+            results["user"] = user_results
 
             # Update config with generated password
-            if user_results.get('password') and user_results['password'] != 'existing_user':
-                config['servicenow']['agent_user']['password'] = user_results['password']
+            if (
+                user_results.get("password")
+                and user_results["password"] != "existing_user"
+            ):
+                config["servicenow"]["agent_user"]["password"] = user_results[
+                    "password"
+                ]
                 config_updated = True
 
         # Step 2: Configure API
@@ -186,11 +195,14 @@ Examples:
             print_step(2, "Configure API Keys and Authentication")
             api_automation = ServiceNowAPIAutomation(config)
             api_results = api_automation.setup_api_configuration()
-            results['api'] = api_results
+            results["api"] = api_results
 
             # Update config with API key token
-            if api_results.get('api_key', {}).get('token') and api_results['api_key']['token'] != 'hidden':
-                config['servicenow']['api_key_token'] = api_results['api_key']['token']
+            if (
+                api_results.get("api_key", {}).get("token")
+                and api_results["api_key"]["token"] != "hidden"
+            ):
+                config["servicenow"]["api_key_token"] = api_results["api_key"]["token"]
                 config_updated = True
 
         # Step 3: Create catalog
@@ -198,29 +210,29 @@ Examples:
             print_step(3, "Create PC Refresh Catalog Item")
             catalog_automation = ServiceNowCatalogAutomation(config)
             catalog_results = catalog_automation.setup_catalog()
-            results['catalog'] = catalog_results
+            results["catalog"] = catalog_results
 
         # Save updated configuration
         if config_updated:
-            config_path = args.config.replace('.example.json', '.json')
+            config_path = args.config.replace(".example.json", ".json")
             save_config(config, config_path)
 
         # Print final summary
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("🎉 Setup completed successfully!")
-        print("="*60)
+        print("=" * 60)
 
-        if results.get('user'):
+        if results.get("user"):
             print(f"👤 User created: {config['servicenow']['agent_user']['user_id']}")
-            if results['user'].get('password') != 'existing_user':
+            if results["user"].get("password") != "existing_user":
                 print(f"🔐 Password: {results['user']['password']}")
 
-        if results.get('api', {}).get('api_key'):
+        if results.get("api", {}).get("api_key"):
             print(f"🔑 API Key created: {config['servicenow']['api_key_name']}")
-            if results['api']['api_key'].get('token') != 'hidden':
+            if results["api"]["api_key"].get("token") != "hidden":
                 print(f"🔐 Token: {results['api']['api_key']['token']}")
 
-        if results.get('catalog'):
+        if results.get("catalog"):
             print(f"📦 Catalog item created: {config['catalog']['name']}")
 
         print("\n📝 Next steps:")
@@ -230,7 +242,9 @@ Examples:
         print("4. Test the catalog item in the Service Portal")
         print("5. Update your blueprint configuration with the new credentials")
 
-        print(f"\n💾 Credentials saved to: {config_path.replace('.example.json', '.json')}")
+        print(
+            f"\n💾 Credentials saved to: {config_path.replace('.example.json', '.json')}"
+        )
         print("⚠️  Keep these credentials secure!")
 
     except KeyboardInterrupt:
@@ -241,5 +255,5 @@ Examples:
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

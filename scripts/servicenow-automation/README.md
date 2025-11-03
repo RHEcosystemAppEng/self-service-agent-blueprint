@@ -26,9 +26,10 @@ The scripts automate most of the manual steps described in the [ServiceNow Setup
 
 ## 📋 Prerequisites
 
-1. **Python 3.7+** with `requests` library:
+1. **Python 3.12+** and **uv** package manager:
    ```bash
-   pip install requests
+   # Install uv if you haven't already
+   curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
 2. **ServiceNow PDI Instance**:
@@ -60,12 +61,26 @@ Edit `config.json` with your ServiceNow instance details:
 }
 ```
 
-### 2. Run Complete Setup
+### 2. Install Dependencies
+
+Install the project and its dependencies using uv:
+
+```bash
+cd scripts/servicenow-automation
+uv sync
+```
+
+For development dependencies (optional):
+```bash
+uv sync --group dev
+```
+
+### 3. Run Complete Setup
 
 Execute the main orchestration script:
 
 ```bash
-python setup_servicenow.py --config config.json
+uv run setup-servicenow --config config.json
 ```
 
 The script will:
@@ -74,7 +89,7 @@ The script will:
 - Execute all steps in sequence
 - Save generated credentials to `config.json`
 
-### 3. Verify Results
+### 4. Verify Results
 
 1. Log into your ServiceNow instance
 2. Check that the MCP Agent user was created
@@ -83,23 +98,23 @@ The script will:
 
 ## 📜 Individual Scripts
 
-You can also run individual automation scripts:
+You can also run individual automation modules using Python's module syntax:
 
 ### User Automation
 ```bash
-python user_automation.py --config config.json
+uv run python -m servicenow_automation.user_automation --config config.json
 ```
 Creates the MCP Agent user, generates password, and assigns roles.
 
 ### API Automation
 ```bash
-python api_automation.py --config config.json
+uv run python -m servicenow_automation.api_automation --config config.json
 ```
 Sets up API keys, authentication profiles, and access policies.
 
 ### Catalog Automation
 ```bash
-python catalog_automation.py --config config.json
+uv run python -m servicenow_automation.catalog_automation --config config.json
 ```
 Creates the PC Refresh catalog item with variables and choices.
 
@@ -145,16 +160,16 @@ The laptop choices in the configuration match the ServiceNow codes used in the k
 
 ```bash
 # Skip user creation (if already done)
-python setup_servicenow.py --config config.json --skip-user
+uv run setup-servicenow --config config.json --skip-user
 
 # Skip API setup
-python setup_servicenow.py --config config.json --skip-api
+uv run setup-servicenow --config config.json --skip-api
 
 # Skip catalog creation
-python setup_servicenow.py --config config.json --skip-catalog
+uv run setup-servicenow --config config.json --skip-catalog
 
 # Run without confirmation prompts
-python setup_servicenow.py --config config.json --no-confirm
+uv run setup-servicenow --config config.json --no-confirm
 ```
 
 ### Re-running Scripts
@@ -249,6 +264,46 @@ If you find issues or want to improve the automation:
 2. Update this README if needed
 3. Consider backward compatibility
 4. Add appropriate error handling
+
+## 👨‍💻 Development
+
+This project uses modern Python tooling with uv for package management:
+
+### Development Setup
+```bash
+# Clone and navigate to the project
+cd scripts/servicenow-automation
+
+# Install with development dependencies
+uv sync --group dev
+
+# Run linting and formatting
+uv run black src/ tests/
+uv run flake8 src/ tests/
+uv run isort src/ tests/
+
+# Run type checking
+uv run mypy src/
+
+# Run tests (when available)
+uv run pytest
+```
+
+### Project Structure
+```
+scripts/servicenow-automation/
+├── pyproject.toml              # Project configuration and dependencies
+├── README.md                   # This file
+├── config.example.json         # Example configuration
+├── src/servicenow_automation/  # Main package
+│   ├── __init__.py
+│   ├── setup.py              # Main entry point
+│   ├── user_automation.py    # User management automation
+│   ├── api_automation.py     # API configuration automation
+│   └── catalog_automation.py # Catalog setup automation
+└── tests/                     # Test directory
+    └── __init__.py
+```
 
 ## 📝 License
 
