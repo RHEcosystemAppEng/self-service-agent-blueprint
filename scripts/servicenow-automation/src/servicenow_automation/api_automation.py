@@ -168,7 +168,8 @@ class ServiceNowAPIAutomation:
                 "apply_all_versions": "true",
             }
 
-            # For some reason service now is ignoring this value
+            # TODO fix/investigate
+            # For some reason service now is ignoring the "api" field value
             # The following example values haven't worked: b4558e83c3a302006f333b0ac3d3ae8e, Service Catalog API, servicecatalog, service_catalog_api, service-catalog-api
             policy_data["api"] = api_name
 
@@ -188,16 +189,16 @@ class ServiceNowAPIAutomation:
             policy_sys_id = result["result"]["sys_id"]
 
             # Add authentication profiles to the policy
-            #             for auth_profile_sys_id in auth_profiles:
-            #                 if auth_profile_sys_id:  # Only add if we have a valid sys_id
-            #                     auth_data = {
-            #                         'api_access_policy': policy_sys_id,
-            #                         'auth_profile': auth_profile_sys_id
-            #                     }
-            #
-            #                     auth_url = f"{self.instance_url}/api/now/table/sys_api_access_policy"
-            #                     auth_response = self.session.post(auth_url, json=auth_data)
-            #                     auth_response.raise_for_status()
+            for auth_profile_sys_id in auth_profiles:
+                if auth_profile_sys_id:
+                    auth_data = {
+                        'api_access_policy': policy_sys_id,
+                        'auth_profile': auth_profile_sys_id
+                    }
+#                     TODO this currently isn't working and has to be set manually
+#                     auth_url = f"{self.instance_url}/api/now/table/sys_api_access_policy"
+#                     auth_response = self.session.post(auth_url, json=auth_data)
+#                     auth_response.raise_for_status()
 
             print(f"✅ API access policy '{policy_name}' created successfully!")
             return policy_sys_id
