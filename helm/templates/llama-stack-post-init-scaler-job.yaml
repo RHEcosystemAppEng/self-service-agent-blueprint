@@ -1,0 +1,94 @@
+{{- if .Values.llamastack.postInitScaling.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-llama-stack-post-init-scaler
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: llama-stack-scaler
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "self-service-agent.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: llama-stack-scaler
+    spec:
+      serviceAccountName: {{ include "self-service-agent.fullname" . }}-llama-stack-scaler
+      restartPolicy: OnFailure
+      containers:
+      - name: scale-deployment
+        image: bitnami/kubectl:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: NAMESPACE
+          value: {{ .Release.Namespace }}
+        - name: INIT_JOB_NAME
+          value: "self-service-agent-init"
+        - name: DEPLOYMENT_NAME
+          value: "llamastack"
+        - name: TARGET_REPLICAS
+          value: {{ .Values.llamastack.postInitScaling.targetReplicas | quote }}
+        - name: TIMEOUT_SECONDS
+          value: "600"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "Waiting for init job '$INIT_JOB_NAME' to complete..."
+
+          start_time=$(date +%s)
+          while true; do
+            # Check if job exists
+            if ! kubectl get job "$INIT_JOB_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+              echo "Init job '$INIT_JOB_NAME' not found, waiting..."
+              sleep 5
+              continue
+            fi
+
+            # Check job status
+            job_status=$(kubectl get job "$INIT_JOB_NAME" -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}')
+
+            if [ "$job_status" = "True" ]; then
+              echo "Init job completed successfully"
+              break
+            fi
+
+            # Check for failed job
+            job_failed=$(kubectl get job "$INIT_JOB_NAME" -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}')
+            if [ "$job_failed" = "True" ]; then
+              echo "ERROR: Init job failed. Aborting scaling."
+              exit 1
+            fi
+
+            # Check timeout
+            current_time=$(date +%s)
+            elapsed=$((current_time - start_time))
+            if [ $elapsed -gt $TIMEOUT_SECONDS ]; then
+              echo "ERROR: Timeout waiting for init job to complete"
+              exit 1
+            fi
+
+            echo "Still waiting... (${elapsed}s elapsed)"
+            sleep 10
+          done
+
+          echo "Scaling deployment '$DEPLOYMENT_NAME' to $TARGET_REPLICAS replicas..."
+          kubectl scale deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" --replicas=$TARGET_REPLICAS
+
+          echo "Waiting for deployment to scale..."
+          kubectl wait --for=condition=available --timeout=300s deployment/"$DEPLOYMENT_NAME" -n "$NAMESPACE"
+
+          echo "Successfully scaled deployment to $TARGET_REPLICAS replicas"
+
+          # Verify final replica count
+          actual_replicas=$(kubectl get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}')
+          echo "Final replica count: $actual_replicas"
+{{- end }}

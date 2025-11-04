@@ -42,32 +42,34 @@ Asyncio is a great fit for this quickstart as we've seen that most of the time a
 
 ### Quickstart components
 
-Use standard kubernetes scaling techniques. For agent-service, integration-dispatcher, request-manager, mock-eventing, you can scale the number of uvicorn workers as well as the number of replicas. For MCP servers (such as snow) you must use 1 uvicorn worker and scale the number of replicas. Both the number of workers and number of replicas can be configured in helm/values.yaml. As an example this snippet which is part of the configuration for the agent service set the workers to 4, starts with 1 replica and allows scaling up to 5 replicas as load increases:
+Use standard kubernetes scaling techniques. For agent-service, integration-dispatcher, request-manager, mock-eventing, you can scale the number of uvicorn workers as well as the number of replicas. For MCP servers (such as snow) see the section below as there are special considerations. Both the number of workers and number of replicas can be configured in helm/values.yaml. As an example this snippet which is part of the configuration for the agent service sets 4 workers and 2 replicas:
 
 ```
  agentService:
-    replicas: 1
+    replicas: 2
     uvicornWorkers: 4  # Number of uvicorn worker processes for handling concurrent requests
-
-...
-
-    autoscaling:
-      enabled: false
-      minReplicas: 1
-      maxReplicas: 5
-      targetCPUUtilization: 70
-      targetMemoryUtilization: 80
 ```
+
+In addition, autoscaling can also be configured to scale up the number of pods as load increases.
 
 These are a few documents which may be of interest:
 
 - [Scalability and performance | OpenShift Container Platform 4.20 Documentation](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/scalability_and_performance/index)
 - [Capacity management and overcommitment best practices in Red Hat OpenShift](https://www.redhat.com/en/blog/capacity-management-overcommitment-best-practices-openshift)
 
+### MCP Server Scaling (for example snow MCP server)
+
+MCP servers often have state which can complicate scaling. For example the default for FastMCP is sse
+which maintains state.
+
+This quickstart uses streamable-http with stateless http to keep the server stateless. By using this combination scaling
+is possible both with uvicorn worker and multiple pod replicas.
 
 ### Llama Stack
 
-Use standard kubernetes scaling techniques. These are a few documents which may be of interest:
+LlamaStack can be scaled horizontally using multiple replicas. **Important: You must configure PostgreSQL-backed storage for multi-replica deployments** to ensure resources like knowledge bases are shared across all replicas.
+
+These are a few documents which may be of interest:
 
 - [Llama Stack Kubernetes Operator - Quick Start](https://llama-stack-k8s-operator.pages.dev/getting-started/quick-start/)
 - [Deploying Llama Stack on Kubernetes](https://llama-stack-k8s-operator.pages.dev/how-to/deploy-llamastack/)

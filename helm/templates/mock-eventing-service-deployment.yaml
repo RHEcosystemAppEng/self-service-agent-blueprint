@@ -9,7 +9,7 @@ metadata:
     {{- include "self-service-agent.labels" . | nindent 4 }}
     app.kubernetes.io/component: mock-eventing
 spec:
-  replicas: 1
+  replicas: {{ .Values.requestManagement.knative.mockEventing.replicas }}
   selector:
     matchLabels:
       {{- include "self-service-agent.selectorLabels" . | nindent 6 }}

@@ -23,7 +23,7 @@ MCP_PORT = int(
     os.environ.get("SELF_SERVICE_AGENT_SNOW_SERVER_SERVICE_PORT_HTTP", "8001")
 )
 MCP_HOST = os.environ.get("MCP_HOST", "0.0.0.0")
-mcp = FastMCP("Snow Server", host=MCP_HOST)
+mcp = FastMCP("Snow Server", host=MCP_HOST, stateless_http=(MCP_TRANSPORT == "streamable-http"))
 
 
 def _should_use_real_servicenow() -> bool:
@@ -292,6 +292,10 @@ def get_employee_laptop_info(
 def main() -> None:
     """Run the Snow Server MCP server."""
     mcp.run(transport=MCP_TRANSPORT)
+
+
+# Expose the ASGI app for uvicorn (for streamable-http transport)
+app = mcp.streamable_http_app()
 
 
 if __name__ == "__main__":

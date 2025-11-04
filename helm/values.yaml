@@ -92,7 +92,16 @@ llama_stack_url: http://llamastack:8321
 # These settings configure both the native LlamaStack client and OpenAI-compatible client
 # By default, clients use Kubernetes auto-injected service discovery environment variables
 # (LLAMASTACK_SERVICE_HOST and LLAMASTACK_SERVICE_PORT). Only override if needed.
-llamastack: {}
+llamastack:
+  # Post-init scaling configuration
+  # When enabled, llama-stack starts with 1 replica (from llama-stack chart default)
+  # After init job completes, this job scales deployment to targetReplicas
+  # Note: This is controlled by REPLICA_COUNT in Makefile - if REPLICA_COUNT is set,
+  #       this will be enabled automatically and targetReplicas will be set to REPLICA_COUNT
+  postInitScaling:
+    enabled: false  # Set to true to enable post-init scaling (or use REPLICA_COUNT in Makefile)
+    targetReplicas: 2  # Number of replicas to scale to after init completes
+
 # Uncomment to override Kubernetes auto-discovery:
 # port: 8321                          # Port override (sets LLAMASTACK_CLIENT_PORT, default uses LLAMASTACK_SERVICE_PORT)
 # apiKey: "dummy-key"                 # API key for authentication (default: "dummy-key")
@@ -118,9 +127,33 @@ pgvector:
 
 # Llama Stack agents configuration with PostgreSQL persistence
 llama-stack:
+  replicaCount: 1
   initContainers:
     enabled: true
   resources: {}
+
+  # Configure metadata store to use PostgreSQL for multi-replica support
+  metadataStore:
+    type: postgres
+    db_path: null  # Explicitly unset SQLite field
+    host: ${env.POSTGRES_HOST:=pgvector}
+    port: ${env.POSTGRES_PORT:=5432}
+    db: ${env.POSTGRES_DBNAME:=rag_blueprint}
+    user: ${env.POSTGRES_USER:=postgres}
+    password: ${env.POSTGRES_PASSWORD:=rag_password}
+    namespace: llamastack_registry
+
+  # Configure vector_io kvstore to use PostgreSQL for multi-replica support
+  vectorIOKvstore:
+    type: postgres
+    db_path: null  # Explicitly unset SQLite field
+    namespace: llamastack_vector_io
+    host: ${env.POSTGRES_HOST:=pgvector}
+    port: ${env.POSTGRES_PORT:=5432}
+    db: ${env.POSTGRES_DBNAME:=rag_blueprint}
+    user: ${env.POSTGRES_USER:=postgres}
+    password: ${env.POSTGRES_PASSWORD:=rag_password}
+
   providers:
     agents:
       - provider_id: meta-ref-postgres
@@ -164,17 +197,23 @@ mcp-servers:
     # Custom self-service-agent ServiceNow MCP server
     self-service-agent-snow:
       enabled: true
+      replicas: 1
       deploymentMode: deployment  # Use standard Deployment (no Toolhive)
       image:
         repository: quay.io/ecosystem-appeng/self-service-agent-snow-mcp
         tag: "0.0.2"
       port: 8000
       targetPort: 8000
-      transport: sse
+      transport: streamable-http
       imagePullPolicy: Always
       env:
+        MCP_TRANSPORT: "streamable-http"
         SERVICENOW_AUTH_TYPE: "basic"
         USE_REAL_SERVICENOW: "false"
+        # Number of uvicorn worker processes (stateless-http allows multiple workers)
+        # Note: The mcp-servers chart doesn't auto-convert uvicornWorkers field to env var,
+        # so we set it directly in the env section
+        UVICORN_WORKERS: "4"
 
     # Disable default servers from architecture chart
     weather:
@@ -210,6 +249,7 @@ requestManagement:
     # Mock Eventing Service (default eventing mode for development and testing)
     mockEventing:
       enabled: true  # Default to mock eventing service (disable for full Knative eventing)
+      replicas: 1
       logLevel: "INFO"
       uvicornWorkers: 4  # Number of uvicorn worker processes for handling concurrent requests
       resources: {}

@@ -51,4 +51,9 @@ USER 1001
 EXPOSE 8000
 
 # Run the MCP server
-CMD python src/$(echo $MODULE_NAME | sed 's/\./\//').py
+# Support optional UVICORN_WORKERS environment variable for multi-process concurrency
+CMD if [ -n "$UVICORN_WORKERS" ]; then \
+      uvicorn $MODULE_NAME:app --host 0.0.0.0 --port 8000 --workers $UVICORN_WORKERS; \
+    else \
+      uvicorn $MODULE_NAME:app --host 0.0.0.0 --port 8000; \
+    fi

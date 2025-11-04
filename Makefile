@@ -6,6 +6,9 @@ endif
 endif
 
 VERSION ?= 0.0.2
+# Replica count - can be set with REPLICA_COUNT=X to override all replica counts
+# If not set, uses defaults from helm/values.yaml
+REPLICA_COUNT ?=
 CONTAINER_TOOL ?= podman
 REGISTRY ?= quay.io/ecosystem-appeng
 PYTHON_VERSION ?= 3.12
@@ -104,6 +107,15 @@ helm_generic_args = \
 	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set otelExporter=$(OTEL_EXPORTER_OTLP_ENDPOINT),) \
 	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set llama-stack.otelExporter=$(OTEL_EXPORTER_OTLP_ENDPOINT),)
 
+helm_replica_count_args = \
+	$(if $(REPLICA_COUNT),--set llamastack.postInitScaling.enabled=true,) \
+	$(if $(REPLICA_COUNT),--set llamastack.postInitScaling.targetReplicas=$(REPLICA_COUNT),) \
+	$(if $(REPLICA_COUNT),--set mcp-servers.mcp-servers.self-service-agent-snow.replicas=$(REPLICA_COUNT),) \
+	$(if $(REPLICA_COUNT),--set requestManagement.knative.mockEventing.replicas=$(REPLICA_COUNT),) \
+	$(if $(REPLICA_COUNT),--set requestManagement.kafka.replicas=$(REPLICA_COUNT),) \
+	$(if $(REPLICA_COUNT),--set requestManagement.integrationDispatcher.replicas=$(REPLICA_COUNT),) \
+	$(if $(REPLICA_COUNT),--set requestManagement.agentService.replicas=$(REPLICA_COUNT),)
+
 # Version target
 .PHONY: version
 version:
@@ -176,6 +188,8 @@ help:
 	@echo "  test-request-manager                - Run tests for request manager"
 	@echo "  test-shared-models                  - Run tests for shared models"
 	@echo "  test-short-resp-integration-request-mgr - Run short responses integration tests with Request Manager"
+	@echo "  test-long-resp-integration-request-mgr - Run long responses integration tests with Request Manager"
+	@echo "  test-long-concurrent-integration-request-mgr - Run long concurrent responses integration tests with Request Manager (concurrency=4)"
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  format                              - Run isort import sorting and Black formatting on entire codebase"
@@ -192,6 +206,11 @@ help:
 	@echo "    REGISTRY                          - Container registry (default: quay.io/ecosystem-appeng)"
 	@echo "    VERSION                           - Image version tag (default: 0.0.2)"
 	@echo "    NAMESPACE                         - Target namespace (required, no default)"
+	@echo "    REPLICA_COUNT                     - Number of replicas for scalable services (optional)"
+	@echo "                                        If set, overrides defaults from helm/values.yaml"
+	@echo "                                        If not set, uses defaults from helm/values.yaml"
+	@echo "                                        Applies to: llama-stack, snow MCP, mock-eventing, kafka,"
+	@echo "                                        integration-dispatcher, and agent-service"
 	@echo ""
 	@echo "  Image Configuration:"
 	@echo "    AGENT_SERVICE_IMG                 - Full agent service image name (default: \$${REGISTRY}/self-service-agent-service:\$${VERSION})"
@@ -780,6 +799,12 @@ test-long-resp-integration-request-mgr:
 	uv --directory evaluations run evaluate.py -n 20 --test-script chat-responses-request-mgr.py --reset-conversation --timeout=1800
 	@echo "long responses integrations tests with Request Manager completed successfully!"
 
+.PHONY: test-long-concurrent-integration-request-mgr
+test-long-concurrent-integration-request-mgr:
+	@echo "Running long concurrent responses integration test with Request Manager..."
+	uv --directory evaluations run evaluate.py -n 10 --test-script chat-responses-request-mgr.py --reset-conversation --timeout=1800 --concurrency 4 --message-timeout 120
+	@echo "long concurrent responses integrations tests with Request Manager completed successfully!"
+
 # Create namespace and deploy
 namespace:
 	@kubectl create namespace $(NAMESPACE) &> /dev/null && kubectl label namespace $(NAMESPACE) modelmesh-enabled=false ||:
@@ -802,6 +827,7 @@ define helm_install_common
 	@$(eval REQUEST_MANAGEMENT_ARGS := $(helm_request_management_args))
 	@$(eval LOG_LEVEL_ARGS := $(if $(LOG_LEVEL),--set logLevel=$(LOG_LEVEL),))
 	@$(eval GENERIC_ARGS := $(helm_generic_args))
+	@$(eval REPLICA_COUNT_ARGS := $(helm_replica_count_args))
 
 	@if [ "$(USE_REAL_SERVICENOW)" = "true" ]; then \
 		echo "Creating ServiceNow credentials secret..."; \
@@ -842,6 +868,7 @@ define helm_install_common
 		$(REQUEST_MANAGEMENT_ARGS) \
 		$(LOG_LEVEL_ARGS) \
 		$(GENERIC_ARGS) \
+		$(REPLICA_COUNT_ARGS) \
 		$(if $(filter-out "",$(2)),$(2),) \
 		$(EXTRA_HELM_ARGS)
 	@echo "Waiting for request manager deployment..."
