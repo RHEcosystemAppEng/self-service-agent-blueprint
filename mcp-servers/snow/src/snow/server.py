@@ -16,9 +16,9 @@ from snow.data.data import (
 )
 from snow.servicenow.client import ServiceNowClient
 from snow.servicenow.models import OpenServiceNowLaptopRefreshRequestParams
+from snow.tracing import trace_mcp_tool
 from starlette.responses import JSONResponse
 from tracing_config.auto_tracing import run as auto_tracing_run
-from tracing_config.auto_tracing import tracingIsActive
 
 SERVICE_NAME = "snow-mcp-server"
 logger = logging.getLogger(SERVICE_NAME)
@@ -207,6 +207,7 @@ async def health(request: Any) -> JSONResponse:
 
 
 @mcp.tool()
+@trace_mcp_tool()
 def open_laptop_refresh_ticket(
     employee_name: str,
     business_justification: str,
@@ -271,6 +272,7 @@ def open_laptop_refresh_ticket(
 
 
 @mcp.tool()
+@trace_mcp_tool()
 def get_employee_laptop_info(
     ctx: Context[Any, Any],
     dummy_parameter: str = "",
@@ -335,11 +337,6 @@ def get_employee_laptop_info(
     )
 
     return result
-
-
-if tracingIsActive():
-    # TODO: trace the MCP requests
-    pass
 
 
 def main() -> None:

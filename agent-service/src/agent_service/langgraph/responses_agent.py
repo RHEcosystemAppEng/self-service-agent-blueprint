@@ -4,6 +4,8 @@ from typing import Any, Dict, Optional
 
 import yaml
 from agent_service.utils import create_llamastack_client
+from opentelemetry.propagate import inject
+from tracing_config.auto_tracing import tracingIsActive
 
 from .util import load_config_from_path, resolve_agent_service_path
 
@@ -218,6 +220,15 @@ class Agent:
                     # Add headers if provided
                     if authoritative_user_id:
                         tool_headers["AUTHORITATIVE_USER_ID"] = authoritative_user_id
+
+                    # Add tracing headers if tracing is active
+                    if tracingIsActive():
+                        # Inject current tracing context into headers
+                        # This will add traceparent and tracestate headers
+                        inject(tool_headers)
+                        logger.debug(
+                            f"Injected tracing headers for MCP server {server_name}: {list(tool_headers.keys())}"
+                        )
 
                     # Add ServiceNow API key header for pass-through authentication
                     # Read from environment dynamically, just like authoritative_user_id
