@@ -23,7 +23,9 @@ MCP_PORT = int(
     os.environ.get("SELF_SERVICE_AGENT_SNOW_SERVER_SERVICE_PORT_HTTP", "8001")
 )
 MCP_HOST = os.environ.get("MCP_HOST", "0.0.0.0")
-mcp = FastMCP("Snow Server", host=MCP_HOST, stateless_http=(MCP_TRANSPORT == "streamable-http"))
+mcp = FastMCP(
+    "Snow Server", host=MCP_HOST, stateless_http=(MCP_TRANSPORT == "streamable-http")
+)
 
 
 def _should_use_real_servicenow() -> bool:
