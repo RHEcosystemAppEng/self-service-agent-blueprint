@@ -50,7 +50,7 @@ states:
 
         2) CRITICAL Query the laptop-refresh knowledge base to find the laptop refresh interval policy. CRITICAL You MUST use a knowledge base query tool to search for "laptop refresh interval" or "laptop refresh policy" to get the actual policy from the knowledge base. CRITICAL Do NOT guess or assume the refresh interval - you MUST retrieve it from the knowledge base. CRITICAL The refresh interval is typically stated as "X years" in the policy documents.
 
-        3) Check the age of the users laptop against the refresh interval retrieved from the knowledge base in step 2 and generate a concise summary that explains if the user is eligible for a replacement today. CRITICAL Use the EXACT refresh interval value from the knowledge base query, not a guess. CRITICAL If they are not eligible make sure that is clear in the summary.
+        3) Check eligibility by converting both the laptop age and policy refresh interval to total months, then compare using greater-than-or-equal-to: laptop_age_months = (years × 12) + months, policy_months = (policy_years × 12). The laptop is ELIGIBLE if laptop_age_months >= policy_months, otherwise NOT ELIGIBLE. CRITICAL: You must do the mathematical comparison correctly. If the laptop age in months is even 1 month less than the policy requirement in months, it is NOT ELIGIBLE. CRITICAL EXAMPLES: If laptop is 45 months and policy is 46 months, then 45 < 46 therefore NOT ELIGIBLE. If laptop is 44 months and policy is 46 months, then 44 < 46 therefore NOT ELIGIBLE. If laptop is 46 months and policy is 46 months, then 46 >= 46 therefore ELIGIBLE. If laptop is 47 months and policy is 46 months, then 47 >= 46 therefore ELIGIBLE. CRITICAL: Even if a laptop is only 1 month short of the policy requirement, it is NOT ELIGIBLE. CRITICAL Use the EXACT refresh interval from the knowledge base. Generate a summary clearly stating the laptop age in months, policy requirement in months, and whether ELIGIBLE or NOT ELIGIBLE.
 
         4) Return the following
           - CRITICAL You MUST include ALL of the laptop information EXACTLY as returned by get_employee_laptop_info. Do NOT summarize, do NOT omit any fields, do NOT reformat. Copy the COMPLETE output from get_employee_laptop_info into your response.
@@ -86,7 +86,7 @@ states:
       Laptop Warranty Expiry Date: gg
       Laptop Warranty: hh
 
-      Your laptop, a XXXXXXXX, was purchased on 20XX-XX-XX and is currently A years and B months old. The company's laptop refresh policy states that standard laptops will be refreshed every Y years from the date of issuance. Since your laptop is older than Y years, you are eligible for a laptop refresh. Would you like to proceed with reviewing the available laptop options for your location?
+      Your laptop, a XXXXXXXX, was purchased on 20XX-XX-XX and is currently A years and B months old (X total months). The company's laptop refresh policy states that standard laptops will be refreshed every Y years (Z months) from the date of issuance. Since your laptop is Y years or older (X months >= Z months), you are eligible for a laptop refresh. Would you like to proceed with reviewing the available laptop options for your location?
 
       **User:** Yes, I'd like to review the available laptop options.
 
@@ -125,7 +125,7 @@ states:
       Laptop Warranty Expiry Date: gg
       Laptop Warranty: hh
 
-      Your laptop, a XXXXXXXX, was purchased on 20XX-XX-XX and is currently A years and B months old. The company's laptop refresh policy states that standard laptops will be refreshed every Y years from the date of issuance. Since your laptop is less than Y years, you are not eligible for a laptop refresh. You may proceed anyway but the request for refresh may require additional approvals or be rejected. Would you like to proceed with reviewing the available laptop options for your location?
+      Your laptop, a XXXXXXXX, was purchased on 20XX-XX-XX and is currently A years and B months old (X total months). The company's laptop refresh policy states that standard laptops will be refreshed every Y years (Z months) from the date of issuance. Since your laptop is less than Y years old (X months < Z months), you are not yet eligible for a laptop refresh. You may proceed anyway but the request for refresh may require additional approvals or be rejected. Would you like to proceed with reviewing the available laptop options for your location?
 
       **User:** Yes, I'd like to review the available laptop options.
 
