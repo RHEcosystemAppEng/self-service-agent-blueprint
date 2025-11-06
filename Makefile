@@ -860,8 +860,8 @@ define helm_install_common
 		--set requestManagement.integrations.slack.enabled=$(SLACK_ENABLED) \
 		$(if $(filter true,$(SLACK_ENABLED)),--set security.slack.signingSecret=$(SLACK_SIGNING_SECRET) --set security.slack.botToken=$(SLACK_BOT_TOKEN),) \
 		--set image.registry=$(REGISTRY) \
-		--set mcp-servers.mcp-servers.self-service-agent-snow.imageRepository=$(REGISTRY)/self-service-agent-snow-mcp \
-		--set mcp-servers.mcp-servers.self-service-agent-snow.imageTag=$(VERSION) \
+		--set mcp-servers.mcp-servers.self-service-agent-snow.image.repository=$(REGISTRY)/self-service-agent-snow-mcp \
+		--set mcp-servers.mcp-servers.self-service-agent-snow.image.tag=$(VERSION) \
 		--set-string mcp-servers.mcp-servers.self-service-agent-snow.env.SERVICENOW_AUTH_TYPE="$(SERVICENOW_AUTH_TYPE)" \
 		--set-string mcp-servers.mcp-servers.self-service-agent-snow.env.USE_REAL_SERVICENOW="$(USE_REAL_SERVICENOW)" \
 		$(if $(filter true,$(USE_REAL_SERVICENOW)),--set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_INSTANCE_URL.name=$(MAIN_CHART_NAME)-servicenow-credentials --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_INSTANCE_URL.key=servicenow-instance-url --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_USERNAME.name=$(MAIN_CHART_NAME)-servicenow-credentials --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_USERNAME.key=servicenow-username --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_PASSWORD.name=$(MAIN_CHART_NAME)-servicenow-credentials --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_PASSWORD.key=servicenow-password --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_API_KEY.name=$(MAIN_CHART_NAME)-servicenow-credentials --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_API_KEY.key=servicenow-api-key,) \
