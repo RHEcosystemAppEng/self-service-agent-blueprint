@@ -54,8 +54,9 @@ EXPOSE 8000
 
 # Run the MCP server
 # Support optional UVICORN_WORKERS environment variable for multi-process concurrency
+# Use 'python -m uvicorn' instead of 'uvicorn' to avoid shebang path issues
 CMD if [ -n "$UVICORN_WORKERS" ]; then \
-      uvicorn $MODULE_NAME:app --host 0.0.0.0 --port 8000 --workers $UVICORN_WORKERS; \
+      python -m uvicorn $MODULE_NAME:app --host 0.0.0.0 --port 8000 --workers $UVICORN_WORKERS; \
     else \
-      uvicorn $MODULE_NAME:app --host 0.0.0.0 --port 8000; \
+      python -m uvicorn $MODULE_NAME:app --host 0.0.0.0 --port 8000; \
     fi
