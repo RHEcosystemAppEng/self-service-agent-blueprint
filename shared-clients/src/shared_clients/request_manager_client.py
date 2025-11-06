@@ -12,9 +12,12 @@ import uuid
 from typing import Any, Dict, Optional, Union
 
 import httpx
+from shared_models import configure_logging
 
 # Remove logging we otherwise get by default
 logging.getLogger("httpx").setLevel(logging.WARNING)
+
+logger = configure_logging("request-manager-client")
 
 AGENT_MESSAGE_TERMINATOR = os.environ.get("AGENT_MESSAGE_TERMINATOR", "")
 
@@ -210,11 +213,11 @@ class CLIChatClient(RequestManagerClient):
             "session_name": session_name or "",
         }
 
-        if debug:
-            print(
-                f"DEBUG: Sending request to {self.request_manager_url}/api/v1/requests/generic"
-            )
-            print(f"DEBUG: Payload: {message}")
+        logger.debug(
+            "Sending request to Request Manager",
+            url=f"{self.request_manager_url}/api/v1/requests/generic",
+            payload=message,
+        )
 
         try:
             result = await self.send_request(
@@ -225,9 +228,11 @@ class CLIChatClient(RequestManagerClient):
                 endpoint="generic",
             )
 
-            if debug:
-                print(f"DEBUG: Result type: {type(result)}")
-                print(f"DEBUG: Result: {result}")
+            logger.debug(
+                "Received result from Request Manager",
+                result_type=type(result).__name__,
+                result=result,
+            )
 
             return self._format_response(result)
 
@@ -355,18 +360,18 @@ class CLIChatClient(RequestManagerClient):
             test_mode: If True, reads from stdin for automated testing
         """
         if test_mode:
-            if debug:
-                print("DEBUG: Test mode chat loop started")
-                print(f"DEBUG: Using Request Manager at: {self.request_manager_url}")
-                print(f"DEBUG: User ID: {self.user_id}")
+            logger.debug(
+                "Test mode chat loop started",
+                request_manager_url=self.request_manager_url,
+                user_id=self.user_id,
+            )
         else:
             print("CLI Chat - Type 'quit' to exit, 'reset' to clear session")
             print(f"Using Request Manager at: {self.request_manager_url}")
 
         # Send initial greeting if provided
         if initial_message:
-            if debug and test_mode:
-                print(f"DEBUG: Sending initial message: {initial_message}")
+            logger.debug("Sending initial message", message=initial_message)
             try:
                 agent_response = await self.send_message(initial_message, debug=debug)
                 print(f"agent: {agent_response}")

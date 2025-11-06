@@ -1,2 +1,3 @@
 def main() -> None:
-    print("Hello from tracing-config!")
+    """Placeholder main function for tracing-config."""
+    pass

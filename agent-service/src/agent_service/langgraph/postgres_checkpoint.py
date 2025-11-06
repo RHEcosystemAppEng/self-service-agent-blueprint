@@ -6,13 +6,13 @@ The LangGraph tables are set up by the database migration job, so this module
 just creates PostgresSaver instances with proper connection management.
 """
 
-import logging
 from typing import Optional
 
 from langgraph.checkpoint.postgres import PostgresSaver
+from shared_models import configure_logging
 from shared_models.database import get_database_manager
 
-logger = logging.getLogger(__name__)
+logger = configure_logging("agent-service")
 
 # Global checkpointer instance for connection reuse
 _checkpointer: Optional[PostgresSaver] = None

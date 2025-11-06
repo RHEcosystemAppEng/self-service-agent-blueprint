@@ -18,13 +18,13 @@ requirement that an API key be provided. The actual security boundary is at
 the network level (services communicate within the Kubernetes cluster).
 """
 
-import logging
 import os
 from typing import Any, Optional
 
 import openai
+from shared_models import configure_logging
 
-logger = logging.getLogger(__name__)
+logger = configure_logging("agent-service")
 
 
 def create_llamastack_openai_client(

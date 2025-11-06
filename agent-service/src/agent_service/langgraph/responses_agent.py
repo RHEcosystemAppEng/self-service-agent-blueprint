@@ -1,15 +1,15 @@
-import logging
 import os
 from typing import Any, Dict, Optional
 
 import yaml
 from agent_service.utils import create_llamastack_client
 from opentelemetry.propagate import inject
+from shared_models import configure_logging
 from tracing_config.auto_tracing import tracingIsActive
 
 from .util import load_config_from_path, resolve_agent_service_path
 
-logger = logging.getLogger(__name__)
+logger = configure_logging("agent-service")
 
 
 class Agent:

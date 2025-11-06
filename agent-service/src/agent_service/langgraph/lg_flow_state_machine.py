@@ -5,7 +5,6 @@ LangGraph-based state machine and agent session management.
 This module contains the StateMachine and AgentSession classes for managing
 conversational flows using LangGraph with persistent checkpoint storage.
 """
-import logging
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Optional, TypedDict
 
@@ -14,12 +13,13 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.types import Command
+from shared_models import configure_logging
 
 # Import PostgreSQL checkpoint utilities
 from .postgres_checkpoint import get_postgres_checkpointer, reset_postgres_checkpointer
 from .util import resolve_agent_service_path
 
-logger = logging.getLogger(__name__)
+logger = configure_logging("agent-service")
 
 
 # Dynamic state definition created from YAML configuration

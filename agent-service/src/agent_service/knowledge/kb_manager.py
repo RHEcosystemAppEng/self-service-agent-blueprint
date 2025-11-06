@@ -1,9 +1,11 @@
-import logging
 import uuid
 from pathlib import Path
 from typing import Any, Optional
 
 from agent_service.utils import create_llamastack_client
+from shared_models import configure_logging
+
+logger = configure_logging("agent-service")
 
 
 class KnowledgeBaseManager:
@@ -14,24 +16,22 @@ class KnowledgeBaseManager:
     def connect_to_llamastack_client(self) -> None:
         """Initialize LlamaStack client for OpenAI-compatible APIs"""
         if self._llama_client is None:
-            logging.debug(
+            logger.debug(
                 "Connecting to LlamaStack client for knowledge base operations"
             )
             self._llama_client = create_llamastack_client()
         else:
-            logging.debug("Already connected to LlamaStack client")
+            logger.debug("Already connected to LlamaStack client")
 
     def register_knowledge_bases(self) -> None:
         """Register all knowledge bases by processing directories in knowledge_bases path"""
         if self._llama_client is None:
             self.connect_to_llamastack_client()
 
-        logging.debug(
-            "Registering knowledge bases via LlamaStack OpenAI-compatible API"
-        )
+        logger.debug("Registering knowledge bases via LlamaStack OpenAI-compatible API")
 
         if not self._knowledge_bases_path.exists():
-            logging.warning(
+            logger.warning(
                 f"Knowledge bases path {self._knowledge_bases_path} does not exist"
             )
             return
@@ -45,18 +45,18 @@ class KnowledgeBaseManager:
                 # Log results
                 kb_name = kb_dir.name
                 if result:
-                    logging.info(f"Successfully registered {kb_name} via LlamaStack")
+                    logger.info(f"Successfully registered {kb_name} via LlamaStack")
                 else:
-                    logging.error(f"Failed to register {kb_name} via LlamaStack")
+                    logger.error(f"Failed to register {kb_name} via LlamaStack")
 
     def register_knowledge_base(self, kb_directory: Path) -> Optional[str]:
         """Register a single knowledge base from a directory via LlamaStack OpenAI-compatible API"""
         kb_name = kb_directory.name
 
-        logging.info(f"Registering knowledge base via LlamaStack: {kb_name}")
+        logger.info(f"Registering knowledge base via LlamaStack: {kb_name}")
 
         if self._llama_client is None:
-            logging.error(
+            logger.error(
                 "LlamaStack client not connected. Cannot register knowledge base."
             )
             return None
@@ -69,7 +69,7 @@ class KnowledgeBaseManager:
             )
             vector_store_id = vector_store.id
 
-            logging.info(
+            logger.info(
                 f"Created vector store via LlamaStack: {vector_store_id} with name: {vector_store_name}"
             )
 
@@ -79,18 +79,18 @@ class KnowledgeBaseManager:
             )
 
             if uploaded_files > 0:
-                logging.info(
+                logger.info(
                     f"Successfully uploaded {uploaded_files} files via LlamaStack to vector store"
                 )
                 return str(vector_store_id)
             else:
-                logging.warning(
+                logger.warning(
                     "No knowledge base files uploaded via LlamaStack - vector store will be empty"
                 )
                 return str(vector_store_id)  # Return ID even if empty for consistency
 
         except Exception as e:
-            logging.error(
+            logger.error(
                 f"Failed to register knowledge base {kb_name} via LlamaStack: {str(e)}"
             )
             return None
@@ -100,21 +100,21 @@ class KnowledgeBaseManager:
     ) -> int:
         """Upload all txt files from a directory to LlamaStack vector store"""
         if self._llama_client is None:
-            logging.error("LlamaStack client not connected. Cannot upload files.")
+            logger.error("LlamaStack client not connected. Cannot upload files.")
             return 0
 
         uploaded_count = 0
 
         # Find all .txt files in the directory
         txt_files = list(directory.rglob("*.txt"))
-        logging.info(
+        logger.info(
             f"Found {len(txt_files)} knowledge base files: {[f.name for f in txt_files]}"
         )
 
         for file_path in txt_files:
             if file_path.is_file():
                 try:
-                    logging.info(
+                    logger.info(
                         f"Uploading knowledge base file via LlamaStack: {file_path}"
                     )
 
@@ -132,12 +132,12 @@ class KnowledgeBaseManager:
                     )
 
                     uploaded_count += 1
-                    logging.info(
+                    logger.info(
                         f"Successfully uploaded and attached file via LlamaStack: {file_id}"
                     )
 
                 except Exception as e:
-                    logging.error(
+                    logger.error(
                         f"Failed to upload file {file_path} to LlamaStack: {e}"
                     )
                     continue
