@@ -42,7 +42,7 @@ Asyncio is a great fit for this quickstart as we've seen that most of the time a
 
 ### Quickstart components
 
-Use standard kubernetes scaling techniques. For agent-service, integration-dispatcher, request-manager, mock-eventing, you can scale the number of uvicorn workers as well as the number of replicas. For MCP servers (such as snow) see the section below as there are special considerations. Both the number of workers and number of replicas can be configured in helm/values.yaml. As an example this snippet which is part of the configuration for the agent service sets 4 workers and 2 replicas:
+Use standard kubernetes scaling techniques. For agent-service, integration-dispatcher, request-manager, mock-eventing, you can scale the number of uvicorn workers as well as the number of replicas. For MCP servers (such as snow) the same is true, but special considerations which are covered in a later section. Both the number of workers and number of replicas can be configured in helm/values.yaml. As an example this snippet which is part of the configuration for the agent service sets 4 workers and 2 replicas:
 
 ```
  agentService:
@@ -57,9 +57,15 @@ These are a few documents which may be of interest:
 - [Scalability and performance | OpenShift Container Platform 4.20 Documentation](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/scalability_and_performance/index)
 - [Capacity management and overcommitment best practices in Red Hat OpenShift](https://www.redhat.com/en/blog/capacity-management-overcommitment-best-practices-openshift)
 
+The quickstart already uses 4 unicornWorkers for each of the components. If you would like to try out multiple pods for each of the components you can set `REPLICA_COUNT` to set the number of pods to use. For example:
+
+```
+make helm-install-test REPLICA_COUNT=2 ....
+```
+
 ### MCP Server Scaling (for example snow MCP server)
 
-MCP servers often have state which can complicate scaling. For example the default for FastMCP is sse
+MCP servers often have state which can complicate scaling. For example the default transport for FastMCP is sse
 which maintains state.
 
 This quickstart uses streamable-http with stateless http to keep the server stateless. By using this combination scaling
@@ -67,7 +73,52 @@ is possible both with uvicorn worker and multiple pod replicas.
 
 ### Llama Stack
 
-LlamaStack can be scaled horizontally using multiple replicas. **Important: You must configure PostgreSQL-backed storage for multi-replica deployments** to ensure resources like knowledge bases are shared across all replicas.
+LlamaStack can be scaled horizontally using multiple replicas. **Important: You must configure PostgreSQL-backed storage for multi-replica deployments** to ensure resources like knowledge bases are shared across all replicas. This is done in the quickstart helm/values.yaml with:
+
+```
+  # Configure metadata store to use PostgreSQL for multi-replica support
+  metadataStore:
+    type: postgres
+    db_path: null  # Explicitly unset SQLite field
+    host: ${env.POSTGRES_HOST:=pgvector}
+    port: ${env.POSTGRES_PORT:=5432}
+    db: ${env.POSTGRES_DBNAME:=rag_blueprint}
+    user: ${env.POSTGRES_USER:=postgres}
+    password: ${env.POSTGRES_PASSWORD:=rag_password}
+    namespace: llamastack_registry
+
+  # Configure vector_io kvstore to use PostgreSQL for multi-replica support
+  vectorIOKvstore:
+    type: postgres
+    db_path: null  # Explicitly unset SQLite field
+    namespace: llamastack_vector_io
+    host: ${env.POSTGRES_HOST:=pgvector}
+    port: ${env.POSTGRES_PORT:=5432}
+    db: ${env.POSTGRES_DBNAME:=rag_blueprint}
+    user: ${env.POSTGRES_USER:=postgres}
+    password: ${env.POSTGRES_PASSWORD:=rag_password}
+
+  providers:
+    agents:
+      - provider_id: meta-ref-postgres
+        provider_type: inline::meta-reference
+        config:
+          persistence_store:
+            type: postgres
+            namespace: null
+            host: ${env.POSTGRES_HOST:=pgvector}
+            port: ${env.POSTGRES_PORT:=5432}
+            db: llama_agents
+            user: ${env.POSTGRES_USER:=pgvector}
+            password: ${env.POSTGRES_PASSWORD:=pgvector}
+          responses_store:
+            type: postgres
+            host: ${env.POSTGRES_HOST:=pgvector}
+            port: ${env.POSTGRES_PORT:=5432}
+            db: llama_responses
+            user: ${env.POSTGRES_USER:=pgvector}
+            password: ${env.POSTGRES_PASSWORD:=pgvector}
+```
 
 These are a few documents which may be of interest:
 
