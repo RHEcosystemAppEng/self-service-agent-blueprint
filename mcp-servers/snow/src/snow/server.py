@@ -43,19 +43,20 @@ def _should_use_real_servicenow() -> bool:
 
 
 def _create_real_servicenow_ticket(
-    authoritative_user_id: str, preferred_model: str
+    authoritative_user_id: str, preferred_model: str, api_token: str | None = None
 ) -> str:
     """Create a real ServiceNow ticket using the API.
 
     Args:
         authoritative_user_id: Authoritative user ID from request headers
         preferred_model: ServiceNow laptop model code
+        api_token: Optional API token from request header
 
     Returns:
         ServiceNow ticket creation result message
     """
     try:
-        client = ServiceNowClient()
+        client = ServiceNowClient(api_token)
 
         # Look up user sys_id by email as currently only email is supported
         # authoritative user id
@@ -129,7 +130,36 @@ def _extract_authoritative_user_id(ctx: Context[Any, Any]) -> str | None:
     return None
 
 
-def _get_real_servicenow_laptop_info(authoritative_user_id: str) -> str:
+def _extract_servicenow_token(ctx: Context[Any, Any]) -> str | None:
+    """Extract ServiceNow API token from request context headers.
+
+    This implements pass-through authentication where the client (agent-service)
+    reads the API key from its environment and passes it via the X-ServiceNow-Token header.
+
+    Args:
+        ctx: Request context containing headers
+
+    Returns:
+        ServiceNow API token if found, None otherwise
+    """
+    try:
+        request_context = ctx.request_context
+        if hasattr(request_context, "request") and request_context.request:
+            request = request_context.request
+            if hasattr(request, "headers"):
+                headers = request.headers
+                # Check both uppercase and lowercase variants
+                token = headers.get("ServiceNow_Token")
+                return str(token) if token is not None else None
+    except Exception as e:
+        logging.debug(f"Error extracting ServiceNow token from request context: {e}")
+
+    return None
+
+
+def _get_real_servicenow_laptop_info(
+    authoritative_user_id: str, api_token: str | None = None
+) -> str:
     """Get laptop information from real ServiceNow API.
 
     Note: ServiceNow API currently only supports email-based lookups.
@@ -137,12 +167,12 @@ def _get_real_servicenow_laptop_info(authoritative_user_id: str) -> str:
 
     Args:
         authoritative_user_id: Authoritative user ID from request headers (email or employee ID)
-
+        api_token: Optional API token from request header
     Returns:
         Formatted laptop information string including employee details and hardware specifications
     """
     try:
-        client = ServiceNowClient()
+        client = ServiceNowClient(api_token)
 
         laptop_info = client.get_employee_laptop_info(authoritative_user_id)
         if laptop_info:
@@ -208,6 +238,7 @@ def open_laptop_refresh_ticket(
         )
 
     authoritative_user_id = _extract_authoritative_user_id(ctx)
+    api_token = _extract_servicenow_token(ctx)
 
     if not authoritative_user_id:
         raise ValueError(
@@ -216,11 +247,15 @@ def open_laptop_refresh_ticket(
 
     # Try real ServiceNow first if configured
     if _should_use_real_servicenow():
+        if not api_token:
+            raise ValueError(
+                "ServiceNow API token is required for real ServiceNow integration. "
+            )
         logging.info(
             f"Using real ServiceNow API - authoritative_user_id: {authoritative_user_id}, laptop_code: {servicenow_laptop_code}"
         )
         return _create_real_servicenow_ticket(
-            authoritative_user_id, servicenow_laptop_code
+            authoritative_user_id, servicenow_laptop_code, api_token
         )
 
     # Use mock implementation
@@ -270,6 +305,7 @@ def get_employee_laptop_info(
     """
     # Extract authoritative user ID from request headers - CENTRALIZED HANDLING
     authoritative_user_id = _extract_authoritative_user_id(ctx)
+    api_token = _extract_servicenow_token(ctx)
 
     if not authoritative_user_id:
         raise ValueError(
@@ -278,10 +314,14 @@ def get_employee_laptop_info(
 
     # Try real ServiceNow first if configured, otherwise use mock
     if _should_use_real_servicenow():
+        if not api_token:
+            raise ValueError(
+                "ServiceNow API token is required for real ServiceNow integration. "
+            )
         logging.info(
             f"Using real ServiceNow API for laptop info - authoritative_user_id: {authoritative_user_id}"
         )
-        return _get_real_servicenow_laptop_info(authoritative_user_id)
+        return _get_real_servicenow_laptop_info(authoritative_user_id, api_token)
 
     # Use mock implementation
     logging.info(

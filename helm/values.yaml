@@ -204,8 +204,8 @@ mcp-servers:
       imagePullPolicy: Always
       env:
         MCP_TRANSPORT: "streamable-http"
-        SERVICENOW_AUTH_TYPE: "basic"
         USE_REAL_SERVICENOW: "false"
+        SERVICENOW_LAPTOP_REFRESH_ID: ""
         # Number of uvicorn worker processes (stateless-http allows multiple workers)
         # Note: The mcp-servers chart doesn't auto-convert uvicornWorkers field to env var,
         # so we set it directly in the env section

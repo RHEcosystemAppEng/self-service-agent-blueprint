@@ -365,6 +365,14 @@ Generate all environment variables for Agent Service
 {{- include "self-service-agent.dbEnvVars" . }}
 {{- include "self-service-agent.commonEnvVars" . }}
 {{- include "self-service-agent.agentServiceEnvVars" . }}
+
+{{/* ServiceNow API key for authentication */}}
+- name: SERVICENOW_API_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "self-service-agent.fullname" . }}-servicenow-credentials
+      key: servicenow-api-key
+      optional: true
 {{- end }}
 
 {{/*

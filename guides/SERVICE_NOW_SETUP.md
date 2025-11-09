@@ -156,42 +156,30 @@ This final step establishes the authentication and authorization framework that 
    - **Auth Parameter:** Click search and select "x-sn-apikey", "Auth Header"
    - Click "Submit"
 
-3. **Create Basic Auth Authentication Profile** (Optional)
-   - Click "All" in the top left corner
-   - Search for "Inbound Authentication Profile"
-   - Click "New"
-   - Select "Create standard http authentication profiles"
-   - **Name:** `Basic Auth`
-   - Click "Submit"
-   - **Note:** This step is optional if you require Basic Auth access to your APIs
-
-4. **Create Service Catalog API Access Policy**
+3. **Create Service Catalog API Access Policy**
    - Click "All" in the top left corner
    - Search for "REST API Access Policies"
    - Click "New"
    - **Name:** `MCP Agent - SC`
    - **REST API:** Service Catalog API
    - Double click "Insert new row..." and search/select "API Key", and click the green checkmark to add
-   - Repeat and select "Basic Auth" (if created in step 3)
    - Click "Submit"
 
-5. **Create Table API Access Policy**
+4. **Create Table API Access Policy**
    - Click "All" in the top left corner
    - Search for "REST API Access Policies"
    - Click "New"
    - **Name:** `MCP Agent - Tables`
    - **REST API:** Table API
    - Double click "Insert new row..." and search/select "API Key", and click the green checkmark to add
-   - Repeat and select "Basic Auth" (if created in step 3)
    - Click "Submit"
 
-6. **Create UI GlideRecord API Access Policy**
+5. **Create UI GlideRecord API Access Policy**
    - Click "All" in the top left corner
    - Search for "REST API Access Policies"
    - Click "New"
    - **Name:** `MCP Agent - UI`
    - **REST API:** UI GlideRecord API
    - Double click "Insert new row..." and search/select "API Key", and click the green checkmark to add
-   - Repeat and select "Basic Auth" (if created in step 3)
    - Click "Submit"
 

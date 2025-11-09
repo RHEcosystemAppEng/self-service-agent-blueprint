@@ -51,22 +51,14 @@ endif
 SLACK_ENABLED := $(if $(and $(SLACK_BOT_TOKEN),$(SLACK_SIGNING_SECRET)),true,false)
 
 # ServiceNow Configuration
-# Can be set either way:
-#   1. Environment variable (required for passwords with $ or other special chars):
-#      export SERVICENOW_PASSWORD='P@ssw0rd$r123'
-#      make helm-install-test ...
-#   2. Make argument (for simple passwords without special chars):
-#      make helm-install-test SERVICENOW_PASSWORD=simple123 ...
 SERVICENOW_INSTANCE_URL ?=
-SERVICENOW_USERNAME ?=
-SERVICENOW_PASSWORD ?=
-SERVICENOW_AUTH_TYPE ?= basic
+SERVICENOW_API_KEY ?=
 USE_REAL_SERVICENOW ?= false
+SERVICENOW_LAPTOP_REFRESH_ID ?=
 
 # Export to shell so kubectl can access them
 export SERVICENOW_INSTANCE_URL
-export SERVICENOW_USERNAME
-export SERVICENOW_PASSWORD
+export SERVICENOW_API_KEY
 
 helm_pgvector_args = \
     --set pgvector.secret.user=$(POSTGRES_USER) \
@@ -235,29 +227,10 @@ help:
 	@echo ""
 	@echo "  ServiceNow Configuration:"
 	@echo "    SERVICENOW_INSTANCE_URL           - ServiceNow instance URL (e.g., https://dev12345.service-now.com)"
-	@echo "    SERVICENOW_AUTH_TYPE              - ServiceNow auth type: basic, oauth, or api_key (default: basic)"
-	@echo "    USE_REAL_SERVICENOW               - Use real ServiceNow API vs mock data (default: false)"
-	@echo ""
-	@echo "  Basic Auth (SERVICENOW_AUTH_TYPE=basic):"
-	@echo "    SERVICENOW_USERNAME               - ServiceNow username"
-	@echo "    SERVICENOW_PASSWORD               - ServiceNow password"
-	@echo ""
-	@echo "  OAuth Auth (SERVICENOW_AUTH_TYPE=oauth):"
-	@echo "    SERVICENOW_CLIENT_ID              - OAuth client ID"
-	@echo "    SERVICENOW_CLIENT_SECRET          - OAuth client secret"
-	@echo "    SERVICENOW_USERNAME               - ServiceNow username"
-	@echo "    SERVICENOW_PASSWORD               - ServiceNow password"
-	@echo ""
-	@echo "  API Key Auth (SERVICENOW_AUTH_TYPE=api_key):"
-	@echo "    SERVICENOW_API_KEY                - ServiceNow API key"
+	@echo "    SERVICENOW_API_KEY                 - ServiceNow API key (required)"
 	@echo "    SERVICENOW_API_KEY_HEADER         - Custom header name (default: x-sn-apikey)"
-	@echo ""
-	@echo "  Note: Passwords with special characters like \$$ must be set via environment variable:"
-	@echo "    export SERVICENOW_PASSWORD='P@ssw0rd\$$r123'  # Required for special chars"
-	@echo "    make helm-install-test NAMESPACE=my-ns USE_REAL_SERVICENOW=true"
-	@echo ""
-	@echo "  Simple passwords can use either method:"
-	@echo "    make helm-install-test SERVICENOW_PASSWORD=simple123  # No special chars"
+	@echo "    USE_REAL_SERVICENOW               - Use real ServiceNow API vs mock data (default: false)"
+	@echo "    SERVICENOW_LAPTOP_REFRESH_ID      - ServiceNow catalog item ID for laptop refresh requests (required)"
 	@echo ""
 	@echo "  Request Management Layer:"
 	@echo "    KNATIVE_EVENTING                  - Enable Knative Eventing (default: true)"
@@ -832,11 +805,9 @@ define helm_install_common
 
 	@if [ "$(USE_REAL_SERVICENOW)" = "true" ]; then \
 		echo "Creating ServiceNow credentials secret..."; \
-		if [ -n "$$SERVICENOW_PASSWORD" ] || [ -n "$$SERVICENOW_USERNAME" ] || [ -n "$$SERVICENOW_INSTANCE_URL" ] || [ -n "$$SERVICENOW_API_KEY" ]; then \
+		if [ -n "$$SERVICENOW_INSTANCE_URL" ] || [ -n "$$SERVICENOW_API_KEY" ]; then \
 			kubectl create secret generic $(MAIN_CHART_NAME)-servicenow-credentials \
 				--from-literal=servicenow-instance-url="$${SERVICENOW_INSTANCE_URL:-}" \
-				--from-literal=servicenow-username="$${SERVICENOW_USERNAME:-}" \
-				--from-literal=servicenow-password="$${SERVICENOW_PASSWORD:-}" \
 				--from-literal=servicenow-api-key="$${SERVICENOW_API_KEY:-}" \
 				-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
 		else \
@@ -863,9 +834,12 @@ define helm_install_common
 		--set image.registry=$(REGISTRY) \
 		--set mcp-servers.mcp-servers.self-service-agent-snow.image.repository=$(REGISTRY)/self-service-agent-snow-mcp \
 		--set mcp-servers.mcp-servers.self-service-agent-snow.image.tag=$(VERSION) \
-		--set-string mcp-servers.mcp-servers.self-service-agent-snow.env.SERVICENOW_AUTH_TYPE="$(SERVICENOW_AUTH_TYPE)" \
 		--set-string mcp-servers.mcp-servers.self-service-agent-snow.env.USE_REAL_SERVICENOW="$(USE_REAL_SERVICENOW)" \
-		$(if $(filter true,$(USE_REAL_SERVICENOW)),--set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_INSTANCE_URL.name=$(MAIN_CHART_NAME)-servicenow-credentials --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_INSTANCE_URL.key=servicenow-instance-url --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_USERNAME.name=$(MAIN_CHART_NAME)-servicenow-credentials --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_USERNAME.key=servicenow-username --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_PASSWORD.name=$(MAIN_CHART_NAME)-servicenow-credentials --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_PASSWORD.key=servicenow-password --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_API_KEY.name=$(MAIN_CHART_NAME)-servicenow-credentials --set mcp-servers.mcp-servers.self-service-agent-snow.envFromSecret.SERVICENOW_API_KEY.key=servicenow-api-key,) \
+		--set-string mcp-servers.mcp-servers.self-service-agent-snow.env.SERVICENOW_LAPTOP_REFRESH_ID="$(SERVICENOW_LAPTOP_REFRESH_ID)" \
+		$(if $(filter true,$(USE_REAL_SERVICENOW)),\
+			--set mcp-servers.mcp-servers.self-service-agent-snow.envSecrets.SERVICENOW_INSTANCE_URL.name=$(MAIN_CHART_NAME)-servicenow-credentials \
+			--set mcp-servers.mcp-servers.self-service-agent-snow.envSecrets.SERVICENOW_INSTANCE_URL.key=servicenow-instance-url \
+		) \
 		$(REQUEST_MANAGEMENT_ARGS) \
 		$(LOG_LEVEL_ARGS) \
 		$(GENERIC_ARGS) \

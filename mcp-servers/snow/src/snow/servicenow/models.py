@@ -11,26 +11,7 @@ from pydantic import BaseModel, Field
 class AuthType(str, Enum):
     """Authentication types supported by the ServiceNow client."""
 
-    BASIC = "basic"
-    OAUTH = "oauth"
     API_KEY = "api_key"
-
-
-class BasicAuthConfig(BaseModel):
-    """Configuration for basic authentication."""
-
-    username: str
-    password: str
-
-
-class OAuthConfig(BaseModel):
-    """Configuration for OAuth authentication."""
-
-    client_id: str
-    client_secret: str
-    username: str
-    password: str
-    token_url: Optional[str] = None
 
 
 class ApiKeyConfig(BaseModel):
@@ -44,8 +25,6 @@ class AuthConfig(BaseModel):
     """Authentication configuration."""
 
     type: AuthType
-    basic: Optional[BasicAuthConfig] = None
-    oauth: Optional[OAuthConfig] = None
     api_key: Optional[ApiKeyConfig] = None
 
 

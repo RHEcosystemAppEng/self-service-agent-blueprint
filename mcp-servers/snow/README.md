@@ -128,28 +128,18 @@ snow/
 - `SELF_SERVICE_AGENT_SNOW_SERVER_SERVICE_PORT_HTTP`: HTTP port (default: 8001)
 - `MCP_HOST`: Host address (default: "0.0.0.0")
 - `SERVICENOW_INSTANCE_URL`: ServiceNow instance URL (e.g., "https://dev295439.service-now.com/")
-- `SERVICENOW_AUTH_TYPE`: Authentication type: "basic", "oauth", or "api_key" (default: "basic")
 - `USE_REAL_SERVICENOW`: if set to "true" will attempt to call the APIs of `SERVICENOW_INSTANCE_URL` (default: false)
-
-### Basic Authentication
-- `SERVICENOW_USERNAME`: ServiceNow username for authentication
-- `SERVICENOW_PASSWORD`: ServiceNow password (sensitive - store as secret)
-
-### OAuth Authentication
-- `SERVICENOW_CLIENT_ID`: OAuth client ID
-- `SERVICENOW_CLIENT_SECRET`: OAuth client secret
-- `SERVICENOW_USERNAME`: ServiceNow username
-- `SERVICENOW_PASSWORD`: ServiceNow password
-- `SERVICENOW_TOKEN_URL`: OAuth token URL (optional)
+- `SERVICENOW_API_KEY`: ServiceNow API key
+- `SERVICENOW_API_KEY_HEADER`: Custom header name for API key (default: "x-sn-apikey")
 
 ### API Key Authentication
-- `SERVICENOW_AUTH_TYPE=api_key`
+
 - `SERVICENOW_API_KEY`: Your API key value
 - `SERVICENOW_API_KEY_HEADER`: Custom header name (default: "x-sn-apikey")
 
 ## Creating ServiceNow API Keys
 
-To use API key authentication with ServiceNow (recommended method), follow these steps:
+To use API key authentication with ServiceNow, follow these steps:
 
 ### Prerequisites
 Make sure that API Key and HMAC Authentication plugin is activated in Service Now.
@@ -185,18 +175,6 @@ Before creating the API key, you need a service account user that will be associ
    - **Auth Parameter**: Auth Header
      - From the dropdown, select: `x-sn-apikey`
      - This is the header name used by default and matches the MCP server configuration
-5. Click **Submit**
-
-### Step 1b: Create Basic Authentication Profile
-
-To support both API key and basic authentication methods, create a Basic Authentication profile:
-
-1. Navigate to **All > System Web Services > API Access Policies > Inbound Authentication Profile**
-2. Click **New**
-3. Click **Create Basic authentication profiles**
-4. Fill in the form:
-   - **Name**: `Basic Auth`
-   - **Type**: `Basic Auth`
 5. Click **Submit**
 
 > **Tip**: The complete list of Auth Parameters is available at **All > System Web Services > API Access Policies > REST API Auth Parameter**
@@ -245,8 +223,7 @@ For creating and managing ServiceNow tickets via the Service Catalog:
 - **Methods**: Apply to all methods
 - **Resources**: Apply to all resources
 - **Versions**: Apply to all versions
-- **Authentication profile**: Add both authentication profiles:
-  - Select your "API Key" and "Basic Auth" Authentication Profiles
+- **Authentication profile**: Select your "API Key" Authentication Profile
 - Set to active
 
 #### Configuration 2: Table API for Laptop Queries
@@ -260,8 +237,7 @@ For querying ServiceNow tables to retrieve laptop information:
 - **Resources**: Apply to all resources
 - **Versions**: Apply to all versions
 - **Tables**: Apply to all tables
-- **Authentication profile**: Add both authentication profiles:
-  - Select your "API Key" and "Basic Auth" Authentication Profiles
+- **Authentication profile**: Select your "API Key" Authentication Profile
 - Set to active
 
 ### Step 4: Test Your API Key

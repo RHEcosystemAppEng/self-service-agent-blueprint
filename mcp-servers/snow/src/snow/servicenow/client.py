@@ -15,8 +15,6 @@ from .models import (
     ApiKeyConfig,
     AuthConfig,
     AuthType,
-    BasicAuthConfig,
-    OAuthConfig,
     OpenServiceNowLaptopRefreshRequestParams,
     ServerConfig,
 )
@@ -29,19 +27,31 @@ class ServiceNowClient:
     ServiceNow API client for making requests to ServiceNow instance.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, api_token: str | None = None) -> None:
         """
-        Initialize the ServiceNow client with configuration from environment variables.
+        Initialize the ServiceNow client with API token.
+
+        Args:
+            api_token: ServiceNow API token from request header (ServiceNow_Token).
+                       This is required and must be provided for authentication.
+
+        Raises:
+            ValueError: If api_token is not provided.
         """
-        self.config = self._load_config_from_env()
+        if not api_token:
+            raise ValueError("ServiceNow API token is required.")
+        self.config = self._load_config(api_token=api_token)
         self.auth_manager = AuthManager(self.config.auth, self.config.instance_url)
 
-    def _load_config_from_env(self) -> ServerConfig:
+    def _load_config(self, api_token: str) -> ServerConfig:
         """
-        Load configuration from environment variables.
+        Load configuration using API token.
+
+        Args:
+            api_token: ServiceNow API token from request header.
 
         Returns:
-            ServerConfig: Configuration loaded from environment variables.
+            ServerConfig: Configuration loaded with API token.
 
         Raises:
             ValueError: If required environment variables are missing.
@@ -50,60 +60,13 @@ class ServiceNowClient:
         if not instance_url:
             raise ValueError("SERVICENOW_INSTANCE_URL environment variable is required")
 
-        auth_type = os.getenv("SERVICENOW_AUTH_TYPE", "basic").lower()
-
-        if auth_type == "basic":
-            username = os.getenv("SERVICENOW_USERNAME")
-            password = os.getenv("SERVICENOW_PASSWORD")
-            if not username or not password:
-                raise ValueError(
-                    "SERVICENOW_USERNAME and SERVICENOW_PASSWORD are required for basic auth"
-                )
-
-            auth_config = AuthConfig(
-                type=AuthType.BASIC,
-                basic=BasicAuthConfig(username=username, password=password),
-            )
-
-        elif auth_type == "oauth":
-            client_id = os.getenv("SERVICENOW_CLIENT_ID")
-            client_secret = os.getenv("SERVICENOW_CLIENT_SECRET")
-            username = os.getenv("SERVICENOW_USERNAME")
-            password = os.getenv("SERVICENOW_PASSWORD")
-
-            if not client_id or not client_secret:
-                raise ValueError(
-                    "SERVICENOW_CLIENT_ID and SERVICENOW_CLIENT_SECRET are required for OAuth"
-                )
-
-            auth_config = AuthConfig(
-                type=AuthType.OAUTH,
-                oauth=OAuthConfig(
-                    client_id=client_id,
-                    client_secret=client_secret,
-                    username=username or "",
-                    password=password or "",
-                    token_url=os.getenv("SERVICENOW_TOKEN_URL"),
-                ),
-            )
-
-        elif auth_type == "api_key":
-            api_key = os.getenv("SERVICENOW_API_KEY")
-            if not api_key:
-                raise ValueError("SERVICENOW_API_KEY is required for API key auth")
-
-            auth_config = AuthConfig(
-                type=AuthType.API_KEY,
-                api_key=ApiKeyConfig(
-                    api_key=api_key,
-                    header_name=os.getenv(
-                        "SERVICENOW_API_KEY_HEADER", "X-ServiceNow-API-Key"
-                    ),
-                ),
-            )
-
-        else:
-            raise ValueError(f"Unsupported auth type: {auth_type}")
+        auth_config = AuthConfig(
+            type=AuthType.API_KEY,
+            api_key=ApiKeyConfig(
+                api_key=api_token,
+                header_name=os.getenv("SERVICENOW_API_KEY_HEADER", "x-sn-apikey"),
+            ),
+        )
 
         return ServerConfig(
             instance_url=instance_url,
@@ -126,9 +89,19 @@ class ServiceNowClient:
         """
         logger.info("Opening ServiceNow laptop refresh request")
 
-        # Build the API URL with the hardcoded laptop refresh ID
-        laptop_refresh_id = os.getenv(
-            "SERVICENOW_LAPTOP_REFRESH_ID", "1d3eae4f93232210eead74418bba10f4"
+        # Get laptop refresh ID from environment variable
+        laptop_refresh_id = os.getenv("SERVICENOW_LAPTOP_REFRESH_ID")
+        if not laptop_refresh_id:
+            logger.error(
+                "SERVICENOW_LAPTOP_REFRESH_ID environment variable is not set. "
+                "Please set it to the ServiceNow catalog item ID for laptop refresh requests."
+            )
+            raise ValueError(
+                "SERVICENOW_LAPTOP_REFRESH_ID environment variable is required but not set. "
+                "Please configure it in your deployment."
+            )
+        logger.info(
+            f"Using ServiceNow laptop refresh catalog item ID: {laptop_refresh_id}"
         )
         url = f"{self.config.instance_url}/api/sn_sc/servicecatalog/items/{laptop_refresh_id}/order_now"
 

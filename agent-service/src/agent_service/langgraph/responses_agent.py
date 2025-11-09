@@ -212,11 +212,22 @@ class Agent:
                         ),
                     }
 
-                    # Add headers if authoritative_user_id is provided
+                    # Build headers dictionary dynamically per request
+                    tool_headers = {}
+
+                    # Add headers if provided
                     if authoritative_user_id:
-                        mcp_tool["headers"] = {
-                            "AUTHORITATIVE_USER_ID": authoritative_user_id
-                        }
+                        tool_headers["AUTHORITATIVE_USER_ID"] = authoritative_user_id
+
+                    # Add ServiceNow API key header for pass-through authentication
+                    # Read from environment dynamically, just like authoritative_user_id
+                    snow_api_key = os.environ.get("SERVICENOW_API_KEY")
+                    if snow_api_key:
+                        tool_headers["ServiceNow_Token"] = snow_api_key
+
+                    # Apply headers if any are present
+                    if tool_headers:
+                        mcp_tool["headers"] = tool_headers
 
                     # Add allowed_tools if specified (from parameter or config)
                     config_allowed_tools = server_config.get("allowed_tools")
