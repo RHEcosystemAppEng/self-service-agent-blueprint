@@ -149,7 +149,7 @@ def _extract_servicenow_token(ctx: Context[Any, Any]) -> str | None:
             if hasattr(request, "headers"):
                 headers = request.headers
                 # Check both uppercase and lowercase variants
-                token = headers.get("ServiceNow_Token")
+                token = headers.get("SERVICE_NOW_TOKEN")
                 return str(token) if token is not None else None
     except Exception as e:
         logging.debug(f"Error extracting ServiceNow token from request context: {e}")

@@ -32,7 +32,7 @@ class ServiceNowClient:
         Initialize the ServiceNow client with API token.
 
         Args:
-            api_token: ServiceNow API token from request header (ServiceNow_Token).
+            api_token: ServiceNow API token from request header (SERVICE_NOW_TOKEN).
                        This is required and must be provided for authentication.
 
         Raises:

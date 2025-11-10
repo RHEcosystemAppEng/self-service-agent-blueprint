@@ -223,7 +223,7 @@ class Agent:
                     # Read from environment dynamically, just like authoritative_user_id
                     snow_api_key = os.environ.get("SERVICENOW_API_KEY")
                     if snow_api_key:
-                        tool_headers["ServiceNow_Token"] = snow_api_key
+                        tool_headers["SERVICE_NOW_TOKEN"] = snow_api_key
 
                     # Apply headers if any are present
                     if tool_headers:
