@@ -6,7 +6,7 @@ Creates API keys, authentication profiles, and access policies for ServiceNow in
 
 import argparse
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import requests
 
@@ -145,9 +145,7 @@ class ServiceNowAPIAutomation:
                 print(f"Response: {e.response.text}")
             raise
 
-    def create_api_access_policy(
-        self, policy_name: str, api_name: str, auth_profiles: List[str]
-    ) -> str:
+    def create_api_access_policy(self, policy_name: str, api_name: str) -> str:
         """Create API access policy."""
         print(f"🛡️  Creating API access policy: {policy_name}")
 
@@ -220,24 +218,21 @@ class ServiceNowAPIAutomation:
             "basic_auth": basic_auth_profile_sys_id,
         }
 
-        # Create API access policies
-        auth_profiles = [api_key_profile_sys_id, basic_auth_profile_sys_id]
-
         # Service Catalog API
         sc_policy_sys_id = self.create_api_access_policy(
-            "MCP Agent - SC", "Service Catalog API", auth_profiles
+            "MCP Agent - SC", "Service Catalog API"
         )
         results["sc_policy"] = sc_policy_sys_id
 
         # Table API
         table_policy_sys_id = self.create_api_access_policy(
-            "MCP Agent - Tables", "Table API", auth_profiles
+            "MCP Agent - Tables", "Table API"
         )
         results["table_policy"] = table_policy_sys_id
 
         # UI GlideRecord API
         ui_policy_sys_id = self.create_api_access_policy(
-            "MCP Agent - UI", "UI GlideRecord API", auth_profiles
+            "MCP Agent - UI", "UI GlideRecord API"
         )
         results["ui_policy"] = ui_policy_sys_id
 
