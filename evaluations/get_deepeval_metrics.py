@@ -17,6 +17,7 @@ from helpers.load_conversation_context import load_default_context
 
 def get_metrics(
     custom_model: Optional[DeepEvalBaseLLM] = None,
+    validate_full_laptop_details: bool = False,
 ) -> List[Any]:
     """
     Create comprehensive evaluation metrics for laptop refresh conversation assessment.
@@ -28,6 +29,9 @@ def get_metrics(
     Args:
         custom_model: Optional custom LLM model instance to use for evaluations.
                      If None, uses the default DeepEval model.
+        validate_full_laptop_details: If True, enhances the "Correct laptop options"
+                     metric to validate all 15 specification fields are present.
+                     Default is False.
 
     Returns:
         List[ConversationalGEval]: List of evaluation metrics including:
@@ -255,17 +259,43 @@ def get_metrics(
             threshold=1.0,
             model=custom_model,
             evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
-            evaluation_steps=[
-                "First, identify the user's location from the conversation (NA, EMEA, APAC, or LATAM).",
-                "Then, look for where the agent presents laptop options to the user in the conversation.",
-                "IMPORTANT: If the conversation includes a return-to-router pattern (user asks out-of-scope question, returns to routing agent, then restarts laptop refresh), use the LAST/FINAL presentation of laptop options for evaluation, not the initial one.",
-                "Count how many distinct laptop models are presented by the agent in the final laptop presentation. Look for laptop model names like 'MacBook Air M2', 'MacBook Pro 16 M3 Max', 'ThinkPad T14s Gen 5 AMD', 'ThinkPad P16 Gen 2', etc.",
-                "Compare the count of laptop models presented against the total number of laptop models available for that location in the additional context below. For EMEA, there should be exactly 4 laptop models. For NA, APAC, and LATAM, there should also be exactly 4 laptop models each.",
-                "The agent MUST present ALL laptop models for the user's location in the final presentation. If even ONE model is missing from the final list, this evaluation step FAILS.",
-                "Additionally, verify that each laptop model presented matches one of the models in the additional context for that location. If the agent shows a laptop that does not exist in the context for that location (like a 'Commodore 64' or any other incorrect model), this evaluation step FAILS.",
-                "Note: Valid conversation restarts (due to out-of-scope questions) are acceptable behavior and should not cause this metric to fail as long as the final laptop presentation is complete.",
-                f"\n\nadditional-context-start\n{default_context}\nadditional-context-end",
-            ],
+            evaluation_steps=(
+                # Enhanced version with full specification field validation
+                [
+                    "First, identify the user's location from the conversation (NA, EMEA, APAC, or LATAM).",
+                    "Then, look for where the agent presents laptop options to the user in the conversation.",
+                    "IMPORTANT: If the conversation includes a return-to-router pattern (user asks out-of-scope question, returns to routing agent, then restarts laptop refresh), use the LAST/FINAL presentation of laptop options for evaluation, not the initial one.",
+                    "Count how many distinct laptop models are presented by the agent in the final laptop presentation. Look for laptop model names like 'MacBook Air M2', 'MacBook Pro 16 M3 Max', 'ThinkPad T14s Gen 5 AMD', 'ThinkPad P16 Gen 2', etc.",
+                    "Compare the count of laptop models presented against the total number of laptop models available for that location in the additional context below. For EMEA, there should be exactly 4 laptop models. For NA, APAC, and LATAM, there should also be exactly 4 laptop models each.",
+                    "The agent MUST present ALL laptop models for the user's location in the final presentation. If even ONE model is missing from the final list, this evaluation step FAILS.",
+                    "Additionally, verify that each laptop model presented matches one of the models in the additional context for that location. If the agent shows a laptop that does not exist in the context for that location (like a 'Commodore 64' or any other incorrect model), this evaluation step FAILS.",
+                    "CRITICAL SPECIFICATION VALIDATION: You MUST verify that EVERY laptop has EXACTLY 15 specification fields. This is a STRICT requirement.",
+                    "  STEP 1: Extract the section for laptop #1 from the conversation. Look for text between '1. ' and '2. ' (or end of list if only one laptop).",
+                    "  STEP 2: In laptop #1's section, search for EACH of these 15 field names (must appear with colon): 'Manufacturer:', 'Model:', 'ServiceNow Code:', 'Target User:', 'Cost:', 'Operating System:', 'Display Size:', 'Display Resolution:', 'Graphics Card:', 'Minimum Storage:', 'Weight:', 'Ports:', 'Minimum Processor:', 'Minimum Memory:', 'Dimensions:'",
+                    "  STEP 3: Count EXACTLY how many fields you found. Write down: 'Laptop #1 has X out of 15 fields'.",
+                    "  STEP 4: If X is not equal to 15, immediately FAIL this evaluation with score 0.0. Do not continue checking other laptops.",
+                    "  STEP 5: Only if laptop #1 has all 15 fields, repeat steps 1-4 for laptop #2, #3, and #4.",
+                    "  IMPORTANT: If you find laptop #1 is missing 'Manufacturer:' or 'Target User:' or ANY field, you MUST fail.",
+                    "  EXAMPLE OF FAILURE: Laptop shows 'Model: MacBook Air M2\\nServiceNow Code: abc\\nCost: €1,299\\n...' but no 'Manufacturer:' line and no 'Target User:' line = ONLY 13/15 fields = MUST FAIL with score 0.0.",
+                    "  The evaluation ONLY passes if you counted EXACTLY 15 fields for EVERY laptop.",
+                    "Note: Valid conversation restarts (due to out-of-scope questions) are acceptable behavior and should not cause this metric to fail as long as the final laptop presentation is complete.",
+                    f"\n\nadditional-context-start\n{default_context}\nadditional-context-end",
+                ]
+                if validate_full_laptop_details
+                else
+                # Standard version (original)
+                [
+                    "First, identify the user's location from the conversation (NA, EMEA, APAC, or LATAM).",
+                    "Then, look for where the agent presents laptop options to the user in the conversation.",
+                    "IMPORTANT: If the conversation includes a return-to-router pattern (user asks out-of-scope question, returns to routing agent, then restarts laptop refresh), use the LAST/FINAL presentation of laptop options for evaluation, not the initial one.",
+                    "Count how many distinct laptop models are presented by the agent in the final laptop presentation. Look for laptop model names like 'MacBook Air M2', 'MacBook Pro 16 M3 Max', 'ThinkPad T14s Gen 5 AMD', 'ThinkPad P16 Gen 2', etc.",
+                    "Compare the count of laptop models presented against the total number of laptop models available for that location in the additional context below. For EMEA, there should be exactly 4 laptop models. For NA, APAC, and LATAM, there should also be exactly 4 laptop models each.",
+                    "The agent MUST present ALL laptop models for the user's location in the final presentation. If even ONE model is missing from the final list, this evaluation step FAILS.",
+                    "Additionally, verify that each laptop model presented matches one of the models in the additional context for that location. If the agent shows a laptop that does not exist in the context for that location (like a 'Commodore 64' or any other incorrect model), this evaluation step FAILS.",
+                    "Note: Valid conversation restarts (due to out-of-scope questions) are acceptable behavior and should not cause this metric to fail as long as the final laptop presentation is complete.",
+                    f"\n\nadditional-context-start\n{default_context}\nadditional-context-end",
+                ]
+            ),
         ),
         ConversationalGEval(
             name="Confirmation Before Ticket Creation",

@@ -79,6 +79,7 @@ def _evaluate_conversations(
     results_dir: str = "results/conversation_results",
     output_dir: str = "results/deep_eval_results",
     context_dir: Optional[str] = None,
+    validate_full_laptop_details: bool = False,
 ) -> int:
     """
     Main evaluation function that processes conversation files and generates assessment reports.
@@ -134,7 +135,9 @@ def _evaluate_conversations(
 
     print(f"Found {len(json_files)} conversation files to evaluate")
 
-    metrics = get_metrics(custom_model)
+    metrics = get_metrics(
+        custom_model, validate_full_laptop_details=validate_full_laptop_details
+    )
 
     # Initialize tracking for evaluation results and success metrics
     all_results = []
@@ -432,6 +435,17 @@ def _parse_arguments() -> argparse.Namespace:
         help="Directory containing context files (matched by conversation filename). Note: 'conversations_config/default_context/' and 'conversations_config/conversation_context/' directories are automatically used if they exist.",
     )
 
+    parser.add_argument(
+        "--validate-full-laptop-details",
+        action="store_true",
+        default=False,
+        help="Enable validation that all 15 laptop specification fields are presented (default: False). "
+        "When enabled, enhances the 'Correct laptop options for user location' metric to verify "
+        "complete laptop specifications including: Manufacturer, Model, ServiceNow Code, Target User, "
+        "Cost, Operating System, Display Size, Display Resolution, Graphics Card, Minimum Storage, "
+        "Weight, Ports, Minimum Processor, Minimum Memory, and Dimensions.",
+    )
+
     return parser.parse_args()
 
 
@@ -473,6 +487,7 @@ if __name__ == "__main__":
         results_dir=args.results_dir,
         output_dir=args.output_dir,
         context_dir=args.context_dir,
+        validate_full_laptop_details=args.validate_full_laptop_details,
     )
 
     # Print token usage summary using shared function

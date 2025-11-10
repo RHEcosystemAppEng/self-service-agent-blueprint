@@ -56,6 +56,11 @@ SERVICENOW_API_KEY ?=
 USE_REAL_SERVICENOW ?= false
 SERVICENOW_LAPTOP_REFRESH_ID ?=
 
+# Evaluation Configuration
+# If LG_PROMPT_LAPTOP_REFRESH is NOT set, enable full laptop details validation
+# This ensures validation is strict when using default prompts
+VALIDATE_LAPTOP_DETAILS_FLAG := $(if $(LG_PROMPT_LAPTOP_REFRESH),,--validate-full-laptop-details)
+
 # Export to shell so kubectl can access them
 export SERVICENOW_INSTANCE_URL
 export SERVICENOW_API_KEY
@@ -244,6 +249,8 @@ help:
 	@echo "      LG_PROMPT_ROUTING               - Override routing agent"
 	@echo "      LG_PROMPT_EMAIL_UPDATE          - Override email-update agent"
 	@echo "    Usage: make helm-install-test LG_PROMPT_LAPTOP_REFRESH=config/lg-prompts/custom.yaml"
+	@echo "    Note: When LG_PROMPT_LAPTOP_REFRESH is NOT set, integration tests automatically enable"
+	@echo "          --validate-full-laptop-details to ensure strict validation with default prompts"
 
 # Build function: $(call build_image,IMAGE_NAME,DESCRIPTION,CONTAINERFILE_PATH,BUILD_CONTEXT)
 define build_image
@@ -764,19 +771,19 @@ sync-evaluations:
 .PHONY: test-short-resp-integration-request-mgr
 test-short-resp-integration-request-mgr:
 	@echo "Running short responses integration test with Request Manager..."
-	uv --directory evaluations run evaluate.py -n 1 --test-script chat-responses-request-mgr.py --reset-conversation
+	uv --directory evaluations run evaluate.py -n 1 --test-script chat-responses-request-mgr.py --reset-conversation $(VALIDATE_LAPTOP_DETAILS_FLAG)
 	@echo "short responses integrations tests with Request Manager completed successfully!"
 
 .PHONY: test-long-resp-integration-request-mgr
 test-long-resp-integration-request-mgr:
 	@echo "Running long responses integration test with Request Manager..."
-	uv --directory evaluations run evaluate.py -n 20 --test-script chat-responses-request-mgr.py --reset-conversation --timeout=1800
+	uv --directory evaluations run evaluate.py -n 20 --test-script chat-responses-request-mgr.py --reset-conversation --timeout=1800 $(VALIDATE_LAPTOP_DETAILS_FLAG)
 	@echo "long responses integrations tests with Request Manager completed successfully!"
 
 .PHONY: test-long-concurrent-integration-request-mgr
 test-long-concurrent-integration-request-mgr:
 	@echo "Running long concurrent responses integration test with Request Manager..."
-	uv --directory evaluations run evaluate.py -n 10 --test-script chat-responses-request-mgr.py --reset-conversation --timeout=1800 --concurrency 4 --message-timeout 120
+	uv --directory evaluations run evaluate.py -n 10 --test-script chat-responses-request-mgr.py --reset-conversation --timeout=1800 --concurrency 4 --message-timeout 120 $(VALIDATE_LAPTOP_DETAILS_FLAG)
 	@echo "long concurrent responses integrations tests with Request Manager completed successfully!"
 
 # Create namespace and deploy
