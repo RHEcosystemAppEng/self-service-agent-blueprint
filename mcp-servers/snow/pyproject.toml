@@ -13,6 +13,7 @@ dependencies = [
     "opentelemetry-instrumentation-httpx==0.58b0",
     "pydantic>=2.5.0",
     "requests>=2.25.0",
+    "self-service-agent-shared-models",
     "tracing-config",
 ]
 
@@ -54,13 +55,15 @@ testpaths = ["tests"]
 python_version = "3.12"
 
 # Configure mypy to use source directories for local packages
-mypy_path = "../../tracing-config/src"
+mypy_path = "../../tracing-config/src:../../shared-models/src"
 
 [[tool.mypy.overrides]]
 module = [
     "opentelemetry.*",
+    "shared_models.*",
 ]
 follow_imports = "skip"
 
 [tool.uv.sources]
+self-service-agent-shared-models = { path = "../../shared-models" }
 tracing-config = { path = "../../tracing-config" }

@@ -2,12 +2,12 @@
 ServiceNow API client for laptop refresh requests.
 """
 
-import logging
 import os
 from datetime import datetime
 from typing import Any, Dict, Optional
 
 import requests
+from shared_models import configure_logging
 from snow.data.data import _calculate_laptop_age
 
 from .auth import AuthManager
@@ -19,7 +19,7 @@ from .models import (
     ServerConfig,
 )
 
-logger = logging.getLogger(__name__)
+logger = configure_logging("snow-mcp-server")
 
 
 class ServiceNowClient:

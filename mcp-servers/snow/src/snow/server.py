@@ -4,11 +4,11 @@ A FastMCP server that provides tools for creating
 ServiceNow laptop refresh tickets.
 """
 
-import logging
 import os
 from typing import Any, Literal
 
 from mcp.server.fastmcp import Context, FastMCP
+from shared_models import configure_logging
 from snow.data.data import (
     create_laptop_refresh_ticket,
     find_employee_by_authoritative_user_id,
@@ -21,15 +21,8 @@ from starlette.responses import JSONResponse
 from tracing_config.auto_tracing import run as auto_tracing_run
 
 SERVICE_NAME = "snow-mcp-server"
-logger = logging.getLogger(SERVICE_NAME)
+logger = configure_logging(SERVICE_NAME)
 auto_tracing_run(SERVICE_NAME, logger)
-
-# Configure logging for MCP server
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
 
 MCP_TRANSPORT: Literal["stdio", "sse", "streamable-http"] = os.environ.get("MCP_TRANSPORT", "sse")  # type: ignore[assignment]
 MCP_PORT = int(
@@ -159,7 +152,9 @@ def _extract_servicenow_token(ctx: Context[Any, Any]) -> str | None:
                 token = headers.get("SERVICE_NOW_TOKEN")
                 return str(token) if token is not None else None
     except Exception as e:
-        logging.debug(f"Error extracting ServiceNow token from request context: {e}")
+        logger.debug(
+            "Error extracting ServiceNow token from request context", error=str(e)
+        )
 
     return None
 

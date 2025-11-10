@@ -2,12 +2,9 @@
 Authentication manager for the ServiceNow MCP server.
 """
 
-import logging
 from typing import Dict
 
 from .models import AuthConfig, AuthType
-
-logger = logging.getLogger(__name__)
 
 
 class AuthManager:

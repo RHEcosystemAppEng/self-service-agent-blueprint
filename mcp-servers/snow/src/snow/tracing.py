@@ -1,15 +1,15 @@
 """Tracing utilities for MCP tools."""
 
 import functools
-import logging
 from typing import Any, Callable, TypeVar, cast
 
 from opentelemetry import context, trace
 from opentelemetry.propagate import extract
 from opentelemetry.trace.status import Status, StatusCode
+from shared_models import configure_logging
 from tracing_config.auto_tracing import tracingIsActive
 
-logger = logging.getLogger()
+logger = configure_logging("snow-mcp-server")
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -58,12 +58,15 @@ def _extract_context_from_request(args: tuple[Any, ...], kwargs: dict[str, Any])
                 carrier = {k.lower(): v for k, v in dict(headers).items()}
 
                 logger.debug(
-                    f"Extracting tracing context from headers: {list(carrier.keys())}"
+                    "Extracting tracing context from headers",
+                    headers=list(carrier.keys()),
                 )
 
                 # Check for traceparent header specifically
                 if "traceparent" in carrier:
-                    logger.debug(f"Found traceparent header: {carrier['traceparent']}")
+                    logger.debug(
+                        "Found traceparent header", traceparent=carrier["traceparent"]
+                    )
                 else:
                     logger.debug("No traceparent header found")
 
@@ -74,7 +77,8 @@ def _extract_context_from_request(args: tuple[Any, ...], kwargs: dict[str, Any])
                 span = trace.get_current_span(extracted_context)
                 if span and span.get_span_context().is_valid:
                     logger.debug(
-                        f"Successfully extracted parent span context: trace_id={span.get_span_context().trace_id}"
+                        "Successfully extracted parent span context",
+                        trace_id=span.get_span_context().trace_id,
                     )
                 else:
                     logger.debug("No valid parent span context found in headers")
@@ -82,7 +86,7 @@ def _extract_context_from_request(args: tuple[Any, ...], kwargs: dict[str, Any])
                 return extracted_context
     except Exception as e:
         # If extraction fails, return current context
-        logger.debug(f"Failed to extract context from request: {e}")
+        logger.debug("Failed to extract context from request", error=str(e))
         pass
 
     return context.get_current()
@@ -124,14 +128,18 @@ def trace_mcp_tool(tool_name: str | None = None) -> Callable[[F], F]:
             # Use provided tool name or function name
             span_name = tool_name or f"mcp.tool.{func.__name__}"
 
-            logger.debug(f"Starting span '{span_name}' with context: {parent_context}")
+            logger.debug(
+                "Starting span", span_name=span_name, context=str(parent_context)
+            )
 
             # Start a new span for this tool call with the extracted parent context
             with tracer.start_as_current_span(
                 span_name, context=parent_context
             ) as span:
                 logger.debug(
-                    f"Created span with trace_id={span.get_span_context().trace_id}, span_id={span.get_span_context().span_id}"
+                    "Created span",
+                    trace_id=span.get_span_context().trace_id,
+                    span_id=span.get_span_context().span_id,
                 )
                 try:
                     # Add tool metadata as span attributes
