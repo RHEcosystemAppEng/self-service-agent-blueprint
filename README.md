@@ -851,7 +851,9 @@ In your Slack workspace:
 
 ### 5.4 Integration with Real ServiceNow (Optional)
 
-By default, the system uses mock ServiceNow data. To integrate with your actual ServiceNow instance:
+By default, the system uses mock ServiceNow data. To integrate with your actual ServiceNow instance see the following docs for full details. The sections which follow walk you through the streamlined processes for setting up and using a ServiceNow instance.
+- [ServiceNow PDI Bootstrap - Automated Setup](guides/SERVICE_NOW_BOOTSTRAP_AUTOMATED.md) - for a guide to automated ServiceNow Bootstrap (recommended)
+- [ServiceNow PDI Bootstrap - Manual Setup](guides/SERVICE_NOW_BOOTSTRAP_MANUAL.md) - for a guide to manual ServiceNow Bootstrap
 
 #### Step 1: Configure ServiceNow Credentials
 
