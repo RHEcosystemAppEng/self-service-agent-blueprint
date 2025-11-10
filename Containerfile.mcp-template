@@ -11,6 +11,7 @@ RUN pip3 install --no-cache-dir uv
 
 WORKDIR /app
 
+COPY shared-models ./shared-models/
 COPY tracing-config/ ./tracing-config
 
 ARG SERVICE_NAME
@@ -24,6 +25,7 @@ FROM registry.access.redhat.com/ubi9/python-312-minimal:latest
 
 WORKDIR /app
 
+COPY --from=builder /app/shared-models /app/shared-models
 COPY --from=builder /app/tracing-config /app/tracing-config
 
 ARG SERVICE_NAME
@@ -37,7 +39,7 @@ COPY ${SERVICE_NAME}/pyproject.toml ./
 
 # Set environment variables
 ENV PATH="/app/.venv/bin:$PATH"
-ENV PYTHONPATH="/app/src:/app/tracing-config/src:$PYTHONPATH"
+ENV PYTHONPATH="/app/src:/app/shared-models/src:/app/tracing-config/src:$PYTHONPATH"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV OTEL_SERVICE_NAME=${SERVICE_NAME}
