@@ -1,6 +1,6 @@
-# ServiceNow PDI (Personal Development Instance) Setup Guide
+# ServiceNow PDI Bootstrap - Manual Setup
 
-This guide describes the steps required to create a PDI (Personal Development Instance) that can be used to test the Blueprint's integration with ServiceNow. Creating a PDI is offered for free (at least at the time of writing this document).
+This guide describes the manual steps required to bootstrap a PDI (Personal Development Instance) that can be used to test the Blueprint's integration with ServiceNow. Creating a PDI is offered for free (at least at the time of writing this document).
 
 ## Table of Contents
 

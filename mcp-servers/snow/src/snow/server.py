@@ -9,11 +9,6 @@ import os
 from typing import Any, Literal
 
 from mcp.server.fastmcp import Context, FastMCP
-from snow.data.data import (
-    create_laptop_refresh_ticket,
-    find_employee_by_authoritative_user_id,
-    format_laptop_info,
-)
 from snow.servicenow.client import ServiceNowClient
 from snow.servicenow.models import OpenServiceNowLaptopRefreshRequestParams
 from starlette.responses import JSONResponse
@@ -29,23 +24,15 @@ MCP_PORT = int(
     os.environ.get("SELF_SERVICE_AGENT_SNOW_SERVER_SERVICE_PORT_HTTP", "8001")
 )
 MCP_HOST = os.environ.get("MCP_HOST", "0.0.0.0")
+SERVICENOW_INSTANCE_URL = os.environ.get("SERVICENOW_INSTANCE_URL")
+
 mcp = FastMCP(
     "Snow Server", host=MCP_HOST, stateless_http=(MCP_TRANSPORT == "streamable-http")
 )
 
 
-def _should_use_real_servicenow() -> bool:
-    """Determine if real ServiceNow should be used based on environment configuration."""
-    servicenow_url = os.getenv("SERVICENOW_INSTANCE_URL")
-    use_real = os.getenv("USE_REAL_SERVICENOW", "false").lower() == "true"
-
-    return bool(servicenow_url and use_real)
-
-
-def _create_real_servicenow_ticket(
-    authoritative_user_id: str, preferred_model: str
-) -> str:
-    """Create a real ServiceNow ticket using the API.
+def _create_servicenow_ticket(authoritative_user_id: str, preferred_model: str) -> str:
+    """Create a ServiceNow ticket using the API.
 
     Args:
         authoritative_user_id: Authoritative user ID from request headers
@@ -129,8 +116,8 @@ def _extract_authoritative_user_id(ctx: Context[Any, Any]) -> str | None:
     return None
 
 
-def _get_real_servicenow_laptop_info(authoritative_user_id: str) -> str:
-    """Get laptop information from real ServiceNow API.
+def _get_servicenow_laptop_info(authoritative_user_id: str) -> str:
+    """Get laptop information from ServiceNow API.
 
     Note: ServiceNow API currently only supports email-based lookups.
     If an employee ID is provided, this will likely fail.
@@ -153,21 +140,6 @@ def _get_real_servicenow_laptop_info(authoritative_user_id: str) -> str:
         error_msg = f"Error getting laptop info from ServiceNow: {str(e)}"
         logging.error(error_msg)
         raise  # Re-raise to allow fallback handling
-
-
-def _get_mock_laptop_info(authoritative_user_id: str) -> str:
-    """Get laptop information from mock data.
-
-    Args:
-        authoritative_user_id: Authoritative user ID from request headers (email address)
-
-    Returns:
-        Formatted laptop information string including employee details and hardware specifications
-    """
-    employee_data = find_employee_by_authoritative_user_id(authoritative_user_id)
-
-    # filters out some fields and adds others
-    return format_laptop_info(employee_data)
 
 
 @mcp.custom_route("/health", methods=["GET"])  # type: ignore
@@ -214,25 +186,11 @@ def open_laptop_refresh_ticket(
             "Authoritative user ID not found in request headers. Ensure AUTHORITATIVE_USER_ID header is set."
         )
 
-    # Try real ServiceNow first if configured
-    if _should_use_real_servicenow():
-        logging.info(
-            f"Using real ServiceNow API - authoritative_user_id: {authoritative_user_id}, laptop_code: {servicenow_laptop_code}"
-        )
-        return _create_real_servicenow_ticket(
-            authoritative_user_id, servicenow_laptop_code
-        )
-
-    # Use mock implementation
+    # Use ServiceNow API
     logging.info(
-        f"Using mock ServiceNow implementation - authoritative_user_id: {authoritative_user_id}, laptop_code: {servicenow_laptop_code}"
+        f"Opening ServiceNow ticket - authoritative_user_id: {authoritative_user_id}, laptop_code: {servicenow_laptop_code}"
     )
-    return create_laptop_refresh_ticket(
-        authoritative_user_id=authoritative_user_id,
-        employee_name=employee_name,
-        business_justification=business_justification,
-        preferred_model=servicenow_laptop_code,
-    )
+    return _create_servicenow_ticket(authoritative_user_id, servicenow_laptop_code)
 
 
 @mcp.tool()
@@ -276,22 +234,15 @@ def get_employee_laptop_info(
             "Authoritative user ID not found in request headers. Ensure AUTHORITATIVE_USER_ID header is set."
         )
 
-    # Try real ServiceNow first if configured, otherwise use mock
-    if _should_use_real_servicenow():
-        logging.info(
-            f"Using real ServiceNow API for laptop info - authoritative_user_id: {authoritative_user_id}"
-        )
-        return _get_real_servicenow_laptop_info(authoritative_user_id)
-
-    # Use mock implementation
+    # Get laptop info from ServiceNow API
     logging.info(
-        f"Using mock laptop info implementation - authoritative_user_id: {authoritative_user_id}"
+        f"Getting laptop info from ServiceNow - authoritative_user_id: {authoritative_user_id}"
     )
 
-    result = _get_mock_laptop_info(authoritative_user_id)
+    result = _get_servicenow_laptop_info(authoritative_user_id)
 
     logging.info(
-        f"returning laptop info for employee - authoritative_user_id: {authoritative_user_id}"
+        f"Returning laptop info for employee - authoritative_user_id: {authoritative_user_id}"
     )
 
     return result

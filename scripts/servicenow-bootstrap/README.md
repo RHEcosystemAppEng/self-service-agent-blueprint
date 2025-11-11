@@ -1,0 +1,1 @@
+See [guides/ServiceNow PDI Bootstrap - Automated Setup](../../guides/SERVICE_NOW_BOOTSTRAP_AUTOMATED.md) for instructions to use this bootstrap tool.

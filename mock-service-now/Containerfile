@@ -1,0 +1,49 @@
+# Multi-stage build for mock-service-now
+# Builder stage
+FROM registry.access.redhat.com/ubi9/python-312:latest as builder
+
+USER root
+RUN pip3 install --no-cache-dir uv
+
+WORKDIR /app
+
+# Copy shared dependencies
+COPY shared-models ./shared-models/
+COPY tracing-config ./tracing-config/
+
+# Copy mock-service-now files
+COPY mock-service-now/pyproject.toml mock-service-now/uv.lock ./mock-service-now/
+WORKDIR /app/mock-service-now
+
+# Install dependencies
+RUN uv sync --frozen --no-cache --no-dev
+
+# Production stage
+FROM registry.access.redhat.com/ubi9/python-312-minimal:latest
+
+WORKDIR /app
+
+# Copy shared dependencies
+COPY --from=builder /app/shared-models /app/shared-models
+COPY --from=builder /app/tracing-config /app/tracing-config
+
+# Copy virtual environment and source code
+COPY --from=builder /app/mock-service-now/.venv /app/.venv
+COPY mock-service-now/src/. ./src
+
+# Set environment variables
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/shared-models/src:/app/tracing-config/src:/app/src:$PYTHONPATH"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV OTEL_SERVICE_NAME=mock-service-now
+ENV OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true
+
+# Drop privileges
+USER 1001
+
+# Expose port
+EXPOSE 8082
+
+# Run the application
+CMD ["python", "-m", "mock_service_now.main"]

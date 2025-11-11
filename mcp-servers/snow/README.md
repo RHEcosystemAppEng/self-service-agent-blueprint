@@ -5,7 +5,7 @@ A FastMCP server that provides tools for creating ServiceNow laptop refresh tick
 ## Features
 
 - **Laptop Refresh Tickets**: Create ServiceNow tickets for laptop refresh requests
-- **Mock Data**: Uses simulated ServiceNow integration for demonstration purposes
+- **ServiceNow Integration**: Works with any ServiceNow-compatible API endpoint (real or mock)
 - **Business Justification**: Requires business justification for all ticket requests
 
 ## Tools
@@ -127,25 +127,10 @@ snow/
 - `MCP_TRANSPORT`: Transport protocol (default: "sse")
 - `SELF_SERVICE_AGENT_SNOW_SERVER_SERVICE_PORT_HTTP`: HTTP port (default: 8001)
 - `MCP_HOST`: Host address (default: "0.0.0.0")
-- `SERVICENOW_INSTANCE_URL`: ServiceNow instance URL (e.g., "https://dev295439.service-now.com/")
-- `SERVICENOW_AUTH_TYPE`: Authentication type: "basic", "oauth", or "api_key" (default: "basic")
-- `USE_REAL_SERVICENOW`: if set to "true" will attempt to call the APIs of `SERVICENOW_INSTANCE_URL` (default: false)
-
-### Basic Authentication
-- `SERVICENOW_USERNAME`: ServiceNow username for authentication
-- `SERVICENOW_PASSWORD`: ServiceNow password (sensitive - store as secret)
-
-### OAuth Authentication
-- `SERVICENOW_CLIENT_ID`: OAuth client ID
-- `SERVICENOW_CLIENT_SECRET`: OAuth client secret
-- `SERVICENOW_USERNAME`: ServiceNow username
-- `SERVICENOW_PASSWORD`: ServiceNow password
-- `SERVICENOW_TOKEN_URL`: OAuth token URL (optional)
-
-### API Key Authentication
-- `SERVICENOW_AUTH_TYPE=api_key`
-- `SERVICENOW_API_KEY`: Your API key value
-- `SERVICENOW_API_KEY_HEADER`: Custom header name (default: "x-sn-apikey")
+- `SERVICENOW_INSTANCE_URL`: ServiceNow instance URL (can point to real ServiceNow or mock server, e.g., "https://dev295439.service-now.com/" or "http://localhost:8080")
+- `SERVICENOW_AUTH_TYPE`: Set to "api_key" for API key authentication
+- `SERVICENOW_API_KEY`: Your ServiceNow API key value
+- `SERVICENOW_API_KEY_HEADER`: Custom header name (default: "X-ServiceNow-API-Key")
 
 ## Creating ServiceNow API Keys
 

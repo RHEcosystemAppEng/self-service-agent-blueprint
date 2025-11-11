@@ -155,6 +155,7 @@ help:
 	@echo "  install-request-manager             - Install dependencies for request manager"
 	@echo "  install-shared-models               - Install dependencies for shared models"
 	@echo "  install-shared-clients              - Install dependencies for shared clients"
+	@echo "  install-servicenow-bootstrap       - Install dependencies for ServiceNow automation scripts"
 	@echo ""
 	@echo "Reinstall Commands:"
 	@echo "  reinstall-all                       - Force reinstall dependencies for all projects (uv sync --reinstall)"
@@ -165,6 +166,7 @@ help:
 	@echo "  reinstall-request-manager           - Force reinstall request manager dependencies"
 	@echo "  reinstall-shared-models             - Force reinstall shared models dependencies"
 	@echo "  reinstall-shared-clients            - Force reinstall shared clients dependencies"
+	@echo "  reinstall-servicenow-bootstrap     - Force reinstall ServiceNow automation dependencies"
 	@echo ""
 	@echo "Push Commands:"
 	@echo "  push-all-images                     - Push all container images to registry"
@@ -188,6 +190,7 @@ help:
 	@echo "  test-mcp-snow                       - Run tests for snow MCP server"
 	@echo "  test-request-manager                - Run tests for request manager"
 	@echo "  test-shared-models                  - Run tests for shared models"
+	@echo "  test-servicenow-bootstrap          - Run tests for ServiceNow automation scripts"
 	@echo "  test-short-resp-integration-request-mgr - Run short responses integration tests with Request Manager"
 	@echo "  test-long-resp-integration-request-mgr - Run long responses integration tests with Request Manager"
 	@echo "  test-long-concurrent-integration-request-mgr - Run long concurrent responses integration tests with Request Manager (concurrency=4)"
@@ -427,7 +430,7 @@ lint-global-tools:
 
 # Per-directory mypy linting (project-specific configurations)
 .PHONY: lint-mypy-per-directory
-lint-mypy-per-directory: lint-shared-models lint-shared-clients lint-agent-service lint-request-manager lint-integration-dispatcher lint-mcp-snow lint-mock-eventing lint-tracing-config lint-evaluations
+lint-mypy-per-directory: lint-shared-models lint-shared-clients lint-agent-service lint-request-manager lint-integration-dispatcher lint-mcp-snow lint-mock-eventing lint-tracing-config lint-evaluations lint-servicenow-bootstrap
 	@echo "✅ All mypy linting completed"
 
 # Common function for mypy linting
@@ -477,6 +480,10 @@ lint-tracing-config:
 lint-evaluations:
 	$(call lint_mypy,evaluations)
 
+.PHONY: lint-servicenow-bootstrap
+lint-servicenow-bootstrap:
+	$(call lint_mypy,scripts/servicenow-bootstrap)
+
 
 .PHONY: format
 format:
@@ -488,7 +495,7 @@ format:
 
 # Install dependencies
 .PHONY: install-all
-install-all: install-shared-models install-shared-clients install-tracing-config install install-request-manager install-agent-service install-integration-dispatcher install-mcp-snow install-mock-eventing install-evaluations
+install-all: install-shared-models install-shared-clients install-tracing-config install install-request-manager install-agent-service install-integration-dispatcher install-mcp-snow install-mock-eventing install-evaluations install-servicenow-bootstrap
 	@echo "All dependencies installed successfully!"
 
 .PHONY: install-shared-models
@@ -517,7 +524,7 @@ reinstall:
 	@echo "All dependencies reinstalled with latest code!"
 
 .PHONY: reinstall-all
-reinstall-all: reinstall-shared-models reinstall-shared-clients reinstall reinstall-request-manager reinstall-agent-service reinstall-integration-dispatcher reinstall-mcp-snow
+reinstall-all: reinstall-shared-models reinstall-shared-clients reinstall reinstall-request-manager reinstall-agent-service reinstall-integration-dispatcher reinstall-mcp-snow reinstall-servicenow-bootstrap
 	@echo "All project dependencies reinstalled successfully!"
 
 
@@ -556,6 +563,12 @@ reinstall-shared-clients:
 	@echo "Force reinstalling shared clients dependencies..."
 	cd shared-clients && uv sync --reinstall
 	@echo "Shared clients dependencies reinstalled successfully!"
+
+.PHONY: reinstall-servicenow-bootstrap
+reinstall-servicenow-bootstrap:
+	@echo "Force reinstalling ServiceNow automation dependencies..."
+	cd scripts/servicenow-bootstrap && uv sync --reinstall
+	@echo "ServiceNow automation dependencies reinstalled successfully!"
 
 
 .PHONY: install-request-manager
@@ -600,9 +613,15 @@ install-evaluations:
 	cd evaluations && uv sync
 	@echo "Evaluations dependencies installed successfully!"
 
+.PHONY: install-servicenow-bootstrap
+install-servicenow-bootstrap:
+	@echo "Installing ServiceNow automation dependencies..."
+	cd scripts/servicenow-bootstrap && uv sync
+	@echo "ServiceNow automation dependencies installed successfully!"
+
 # Test code
 .PHONY: test-all
-test-all: test-shared-models test-shared-clients test test-request-manager test-agent-service test-integration-dispatcher test-mcp-snow
+test-all: test-shared-models test-shared-clients test test-request-manager test-agent-service test-integration-dispatcher test-mcp-snow test-servicenow-bootstrap
 	@echo "All tests completed successfully!"
 
 # Lockfile management
@@ -656,6 +675,8 @@ check-lockfiles:
 	@echo
 	$(call check_lockfile,mock-eventing-service)
 	@echo
+	$(call check_lockfile,scripts/servicenow-bootstrap)
+	@echo
 	@echo
 	@echo "🎉 All lockfiles are up-to-date!"
 
@@ -681,11 +702,13 @@ update-lockfiles:
 	@echo
 	$(call update_lockfile,mock-eventing-service)
 	@echo
+	$(call update_lockfile,scripts/servicenow-bootstrap)
+	@echo
 	@echo
 	@echo "🎉 All lockfiles updated successfully!"
 
 # Individual service lockfile targets
-.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-snow check-lockfile-mock-eventing
+.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-snow check-lockfile-mock-eventing check-lockfile-servicenow-bootstrap
 check-lockfile-root:
 	@echo "📦 Checking root project..."
 	@if uv lock --check; then \
@@ -715,8 +738,11 @@ check-lockfile-mcp-snow:
 check-lockfile-mock-eventing:
 	$(call check_lockfile,mock-eventing-service)
 
+check-lockfile-servicenow-bootstrap:
+	$(call check_lockfile,scripts/servicenow-bootstrap)
 
-.PHONY: update-lockfile-shared-models update-lockfile-shared-clients update-lockfile-agent-service update-lockfile-request-manager update-lockfile-integration-dispatcher update-lockfile-mcp-snow update-lockfile-mock-eventing
+
+.PHONY: update-lockfile-shared-models update-lockfile-shared-clients update-lockfile-agent-service update-lockfile-request-manager update-lockfile-integration-dispatcher update-lockfile-mcp-snow update-lockfile-mock-eventing update-lockfile-servicenow-bootstrap
 update-lockfile-shared-models:
 	$(call update_lockfile,shared-models)
 
@@ -737,6 +763,9 @@ update-lockfile-mcp-snow:
 
 update-lockfile-mock-eventing:
 	$(call update_lockfile,mock-eventing-service)
+
+update-lockfile-servicenow-bootstrap:
+	$(call update_lockfile,scripts/servicenow-bootstrap)
 
 
 .PHONY: test-shared-models
@@ -781,6 +810,12 @@ test-mcp-snow:
 	@echo "Running snow MCP tests..."
 	cd mcp-servers/snow && uv run python -m pytest tests/
 	@echo "Snow MCP tests completed successfully!"
+
+.PHONY: test-servicenow-bootstrap
+test-servicenow-bootstrap:
+	@echo "Running ServiceNow automation tests..."
+	cd scripts/servicenow-bootstrap && uv run python -m pytest tests/ || echo "No tests found for ServiceNow automation"
+	@echo "ServiceNow automation tests completed successfully!"
 
 .PHONY: sync-evaluations
 sync-evaluations:

@@ -12,6 +12,7 @@ image:
   agentService: self-service-agent-service
   integrationDispatcher: self-service-agent-integration-dispatcher
   mockEventing: self-service-agent-mock-eventing
+  mockServiceNow: self-service-agent-mock-servicenow
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
