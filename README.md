@@ -36,7 +36,7 @@
   - [Integration with Email (Optional)](#55-integration-with-email-optional)
   - [Setting up Safety Shields (Optional)](#56-setting-up-safety-shields-optional)
   - [Run Evaluations](#57-run-evaluations)
-  - [Follow the Flow with Observability](#58-follow-the-flow-with-observability)
+  - [Follow the Flow with Tracing](#58-follow-the-flow-with-tracing)
 
 6. [Performance & Scaling](#6-performance--scaling)
 
@@ -1229,9 +1229,138 @@ python evaluate.py --num-conversations 5
 
 ---
 
-### 5.8 Follow the Flow with Observability
+### 5.8 Follow the Flow with Tracing
 
-(Documentation TBD)
+When users or systems interact with an application, the underlying architecture processes requests that often involve coordination across multiple services to generate responses.
+
+Distributed tracing connects individual work units (known as spans) — typically running across separate processes or machines — enabling visibility into the complete sequence of operations within a distributed transaction. Spans can be hierarchically structured and sequenced to represent cause-and-effect relationships.
+
+The system includes OpenTelemetry support for distributed tracing across all components, enabling you to track requests end-to-end: Request Manager, Agent Service, Integration Dispatcher, MCP Servers, and Llama Stack.
+
+#### Setting up Observability Infrastructure
+
+Before enabling distributed tracing, you need to set up an OpenTelemetry collector to receive, process, and visualize traces.
+
+if you want a more detailed information/understanding you can check out [this quickstart](https://github.com/rh-ai-quickstart/lls-observability), we've extracted the key steps below
+
+**Option 1: Simple Jaeger All-in-One (Development/Testing)**
+
+For quick setup, deploy Jaeger with built-in OTLP support. The all-in-one image includes collector, storage, query service, and UI in a single container.
+
+```bash
+# Deploy Jaeger (example deployment available in official docs)
+export NAMESPACE=your-namespace
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://jaeger-collector.${NAMESPACE}.svc.cluster.local:4318"
+```
+
+**Limitations:** In-memory storage, not suitable for production.
+
+**Reference:** [Jaeger Getting Started Guide](https://www.jaegertracing.io/docs/latest/getting-started/)
+
+**Option 2: OpenShift Observability with Tempo (Production)**
+
+For production deployments, use the Red Hat OpenShift distributed tracing platform based on Tempo with persistent storage, high availability, and multi-tenancy.
+
+**Key Steps:**
+1. Install Red Hat OpenShift distributed tracing platform operator
+2. Deploy TempoStack instance with object storage (S3, Azure Blob, GCS)
+3. Create OpenTelemetry Collector to forward traces to Tempo
+4. Access Jaeger UI through the exposed route
+
+**Reference:** [OpenShift Distributed Tracing Platform Documentation](https://docs.openshift.com/container-platform/latest/observability/distr_tracing/distr_tracing_tempo/distr-tracing-tempo-installing.html)
+
+#### Enabling Tracing in Your Deployment
+
+Once your observability infrastructure is ready, enable tracing by setting the OTLP endpoint:
+
+```bash
+# Set the OTLP endpoint
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://otel-collector.openshift-tracing-system.svc.cluster.local:4318"
+
+# Deploy with tracing enabled
+make helm-install-test NAMESPACE=$NAMESPACE \
+  OTEL_EXPORTER_OTLP_ENDPOINT="$OTEL_EXPORTER_OTLP_ENDPOINT"
+```
+
+The endpoint will be automatically propagated to all components.
+
+#### Accessing and Viewing Traces
+
+**Get the Jaeger UI URL:**
+
+```bash
+# For Jaeger All-in-One
+export JAEGER_UI_URL=$(oc get route jaeger-ui -n $NAMESPACE -o jsonpath='{.spec.host}')
+
+# For OpenShift Tempo
+export JAEGER_UI_URL=$(oc get route tempo-tempo-stack-jaegerui -n openshift-tracing-system -o jsonpath='{.spec.host}')
+
+# Open in browser
+echo "Jaeger UI: https://$JAEGER_UI_URL"
+```
+
+**View Traces:**
+
+1. Generate traces by interacting with the agent (via CLI, Slack, or API)
+2. Open Jaeger UI and select service `self-service-agent-request-manager`
+3. Click "Find Traces" to see recent requests
+4. Click on a trace to view the complete flow including:
+   - Request Manager → Agent Service → Llama Stack → MCP Servers
+   - Knowledge base queries and tool calls
+   - Performance timing for each component
+
+Key spans to look for: `POST /api/v1/requests`, `mcp.tool.get_employee_laptop_info`, `mcp.tool.open_laptop_refresh_ticket`
+
+**Troubleshooting:** If traces don't appear, verify `OTEL_EXPORTER_OTLP_ENDPOINT` is set on deployments and check service logs for OpenTelemetry initialization messages
+
+#### Example Trace Hierarchy
+
+A complete laptop refresh request shows spans across all services:
+
+```
+http.request POST /api/v1/requests (request-manager)          [120ms]
+  └─ publish_event agent.request (request-manager)            [10ms]
+      └─ http.request POST /agent/chat (agent-service)        [95ms]
+          ├─ knowledge_base_query laptop-refresh-policy       [15ms]
+          ├─ http.request POST /inference/chat (llamastack)   [65ms]
+          │   └─ mcp.tool.get_employee_laptop_info            [8ms]
+          │       └─ http.request GET servicenow.com/api      [6ms]
+          └─ http.request POST /inference/chat (llamastack)   [12ms]
+              └─ mcp.tool.open_laptop_refresh_ticket          [8ms]
+                  └─ http.request POST servicenow.com/api     [6ms]
+```
+
+**Visual Example:**
+
+Here's what a complete trace looks like in Jaeger:
+
+![Tracing Example](guides/images/tracing-example.png)
+
+In this example, the overall request time (4:16) is dominated by the LLM inference call (3:53).
+
+Or its graph representation:
+
+![Tracing Graph](guides/images/tracing-graph.png)
+
+#### Understanding Trace Context Propagation
+
+The system implements end-to-end trace context propagation:
+
+1. **Client → Request Manager**: Automatic via FastAPI instrumentation
+2. **Request Manager → Agent Service**: Automatic via HTTP client instrumentation
+3. **Agent Service → Llama Stack**: Automatic via HTTPX instrumentation
+4. **Llama Stack → MCP Servers**: Manual injection via tool headers (`traceparent`, `tracestate`)
+5. **MCP Server → External APIs**: Automatic via HTTPX instrumentation
+
+All operations share the same trace ID, creating a complete distributed trace.
+
+**For detailed implementation information** including context propagation mechanisms, decorator usage, and troubleshooting, see the [Tracing Implementation Documentation](docs/TRACING_IMPLEMENTATION.md).
+
+**You should now be able to:**
+- ✓ Set up observability infrastructure (Jaeger or Tempo)
+- ✓ Enable tracing and access Jaeger UI
+- ✓ View and analyze distributed traces across all components
+- ✓ Identify performance bottlenecks in request flows
 
 ---
 
@@ -1433,12 +1562,3 @@ By completing this quickstart, you have:
 ---
 
 **Thank you for using the Self-Service Agent Quickstart!** We hope this guide helps you successfully deploy AI-driven IT process automation in your organization.
-
-## Tracing
-
-To enable tracing, it is possible to specify a remote OpenTelemetry collector,
-with the `OTEL_EXPORTER_OTLP_ENDPOINT` environement variable.
-
-```bash
-make helm-install-test LLM=llama-3-3-70b-instruct-w8a8 LLM_ID=llama-3-3-70b-instruct-w8a8 LLM_URL=$YOUR_LLM_URL LLM_API_TOKEN=$YOUR_LLM_API_TOKEN OTEL_EXPORTER_OTLP_ENDPOINT="http://jaeger-collector.obs.svc.cluster.local:4318"
-```
