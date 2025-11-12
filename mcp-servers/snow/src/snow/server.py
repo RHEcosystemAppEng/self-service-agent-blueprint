@@ -73,7 +73,9 @@ def _create_real_servicenow_ticket(
                     f"User found but sys_id is missing for email: {authoritative_user_id}"
                 )
             logger.info(
-                "Found sys_id", tool="open_laptop_refresh_ticket", user_sys_id=user_sys_id
+                "Found sys_id",
+                tool="open_laptop_refresh_ticket",
+                user_sys_id=user_sys_id,
             )
         else:
             error_msg = user_result.get("message", "Unknown error")
