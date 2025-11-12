@@ -37,6 +37,18 @@ state_schema:
       type: "dict"
       description: "Available laptop options shown to user"
       default: null
+    laptop_options_retry_count:
+      type: "integer"
+      description: "Number of times we've retried fetching laptop options"
+      default: 0
+    eligibility_check_retry_count:
+      type: "integer"
+      description: "Number of times we've retried checking eligibility"
+      default: 0
+    ticket_creation_retry_count:
+      type: "integer"
+      description: "Number of times we've retried creating a ticket"
+      default: 0
     ticket_created:
       type: "boolean"
       description: "Whether ServiceNow ticket was created"
@@ -62,7 +74,16 @@ states:
     temperature: 0.3  # Factual lookup, should be consistent
     allowed_tools: [ "get_employee_laptop_info" ]
     prompt: |
-      You are a helpful laptop refresh assistant. CRITICAL: look up the laptop information for the authenticated user by using the get_employee_laptop_info tool. Provide their current laptop details including: name, region, purchase date, laptop age, model, and serial number.
+      You are a helpful laptop refresh assistant.
+
+      CRITICAL: DO NOT announce what you are about to do (e.g., "I will look up your information", "Let me check the database"). Execute tool calls silently and present only the results to the user.
+
+      CRITICAL: Look up the laptop information for the authenticated user by using the get_employee_laptop_info tool.
+
+      CRITICAL: You MUST include ALL laptop information EXACTLY as returned by get_employee_laptop_info. Do NOT summarize, do NOT omit any fields, do NOT reformat. Copy the COMPLETE output including all fields: Employee Name, Employee Location, Laptop Model, Laptop Serial Number, Laptop Purchase Date, Laptop Age, Laptop Warranty Expiry Date, Laptop Warranty.
+
+      CRITICAL: If any values are missing in the tool output, keep them empty - do NOT invent values.
+
       If the user is not found, explain that their information was not found in the database.
     transitions:
       success: "classify_lookup_result"
@@ -115,16 +136,35 @@ states:
     prompt: |
       You have the employee information: {employee_info.response}
 
-      Search the laptop refresh knowledge base for the company's laptop refresh policy and determine if this employee is eligible for a laptop replacement. Specifically:
+      Search the laptop refresh knowledge base for the company's laptop refresh policy and determine if this employee is eligible for a laptop replacement.
 
-      1. Look up the corporate laptop refresh policy to find the refresh cycle/interval
-      2. Compare the users current laptop age against the policy requirements
-      3. Provide a clear summary to the user including their laptop details and eligibility status. The summary should speak directly to the user.
-      4. Include their current laptop details (name, region, purchase date, laptop age, model, serial number)
-      5. Clearly state whether they can request a replacement today and explain the policy
-      6. If eligible ask if they would like to proceed to reviewing the laptop options. Do not ask for any additional information.
+      CRITICAL: Do your calculations and reasoning silently. Do NOT show your work. Do NOT explain the calculation steps. Do NOT show "Now let's calculate..." or "Laptop Age in Months: (6 × 12) + 6 = 78 months" or similar explanations. Only output the final formatted response to the user.
 
-      Be conversational and helpful.
+      Steps (perform silently, do not show to user):
+      1. Look up the corporate laptop refresh policy to find the refresh cycle/interval. You MUST retrieve the refresh interval from the knowledge base. Do NOT guess or assume.
+      2. Convert both the laptop age and policy refresh interval to total months: laptop_age_months = (years × 12) + months, policy_months = (policy_years × 12). The laptop is ELIGIBLE if laptop_age_months >= policy_months, otherwise NOT ELIGIBLE. You must do the mathematical comparison correctly. If the laptop age in months is even 1 month less than the policy requirement in months, it is NOT ELIGIBLE.
+
+      Your response to the user must follow this EXACT format:
+
+      First, list all laptop details:
+      - Employee Name: [from employee info]
+      - Employee Location: [from employee info]
+      - Laptop Model: [from employee info]
+      - Laptop Serial Number: [from employee info]
+      - Laptop Purchase Date: [from employee info]
+      - Laptop Age: [from employee info]
+      - Laptop Warranty Expiry Date: [from employee info]
+      - Laptop Warranty: [from employee info]
+
+      Then, state eligibility using EXACTLY one of these formats:
+
+      If ELIGIBLE:
+      Your laptop, a XXXXXXXX, was purchased on 20XX-XX-XX and is currently A years and B months old (X total months). The company's laptop refresh policy states that standard laptops will be refreshed every Y years (Z months) from the date of issuance. Since your laptop is Y years or older (X months >= Z months), you are eligible for a laptop refresh. Would you like to proceed with reviewing the available laptop options for your location?
+
+      If NOT ELIGIBLE:
+      Your laptop, a XXXXXXXX, was purchased on 20XX-XX-XX and is currently A years and B months old (X total months). The company's laptop refresh policy states that standard laptops will be refreshed every Y years (Z months) from the date of issuance. Since your laptop is less than Y years old (X months < Z months), you are not yet eligible for a laptop refresh. You may proceed anyway but the request for refresh may require additional approvals or be rejected. Would you like to proceed with reviewing the available laptop options for your location?
+
+      CRITICAL: Do NOT include any calculation explanations, reasoning, or "thinking out loud" in your response. Only provide the formatted laptop details and eligibility statement above.
     transitions:
       success: "classify_eligibility_result"
     data_storage:
@@ -152,6 +192,9 @@ states:
             - type: "set_field"
               field_name: "eligibility_status"
               value: "ELIGIBLE"
+            - type: "set_field"
+              field_name: "eligibility_check_retry_count"
+              value: 0
             - type: "add_message"
               message: "{laptop_eligibility.response}"
             - type: "transition"
@@ -162,18 +205,30 @@ states:
             - type: "set_field"
               field_name: "eligibility_status"
               value: "NOT_ELIGIBLE"
+            - type: "set_field"
+              field_name: "eligibility_check_retry_count"
+              value: 0
             - type: "add_message"
               message: "{laptop_eligibility.response}"
             - type: "transition"
               target: "waiting_ineligible_user_input"
-        - name: "unclear"
+        - name: "unclear_retry"
+          trigger_phrases: ["UNCLEAR"]
+          check_field: "eligibility_check_retry_count"
+          check_value_less_than: 2
+          actions:
+            - type: "increment_field"
+              field_name: "eligibility_check_retry_count"
+            - type: "transition"
+              target: "check_eligibility"
+        - name: "unclear_max_retries"
           trigger_phrases: ["UNCLEAR"]
           actions:
             - type: "set_field"
               field_name: "eligibility_status"
               value: "UNCLEAR"
             - type: "add_message"
-              message: "I need to review your eligibility status again. Please contact IT support for further assistance."
+              message: "I'm having trouble determining your eligibility status. Please contact IT support for further assistance."
             - type: "transition"
               target: "end"
       default_transition: "end"
@@ -234,6 +289,8 @@ states:
     temperature: 0.2  # Deterministic yes/no classification
     uses_tools: "No"
     intent_prompt: |
+      CRITICAL: First check if the user wants to return to the router. ANY mention of "router", "go back", "return", or "stop" should be classified as RETURN_TO_ROUTER, even if they use polite language like "please".
+
       The user was asked if they want to proceed with reviewing laptop options. They responded: "{user_input}"
 
       Classify their response as one of the following:
@@ -274,22 +331,132 @@ states:
         prompt: |
           Previously retrieved information on laptop eligibility: {laptop_eligibility.response}
 
-          The user wants to see laptop options based on\n {employee_info.response}\n even though they are not currently eligible under standard policy. Search the laptop refresh knowledge base and present them with all available laptop models based on their region. CRITICAL Include detailed specifications for each option and ask them to choose one specific laptop. CRITICAL only show them the numbered list of laptops for their region. CRITICAL do not show any laptops that are not listed for their region
+          The user wants to see laptop options based on\n {employee_info.response}\n even though they are not currently eligible under standard policy.
+
+          CRITICAL: DO NOT announce what you are about to do (e.g., "I will search the knowledge base", "Let me get the options"). Execute tool calls silently and present only the results to the user.
+
+          Search the laptop refresh knowledge base and present them with all available laptop models based on their region.
+
+          CRITICAL: You MUST retrieve and present EVERY specification field for EVERY laptop. The required fields are: Manufacturer, Model, ServiceNow Code, Target User, Cost, Operating System, Display Size, Display Resolution, Graphics Card, Minimum Storage, Weight, Ports, Minimum Processor, Minimum Memory, and Dimensions.
+
+          CRITICAL: Do NOT summarize, abbreviate, or omit ANY specification details. Copy the COMPLETE specifications EXACTLY as retrieved from the knowledge base.
+
+          CRITICAL: Preserve ALL characters and symbols EXACTLY as they appear in the knowledge base, including currency symbols.
+
+          CRITICAL: Do NOT convert or substitute the ¥ symbol (Chinese Yuan) to ₩ (Korean Won) or any other currency symbol.
+
+          CRITICAL: Only show laptops for their region. Do NOT show laptops from other regions. Do NOT use outside knowledge. Do NOT invent information.
+
+          Use this exact format for each laptop:
+
+          1. Model: XXXXX - ServiceNow Code: XXXXX
+          - Manufacturer: XXXXX
+          - Target User: XXXXX
+          - Cost: XXXXX
+          - Operating System: XXXXX
+          - Display Size: XXXXX
+          - Display Resolution: XXXXX
+          - Graphics Card: XXXXX
+          - Minimum Storage: XXXXX
+          - Weight: XXXXX
+          - Ports: XXXXX
+          - Minimum Processor: XXXXX
+          - Minimum Memory: XXXXX
+          - Dimensions: XXXXX
 
           IMPORTANT: Include a warning that they are not currently eligible under standard policy and any request would require special approval and justification.
 
           Ask them to choose one specific laptop if they wish to proceed with a special request.
-
-          Only use information from the knowledge base - don't add external details.
       - condition: "default"
         prompt: |
-          The user wants to see their laptop options based on {employee_info.response}.\n Search the laptop refresh knowledge base and present them with numbered list of all available laptop models based on their region. CRITICAL Include detailed specifications for each option and ask them to choose one specific laptop. CRITICAL only show them the list of laptops for their region.
+          The user wants to see their laptop options based on {employee_info.response}.
 
-          Only use information from the knowledge base - don't add external details.
+          CRITICAL: DO NOT announce what you are about to do (e.g., "I will search the knowledge base", "Let me get the options"). Execute tool calls silently and present only the results to the user.
+
+          Search the laptop refresh knowledge base and present them with numbered list of all available laptop models based on their region.
+
+          CRITICAL: You MUST retrieve and present EVERY specification field for EVERY laptop. The required fields are: Manufacturer, Model, ServiceNow Code, Target User, Cost, Operating System, Display Size, Display Resolution, Graphics Card, Minimum Storage, Weight, Ports, Minimum Processor, Minimum Memory, and Dimensions.
+
+          CRITICAL: Do NOT summarize, abbreviate, or omit ANY specification details. Copy the COMPLETE specifications EXACTLY as retrieved from the knowledge base.
+
+          CRITICAL: Preserve ALL characters and symbols EXACTLY as they appear in the knowledge base, including currency symbols.
+
+          CRITICAL: Do NOT convert or substitute the ¥ symbol (Chinese Yuan) to ₩ (Korean Won) or any other currency symbol.
+
+          CRITICAL: Only show laptops for their region. Do NOT show laptops from other regions. Do NOT use outside knowledge. Do NOT invent information.
+
+          Use this exact format for each laptop:
+
+          1. Model: XXXXX - ServiceNow Code: XXXXX
+          - Manufacturer: XXXXX
+          - Target User: XXXXX
+          - Cost: XXXXX
+          - Operating System: XXXXX
+          - Display Size: XXXXX
+          - Display Resolution: XXXXX
+          - Graphics Card: XXXXX
+          - Minimum Storage: XXXXX
+          - Weight: XXXXX
+          - Ports: XXXXX
+          - Minimum Processor: XXXXX
+          - Minimum Memory: XXXXX
+          - Dimensions: XXXXX
+
+          Ask them to choose one specific laptop.
     transitions:
-      success: "waiting_laptop_selection"
+      success: "validate_laptop_options"
     data_storage:
       laptop_options: "llm_response"
+
+  # State 5a: Validate Laptop Options Response
+  validate_laptop_options:
+    type: "llm_processor"
+    temperature: 0.1  # Very deterministic validation
+    uses_tools: "No"
+    suppress_response: true  # Don't show the VALID/INVALID output to the user
+    prompt: |
+      Think step by step and use no tools
+      Analyze this laptop options response: "{laptop_options.response}"
+
+      Determine if the response contains actual laptop options or if it's an error/announcement message.
+
+      Check:
+      1. Does the response contain multiple laptop models with specifications?
+      2. Is this actual laptop data (not "I will search...", "Let me get...", error messages, or apologies)?
+
+      If the response contains actual laptop options with specifications, respond: VALID
+      If the response is an announcement, error message, or doesn't contain actual laptop data, respond: INVALID
+
+      Respond with only one word: VALID or INVALID
+    response_analysis:
+      conditions:
+        - name: "valid_options"
+          trigger_phrases: ["VALID"]
+          actions:
+            - type: "set_field"
+              field_name: "laptop_options_retry_count"
+              value: 0
+            - type: "add_message"
+              message: "{laptop_options.response}"
+            - type: "transition"
+              target: "waiting_laptop_selection"
+        - name: "invalid_options_retry"
+          trigger_phrases: ["INVALID"]
+          check_field: "laptop_options_retry_count"
+          check_value_less_than: 2
+          actions:
+            - type: "increment_field"
+              field_name: "laptop_options_retry_count"
+            - type: "transition"
+              target: "select_laptop"
+        - name: "invalid_options_max_retries"
+          trigger_phrases: ["INVALID"]
+          actions:
+            - type: "add_message"
+              message: "I'm having trouble retrieving the laptop options from the knowledge base. Please try again later or contact IT support for assistance."
+            - type: "transition"
+              target: "end"
+      default_transition: "select_laptop"
 
   # State 6: Waiting for Laptop Selection
   waiting_laptop_selection:
@@ -340,6 +507,8 @@ states:
       From the following laptop options, find the details for the user's selection and provide them with the complete specifications:
 
       {laptop_options.response}
+
+      CRITICAL: Do NOT create a ticket number. Do NOT mention any ticket numbers. Do NOT generate placeholder ticket numbers. No ticket has been created yet.
 
       Then ask them to confirm that is the correct laptop and that they would like you to create a Service Now ticket. CRITICAL do not ask for any information other than if they would like you to create the service now ticket.
     transitions:
@@ -395,7 +564,19 @@ states:
       You have the employee information: {employee_info.response}
       Selected Laptop details: {selected_laptop_details}
 
-      Create a ServiceNow ticket for the authenticated user requesting laptop: {selected_laptop} by calling the open_laptop_refresh_ticket tool with "None" as the employee_id parameter, the user's name from the employee info, the laptop information, and business justification "agent submission". CRITICAL use the open_laptop_refresh_ticket tool to create the ticket.
+      Create a ServiceNow ticket for the authenticated user by calling the open_laptop_refresh_ticket tool with these parameters:
+      - employee_name: Extract the employee's name from the employee information above
+      - business_justification: Use "agent submission"
+      - servicenow_laptop_code: Extract the ServiceNow Code from the selected laptop details above
+
+      CRITICAL: You must call the open_laptop_refresh_ticket TOOL (not try to call the laptop code as a tool). The laptop code is a PARAMETER to pass to the tool.
+
+      EXAMPLE TOOL CALL:
+      open_laptop_refresh_ticket(
+        employee_name="XXXXXXXXXX",
+        business_justification="agent submission",
+        servicenow_laptop_code="YYYYYY"
+      )
 
       After creating the ticket, respond to the user using EXACTLY this format (replace XXXXXX with the actual ticket number):
 
@@ -403,16 +584,35 @@ states:
       Is there anything else I can help you with?
     response_analysis:
       conditions:
-        - name: "ticket_created"
-          trigger_phrases: ["ServiceNow ticket", "ticket number"]
+        - name: "ticket_created_success"
+          trigger_phrases: ["REQ"]
           actions:
             - type: "extract_data"
-              pattern: "((?:REQ|INC|RITM)\\d+)"
+              pattern: "(REQ\\d+)"
               field_name: "ticket_number"
               source: "response"
+            - type: "set_field"
+              field_name: "ticket_creation_retry_count"
+              value: 0
             - type: "transition"
               target: "waiting_post_ticket_input"
-      default_transition: "waiting_post_ticket_input"
+        - name: "ticket_creation_retry"
+          trigger_phrases: [""]  # Match everything that didn't match REQ
+          check_field: "ticket_creation_retry_count"
+          check_value_less_than: 2
+          actions:
+            - type: "increment_field"
+              field_name: "ticket_creation_retry_count"
+            - type: "transition"
+              target: "create_ticket"
+        - name: "ticket_creation_max_retries"
+          trigger_phrases: [""]  # Match everything after max retries
+          actions:
+            - type: "add_message"
+              message: "I'm having trouble creating the ServiceNow ticket. Please contact IT support to manually create your laptop refresh request."
+            - type: "transition"
+              target: "end"
+      default_transition: "end"
 
   # State 9: Waiting for Post-Ticket Input
   waiting_post_ticket_input:
@@ -453,7 +653,7 @@ states:
           Provide a helpful response to their question. You have access to the following information:
           - Employee info: {employee_info.response}
           - Laptop eligibility: {laptop_eligibility.response}
-          - Selected laptop: {selected_laptop}
+          - Selected laptop: {selected_laptop_details}
           - Ticket number: {ticket_number}
 
           After answering, ask if there is anything else you can help with.

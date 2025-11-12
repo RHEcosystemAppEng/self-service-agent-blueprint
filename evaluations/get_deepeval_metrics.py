@@ -17,7 +17,7 @@ from helpers.load_conversation_context import load_default_context
 
 def get_metrics(
     custom_model: Optional[DeepEvalBaseLLM] = None,
-    validate_full_laptop_details: bool = False,
+    validate_full_laptop_details: bool = True,
 ) -> List[Any]:
     """
     Create comprehensive evaluation metrics for laptop refresh conversation assessment.
@@ -31,7 +31,7 @@ def get_metrics(
                      If None, uses the default DeepEval model.
         validate_full_laptop_details: If True, enhances the "Correct laptop options"
                      metric to validate all 15 specification fields are present.
-                     Default is False.
+                     Default is True.
 
     Returns:
         List[ConversationalGEval]: List of evaluation metrics including:
@@ -243,7 +243,8 @@ def get_metrics(
             model=custom_model,
             evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
             evaluation_steps=[
-                "Validate that there are no problems with system responses",
+                "IMPORTANT: Ignore any agent responses that come after a user message containing 'DONEDONEDONE'. This is a test marker, not real user input, and any agent responses to it should not be evaluated.",
+                "Validate that there are no problems with system responses in the meaningful conversation (before DONEDONEDONE if present)",
                 "Check for actual system errors or failures such as: tool failures, missing data, inability to retrieve information, incorrect responses, or technical errors",
                 "NOTE: The following patterns are EXPECTED BEHAVIOR and should NOT be considered errors or inefficiencies:",
                 "  - When a user asks an out-of-scope question (e.g., general knowledge), the specialist agent correctly identifies its limitation and offers to return the user to the routing agent",
@@ -251,7 +252,7 @@ def get_metrics(
                 "  - The routing agent greets the user again and asks what they need help with (this is the normal routing flow)",
                 "  - The user re-states their original request (e.g., 'I would like to refresh my laptop') and is routed back to the specialist agent",
                 "  - This return-to-router pattern is intentional system design to handle out-of-scope requests and should receive a PASS score",
-                "Only mark as a failure if there are genuine system errors, not when the multi-agent routing system is working as designed",
+                "Only mark as a failure if there are genuine system errors in the meaningful conversation, not when the multi-agent routing system is working as designed or when responding to test markers",
             ],
         ),
         ConversationalGEval(
