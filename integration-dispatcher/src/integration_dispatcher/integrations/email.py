@@ -52,7 +52,12 @@ def _test_socket_connectivity(
 
         # Connect to server
         sock.connect((host, port))
-        logger.debug(f"TCP connection to {protocol_name} server established")
+        logger.debug(
+            "TCP connection to server established",
+            protocol=protocol_name,
+            host=host,
+            port=port,
+        )
 
         # Wrap with SSL if needed
         active_sock: Union[socket.socket, ssl.SSLSocket]
@@ -68,7 +73,9 @@ def _test_socket_connectivity(
         # Read initial greeting
         response = active_sock.recv(1024).decode("utf-8")
         logger.debug(
-            f"{protocol_name} server greeting received", response=response[:100]
+            "Server greeting received",
+            protocol=protocol_name,
+            response=response[:100],
         )
 
         # Send command if provided
@@ -80,17 +87,27 @@ def _test_socket_connectivity(
             # Validate response if validator provided
             if response_validator:
                 if not response_validator(response):
-                    logger.warning(f"{protocol_name} response validation failed")
+                    logger.warning("Response validation failed", protocol=protocol_name)
                     return False
 
-        logger.debug(f"{protocol_name} connectivity test passed")
+        logger.debug("Connectivity test passed", protocol=protocol_name)
         return True
 
     except ssl.SSLError as e:
-        logger.error(f"{protocol_name} SSL connection failed", error=str(e))
+        logger.error(
+            "SSL connection failed",
+            protocol=protocol_name,
+            error=str(e),
+            error_type=type(e).__name__,
+        )
         return False
     except Exception as e:
-        logger.error(f"{protocol_name} connection test failed", error=str(e))
+        logger.error(
+            "Connection test failed",
+            protocol=protocol_name,
+            error=str(e),
+            error_type=type(e).__name__,
+        )
         return False
     finally:
         if ssl_sock:
@@ -280,8 +297,9 @@ class EmailIntegrationHandler(BaseIntegrationHandler):
             else:
                 # Port 465 (SMTPS) or other configurations
                 logger.debug(
-                    f"Testing SMTP connectivity on port {self.smtp_port} "
-                    f"({'SMTPS' if use_ssl else 'plain'})"
+                    "Testing SMTP connectivity",
+                    port=self.smtp_port,
+                    protocol="SMTPS" if use_ssl else "plain",
                 )
                 return _test_socket_connectivity(
                     host=self.smtp_host,

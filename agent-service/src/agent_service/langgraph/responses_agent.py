@@ -58,8 +58,8 @@ class Agent:
             self.output_shields = []
             if self.config.get("input_shields") or self.config.get("output_shields"):
                 logger.warning(
-                    f"Shields configured in agent '{agent_name}' but SAFETY/SAFETY_URL "
-                    "environment variables not set. Shields will be disabled."
+                    "Shields configured in agent but SAFETY/SAFETY_URL environment variables not set. Shields will be disabled.",
+                    agent_name=agent_name,
                 )
 
         # Load categories to ignore (for handling false positives)
@@ -71,36 +71,44 @@ class Agent:
         )
 
         logger.info(
-            f"Initialized Agent '{agent_name}' with model '{self.model}' and {len(self.tools)} tools"
+            "Initialized Agent",
+            agent_name=agent_name,
+            model=self.model,
+            tool_count=len(self.tools),
         )
         if self.input_shields:
-            logger.info(f"Input shields configured: {self.input_shields}")
+            logger.info("Input shields configured", shields=self.input_shields)
             if self.ignored_input_categories:
                 logger.info(
-                    f"Ignored input categories: {self.ignored_input_categories}"
+                    "Ignored input categories", categories=self.ignored_input_categories
                 )
         if self.output_shields:
-            logger.info(f"Output shields configured: {self.output_shields}")
+            logger.info("Output shields configured", shields=self.output_shields)
             if self.ignored_output_categories:
                 logger.info(
-                    f"Ignored output categories: {self.ignored_output_categories}"
+                    "Ignored output categories",
+                    categories=self.ignored_output_categories,
                 )
 
     def _get_model_for_agent(self) -> str:
         """Get the model to use for the agent from configuration."""
         if self.config and self.config.get("model"):
             model = self.config["model"]
-            logger.info(f"Using configured model: {model}")
+            logger.info("Using configured model", model=model)
             return str(model) if model is not None else ""
 
         try:
             models = self.llama_client.models.list()
             model_id = next(m.identifier for m in models if m.api_model_type == "llm")
             if model_id:
-                logger.info(f"Using first available LLM model: {model_id}")
+                logger.info("Using first available LLM model", model_id=model_id)
                 return str(model_id)
         except Exception as e:
-            logger.error(f"Error getting models from LlamaStack: {e}")
+            logger.error(
+                "Error getting models from LlamaStack",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
 
         raise RuntimeError(
             "Could not determine model from agent configuration or LlamaStack - no LLM models available"
@@ -143,18 +151,24 @@ class Agent:
             if matching_stores:
                 latest_store = max(matching_stores, key=lambda x: x.created_at)
                 logger.info(
-                    f"Found existing vector store: {latest_store.id} with name: {latest_store.name}"
+                    "Found existing vector store",
+                    vector_store_id=latest_store.id,
+                    vector_store_name=latest_store.name,
                 )
                 return str(latest_store.id) if latest_store.id is not None else kb_name
             else:
                 logger.warning(
-                    f"No vector store found for knowledge base '{kb_name}', using fallback"
+                    "No vector store found for knowledge base, using fallback",
+                    kb_name=kb_name,
                 )
                 return kb_name
 
         except Exception as e:
             logger.error(
-                f"Error finding vector store for knowledge base '{kb_name}': {e}"
+                "Error finding vector store for knowledge base",
+                kb_name=kb_name,
+                error=str(e),
+                error_type=type(e).__name__,
             )
             return kb_name  # Return the kb_name as fallback
 
@@ -201,7 +215,8 @@ class Agent:
 
                     if not server_name or not server_uri:
                         logger.warning(
-                            f"Skipping MCP server with missing name or uri: {server_config}"
+                            "Skipping MCP server with missing name or uri",
+                            server_config=server_config,
                         )
                         continue
 
@@ -227,7 +242,9 @@ class Agent:
                         # This will add traceparent and tracestate headers
                         inject(tool_headers)
                         logger.debug(
-                            f"Injected tracing headers for MCP server {server_name}: {list(tool_headers.keys())}"
+                            "Injected tracing headers for MCP server",
+                            server_name=server_name,
+                            header_keys=list(tool_headers.keys()),
                         )
 
                     # Add ServiceNow API key header for pass-through authentication
@@ -251,10 +268,13 @@ class Agent:
 
                 except Exception as e:
                     logger.error(
-                        f"Error building MCP tool for server config {server_config}: {e}"
+                        "Error building MCP tool for server config",
+                        server_config=server_config,
+                        error=str(e),
+                        error_type=type(e).__name__,
                     )
 
-        logger.info(f"Built tools array with {len(tools_to_use)} tools")
+        logger.info("Built tools array", tool_count=len(tools_to_use))
 
         return tools_to_use
 
@@ -309,19 +329,26 @@ class Agent:
                 moderation_input = last_msg
             else:
                 logger.warning(
-                    f"Invalid last message format for moderation: {type(last_msg)}"
+                    "Invalid last message format for moderation",
+                    message_type=type(last_msg).__name__,
                 )
                 return True, None
 
             log_preview = f"last message, {len(moderation_input)} chars"
         else:
-            logger.warning(f"Invalid content type for moderation: {type(content)}")
+            logger.warning(
+                "Invalid content type for moderation",
+                content_type=type(content).__name__,
+            )
             return True, None
 
         for shield_model in shield_models:
             try:
                 logger.debug(
-                    f"Running {check_type} shield '{shield_model}' on content: {log_preview}..."
+                    "Running shield on content",
+                    check_type=check_type,
+                    shield_model=shield_model,
+                    preview=log_preview,
                 )
 
                 # Call OpenAI-compatible moderation API
@@ -344,10 +371,12 @@ class Agent:
                         if flagged_categories:
                             # Log the violation with details including full content
                             logger.warning(
-                                f"Content flagged by {check_type} shield '{shield_model}': "
-                                f"categories={result.categories}, "
-                                f"scores={result.category_scores}, "
-                                f"content={moderation_input!r}"
+                                "Content flagged by shield",
+                                check_type=check_type,
+                                shield_model=shield_model,
+                                categories=result.categories,
+                                scores=result.category_scores,
+                                content=repr(moderation_input),
                             )
 
                             # Return user-facing message
@@ -359,12 +388,20 @@ class Agent:
                         else:
                             # Only ignored categories were flagged - allow content
                             logger.info(
-                                f"Content flagged by {check_type} shield '{shield_model}' "
-                                f"but only in ignored categories: {result.categories}"
+                                "Content flagged by shield but only in ignored categories",
+                                check_type=check_type,
+                                shield_model=shield_model,
+                                categories=result.categories,
                             )
 
             except Exception as e:
-                logger.error(f"Error running {check_type} shield '{shield_model}': {e}")
+                logger.error(
+                    "Error running shield",
+                    check_type=check_type,
+                    shield_model=shield_model,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 # Fail open - continue to next shield or allow if last shield
                 continue
 
@@ -418,20 +455,31 @@ class Agent:
                         2**attempt, 8
                     )  # Exponential backoff: 1s, 2s, 4s, 8s max
                     logger.info(
-                        f"Empty/error response on attempt {attempt + 1}/{max_retries + 1}, retrying in {retry_delay}s..."
+                        "Empty/error response, retrying",
+                        attempt=attempt + 1,
+                        max_attempts=max_retries + 1,
+                        retry_delay=retry_delay,
                     )
                     import time
 
                     time.sleep(retry_delay)
                 else:
                     logger.warning(
-                        f"All {max_retries + 1} attempts failed. Last error: {last_error or 'Empty response'}"
+                        "All retry attempts failed",
+                        max_attempts=max_retries + 1,
+                        last_error=last_error or "Empty response",
                     )
                     response = "I apologize, but I'm having difficulty generating a response right now. Please try again."
 
             except Exception as e:
                 last_error = str(e)
-                logger.warning(f"Exception on attempt {attempt + 1}: {e}")
+                logger.warning(
+                    "Exception on retry attempt",
+                    attempt=attempt + 1,
+                    max_retries=max_retries + 1,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 if attempt >= max_retries:
                     response = "I apologize, but I'm experiencing technical difficulties. Please try again later."
                     break
@@ -488,7 +536,11 @@ class Agent:
             return ""  # No errors detected
 
         except Exception as e:
-            logger.warning(f"Error while checking response errors: {e}")
+            logger.warning(
+                "Error while checking response errors",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return f"Error checking failed: {e}"
 
     def _print_empty_response_debug_info(
@@ -570,7 +622,9 @@ class Agent:
                 )
                 if not is_safe:
                     logger.info(
-                        f"Input blocked by shield for agent '{self.agent_name}', messages={messages!r}"
+                        "Input blocked by shield",
+                        agent_name=self.agent_name,
+                        messages=repr(messages),
                     )
                     return (
                         error_message
@@ -644,7 +698,7 @@ class Agent:
             # Check for error conditions in the response
             error_info = self._check_response_errors(response)
             if error_info:
-                logger.warning(f"Response error detected: {error_info}")
+                logger.warning("Response error detected", error_info=error_info)
                 return ""  # Return empty to trigger retry logic
 
             # Extract content from LlamaStack responses API format
@@ -703,7 +757,11 @@ class Agent:
                     return ""  # Return empty to trigger retry logic
 
             except Exception as e:
-                logger.error(f"Error extracting content from response: {e}")
+                logger.error(
+                    "Error extracting content from response",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return f"Error processing response: {e}"
 
             # OUTPUT SHIELD: Check agent response before returning
@@ -713,7 +771,9 @@ class Agent:
                 )
                 if not is_safe:
                     logger.info(
-                        f"Output blocked by shield for agent '{self.agent_name}', response_text={response_text!r}"
+                        "Output blocked by shield",
+                        agent_name=self.agent_name,
+                        response_text=repr(response_text),
                     )
                     return (
                         error_message
@@ -723,10 +783,18 @@ class Agent:
             return response_text
 
         except TimeoutError as e:
-            logger.warning(f"Timeout calling LlamaStack responses API: {e}")
+            logger.warning(
+                "Timeout calling LlamaStack responses API",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return ""  # Return empty to trigger retry with longer timeout
         except ConnectionError as e:
-            logger.warning(f"Connection error calling LlamaStack responses API: {e}")
+            logger.warning(
+                "Connection error calling LlamaStack responses API",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return ""  # Return empty to trigger retry
         except Exception as e:
             error_msg = str(e).lower()
@@ -735,10 +803,18 @@ class Agent:
                 or "connection" in error_msg
                 or "network" in error_msg
             ):
-                logger.warning(f"Network-related error calling LlamaStack: {e}")
+                logger.warning(
+                    "Network-related error calling LlamaStack",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return ""  # Return empty to trigger retry
             else:
-                logger.error(f"Unexpected error calling LlamaStack responses API: {e}")
+                logger.error(
+                    "Unexpected error calling LlamaStack responses API",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return (
                     f"Error: Unable to get response from LlamaStack responses API: {e}"
                 )
@@ -753,9 +829,15 @@ class ResponsesAgentManager:
         # Load the configuration using centralized path resolution
         try:
             config_path = resolve_agent_service_path("config")
-            logger.info(f"ResponsesAgentManager found config at: {config_path}")
+            logger.info(
+                "ResponsesAgentManager found config", config_path=str(config_path)
+            )
         except FileNotFoundError as e:
-            logger.error(f"ResponsesAgentManager config not found: {e}")
+            logger.error(
+                "ResponsesAgentManager config not found",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             raise
 
         agent_configs = load_config_from_path(config_path)

@@ -101,7 +101,8 @@ class ServiceNowClient:
                 "Please configure it in your deployment."
             )
         logger.info(
-            f"Using ServiceNow laptop refresh catalog item ID: {laptop_refresh_id}"
+            "Using ServiceNow laptop refresh catalog item ID",
+            laptop_refresh_id=laptop_refresh_id,
         )
         url = f"{self.config.instance_url}/api/sn_sc/servicecatalog/items/{laptop_refresh_id}/order_now"
 
@@ -121,8 +122,8 @@ class ServiceNowClient:
         headers["Accept"] = "application/json"
 
         # Debug logging - log the request being sent
-        logger.info(f"Sending request to: {url}")
-        logger.info(f"Request body: {body}")
+        logger.info("Sending request to ServiceNow", url=url)
+        logger.info("Request body", body=body)
 
         try:
             response = requests.post(
@@ -130,8 +131,8 @@ class ServiceNowClient:
             )
 
             # Debug logging - log the response
-            logger.info(f"Response status: {response.status_code}")
-            logger.info(f"Response body: {response.text}")
+            logger.info("Response received", status_code=response.status_code)
+            logger.info("Response body", body=response.text)
 
             response.raise_for_status()
 
@@ -139,7 +140,7 @@ class ServiceNowClient:
             result = response.json()
 
             # Log the complete response for debugging
-            logger.info(f"Full ServiceNow response: {result}")
+            logger.info("Full ServiceNow response", response=result)
 
             return {
                 "success": True,
@@ -148,7 +149,11 @@ class ServiceNowClient:
             }
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error opening laptop refresh request: {str(e)}")
+            logger.error(
+                "Error opening laptop refresh request",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return {
                 "success": False,
                 "message": f"Error opening laptop refresh request: {str(e)}",
@@ -172,7 +177,9 @@ class ServiceNowClient:
             return result if isinstance(result, dict) else None
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"ServiceNow API Error: {e}")
+            logger.error(
+                "ServiceNow API Error", error=str(e), error_type=type(e).__name__
+            )
             return None
 
     def get_user_by_email(self, email: str) -> Dict[str, Any]:
@@ -213,14 +220,19 @@ class ServiceNowClient:
                     "user": user_data,
                 }
             else:
-                logger.error(f"User with email '{email}' not found in ServiceNow")
+                logger.error("User not found in ServiceNow", email=email)
                 return {
                     "success": False,
                     "message": f"User with email '{email}' not found",
                 }
 
         except Exception as e:
-            logger.error(f"Failed to get user by email: {e}")
+            logger.error(
+                "Failed to get user by email",
+                email=email,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return {
                 "success": False,
                 "message": f"Failed to get user by email: {str(e)}",
@@ -263,7 +275,7 @@ class ServiceNowClient:
                     "computers": computers,
                 }
             else:
-                logger.info(f"No computers found for user sys_id '{user_sys_id}'")
+                logger.info("No computers found for user", user_sys_id=user_sys_id)
                 return {
                     "success": True,
                     "message": "No computers found for user",
@@ -271,7 +283,12 @@ class ServiceNowClient:
                 }
 
         except Exception as e:
-            logger.error(f"Failed to get computers for user sys_id: {e}")
+            logger.error(
+                "Failed to get computers for user",
+                user_sys_id=user_sys_id,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return {"success": False, "message": f"Failed to get computers: {str(e)}"}
 
     def get_employee_laptop_info(self, employee_identifier: str) -> str:
@@ -389,5 +406,9 @@ class ServiceNowClient:
             return laptop_info
 
         except Exception as e:
-            logger.error(f"Error formatting laptop info: {e}")
+            logger.error(
+                "Error formatting laptop info",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return f"Error: Failed to format laptop information - {str(e)}"

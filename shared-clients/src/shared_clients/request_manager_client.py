@@ -211,9 +211,10 @@ class CLIChatClient(RequestManagerClient):
             "session_name": session_name or "",
         }
 
+        request_url = f"{self.request_manager_url}/api/v1/requests/generic"
         logger.debug(
             "Sending request to Request Manager",
-            url=f"{self.request_manager_url}/api/v1/requests/generic",
+            url=request_url,
             payload=message,
         )
 

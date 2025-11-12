@@ -48,6 +48,8 @@ line_length = 88
 
 [tool.mypy]
 python_version = "3.12"
+# Note: We use StructuredLogger Protocol in shared_models.logging to allow
+# structured logging with arbitrary keyword arguments without type errors
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -39,7 +39,11 @@ def get_postgres_checkpointer() -> PostgresSaver:
                 "Created PostgresSaver with shared configuration and connection pooling"
             )
         except Exception as e:
-            logger.error(f"Failed to create PostgresSaver: {e}")
+            logger.error(
+                "Failed to create PostgresSaver",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             _checkpointer = None
             raise
     else:
@@ -59,7 +63,11 @@ def close_postgres_checkpointer() -> None:
             _checkpointer = None
             logger.debug("PostgresSaver instance cleared")
         except Exception as e:
-            logger.warning(f"Error closing PostgresSaver: {e}")
+            logger.warning(
+                "Error closing PostgresSaver",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
     else:
         logger.debug("No PostgresSaver instance to close")
 

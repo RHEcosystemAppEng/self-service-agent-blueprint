@@ -195,10 +195,11 @@ help:
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  format                              - Run isort import sorting and Black formatting on entire codebase"
-	@echo "  lint                                - Run optimized linting (global isort/flake8 + per-directory mypy)"
+	@echo "  lint                                - Run optimized linting (global isort/flake8 + per-directory mypy + logging patterns)"
 	@echo "  lint-global-tools                   - Run isort and flake8 globally on all projects"
 	@echo "  lint-mypy-per-directory             - Run mypy on all projects with project-specific configs"
 	@echo "  lint-<directory>                    - Run mypy on specific directory (e.g., lint-agent-service)"
+	@echo "  check-logging                       - Check logging patterns (no direct imports, no print, structured logging)"
 	@echo "  version                             - Print the current VERSION"
 	@echo ""
 	@echo "Configuration options (set via environment variables or make arguments):"
@@ -396,7 +397,7 @@ push-mock-eventing-image:
 
 # Code quality
 .PHONY: lint
-lint: format lint-global-tools lint-mypy-per-directory
+lint: format lint-global-tools lint-mypy-per-directory check-logging
 	@echo "All directory linting completed successfully!"
 
 # Global linting tools (isort and flake8) for projects with standard configurations
@@ -408,6 +409,13 @@ lint-global-tools:
 	@echo "2. Running isort globally on all projects..."
 	@uv run isort --check-only --diff .
 	@echo "✅ Global linting tools completed"
+
+# Check logging patterns
+.PHONY: check-logging
+check-logging:
+	@echo "Checking logging patterns..."
+	@python scripts/check_logging_patterns.py
+	@echo "✅ Logging pattern checks completed"
 
 # Per-directory mypy linting (project-specific configurations)
 .PHONY: lint-mypy-per-directory

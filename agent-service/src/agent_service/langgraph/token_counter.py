@@ -9,6 +9,10 @@ import threading
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from shared_models import configure_logging
+
+logger = configure_logging("agent-service")
+
 
 @dataclass
 class TokenUsage:
@@ -298,10 +302,11 @@ def count_tokens_from_response(
                                 db, session_id, input_tokens, output_tokens
                             )
                     except Exception as e:
-                        import logging
-
-                        logging.getLogger(__name__).warning(
-                            f"Failed to save token counts to database for session {session_id}: {e}"
+                        logger.warning(
+                            "Failed to save token counts to database",
+                            session_id=session_id,
+                            error=str(e),
+                            error_type=type(e).__name__,
                         )
 
                 asyncio.create_task(_save_tokens())

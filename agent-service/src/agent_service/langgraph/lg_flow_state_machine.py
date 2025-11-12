@@ -231,7 +231,9 @@ class StateMachine:
                         return str(value)
                     except (KeyError, AttributeError, TypeError):
                         # Return the placeholder unchanged if field not found
-                        logger.warning(f"Missing placeholder data for {field_path}")
+                        logger.warning(
+                            "Missing placeholder data", field_path=field_path
+                        )
                         return match.group(0)
 
                 # Replace placeholders
@@ -247,7 +249,11 @@ class StateMachine:
             return str(result) if result is not None else text
 
         except Exception as e:
-            logger.warning(f"Error formatting text: {e}, returning original text")
+            logger.warning(
+                "Error formatting text, returning original",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return text
 
     def process_llm_processor_state(
@@ -280,9 +286,7 @@ class StateMachine:
 
             # Add conversation history
             state_messages = state.get("messages", [])
-            logger.info(
-                f"Using conversation history with {len(state_messages)} messages"
-            )
+            logger.info("Using conversation history", message_count=len(state_messages))
             for msg in state_messages:
                 if hasattr(msg, "content"):
                     msg_class = getattr(msg, "__class__", None)
@@ -298,7 +302,10 @@ class StateMachine:
                             )
 
             logger.info(
-                f"Sending {len(messages_to_send)} messages to LLM (1 system + {len(messages_to_send) - 1} conversation)"
+                "Sending messages to LLM",
+                total_messages=len(messages_to_send),
+                system_messages=1,
+                conversation_messages=len(messages_to_send) - 1,
             )
         else:
             # Traditional approach - send prompt as single user message
@@ -713,8 +720,9 @@ class StateMachine:
             # This shouldn't happen with proper YAML configuration
             # Intent classifiers should always have a waiting state before them
             logger.error(
-                f"Intent classifier '{state.get('current_state')}' reached without user input. "
-                "Check YAML configuration - intent_classifiers need a preceding waiting state."
+                "Intent classifier reached without user input - check YAML configuration",
+                current_state=state.get("current_state"),
+                message="intent_classifiers need a preceding waiting state",
             )
             return state, "end"
 
@@ -812,7 +820,9 @@ class StateMachine:
                 return state, next_state
 
         # Default fallback if no intent matched - this shouldn't happen
-        logger.warning(f"No intent matched for state {state.get('current_state')}")
+        logger.warning(
+            "No intent matched for state", current_state=state.get("current_state")
+        )
         return state, "end"
 
     def process_llm_validator_state(
@@ -944,7 +954,7 @@ class StateMachine:
         current_state_name = state.get("current_state", "")
         state_config = self.config["states"].get(current_state_name)
         if not state_config:
-            logger.error(f"Unknown state: {current_state_name}")
+            logger.error("Unknown state", current_state=current_state_name)
             return state, "end"
 
         state_type = state_config.get("type", "")
@@ -964,7 +974,7 @@ class StateMachine:
         elif state_type == "terminal":
             return self.process_terminal_state(state, state_config)
         else:
-            logger.error(f"Unknown state type: {state_type}")
+            logger.error("Unknown state type", state_type=state_type)
             return state, "end"
 
 
@@ -1009,7 +1019,9 @@ class ConversationSession:
         )
         if env_var_name in os.environ:
             logger.info(
-                f"Using LangGraph prompt override from {env_var_name}: {lg_config_path}"
+                "Using LangGraph prompt override",
+                env_var=env_var_name,
+                config_path=lg_config_path,
             )
 
         # Convert to absolute path using centralized path resolution
@@ -1017,7 +1029,11 @@ class ConversationSession:
             try:
                 self.config_path = resolve_agent_service_path(lg_config_path)
             except FileNotFoundError as e:
-                logger.error(f"ConversationSession config not found: {e}")
+                logger.error(
+                    "ConversationSession config not found",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 raise
         else:
             self.config_path = Path(lg_config_path)
@@ -1058,7 +1074,10 @@ class ConversationSession:
                 def node_func(state: dict[str, Any]) -> Command[Any] | dict[str, Any]:
                     """Node function that returns Command for routing (or state for terminal nodes)."""
                     logger.info(
-                        f"Thread {self.thread_id} processing node: {name}, type: {stype}"
+                        "Processing node",
+                        thread_id=self.thread_id,
+                        node_name=name,
+                        node_type=stype,
                     )
 
                     # Update current_state to track where we are (for logging/debugging)
@@ -1137,7 +1156,7 @@ class ConversationSession:
 
         workflow.add_node("__resume_dispatcher__", resume_dispatcher)  # type: ignore[type-var]
 
-        logger.info(f"Created {len(node_names)} nodes: {', '.join(node_names)}")
+        logger.info("Created nodes", node_count=len(node_names), nodes=node_names)
 
         # Set entry point to resume dispatcher
         workflow.set_entry_point("__resume_dispatcher__")
@@ -1173,7 +1192,10 @@ class ConversationSession:
                 return ""
         except Exception as e:
             logger.error(
-                f"Error getting initial response for thread {self.thread_id}: {e}"
+                "Error getting initial response for thread",
+                thread_id=self.thread_id,
+                error=str(e),
+                error_type=type(e).__name__,
             )
             return ""
 
@@ -1194,7 +1216,9 @@ class ConversationSession:
                 or "the connection" in error_str
             ):
                 logger.warning(
-                    f"PostgresSaver connection lost, resetting and retrying: {e}"
+                    "PostgresSaver connection lost, resetting and retrying",
+                    error=str(e),
+                    error_type=type(e).__name__,
                 )
                 reset_postgres_checkpointer()
                 # Recreate the graph with a fresh checkpointer
@@ -1204,7 +1228,11 @@ class ConversationSession:
                 try:
                     return self.app.get_state(self.thread_config)
                 except Exception as e2:
-                    logger.error(f"Failed to get state after connection reset: {e2}")
+                    logger.error(
+                        "Failed to get state after connection reset",
+                        error=str(e2),
+                        error_type=type(e2).__name__,
+                    )
                     raise
             else:
                 raise
@@ -1339,7 +1367,12 @@ class ConversationSession:
             )
 
         except Exception as e:
-            logger.error(f"Error processing message for thread {self.thread_id}: {e}")
+            logger.error(
+                "Error processing message for thread",
+                thread_id=self.thread_id,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return f"Error processing message: {e}"
 
     def close(self) -> None:

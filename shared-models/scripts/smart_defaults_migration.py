@@ -2,7 +2,6 @@
 """Integration defaults migration script for existing user configurations."""
 
 import asyncio
-import logging
 import os
 import sys
 from pathlib import Path
@@ -11,20 +10,19 @@ from typing import Any, Dict
 # Add the src directory to Python path and import shared_models modules
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 try:
+    from shared_models import configure_logging
     from shared_models.database import get_database_manager
     from shared_models.models import UserIntegrationConfig
     from sqlalchemy import select
 except ImportError:
     # If running in container, try direct import
+    from shared_models import configure_logging
     from shared_models.database import get_database_manager
     from shared_models.models import UserIntegrationConfig
     from sqlalchemy import select
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+# Configure logging with structured logging support
+logger = configure_logging("smart-defaults-migration")
 
 
 class IntegrationDefaultsMigration:
@@ -296,7 +294,11 @@ async def main() -> None:
         logger.info("Integration defaults migration process completed successfully")
 
     except Exception as e:
-        logger.error(f"Migration process failed: {e}")
+        logger.error(
+            "Migration process failed",
+            error=str(e),
+            error_type=type(e).__name__,
+        )
         logger.exception("Full process error traceback:")
         sys.exit(1)
     finally:

@@ -32,7 +32,8 @@ class KnowledgeBaseManager:
 
         if not self._knowledge_bases_path.exists():
             logger.warning(
-                f"Knowledge bases path {self._knowledge_bases_path} does not exist"
+                "Knowledge bases path does not exist",
+                path=str(self._knowledge_bases_path),
             )
             return
 
@@ -45,15 +46,21 @@ class KnowledgeBaseManager:
                 # Log results
                 kb_name = kb_dir.name
                 if result:
-                    logger.info(f"Successfully registered {kb_name} via LlamaStack")
+                    logger.info(
+                        "Successfully registered knowledge base via LlamaStack",
+                        kb_name=kb_name,
+                    )
                 else:
-                    logger.error(f"Failed to register {kb_name} via LlamaStack")
+                    logger.error(
+                        "Failed to register knowledge base via LlamaStack",
+                        kb_name=kb_name,
+                    )
 
     def register_knowledge_base(self, kb_directory: Path) -> Optional[str]:
         """Register a single knowledge base from a directory via LlamaStack OpenAI-compatible API"""
         kb_name = kb_directory.name
 
-        logger.info(f"Registering knowledge base via LlamaStack: {kb_name}")
+        logger.info("Registering knowledge base via LlamaStack", kb_name=kb_name)
 
         if self._llama_client is None:
             logger.error(
@@ -70,7 +77,9 @@ class KnowledgeBaseManager:
             vector_store_id = vector_store.id
 
             logger.info(
-                f"Created vector store via LlamaStack: {vector_store_id} with name: {vector_store_name}"
+                "Created vector store via LlamaStack",
+                vector_store_id=vector_store_id,
+                vector_store_name=vector_store_name,
             )
 
             # Upload files to vector store
@@ -80,7 +89,9 @@ class KnowledgeBaseManager:
 
             if uploaded_files > 0:
                 logger.info(
-                    f"Successfully uploaded {uploaded_files} files via LlamaStack to vector store"
+                    "Successfully uploaded files via LlamaStack to vector store",
+                    uploaded_files=uploaded_files,
+                    vector_store_id=vector_store_id,
                 )
                 return str(vector_store_id)
             else:
@@ -91,7 +102,10 @@ class KnowledgeBaseManager:
 
         except Exception as e:
             logger.error(
-                f"Failed to register knowledge base {kb_name} via LlamaStack: {str(e)}"
+                "Failed to register knowledge base via LlamaStack",
+                kb_name=kb_name,
+                error=str(e),
+                error_type=type(e).__name__,
             )
             return None
 
@@ -108,14 +122,17 @@ class KnowledgeBaseManager:
         # Find all .txt files in the directory
         txt_files = list(directory.rglob("*.txt"))
         logger.info(
-            f"Found {len(txt_files)} knowledge base files: {[f.name for f in txt_files]}"
+            "Found knowledge base files",
+            file_count=len(txt_files),
+            files=[f.name for f in txt_files],
         )
 
         for file_path in txt_files:
             if file_path.is_file():
                 try:
                     logger.info(
-                        f"Uploading knowledge base file via LlamaStack: {file_path}"
+                        "Uploading knowledge base file via LlamaStack",
+                        file_path=str(file_path),
                     )
 
                     # Upload file using LlamaStack's OpenAI-compatible API
@@ -133,12 +150,17 @@ class KnowledgeBaseManager:
 
                     uploaded_count += 1
                     logger.info(
-                        f"Successfully uploaded and attached file via LlamaStack: {file_id}"
+                        "Successfully uploaded and attached file via LlamaStack",
+                        file_id=file_id,
+                        file_path=str(file_path),
                     )
 
                 except Exception as e:
                     logger.error(
-                        f"Failed to upload file {file_path} to LlamaStack: {e}"
+                        "Failed to upload file to LlamaStack",
+                        file_path=str(file_path),
+                        error=str(e),
+                        error_type=type(e).__name__,
                     )
                     continue
 

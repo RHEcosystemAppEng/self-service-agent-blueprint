@@ -60,7 +60,11 @@ def _create_real_servicenow_ticket(
 
         # Look up user sys_id by email as currently only email is supported
         # authoritative user id
-        logger.info(f"Looking up sys_id for email: {authoritative_user_id}")
+        logger.info(
+            "Looking up sys_id for email",
+            tool="open_laptop_refresh_ticket",
+            email=authoritative_user_id,
+        )
         user_result = client.get_user_by_email(authoritative_user_id)
         if user_result.get("success") and user_result.get("user"):
             user_sys_id = user_result["user"].get("sys_id")
@@ -68,7 +72,9 @@ def _create_real_servicenow_ticket(
                 raise ValueError(
                     f"User found but sys_id is missing for email: {authoritative_user_id}"
                 )
-            logger.info(f"Found sys_id: {user_sys_id}")
+            logger.info(
+                "Found sys_id", tool="open_laptop_refresh_ticket", user_sys_id=user_sys_id
+            )
         else:
             error_msg = user_result.get("message", "Unknown error")
             raise ValueError(
@@ -85,8 +91,11 @@ def _create_real_servicenow_ticket(
         # Extract the required fields from the result
         if result.get("success") and result.get("data", {}).get("result"):
             logger.info(
-                f"ServiceNow API request completed - authoritative_user_id: {authoritative_user_id}, "
-                f"laptop: {preferred_model}, success: {result.get('success', False)}"
+                "ServiceNow API request completed",
+                tool="open_laptop_refresh_ticket",
+                authoritative_user_id=authoritative_user_id,
+                laptop=preferred_model,
+                success=result.get("success", False),
             )
 
             result_data = result["data"]["result"]
@@ -125,7 +134,11 @@ def _extract_authoritative_user_id(ctx: Context[Any, Any]) -> str | None:
                 )
                 return str(user_id) if user_id is not None else None
     except Exception as e:
-        logger.debug(f"Error extracting headers from request context: {e}")
+        logger.debug(
+            "Error extracting headers from request context",
+            error=str(e),
+            error_type=type(e).__name__,
+        )
 
     return None
 
@@ -255,7 +268,10 @@ def open_laptop_refresh_ticket(
                 "ServiceNow API token is required for real ServiceNow integration. "
             )
         logger.info(
-            f"Using real ServiceNow API - authoritative_user_id: {authoritative_user_id}, laptop_code: {servicenow_laptop_code}"
+            "Using real ServiceNow API",
+            tool="open_laptop_refresh_ticket",
+            authoritative_user_id=authoritative_user_id,
+            laptop_code=servicenow_laptop_code,
         )
         return _create_real_servicenow_ticket(
             authoritative_user_id, servicenow_laptop_code, api_token
@@ -263,7 +279,10 @@ def open_laptop_refresh_ticket(
 
     # Use mock implementation
     logger.info(
-        f"Using mock ServiceNow implementation - authoritative_user_id: {authoritative_user_id}, laptop_code: {servicenow_laptop_code}"
+        "Using mock ServiceNow implementation",
+        tool="open_laptop_refresh_ticket",
+        authoritative_user_id=authoritative_user_id,
+        laptop_code=servicenow_laptop_code,
     )
     return create_laptop_refresh_ticket(
         authoritative_user_id=authoritative_user_id,
@@ -323,19 +342,25 @@ def get_employee_laptop_info(
                 "ServiceNow API token is required for real ServiceNow integration. "
             )
         logger.info(
-            f"Using real ServiceNow API for laptop info - authoritative_user_id: {authoritative_user_id}"
+            "Using real ServiceNow API for laptop info",
+            tool="get_employee_laptop_info",
+            authoritative_user_id=authoritative_user_id,
         )
         return _get_real_servicenow_laptop_info(authoritative_user_id, api_token)
 
     # Use mock implementation
     logger.info(
-        f"Using mock laptop info implementation - authoritative_user_id: {authoritative_user_id}"
+        "Using mock laptop info implementation",
+        tool="get_employee_laptop_info",
+        authoritative_user_id=authoritative_user_id,
     )
 
     result = _get_mock_laptop_info(authoritative_user_id)
 
     logger.info(
-        f"returning laptop info for employee - authoritative_user_id: {authoritative_user_id}"
+        "Returning laptop info for employee",
+        tool="get_employee_laptop_info",
+        authoritative_user_id=authoritative_user_id,
     )
 
     return result

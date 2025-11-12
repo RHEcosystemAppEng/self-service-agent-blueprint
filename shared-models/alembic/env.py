@@ -67,9 +67,9 @@ def do_run_migrations(connection: Connection) -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
-    import logging
+    from shared_models import configure_logging
 
-    logger = logging.getLogger("alembic.env")
+    logger = configure_logging("alembic.env")
 
     logger.info("Starting online migrations")
 
@@ -78,7 +78,10 @@ def run_migrations_online() -> None:
 
     # Only log connection string in debug mode
     if db_config.echo_sql:
-        logger.debug(f"Database config: {db_config.sync_connection_string}")
+        logger.debug(
+            "Database config",
+            connection_string=db_config.sync_connection_string,
+        )
 
     # Create sync engine directly
     from sqlalchemy import create_engine

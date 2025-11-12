@@ -62,7 +62,8 @@ class IntegrationDefaultsService:
                 and current_time - mapping.last_validated_at < validation_ttl
             ):
                 logger.debug(
-                    f"Negative cache entry still valid for {context}",
+                    "Negative cache entry still valid",
+                    context=context,
                     user_email=mapping.user_email,
                     last_validated=mapping.last_validated_at,
                 )
@@ -70,7 +71,8 @@ class IntegrationDefaultsService:
             else:
                 # Negative cache expired - allow re-check
                 logger.info(
-                    f"Negative cache entry expired for {context}, will re-check",
+                    "Negative cache entry expired, will re-check",
+                    context=context,
                     user_email=mapping.user_email,
                     last_validated=mapping.last_validated_at,
                 )
@@ -86,7 +88,8 @@ class IntegrationDefaultsService:
         ):
             # Use recent validation result - no API call needed
             logger.debug(
-                f"Using recent validation result for {context}",
+                "Using recent validation result",
+                context=context,
                 user_email=mapping.user_email,
                 slack_user_id=mapping.integration_user_id,
                 last_validated=mapping.last_validated_at,
@@ -95,7 +98,8 @@ class IntegrationDefaultsService:
         else:
             # Mapping is stale - validate it
             logger.info(
-                f"Mapping is stale, validating via Slack API for {context}",
+                "Mapping is stale, validating via Slack API",
+                context=context,
                 user_email=mapping.user_email,
                 slack_user_id=mapping.integration_user_id,
                 last_validated=mapping.last_validated_at,
@@ -112,7 +116,8 @@ class IntegrationDefaultsService:
             if is_valid:
                 mapping.last_validation_error = None
                 logger.info(
-                    f"Validated mapping for {context}",
+                    "Validated mapping",
+                    context=context,
                     user_email=mapping.user_email,
                     slack_user_id=mapping.integration_user_id,
                 )
@@ -120,7 +125,8 @@ class IntegrationDefaultsService:
             else:
                 mapping.last_validation_error = "Email no longer matches Slack user ID"
                 logger.warning(
-                    f"Mapping validation failed for {context}",
+                    "Mapping validation failed",
+                    context=context,
                     user_email=mapping.user_email,
                     slack_user_id=mapping.integration_user_id,
                     attempts=mapping.validation_attempts,
@@ -254,7 +260,9 @@ class IntegrationDefaultsService:
                 # Verify email matches (defensive programming)
                 if profile_email == user_email:
                     logger.info(
-                        f"Found Slack user via API for {user_email}: {slack_user_id}"
+                        "Found Slack user via API",
+                        user_email=user_email,
+                        slack_user_id=slack_user_id,
                     )
 
                     # Store the mapping for future use to avoid repeated API calls
@@ -267,12 +275,16 @@ class IntegrationDefaultsService:
                     return str(slack_user_id)
                 else:
                     logger.warning(
-                        f"Email mismatch during Slack API lookup: requested {user_email}, found {profile_email}"
+                        "Email mismatch during Slack API lookup",
+                        requested_email=user_email,
+                        found_email=profile_email,
                     )
                     return None
             else:
                 error = response.get("error", "Unknown error")
-                logger.warning(f"Slack API lookup failed for {user_email}: {error}")
+                logger.warning(
+                    "Slack API lookup failed", user_email=user_email, error=error
+                )
 
                 # Store negative cache for "not found" errors to avoid repeated API calls
                 if error == "users_not_found":
@@ -293,7 +305,8 @@ class IntegrationDefaultsService:
             error_str = str(e).lower()
             if "users_not_found" in error_str or "error: 'users_not_found'" in str(e):
                 logger.info(
-                    f"Slack user not found for {user_email}: user does not exist in Slack workspace"
+                    "Slack user not found - user does not exist in Slack workspace",
+                    user_email=user_email,
                 )
                 # Store negative cache
                 from ..user_mapping_utils import store_slack_user_mapping
@@ -303,7 +316,10 @@ class IntegrationDefaultsService:
                 )
             else:
                 logger.error(
-                    f"Error looking up Slack user via API for {user_email}: {e}"
+                    "Error looking up Slack user via API",
+                    user_email=user_email,
+                    error=str(e),
+                    error_type=type(e).__name__,
                 )
             return None
 

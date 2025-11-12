@@ -3,9 +3,46 @@
 import logging
 import os
 import sys
-from typing import Any, MutableMapping, Optional
+from typing import Any, MutableMapping, Optional, Protocol
 
 import structlog
+
+
+class StructuredLogger(Protocol):
+    """Protocol for structured logging with arbitrary keyword arguments.
+
+    This protocol allows mypy to understand that our loggers accept
+    arbitrary keyword arguments for structured logging, avoiding the need
+    for type: ignore comments at every logging call site.
+    """
+
+    def debug(self, event: str, **kwargs: Any) -> None:
+        """Log a debug message with structured context."""
+        ...
+
+    def info(self, event: str, **kwargs: Any) -> None:
+        """Log an info message with structured context."""
+        ...
+
+    def warning(self, event: str, **kwargs: Any) -> None:
+        """Log a warning message with structured context."""
+        ...
+
+    def error(self, event: str, **kwargs: Any) -> None:
+        """Log an error message with structured context."""
+        ...
+
+    def critical(self, event: str, **kwargs: Any) -> None:
+        """Log a critical message with structured context."""
+        ...
+
+    def exception(self, event: str, **kwargs: Any) -> None:
+        """Log an exception with structured context."""
+        ...
+
+    def bind(self, **kwargs: Any) -> "StructuredLogger":
+        """Bind context to logger."""
+        ...
 
 
 class LoggingConfig:
@@ -82,13 +119,13 @@ class LoggingConfig:
         self.configure_basic_logging()
         self.configure_structlog()
 
-    def get_logger(self, name: Optional[str] = None) -> structlog.BoundLogger:
+    def get_logger(self, name: Optional[str] = None) -> StructuredLogger:
         """Get a configured logger."""
         logger = structlog.get_logger(name)
         return logger  # type: ignore[no-any-return]
 
 
-def configure_logging(service_name: str = "unknown") -> structlog.BoundLogger:
+def configure_logging(service_name: str = "unknown") -> StructuredLogger:
     """Configure logging for a service and return a logger.
 
     Args:
@@ -102,7 +139,7 @@ def configure_logging(service_name: str = "unknown") -> structlog.BoundLogger:
     return config.get_logger()
 
 
-def get_service_logger(service_name: str) -> structlog.BoundLogger:
+def get_service_logger(service_name: str) -> StructuredLogger:
     """Get a logger for a specific service.
 
     Args:
@@ -120,9 +157,9 @@ class ServiceLogger:
 
     def __init__(self, service_name: str):
         self.service_name = service_name
-        self.logger: Optional[structlog.BoundLogger] = None
+        self.logger: Optional[StructuredLogger] = None
 
-    def __enter__(self) -> structlog.BoundLogger:
+    def __enter__(self) -> StructuredLogger:
         self.logger = get_service_logger(self.service_name)
         return self.logger
 
@@ -131,19 +168,19 @@ class ServiceLogger:
 
 
 # Convenience functions for common logging patterns
-def log_request(logger: structlog.BoundLogger, request_id: str, **context: Any) -> None:
+def log_request(logger: StructuredLogger, request_id: str, **context: Any) -> None:
     """Log a request with standard context."""
     logger.debug("Request received", request_id=request_id, **context)
 
 
 def log_response(
-    logger: structlog.BoundLogger, request_id: str, status: str, **context: Any
+    logger: StructuredLogger, request_id: str, status: str, **context: Any
 ) -> None:
     """Log a response with standard context."""
     logger.debug("Response sent", request_id=request_id, status=status, **context)
 
 
-def log_error(logger: structlog.BoundLogger, error: Exception, **context: Any) -> None:
+def log_error(logger: StructuredLogger, error: Exception, **context: Any) -> None:
     """Log an error with standard context."""
     logger.error(
         "Error occurred", error=str(error), error_type=type(error).__name__, **context
@@ -151,21 +188,23 @@ def log_error(logger: structlog.BoundLogger, error: Exception, **context: Any) -
 
 
 def log_health_check(
-    logger: structlog.BoundLogger, service: str, status: str, **context: Any
+    logger: StructuredLogger, service: str, status: str, **context: Any
 ) -> None:
     """Log a health check with standard context."""
     logger.info("Health check", service=service, status=status, **context)
 
 
 def log_database_operation(
-    logger: structlog.BoundLogger, operation: str, **context: Any
+    logger: StructuredLogger, operation: str, **context: Any
 ) -> None:
     """Log a database operation with standard context."""
     logger.debug("Database operation", operation=operation, **context)
 
 
 def log_integration_event(
-    logger: structlog.BoundLogger, integration: str, event: str, **context: Any
+    logger: StructuredLogger, integration: str, event_type: str, **context: Any
 ) -> None:
     """Log an integration event with standard context."""
-    logger.info("Integration event", integration=integration, event=event, **context)
+    logger.info(
+        "Integration event", integration=integration, event_type=event_type, **context
+    )

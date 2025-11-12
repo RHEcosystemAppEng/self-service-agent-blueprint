@@ -90,7 +90,9 @@ def create_llamastack_openai_client(
     base_url = f"http://{host}:{port_num}{path}"
 
     logger.debug(
-        f"Creating OpenAI client for LlamaStack: base_url={base_url}, timeout={timeout_val}"
+        "Creating OpenAI client for LlamaStack",
+        base_url=base_url,
+        timeout=timeout_val,
     )
 
     return openai.OpenAI(
@@ -154,7 +156,9 @@ def create_llamastack_client(
     base_url = f"http://{host}:{port_num}"
 
     logger.debug(
-        f"Creating LlamaStack client: base_url={base_url}, timeout={timeout_val}"
+        "Creating LlamaStack client",
+        base_url=base_url,
+        timeout=timeout_val,
     )
 
     return LlamaStackClient(

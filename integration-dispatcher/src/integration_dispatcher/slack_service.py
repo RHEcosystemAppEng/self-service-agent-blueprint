@@ -318,7 +318,9 @@ class SlackService:
             # ✅ MESSAGE ALREADY RECORDED: The deduplication record was created earlier to prevent race conditions
 
         except Exception as e:
-            logger.error("Error handling Slack message", error=str(e), event=event)
+            logger.error(
+                "Error handling Slack message", error=str(e), slack_event=event
+            )
 
     async def handle_slash_command(self, command: SlackSlashCommand) -> Dict[str, Any]:
         """Handle Slack slash command."""
@@ -433,7 +435,11 @@ class SlackService:
                             )
                             response.raise_for_status()
                     except Exception as e:
-                        logger.error(f"Failed to post session info: {e}")
+                        logger.error(
+                            "Failed to post session info",
+                            error=str(e),
+                            error_type=type(e).__name__,
+                        )
 
                 return {"text": "Session info sent!"}
 
@@ -450,7 +456,12 @@ class SlackService:
                         "Session closed successfully", session_id=old_session_id
                     )
                 except Exception as e:
-                    logger.error(f"Error closing session: {e}")
+                    logger.error(
+                        "Error closing session",
+                        session_id=old_session_id,
+                        error=str(e),
+                        error_type=type(e).__name__,
+                    )
 
                 # Create a new session and immediately send a message to routing-agent
                 try:
@@ -480,10 +491,15 @@ class SlackService:
                         },
                     )
 
-                    logger.info(f"Successfully created new session for user {user_id}")
+                    logger.info("Successfully created new session", user_id=user_id)
 
                 except Exception as e:
-                    logger.error(f"Error creating new session: {e}")
+                    logger.error(
+                        "Error creating new session",
+                        user_id=user_id,
+                        error=str(e),
+                        error_type=type(e).__name__,
+                    )
                     # Fallback to the old behavior if new session creation fails
                     if payload.response_url:
                         fallback_message = {
@@ -701,7 +717,8 @@ class SlackService:
             tuple: (resolved_user_id, slack_user_id) where resolved_user_id is either email or slack_user_id
         """
         logger.info(
-            f"Resolving user ID for {context}",
+            "Resolving user ID",
+            context=context,
             slack_user_id=slack_user_id,
         )
 
@@ -709,7 +726,8 @@ class SlackService:
         existing_email = await self._get_cached_email_from_slack_user_id(slack_user_id)
         if existing_email:
             logger.info(
-                f"Using cached email for {context}",
+                "Using cached email",
+                context=context,
                 slack_user_id=slack_user_id,
                 user_email=existing_email,
             )
@@ -719,7 +737,8 @@ class SlackService:
         user_email = await self._get_user_email(slack_user_id)
         if user_email:
             logger.info(
-                f"Using fresh email from Slack API for {context}",
+                "Using fresh email from Slack API",
+                context=context,
                 slack_user_id=slack_user_id,
                 user_email=user_email,
             )
@@ -746,7 +765,8 @@ class SlackService:
                 return resolved_user_id, slack_user_id
         else:
             logger.warning(
-                f"Could not fetch user email for {context}, using Slack user ID as fallback",
+                "Could not fetch user email, using Slack user ID as fallback",
+                context=context,
                 slack_user_id=slack_user_id,
             )
             return slack_user_id, slack_user_id
@@ -873,7 +893,12 @@ class SlackService:
             )
 
         except Exception as e:
-            logger.error(f"Error fetching session details: {e}")
+            logger.error(
+                "Error fetching session details",
+                session_id=session_id,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return f"Error fetching session details: {str(e)}"
 
     async def stream_slack_message(

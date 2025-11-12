@@ -202,13 +202,21 @@ class ResponsesSessionManager(BaseSessionManager):
                 self.agent_manager is not None
             )  # ResponsesAgentManager() never returns None
             self.agents = list(self.agent_manager.agents_dict.keys())
-            logger.info(f"Loaded agents for responses mode - agents: {self.agents}")
+            logger.info("Loaded agents for responses mode", agents=self.agents)
         except ImportError as e:
-            logger.warning(f"LangGraph components not available: {e}")
+            logger.warning(
+                "LangGraph components not available",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             self.agent_manager = None
             self.agents = []
         except Exception as e:
-            logger.error(f"Failed to initialize ResponsesAgentManager: {e}")
+            logger.error(
+                "Failed to initialize ResponsesAgentManager",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             self.agent_manager = None
             self.agents = []
 
@@ -223,7 +231,7 @@ class ResponsesSessionManager(BaseSessionManager):
     ) -> str:
         """Handle a message in responses mode with full conversation management."""
         if not self.user_id:
-            logger.error(f"Responses mode not available - user_id: {self.user_id}")
+            logger.error("Responses mode not available", user_id=self.user_id)
             return "Error: Responses mode not available"
 
         if not self.agent_manager:
@@ -235,7 +243,13 @@ class ResponsesSessionManager(BaseSessionManager):
             self.request_manager_session_id = request_manager_session_id
 
         logger.debug(
-            f"Handling responses message - user_id: {self.user_id}, message_preview: {text[:100]}, request_manager_session_id: {request_manager_session_id}, session_name: {session_name}, has_current_session: {bool(self.current_session)}, current_agent: {self.current_agent_name}"
+            "Handling responses message",
+            user_id=self.user_id,
+            message_preview=text[:100],
+            request_manager_session_id=request_manager_session_id,
+            session_name=session_name,
+            has_current_session=bool(self.current_session),
+            current_agent=self.current_agent_name,
         )
 
         try:
@@ -244,29 +258,44 @@ class ResponsesSessionManager(BaseSessionManager):
                 # Try to resume existing session from database
                 if request_manager_session_id:
                     logger.debug(
-                        f"Attempting to resume existing session - request_manager_session_id: {request_manager_session_id}, user_id: {self.user_id}"
+                        "Attempting to resume existing session",
+                        request_manager_session_id=request_manager_session_id,
+                        user_id=self.user_id,
                     )
                     session_resumed = await self._resume_session_from_database(
                         request_manager_session_id
                     )
                     if session_resumed:
                         logger.info(
-                            f"Resumed existing session - request_manager_session_id: {request_manager_session_id}, thread_id: {self.conversation_session.thread_id if self.conversation_session else None}, current_agent: {self.current_agent_name}"
+                            "Resumed existing session",
+                            request_manager_session_id=request_manager_session_id,
+                            thread_id=(
+                                self.conversation_session.thread_id
+                                if self.conversation_session
+                                else None
+                            ),
+                            current_agent=self.current_agent_name,
                         )
                     else:
                         logger.debug(
-                            f"No existing session found, creating new session - request_manager_session_id: {request_manager_session_id}, user_id: {self.user_id}"
+                            "No existing session found, creating new session",
+                            request_manager_session_id=request_manager_session_id,
+                            user_id=self.user_id,
                         )
 
                 # If session not resumed, create a new one
                 if not self.current_session:
                     logger.debug(
-                        f"Creating initial session for responses mode - user_id: {self.user_id}, session_name: {session_name}"
+                        "Creating initial session for responses mode",
+                        user_id=self.user_id,
+                        session_name=session_name,
                     )
                     success = await self._create_initial_session(session_name)
                     if not success:
                         logger.error(
-                            f"Failed to create initial session - user_id: {self.user_id}, session_name: {session_name}"
+                            "Failed to create initial session",
+                            user_id=self.user_id,
+                            session_name=session_name,
                         )
                         return "Error: Failed to create session"
 
@@ -289,11 +318,17 @@ class ResponsesSessionManager(BaseSessionManager):
                                 "Found _should_return_to_routing flag in state - routing back to routing agent"
                             )
                 except Exception as e:
-                    logger.debug(f"Could not check conversation state: {e}")
+                    logger.debug(
+                        "Could not check conversation state",
+                        error=str(e),
+                        error_type=type(e).__name__,
+                    )
 
             if should_reset:
                 logger.info(
-                    f"Specialist task complete, returning to routing agent - user_id: {self.user_id}, current_agent: {self.current_agent_name}"
+                    "Specialist task complete, returning to routing agent",
+                    user_id=self.user_id,
+                    current_agent=self.current_agent_name,
                 )
                 await self._reset_conversation_state()
                 # Recursively call with the actual user message to create new routing session
@@ -304,13 +339,22 @@ class ResponsesSessionManager(BaseSessionManager):
             # Intercept special commands before passing to conversation
             if text.strip().lower() == "**tokens**":
                 logger.debug(
-                    f"Intercepting **tokens** command - user_id: {self.user_id}, request_manager_session_id: {self.request_manager_session_id}"
+                    "Intercepting **tokens** command",
+                    user_id=self.user_id,
+                    request_manager_session_id=self.request_manager_session_id,
                 )
                 return await self._handle_tokens_query()
 
             # Send message to current session
             logger.debug(
-                f"Sending message to LangGraph session - user_id: {self.user_id}, current_agent: {self.current_agent_name}, thread_id: {self.conversation_session.thread_id if self.conversation_session else None}"
+                "Sending message to LangGraph session",
+                user_id=self.user_id,
+                current_agent=self.current_agent_name,
+                thread_id=(
+                    self.conversation_session.thread_id
+                    if self.conversation_session
+                    else None
+                ),
             )
 
             token_context = get_session_token_context(self.request_manager_session_id)
@@ -335,14 +379,22 @@ class ResponsesSessionManager(BaseSessionManager):
             processed_response = await self._handle_routing(processed_response, text)
 
             logger.info(
-                f"Responses message processed successfully - user_id: {self.user_id}, current_agent: {self.current_agent_name}, response_length: {len(processed_response)}"
+                "Responses message processed successfully",
+                user_id=self.user_id,
+                current_agent=self.current_agent_name,
+                response_length=len(processed_response),
             )
 
             return processed_response
 
         except Exception as e:
             logger.error(
-                f"Error handling responses message - error: {str(e)}, error_type: {type(e).__name__}, user_id: {self.user_id}, current_agent: {self.current_agent_name}, message_preview: {text[:100]}",
+                "Error handling responses message",
+                error=str(e),
+                error_type=type(e).__name__,
+                user_id=self.user_id,
+                current_agent=self.current_agent_name,
+                message_preview=text[:100],
                 exc_info=e,
             )
             return f"Error: {str(e)}"
@@ -351,7 +403,9 @@ class ResponsesSessionManager(BaseSessionManager):
         """Create an initial session for responses mode."""
         try:
             logger.debug(
-                f"Creating initial session for responses mode - user_id: {self.user_id}, session_name: {session_name}"
+                "Creating initial session for responses mode",
+                user_id=self.user_id,
+                session_name=session_name,
             )
 
             # Get routing agent
@@ -364,20 +418,31 @@ class ResponsesSessionManager(BaseSessionManager):
             routing_agent = self.agent_manager.get_agent(self.ROUTING_AGENT_NAME)
             if not routing_agent:
                 logger.error(
-                    f"Core routing agent not available - user_id: {self.user_id}, routing_agent_name: {self.ROUTING_AGENT_NAME}, available_agents: {list(self.agent_manager.agents_dict.keys()) if self.agent_manager else []}"
+                    "Core routing agent not available",
+                    user_id=self.user_id,
+                    routing_agent_name=self.ROUTING_AGENT_NAME,
+                    available_agents=(
+                        list(self.agent_manager.agents_dict.keys())
+                        if self.agent_manager
+                        else []
+                    ),
                 )
                 return False
 
             # Debug: Check routing agent configuration
             lg_config = routing_agent.config.get("lg_state_machine_config")
             logger.info(
-                f"Routing agent configuration - lg_state_machine_config: {lg_config}"
+                "Routing agent configuration",
+                lg_state_machine_config=lg_config,
             )
 
             # Generate session name and create session
             session_name = session_name or self._generate_session_name()
             logger.debug(
-                f"Creating LangGraph session - user_id: {self.user_id}, session_name: {session_name}, routing_agent: {self.ROUTING_AGENT_NAME}"
+                "Creating LangGraph session",
+                user_id=self.user_id,
+                session_name=session_name,
+                routing_agent=self.ROUTING_AGENT_NAME,
             )
 
             session = self._create_session_for_agent(
@@ -388,7 +453,11 @@ class ResponsesSessionManager(BaseSessionManager):
 
             # Debug: Check StateMachine configuration
             logger.info(
-                f"StateMachine configuration - config_path: {session.config_path}, initial_state: {session.state_machine.config.get('settings', {}).get('initial_state')}"
+                "StateMachine configuration",
+                config_path=str(session.config_path),
+                initial_state=session.state_machine.config.get("settings", {}).get(
+                    "initial_state"
+                ),
             )
 
             # Set up the new session
@@ -399,12 +468,19 @@ class ResponsesSessionManager(BaseSessionManager):
             )
 
             logger.debug(
-                f"Session created successfully - user_id: {self.user_id}, session_name: {session_name}, thread_id: {session.thread_id}, current_agent: {self.current_agent_name}"
+                "Session created successfully",
+                user_id=self.user_id,
+                session_name=session_name,
+                thread_id=session.thread_id,
+                current_agent=self.current_agent_name,
             )
 
             # Update database with current agent
             logger.debug(
-                f"Updating database session state - user_id: {self.user_id}, agent_name: {self.ROUTING_AGENT_NAME}, thread_id: {session.thread_id}"
+                "Updating database session state",
+                user_id=self.user_id,
+                agent_name=self.ROUTING_AGENT_NAME,
+                thread_id=session.thread_id,
             )
 
             await self._update_database_session_state(
@@ -414,14 +490,22 @@ class ResponsesSessionManager(BaseSessionManager):
             )
 
             logger.info(
-                f"Initial session created and database updated - user_id: {self.user_id}, session_name: {session_name}, thread_id: {session.thread_id}, current_agent: {self.current_agent_name}"
+                "Initial session created and database updated",
+                user_id=self.user_id,
+                session_name=session_name,
+                thread_id=session.thread_id,
+                current_agent=self.current_agent_name,
             )
 
             return True
 
         except Exception as e:
             logger.error(
-                f"Failed to create new session - error: {str(e)}, error_type: {type(e).__name__}, user_id: {self.user_id}, session_name: {session_name}",
+                "Failed to create new session",
+                error=str(e),
+                error_type=type(e).__name__,
+                user_id=self.user_id,
+                session_name=session_name,
                 exc_info=e,
             )
             return False
@@ -435,7 +519,9 @@ class ResponsesSessionManager(BaseSessionManager):
             db_session = await self.get_session(request_manager_session_id)
             if not db_session:
                 logger.debug(
-                    f"No existing session found in database - request_manager_session_id: {request_manager_session_id}, user_id: {self.user_id}"
+                    "No existing session found in database",
+                    request_manager_session_id=request_manager_session_id,
+                    user_id=self.user_id,
                 )
                 return False
 
@@ -446,12 +532,18 @@ class ResponsesSessionManager(BaseSessionManager):
 
             if not conversation_thread_id or not current_agent_id:
                 logger.debug(
-                    f"Session found but missing required fields - request_manager_session_id: {request_manager_session_id}, current_agent_id: {current_agent_id}, conversation_thread_id: {conversation_thread_id}"
+                    "Session found but missing required fields",
+                    request_manager_session_id=request_manager_session_id,
+                    current_agent_id=current_agent_id,
+                    conversation_thread_id=conversation_thread_id,
                 )
                 return False
 
             logger.info(
-                f"Resuming session from database - request_manager_session_id: {request_manager_session_id}, current_agent_id: {current_agent_id}, conversation_thread_id: {conversation_thread_id}"
+                "Resuming session from database",
+                request_manager_session_id=request_manager_session_id,
+                current_agent_id=current_agent_id,
+                conversation_thread_id=conversation_thread_id,
             )
 
             # Get the agent
@@ -462,7 +554,13 @@ class ResponsesSessionManager(BaseSessionManager):
             agent = self.agent_manager.get_agent(current_agent_id)
             if not agent:
                 logger.error(
-                    f"Agent not found for resumption - agent_id: {current_agent_id}, available_agents: {list(self.agent_manager.agents_dict.keys()) if self.agent_manager else []}"
+                    "Agent not found for resumption",
+                    agent_id=current_agent_id,
+                    available_agents=(
+                        list(self.agent_manager.agents_dict.keys())
+                        if self.agent_manager
+                        else []
+                    ),
                 )
                 return False
 
@@ -485,14 +583,21 @@ class ResponsesSessionManager(BaseSessionManager):
             )
 
             logger.info(
-                f"Session resumed successfully - request_manager_session_id: {request_manager_session_id}, current_agent: {self.current_agent_name}, thread_id: {conversation_thread_id}"
+                "Session resumed successfully",
+                request_manager_session_id=request_manager_session_id,
+                current_agent=self.current_agent_name,
+                thread_id=conversation_thread_id,
             )
 
             return True
 
         except Exception as e:
             logger.error(
-                f"Failed to resume session - error: {str(e)}, error_type: {type(e).__name__}, request_manager_session_id: {request_manager_session_id}, user_id: {self.user_id}",
+                "Failed to resume session",
+                error=str(e),
+                error_type=type(e).__name__,
+                request_manager_session_id=request_manager_session_id,
+                user_id=self.user_id,
                 exc_info=e,
             )
             return False
@@ -534,7 +639,10 @@ class ResponsesSessionManager(BaseSessionManager):
 
         except Exception as e:
             logger.error(
-                f"Failed to retrieve token counts - error: {str(e)}, session_id: {self.request_manager_session_id}",
+                "Failed to retrieve token counts",
+                error=str(e),
+                error_type=type(e).__name__,
+                session_id=self.request_manager_session_id,
                 exc_info=e,
             )
             return "Token stats not available (error retrieving counts)"
@@ -626,7 +734,11 @@ class ResponsesSessionManager(BaseSessionManager):
                 routing_decision = current_values.get("routing_decision")
                 user_intent = current_values.get("user_intent")
                 logger.info(
-                    f"LangGraph state machine state - current_state: {current_state_name}, routing_decision: {routing_decision}, user_intent: {user_intent}, thread_id: {self.conversation_session.thread_id}"
+                    "LangGraph state machine state",
+                    current_state=current_state_name,
+                    routing_decision=routing_decision,
+                    user_intent=user_intent,
+                    thread_id=self.conversation_session.thread_id,
                 )
             except Exception as e:
                 logger.warning(
@@ -642,7 +754,10 @@ class ResponsesSessionManager(BaseSessionManager):
 
         # Log the full response and available agents
         logger.info(
-            f"Routing analysis - full_response: '{processed_response}', available_agents: {self.agents}, current_agent: {self.current_agent_name}"
+            "Routing analysis",
+            full_response=processed_response,
+            available_agents=self.agents,
+            current_agent=self.current_agent_name,
         )
 
         # Use StateMachine routing_decision field instead of parsing messages
@@ -660,17 +775,22 @@ class ResponsesSessionManager(BaseSessionManager):
                 current_state_name = current_values.get("current_state")
 
                 logger.info(
-                    f"StateMachine state check - current_state: {current_state_name}, routing_decision: {routing_decision}, user_intent: {user_intent}"
+                    "StateMachine state check",
+                    current_state=current_state_name,
+                    routing_decision=routing_decision,
+                    user_intent=user_intent,
                 )
 
                 if routing_decision and routing_decision in self.agents:
                     routed_agent = routing_decision
                     logger.info(
-                        f"Found routing decision from StateMachine - agent: {routed_agent}"
+                        "Found routing decision from StateMachine", agent=routed_agent
                     )
                 else:
                     logger.info(
-                        f"No valid routing decision in StateMachine state - routing_decision: {routing_decision}, available_agents: {self.agents}"
+                        "No valid routing decision in StateMachine state",
+                        routing_decision=routing_decision,
+                        available_agents=self.agents,
                     )
             except Exception as e:
                 logger.warning(
@@ -688,11 +808,13 @@ class ResponsesSessionManager(BaseSessionManager):
                 if agent_name.lower() in signal:
                     routed_agent = agent_name
                     logger.info(
-                        f"Found agent name in response (fallback) - agent: {agent_name}, signal: {signal}"
+                        "Found agent name in response (fallback)",
+                        agent=agent_name,
+                        signal=signal,
                     )
                     break
 
-        logger.debug(f"Routing detection result - routed_agent: {routed_agent}")
+        logger.debug("Routing detection result", routed_agent=routed_agent)
 
         if routed_agent:
             logger.info(
@@ -955,16 +1077,23 @@ class ResponsesSessionManager(BaseSessionManager):
                 await self.db_session.commit()
 
                 logger.info(
-                    f"Database session state updated successfully - user_id: {self.user_id}, session_id: {session.session_id}, agent_name: {agent_name}, thread_id: {thread_id}"
+                    "Database session state updated successfully",
+                    user_id=self.user_id,
+                    session_id=session.session_id,
+                    agent_name=agent_name,
+                    thread_id=thread_id,
                 )
             else:
-                logger.warning(
-                    f"No active session found for user - user_id: {self.user_id}"
-                )
+                logger.warning("No active session found for user", user_id=self.user_id)
 
         except Exception as e:
             logger.error(
-                f"Failed to update database session state - error: {str(e)}, error_type: {type(e).__name__}, user_id: {self.user_id}, agent_name: {agent_name}, thread_id: {thread_id}",
+                "Failed to update database session state",
+                error=str(e),
+                error_type=type(e).__name__,
+                user_id=self.user_id,
+                agent_name=agent_name,
+                thread_id=thread_id,
                 exc_info=e,
             )
 

@@ -133,7 +133,7 @@ async def create_shared_lifespan(
         None (standard lifespan pattern)
     """
     # Startup
-    logger.info(f"Starting {service_name}", version=version)
+    logger.info("Starting service", service=service_name, version=version)
 
     # Wait for database migration to complete
     db_manager = get_database_manager()
@@ -166,12 +166,12 @@ async def create_shared_lifespan(
             logger.error("Custom startup failed", error=str(e))
             raise
 
-    logger.info(f"{service_name} startup completed")
+    logger.info("Service startup completed", service=service_name)
 
     yield
 
     # Shutdown
-    logger.info(f"Shutting down {service_name}")
+    logger.info("Shutting down service", service=service_name)
 
     # Call custom shutdown function if provided
     if custom_shutdown:
@@ -183,7 +183,7 @@ async def create_shared_lifespan(
 
     # Close database connections
     await db_manager.close()
-    logger.info(f"{service_name} shutdown completed")
+    logger.info("Service shutdown completed", service=service_name)
 
 
 def create_standard_fastapi_app(
@@ -236,5 +236,5 @@ def create_standard_fastapi_app(
         allow_headers=["*"],
     )
 
-    logger.info(f"Created FastAPI app for {service_name}")
+    logger.info("Created FastAPI app", service=service_name)
     return app

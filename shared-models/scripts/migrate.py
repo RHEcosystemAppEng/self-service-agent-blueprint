@@ -14,18 +14,18 @@ from alembic.config import Config
 # Add the src directory to Python path and import shared_models modules
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 try:
+    from shared_models import configure_logging
     from shared_models.database import get_database_manager, get_db_config
 except ImportError:
     # If running in container, try direct import
+    from shared_models import configure_logging  # noqa: F401
     from shared_models.database import get_database_manager, get_db_config  # noqa: F401
 
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+# Configure logging with structured logging support
+logger = configure_logging("migrate")
 
-# Also enable Alembic logging
+# Also enable Alembic logging at DEBUG level
+logging.basicConfig(level=logging.DEBUG)
 alembic_logger = logging.getLogger("alembic")
 alembic_logger.setLevel(logging.DEBUG)
 
@@ -43,7 +43,11 @@ async def wait_for_database(max_retries: int = 150, retry_delay: int = 2) -> boo
                 return True
         except Exception as e:
             logger.debug(
-                f"Database not ready (attempt {attempt + 1}/{max_retries}): {e}"
+                "Database not ready",
+                attempt=attempt + 1,
+                max_retries=max_retries,
+                error=str(e),
+                error_type=type(e).__name__,
             )
 
         if attempt < max_retries - 1:
@@ -61,11 +65,14 @@ def run_migrations() -> None:
     script_dir = Path(__file__).parent.parent
     alembic_cfg_path = script_dir / "alembic.ini"
 
-    logger.debug(f"Script directory: {script_dir}")
-    logger.debug(f"Alembic config path: {alembic_cfg_path}")
+    logger.debug("Script directory", script_dir=str(script_dir))
+    logger.debug("Alembic config path", alembic_cfg_path=str(alembic_cfg_path))
 
     if not alembic_cfg_path.exists():
-        logger.error(f"Alembic configuration not found: {alembic_cfg_path}")
+        logger.error(
+            "Alembic configuration not found",
+            alembic_cfg_path=str(alembic_cfg_path),
+        )
         sys.exit(1)
 
     # Create Alembic config
@@ -75,12 +82,18 @@ def run_migrations() -> None:
     # Override database URL from environment
     db_config = get_db_config()
     logger.debug(
-        f"Database config: host={db_config.host}, port={db_config.port}, db={db_config.database}"
+        "Database config",
+        host=db_config.host,
+        port=db_config.port,
+        database=db_config.database,
     )
 
     # Only log connection string in debug mode
     if os.getenv("SQL_DEBUG", "false").lower() == "true":
-        logger.debug(f"Connection string: {db_config.sync_connection_string}")
+        logger.debug(
+            "Connection string",
+            connection_string=db_config.sync_connection_string,
+        )
 
     alembic_cfg.set_main_option("sqlalchemy.url", db_config.sync_connection_string)
 
@@ -89,7 +102,7 @@ def run_migrations() -> None:
         # Change to the shared-db directory so Alembic can find the alembic/ folder
         original_cwd = os.getcwd()
         os.chdir(script_dir)
-        logger.debug(f"Changed working directory to: {script_dir}")
+        logger.debug("Changed working directory", script_dir=str(script_dir))
 
         # Run migrations
         command.upgrade(alembic_cfg, "head")
@@ -124,14 +137,18 @@ def run_migrations() -> None:
                     "✅ LangGraph PostgreSQL checkpoint tables setup completed successfully"
                 )
             except psycopg.Error as db_error:
-                logger.error(f"Database error during PostgresSaver setup: {db_error}")
-                logger.error(f"Error code: {getattr(db_error, 'pgcode', 'unknown')}")
+                logger.error(
+                    "Database error during PostgresSaver setup",
+                    error=str(db_error),
+                    error_code=getattr(db_error, "pgcode", "unknown"),
+                )
                 raise
             except Exception as setup_error:
                 logger.error(
-                    f"Unexpected error during PostgresSaver setup: {setup_error}"
+                    "Unexpected error during PostgresSaver setup",
+                    error=str(setup_error),
+                    error_type=type(setup_error).__name__,
                 )
-                logger.error(f"Exception type: {type(setup_error).__name__}")
                 raise
             finally:
                 try:
@@ -139,12 +156,17 @@ def run_migrations() -> None:
                     logger.debug("PostgresSaver connection closed successfully")
                 except Exception as close_error:
                     logger.warning(
-                        f"Error closing PostgresSaver connection: {close_error}"
+                        "Error closing PostgresSaver connection",
+                        error=str(close_error),
+                        error_type=type(close_error).__name__,
                     )
 
         except Exception as e:
-            logger.error(f"Failed to setup LangGraph checkpoint tables: {e}")
-            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(
+                "Failed to setup LangGraph checkpoint tables",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             logger.exception("Full PostgresSaver setup error traceback:")
             # Don't fail the migration job - this is not critical for basic functionality
             logger.warning("Continuing without LangGraph checkpoint setup...")
@@ -152,7 +174,11 @@ def run_migrations() -> None:
         # Restore original working directory
         os.chdir(original_cwd)
     except Exception as e:
-        logger.error(f"Migration failed: {e}")
+        logger.error(
+            "Migration failed",
+            error=str(e),
+            error_type=type(e).__name__,
+        )
         logger.exception("Full migration error traceback:")
         sys.exit(1)
 
@@ -179,7 +205,11 @@ async def main() -> None:
 
         logger.info("Migration process completed successfully")
     except Exception as e:
-        logger.error(f"Migration process failed: {e}")
+        logger.error(
+            "Migration process failed",
+            error=str(e),
+            error_type=type(e).__name__,
+        )
         logger.exception("Full process error traceback:")
         sys.exit(1)
 

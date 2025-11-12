@@ -24,7 +24,10 @@ def run(service_name: str, logger: typing.Any) -> None:
         logger.info("OTEL exporter endpoint not provided -- skip auto tracing config.")
         return
 
-    logger.info(f"Export tracing to {otel_exporter_endpoint}")
+    logger.info(
+        "Export tracing",
+        otel_exporter_endpoint=otel_exporter_endpoint,
+    )
     # Set up the tracer provider with service name
     resource = Resource(attributes={service_attributes.SERVICE_NAME: service_name})
     trace.set_tracer_provider(TracerProvider(resource=resource))
