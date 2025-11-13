@@ -1,0 +1,47 @@
+[project]
+name = "mock-employee-data"
+version = "0.1.0"
+description = "Mock employee data library for testing purposes"
+readme = "README.md"
+authors = [
+    { name = "Self-Service Agent Blueprint Team", email = "team@company.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.2.0",
+    "pytest-cov>=6.2.1",
+    "black>=25.1.0",
+    "flake8>=7.3.0",
+    "isort>=5.13.0",
+    "mypy>=1.17.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mock_employee_data"]
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+
+[[tool.mypy.overrides]]
+module = "mock_employee_data.*"
+disable_error_code = ["attr-defined"]

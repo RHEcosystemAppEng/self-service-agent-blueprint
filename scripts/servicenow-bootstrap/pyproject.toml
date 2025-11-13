@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "requests>=2.25.0",
+    "mock-employee-data",
 ]
 
 
@@ -43,3 +44,9 @@ python_functions = ["test_*"]
 
 [tool.mypy]
 python_version = "3.12"
+
+# Configure mypy to use source directories for local packages
+mypy_path = "../../mock-employee-data/src"
+
+[tool.uv.sources]
+mock-employee-data = { path = "../../mock-employee-data" }

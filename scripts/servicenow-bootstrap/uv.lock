@@ -239,6 +239,23 @@ wheels = [
 ]
 
 [[package]]
+name = "mock-employee-data"
+version = "0.1.0"
+source = { directory = "../../mock-employee-data" }
+
+[package.metadata]
+requires-dist = [
+    { name = "black", marker = "extra == 'dev'", specifier = ">=25.1.0" },
+    { name = "flake8", marker = "extra == 'dev'", specifier = ">=7.3.0" },
+    { name = "isort", marker = "extra == 'dev'", specifier = ">=5.13.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.17.1" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.1" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.2.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.2.1" },
+]
+provides-extras = ["dev"]
+
+[[package]]
 name = "mypy"
 version = "1.18.2"
 source = { registry = "https://pypi.org/simple" }
@@ -401,6 +418,7 @@ name = "servicenow-bootstrap"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "mock-employee-data" },
     { name = "requests" },
 ]
 
@@ -416,7 +434,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "requests", specifier = ">=2.25.0" }]
+requires-dist = [
+    { name = "mock-employee-data", directory = "../../mock-employee-data" },
+    { name = "requests", specifier = ">=2.25.0" },
+]
 
 [package.metadata.requires-dev]
 dev = [

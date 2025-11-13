@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 import requests
 from shared_models import configure_logging
-from snow.data.data import _calculate_laptop_age
+from snow.servicenow.utils import _calculate_laptop_age
 
 from .auth import AuthManager
 from .models import (

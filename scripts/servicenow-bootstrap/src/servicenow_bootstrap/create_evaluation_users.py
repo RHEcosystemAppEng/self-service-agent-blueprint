@@ -17,8 +17,8 @@ import sys
 from typing import Any, Optional
 
 import requests
+from mock_employee_data import MOCK_EMPLOYEE_DATA
 from requests.auth import HTTPBasicAuth
-from snow.data.data import MOCK_EMPLOYEE_DATA
 
 
 class ServiceNowUserCreator:

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 2 * * *'  # Run daily at 2 AM UTC
-  
+
 jobs:
   e2e-tests:
     name: Run e2e tests
