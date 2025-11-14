@@ -14,44 +14,28 @@
    - [Customizing for Your Use Case](#19-customizing-for-your-use-case)
 
 2. [Prerequisites](#2-prerequisites)
-   - [Required Tools](#21-required-tools)
-   - [Environment Requirements](#22-environment-requirements)
-   - [Access Requirements](#23-access-requirements)
-   - [Knowledge Prerequisites](#24-knowledge-prerequisites)
-   - [Time Estimate](#25-time-estimate)
 
-3. [Architecture & Deployment Modes](#3-architecture--deployment-modes)
-   - [Deployment Modes](#31-deployment-modes)
-   - [Request Flow](#32-request-flow)
+3. [Hands-On Quickstart](#3-hands-on-quickstart)
+   - [Deploy to OpenShift](#31-deploy-to-openshift)
+   - [Interact with the CLI](#32-interact-with-the-cli)
+   - [Integration with Slack (Optional)](#33-integration-with-slack-optional)
+   - [Integration with Real ServiceNow (Optional)](#34-integration-with-real-servicenow-optional)
+   - [Integration with Email (Optional)](#35-integration-with-email-optional)
+   - [Setting up Safety Shields (Optional)](#36-setting-up-safety-shields-optional)
+   - [Run Evaluations](#37-run-evaluations)
+   - [Follow the Flow with Tracing](#38-follow-the-flow-with-tracing)
 
-4. [Component Overview](#4-component-overview)
-   - [Core Platform Components](#41-core-platform-components-reusable-across-use-cases)
-   - [Laptop Refresh Specific Components](#42-laptop-refresh-specific-components)
+4. [Performance & Scaling](#4-performance--scaling)
 
-5. [Hands-On Quickstart](#5-hands-on-quickstart)
-   - [Deploy to OpenShift](#51-deploy-to-openshift)
-   - [Interact with the CLI](#52-interact-with-the-cli)
-  - [Integration with Slack (Optional)](#53-integration-with-slack-optional)
-  - [Integration with Real ServiceNow (Optional)](#54-integration-with-real-servicenow-optional)
-  - [Integration with Email (Optional)](#55-integration-with-email-optional)
-  - [Setting up Safety Shields (Optional)](#56-setting-up-safety-shields-optional)
-  - [Run Evaluations](#57-run-evaluations)
-  - [Follow the Flow with Tracing](#58-follow-the-flow-with-tracing)
+5. [Going Deeper: Component Documentation](#5-going-deeper-component-documentation)
+   - [Guides](#guides)
+   - [Technical Documentation](#technical-documentation)
 
-6. [Performance & Scaling](#6-performance--scaling)
+6. [Customizing for Your Use Case](#6-customizing-for-your-use-case)
 
-7. [Going Deeper: Component Documentation](#7-going-deeper-component-documentation)
-   - [Core Platform](#71-core-platform)
-   - [Agent Configuration](#72-agent-configuration)
-   - [External Integrations](#73-external-integrations)
-   - [Quality & Operations](#74-quality--operations)
-
-8. [Customizing for Your Use Case](#8-customizing-for-your-use-case)
-   - [Planning Your Use Case](#81-planning-your-use-case)
-
-9. [Next Steps and Additional Resources](#9-next-steps-and-additional-resources)
-   - [What You've Accomplished](#91-what-youve-accomplished)
-   - [Recommended Next Steps](#92-recommended-next-steps)
+7. [Next Steps and Additional Resources](#7-next-steps-and-additional-resources)
+   - [What You've Accomplished](#71-what-youve-accomplished)
+   - [Recommended Next Steps](#72-recommended-next-steps)
 
 ---
 
@@ -98,11 +82,15 @@ The quickstart provides implementations of the common components along with the 
 **Time to complete:** 30-60 minutes (depending on deployment mode)
 
 By the end of this quickstart, you will have:
-- A fully functional AI agent system deployed
-- A working laptop refresh agent with knowledge bases and tools
-- Completed evaluation runs demonstrating agent quality
-- (Optional) Slack integration
+- A fully functional AI agent system deployed on OpenShift
+- A working laptop refresh agent with knowledge bases and MCP server tools
+- Experience interacting with the agent via CLI to test complete workflows
+- Completed evaluation runs demonstrating agent quality and business requirements
+- Understanding of distributed tracing for monitoring and troubleshooting
+- (Optional) Slack integration for real-time user conversations
+- (Optional) Email integration for asynchronous notifications
 - (Optional) ServiceNow integration for real ticket creation
+- (Optional) Safety shields for content moderation
 - Understanding of how to customize for your own use cases
 
 ### 1.6 Architecture Overview
@@ -156,9 +144,10 @@ The repository is organized into the following key directories:
 - **`scripts/`** - CI/CD and container build scripts
 
 **Documentation:**
-- **`docs/`** - Additional guides and documentation resources
+- **`guides/`** - Step-by-step guides for integrations, deployment, and advanced features
+- **`docs/`** - Technical documentation for developers
 
-For detailed information on each component, see [Section 4: Component Overview](#4-component-overview).
+For detailed information on each component, see the [Component Guide](guides/COMPONENT_GUIDE.md).
 
 ### 1.8 Laptop Refresh Implementation
 
@@ -181,66 +170,66 @@ The ServiceNow MCP server authenticates to the ServiceNow backend using a servic
 
 **Example Conversation: Laptop Refresh Process**
 
-**User:** Hi, I'm looking to refresh my laptop, can you please guide me through the process and show me the available options?
-
-**Agent:** Your laptop, an EliteBook 840 G7, was purchased on 2019-05-12 and is currently 6 years and 5 months old. The company's laptop refresh policy states that standard laptops will be refreshed every 3 years from the date of issuance. Since your laptop is older than 3 years, you are eligible for a laptop refresh. Would you like to proceed with reviewing the available laptop options for your location?
-
-**User:** Yes, I'd like to proceed with reviewing the available laptop options for my location.
-
-**Agent:** Here are the available laptop options for your location (NA):
-
-**1. Apple MacBook Air M3** (Code: apple_mac_book_air_m_3)
-- Target User: General Office
-- Cost: $1,199 USD
-- Operating System: macOS
-- Display: 13.6" (2560 x 1664)
-- Processor: Apple M3
-- Memory: 8 GB
-- Storage: 256 GB SSD
-- Weight: 2.7 lbs
-
-**2. Apple MacBook Pro 14 M3 Pro** (Code: apple_mac_book_pro_14_m_3_pro)
-- Target User: Developers
-- Cost: $1,999 USD
-- Operating System: macOS
-- Display: 14.2" (3024 x 1964)
-- Processor: Apple M3 Pro
-- Memory: 18 GB
-- Storage: 512 GB SSD
-- Weight: 3.5 lbs
-
-**3. Lenovo ThinkPad T14 Gen 5 Intel** (Code: lenovo_think_pad_t_14_gen_5_intel)
-- Target User: General Office
-- Cost: $1,399 USD
-- Operating System: Windows 11 Pro
-- Display: 14" (1920 x 1200)
-- Processor: Intel Core i7-1555U
-- Memory: 16 GB
-- Storage: 512 GB SSD
-- Weight: 3.2 lbs
-
-**4. Lenovo ThinkPad P1 Gen 7** (Code: lenovo_think_pad_p_1_gen_7)
-- Target User: Engineers
-- Cost: $2,499 USD
-- Operating System: Red Hat Linux
-- Display: 16" (2560 x 1600)
-- Processor: Intel Core i7-13800H
-- Memory: 32 GB
-- Storage: 1 TB SSD
-- Graphics: NVIDIA RTX A1000
-- Weight: 4.1 lbs
-
-Please select one of the above options. Remember to consider your job role and requirements when making your selection.
-
-**User:** I'd like to select option 1, the Apple MacBook Air M3, as it seems suitable for my general office needs.
-
-**Agent:** You've selected the Apple MacBook Air M3. Would you like to proceed with the creation of a ServiceNow ticket for a laptop refresh?
-
-**User:** Yes, please proceed with creating the ServiceNow ticket for the laptop refresh, and can you also let me know what information I need to provide for the ticket?
-
-**Agent:** A ServiceNow ticket for a laptop refresh has been created for you. The ticket number is REQ3143724. Your request will be processed by the IT Hardware Team, and you will receive updates via email as the ticket progresses.
-
-Is there anything else I can help you with?
+> **User:** Hi, I'm looking to refresh my laptop, can you please guide me through the process and show me the available options?
+>
+> **Agent:** Your laptop, an EliteBook 840 G7, was purchased on 2019-05-12 and is currently 6 years and 5 months old. The company's laptop refresh policy states that standard laptops will be refreshed every 3 years from the date of issuance. Since your laptop is older than 3 years, you are eligible for a laptop refresh. Would you like to proceed with reviewing the available laptop options for your location?
+>
+> **User:** Yes, I'd like to proceed with reviewing the available laptop options for my location.
+>
+> **Agent:** Here are the available laptop options for your location (NA):
+>
+> **1. Apple MacBook Air M3** (Code: apple_mac_book_air_m_3)
+> - Target User: General Office
+> - Cost: $1,199 USD
+> - Operating System: macOS
+> - Display: 13.6" (2560 x 1664)
+> - Processor: Apple M3
+> - Memory: 8 GB
+> - Storage: 256 GB SSD
+> - Weight: 2.7 lbs
+>
+> **2. Apple MacBook Pro 14 M3 Pro** (Code: apple_mac_book_pro_14_m_3_pro)
+> - Target User: Developers
+> - Cost: $1,999 USD
+> - Operating System: macOS
+> - Display: 14.2" (3024 x 1964)
+> - Processor: Apple M3 Pro
+> - Memory: 18 GB
+> - Storage: 512 GB SSD
+> - Weight: 3.5 lbs
+>
+> **3. Lenovo ThinkPad T14 Gen 5 Intel** (Code: lenovo_think_pad_t_14_gen_5_intel)
+> - Target User: General Office
+> - Cost: $1,399 USD
+> - Operating System: Windows 11 Pro
+> - Display: 14" (1920 x 1200)
+> - Processor: Intel Core i7-1555U
+> - Memory: 16 GB
+> - Storage: 512 GB SSD
+> - Weight: 3.2 lbs
+>
+> **4. Lenovo ThinkPad P1 Gen 7** (Code: lenovo_think_pad_p_1_gen_7)
+> - Target User: Engineers
+> - Cost: $2,499 USD
+> - Operating System: Red Hat Linux
+> - Display: 16" (2560 x 1600)
+> - Processor: Intel Core i7-13800H
+> - Memory: 32 GB
+> - Storage: 1 TB SSD
+> - Graphics: NVIDIA RTX A1000
+> - Weight: 4.1 lbs
+>
+> Please select one of the above options. Remember to consider your job role and requirements when making your selection.
+>
+> **User:** I'd like to select option 1, the Apple MacBook Air M3, as it seems suitable for my general office needs.
+>
+> **Agent:** You've selected the Apple MacBook Air M3. Would you like to proceed with the creation of a ServiceNow ticket for a laptop refresh?
+>
+> **User:** Yes, please proceed with creating the ServiceNow ticket for the laptop refresh, and can you also let me know what information I need to provide for the ticket?
+>
+> **Agent:** A ServiceNow ticket for a laptop refresh has been created for you. The ticket number is REQ3143724. Your request will be processed by the IT Hardware Team, and you will receive updates via email as the ticket progresses.
+>
+> Is there anything else I can help you with?
 
 ### 1.9 Customizing for Your Use Case
 
@@ -254,350 +243,42 @@ To adapt this quickstart for your specific IT process:
 
 ---
 
-## What's Next
-
 Now that you understand the architecture and capabilities of the self-service agent quickstart, the next section will guide you through the prerequisites and setup steps needed to deploy the system on your OpenShift cluster.
 
 ---
 
 ## 2. PREREQUISITES
 
-### 2.1 Required Tools
+### What You Need
 
-Before you begin, ensure you have:
+**Local Tools:**
+* [Python 3.12+](https://www.python.org/downloads/)
+* [uv](https://github.com/astral-sh/uv) - Fast Python package installer
+* [Podman](https://podman.io/getting-started/installation) - Container runtime for building images
+* [Helm](https://helm.sh/docs/intro/install/) - Kubernetes package manager
+* [oc CLI](https://docs.openshift.com/container-platform/latest/cli_reference/openshift_cli/getting-started-cli.html) - OpenShift command line tool
+* [git](https://git-scm.com/downloads) - Version control
+* make - Build automation (usually pre-installed on Linux/macOS, see [GNU Make](https://www.gnu.org/software/make/))
 
-* Python 3.12+ - Required for all services and components
-* uv - Fast Python package installer (https://github.com/astral-sh/uv)
-* Podman - Container runtime for building images
-* Helm - Kubernetes package manager (for deployment)
-* oc - OpenShift command line tool
-* git - Version control
-* make - Build automation (usually pre-installed on Linux/macOS)
+**Cluster Environment:**
+* **Testing Mode**: OpenShift/Kubernetes cluster (no special operators)
+* **Production Mode**: OpenShift cluster + [Serverless Operator](https://docs.openshift.com/serverless/latest/install/install-serverless-operator.html) + [Streams for Apache Kafka Operator](https://access.redhat.com/documentation/en-us/red_hat_streams_for_apache_kafka/2.7/html/deploying_and_managing_streams_for_apache_kafka_on_openshift/deploy-tasks_str)
 
-### 2.2 Environment Requirements
-
-Both deployment modes require a Kubernetes-based cluster:
-
-**TESTING MODE (Mock Eventing):**
-* OpenShift or Kubernetes cluster
-* No special operators required
-* Access to LlamaStack/LLM endpoint
-
-**PRODUCTION MODE (Knative Eventing):**
-* OpenShift cluster with:
-  - OpenShift Serverless Operator
-  - Streams for Apache Kafka Operator
-* Access to LlamaStack/LLM endpoint
-
-### 2.3 Access Requirements
-
-* OpenShift cluster access (for Helm deployment)
-* Container registry access (Quay.io or similar)
-* LLM API endpoint and credentials
-* (Optional) Slack workspace admin access for Slack integration
-* (Optional) ServiceNow instance for full laptop refresh workflow
-
-### 2.4 Knowledge Prerequisites
-
-Helpful but not required:
-* Basic understanding of Kubernetes/OpenShift
-* Familiarity with REST APIs
-* Understanding of AI/LLM concepts
-* Experience with Python development
-
-### 2.5 Time Estimate
-
-* OpenShift deployment (testing mode): 45-60 minutes
-* Full production deployment with Slack: 60-90 minutes
-* Running evaluations: 15-30 minutes
-* Customization for your use case: Varies
+**Access & Credentials:**
+* OpenShift cluster access
+* Container registry (Quay.io or similar), OPTIONAL, only if you want to make changes
+* LLM API endpoint with credentials (Llama 3 70B model)
+* LLM API safety model endpoint with credentials, OPTIONAL if you want to enable safety shields (meta-llama/Llama-Guard-3-8B)
+* Slack workspace admin access, OPTIONAL if you want to explore integration with Slack
+* ServiceNow instance admin access, OPTIONAL if you want to explore integration with ServiceNow
 
 ---
 
-## 3. ARCHITECTURE & DEPLOYMENT MODES
-
-### 3.1 Deployment Modes
-
-The quickstart supports two deployment modes that share the same codebase but use different communication infrastructure. You can start with testing mode and transition to production without code changes—only configuration.
-
-**Testing Mode (Mock Eventing)**
-
-Testing mode uses a lightweight mock eventing service that mimics Knative broker behavior via simple HTTP routing. It's ideal for development, CI/CD pipelines, and staging environments. The mock service accepts CloudEvents and routes them to configured endpoints using the same protocols as production, but without requiring Knative operators or Kafka infrastructure. Deploy to any Kubernetes/OpenShift cluster with standard resources.
-
-**Production Mode (Knative Eventing)**
-
-Production mode leverages Knative Eventing with Apache Kafka for enterprise-grade event routing. It provides high availability, fault tolerance, horizontal scalability, and guaranteed delivery. Requires OpenShift Serverless Operator and Streams for Apache Kafka Operator, but delivers production-ready reliability with sophisticated retry logic and durable message queuing.
-
-**Mode Comparison**
-
-| Aspect | Testing Mode | Production Mode |
-|--------|-------------|-----------------|
-| **Infrastructure** | Basic Kubernetes/OpenShift | OpenShift + Serverless + Kafka operators |
-| **Scalability** | Moderate loads | High scalability via Kafka partitioning |
-| **Reliability** | Standard K8s features | Enterprise-grade with guaranteed delivery |
-| **Setup** | Low complexity | Higher complexity |
-| **Cost** | Lower footprint | Higher resources |
-
-Most teams start with testing mode, then transition to production via configuration changes only—no code modifications required.
-
-### 3.2 Request Flow
-
-Both modes use identical services, business logic, and data models. A strategy pattern abstracts the communication mechanism, making deployment mode differences transparent to application code.
-
-**Request Lifecycle**
-
-1. **User initiates request** via any channel (Slack, API, CLI, email) → Integration Dispatcher receives and forwards to Request Manager
-
-2. **Request Manager normalizes** diverse channel formats into standard internal structure, then performs validation and session management. For continuing conversations, retrieves session context from PostgreSQL (conversation history, user metadata, integration details)
-
-3. **Agent Service processes** the request. New requests route to routing agent, which identifies user intent and hands off to appropriate specialist (e.g., laptop refresh agent). Specialist accesses knowledge bases and calls MCP server tools to complete the workflow
-
-4. **Integration Dispatcher delivers** response back to user via their original channel, handling all channel-specific formatting
-
-**Session Management**
-
-The system maintains conversational context across multiple interactions regardless of channel—essential for multi-turn agent workflows. Request Manager stores session state in PostgreSQL with unique session ID, user ID, integration type, conversation history, current agent, and routing metadata.
-
-## 4. COMPONENT OVERVIEW
-
-The quickstart consists of reusable **core platform components** and **use-case-specific components** (demonstrated through the laptop refresh example). Core components work across any IT process without modification, while use-case components show how to customize for specific workflows.
-
-### 4.1 Core Platform Components (Reusable Across Use Cases)
-
-#### 4.1.1 Request Manager
-
-**Purpose:** Central orchestrator that normalizes multi-channel requests and manages session state.
-
-**Key Capabilities:**
-- **Normalization:** Transforms diverse inputs (Slack messages, HTTP calls, CLI commands) into standardized internal format containing user message, identifier, integration type, and session context
-- **Session Management:** Maintains conversational state across interactions by persisting sessions in PostgreSQL with conversation history, user metadata, and routing information
-
----
-
-#### 4.1.2 Agent Service
-
-**Purpose:** Mediates communication with agents and routing between them.
-
-**Key Capabilities:**
-- **Agent Orchestration:** Routes requests to appropriate agents (routing agent → specialist agents), managing handoffs and conversation context
-- **Configuration-Driven:** Uses agents configured via YAML files in agent-service
-- **Generic Design:** All domain logic comes from agent configurations—no hardcoded use-case behavior
-
----
-
-#### 4.1.3 Integration Dispatcher
-
-**Purpose:** Multi-channel delivery hub that sends/receives messages through various communication channels.
-
-**Key Capabilities:**
-- **Channel Handlers:** Registry of handlers for Slack, Email, SMS, webhooks—each handles channel-specific protocols and formatting
-- **Bidirectional Communication:** Implements webhook endpoints (e.g., Slack events), verifies signatures, extracts messages, forwards to Request Manager
-- **Extensible Architecture:** Add custom channels (Teams, mobile apps) by implementing new handlers without core logic changes
-
----
-
-#### 4.1.4 Agent Service
-
-**Purpose:** AI agent processing service that handles agent registration, knowledge base management, and LangGraph state machine execution.
-
-**Key Capabilities:**
-- **Agent Registration:** Reads YAML files from `agent-service/config/agents/`, registers agents with their instructions, tools, and knowledge bases
-- **Knowledge Base Creation:** Processes text documents, creates embeddings, builds vector databases, registers for RAG queries
-- **Safety Shields:** Content moderation for input/output using Llama Guard 3 or compatible models, with configurable category filtering for false positive handling (see [Safety Shields Guide](guides/SAFETY_SHIELDS_GUIDE.md))
-
----
-
-#### 4.1.5 Mock Eventing Service
-
-**Purpose:** Lightweight service that mimics Knative broker behavior for testing event-driven flows without complex infrastructure.
-
-**Key Capabilities:**
-- **Event Routing:** Accepts CloudEvents via HTTP, applies routing rules, forwards to destination services—identical protocols to production
-- **In-Memory Configuration:** Routes event types (`agent.request` → Agent Service, `integration.delivery` → Integration Dispatcher)
-- **Fast Iteration:** Instant startup, minimal resources, easy debugging—ideal for CI/CD pipelines and local development
-
----
-
-#### 4.1.6 Shared Libraries
-
-**Purpose:** Foundational libraries ensuring consistency across all services through centralized data models and client implementations.
-
-**shared-models:**
-- **Database Schema:** SQLAlchemy models for database tables—single source of truth across all services
-- **Pydantic Schemas:** Request/response validation with type safety and automatic serialization
-- **Alembic Migrations:** Schema evolution management without manual SQL scripts
-
-**shared-clients:**
-- **HTTP Clients:** Standardized implementations for inter-service communication (AgentServiceClient, IntegrationDispatcherClient)
-
----
-
-#### 4.1.7 Communication Integrations
-
-**Purpose:** Connect agents to communication channels where users interact with the system.
-
-**Communication Channels:**
-- **Slack**: Real-time conversations in Slack workspace
-- **Email**: Asynchronous notifications and updates
-- **API/CLI**: Programmatic access and automation
-
-**Key Capabilities:**
-- Meet users where they work—no additional tools required
-- Support multiple channels simultaneously (Slack conversation, email confirmations)
-- Fully reusable across all use cases
-- Extensible architecture for custom channels (Teams, mobile apps)
-
----
-
-#### 4.1.8 Observability
-
-**Purpose:** Monitor system behavior, track performance, and troubleshoot production issues.
-
-**Key Capabilities:**
-- **Distributed Tracing**: OpenTelemetry + Jaeger for request lifecycle visibility across all services
-- **Performance Monitoring**: Track agent response latency, tool call timing, knowledge base retrieval performance
-- **Error Tracking**: Debug failed integrations, conversation routing issues, ticket creation errors
-- **Business KPIs**: Measure completion rates, user satisfaction, end-to-end request timing
-
-**Integration:** Works with OpenShift observability stack—unified monitoring across platform components and existing infrastructure
-
-**Reusability:** Infrastructure works for any use case without changes—add custom metrics for specific KPIs (PIA completion, RFP quality, etc.)
-
----
-
-#### 4.1.9 Evaluation Framework
-
-**Purpose:** DeepEval-based testing system that validates agent behavior against business requirements and quality metrics.
-
-**Key Capabilities:**
-- **Conversation Execution**: Run predefined and generated conversation flows against deployed agents
-- **Synthetic Generation**: Create varied test scenarios to exercise edge cases and diverse user inputs
-- **Custom Metrics**: Define business-specific evaluation criteria using ConversationalGEval
-- **Standard Metrics**: Built-in DeepEval metrics (Turn Relevancy, Role Adherence, Conversation Completeness)
-- **Pipeline Automation**: Complete evaluation workflow from execution through reporting
-
-**Why It Matters:**
-- Validates business requirements before deployment
-- Catches regressions when updating prompts or models
-- Provides metrics for continuous improvement
-- Validates compliance with policies and procedures
-- Addresses non-deterministic nature of LLM responses
-
-**Architecture:**
-- **Conversation Flows**: JSON files defining turn-by-turn interactions
-- **Metrics Configuration**: Python-based metric definitions in `get_deepeval_metrics.py`
-- **Evaluation Engine**: DeepEval library for metric assessment
-- **Results Storage**: JSON output with scores, reasons, and pass/fail status
-
-**Reusability:** Framework structure (execution, generation, evaluation) is fully reusable—customize by defining use-case-specific conversation flows and metrics.
-
----
-
-### 4.2 Laptop Refresh Specific Components
-
-These components build on the common components to implement the laptop refresh process. Apply the same patterns for your own use cases (PIA, RFP, etc.).
-
-#### 4.2.1 MCP Servers
-
-MCP servers allow agents to interact with external systems through standardized tools.
-
-**Laptop Refresh MCP Server:**
-
-**ServiceNow MCP (2 tools):**
-- `get_employee_laptop_info`: Retrieves employee's laptop information including model, purchase date, age, warranty status, and employee details (name, location). Supports lookup by email address.
-- `open_laptop_refresh_ticket`: Creates ServiceNow laptop refresh ticket. Returns ticket number and details.
-
-**Implementation Details:**
-- Supports both mock data (for testing/development) and real ServiceNow API integration
-- Uses `AUTHORITATIVE_USER_ID` header for authenticated requests
-- Mock data includes pre-defined employees with laptop information for evaluation testing
-
----
-
-#### 4.2.2 Knowledge Bases
-
-**Purpose:** Retrieval-Augmented Generation (RAG) system that grounds agent responses in authoritative organizational documents.
-
-**Technical Implementation:** Documents chunked → converted to vector embeddings → stored in vector database → semantic search retrieves relevant chunks → provided to LLM as context
-
-**Laptop Refresh Knowledge Base:**
-- `refresh_policy.txt`: Eligibility criteria, approval process, special cases, policy rationale
-- `NA_laptop_offerings.txt`: Available models for North America region with specifications, pricing, target user groups
-- `EMEA_laptop_offerings.txt`: Available models for Europe, Middle East, and Africa region
-- `APAC_laptop_offerings.txt`: Available models for Asia-Pacific region
-- `LATAM_laptop_offerings.txt`: Available models for Latin America region
-
-**Conversational Policy Explanation:** User asks "Why am I not eligible?" → Agent retrieves and explains specific unmet criteria
-
-**Region-Specific Options:** User in EMEA region requests laptop options → Agent queries knowledge base for EMEA-specific offerings and presents only models available in that region with complete specifications
-
-**Pattern:** Create directory under `agent-service/config/knowledge_bases/`, add .txt files, Agent Service handles chunking, embeddings, vector database creation, and LlamaStack registration.
-
-**Knowledge Base Updates:**
-
-This quickstart uses an implementation where knowledge base documents are static text files loaded and ingested during agent service initialization. This approach allows you to get started quickly without complex infrastructure and is used as knowledge base creation and ongoing management is not the focus of this quickstart.
-
-However, production deployments typically require a more sophisticated approach for updating knowledge bases as policies and documentation change. For production use cases, consider implementing a dedicated ingestion pipeline that can:
-- Process updates from multiple source systems (SharePoint, Confluence, document management systems)
-- Handle incremental updates without full redeployment
-- Support various document formats (PDF, Word, HTML, etc.)
-- Provide automated document processing and chunking
-- Enable continuous synchronization of knowledge bases
-
-For a complete ingestion pipeline architecture and implementation guidance, see the **[Ingestion Pipeline](https://github.com/rh-ai-quickstart/ai-architecture-charts/tree/main/ingestion-pipeline)** in the AI Architecture Charts repository. This architecture provides a production-ready approach to knowledge base management that can scale with your organization's needs. This quickstart could easily be adapted to use pre-existing knowledge bases managed by the ingestion pipeline by simply removing the knowledge base registration step from the init-job (`helm/templates/init-job.yaml`) and updating agent configurations to reference the existing vector store IDs created by your ingestion pipeline. 
-
----
-
-#### 4.2.3 Agents
-
-**Purpose:** YAML configurations defining agent behavior, system instructions, accessible tools, and knowledge bases—registered with LlamaStack by Agent Service.
-
-**Laptop Refresh Agent Architecture (Routing Pattern):**
-
-**Routing Agent:**
-- **Role:** Front door—greets users, identifies intent, routes to appropriate specialist
-- **Tools/Knowledge:** None—purely conversation and routing logic
-- **Instructions:** Recognizes request types ("I need a new laptop" → laptop refresh specialist, "privacy assessment" → PIA specialist)
-- **Extensibility:** Add specialists, update routing instructions—becomes conversational switchboard
-
-**Laptop Refresh Specialist Agent:**
-- **Role:** Domain expert guiding laptop refresh process
-- **Instructions:** Process flow (check eligibility, present options, create ticket), compliance requirements, interaction style
-- **Tools:** ServiceNow tools (laptop information, ticket creation)
-- **Knowledge Base:** `laptop-refresh` knowledge base for policy questions
-- **Capabilities:** Queries knowledge base for policies, calls tools to check eligibility/retrieve options/create tickets
-
----
-
-#### 4.2.4 Evaluations
-
-**Purpose:** Laptop refresh-specific conversation flows and metrics that validate the agent's ability to handle laptop refresh requests correctly.
-
-**Predefined Conversation Flows:**
-- **Success flow**: Complete laptop refresh request from greeting through ticket creation
-- **Location**: `evaluations/conversations_config/conversations/`
-
-**Custom Evaluation Metrics** (in `get_deepeval_metrics.py`):
-- **Information Gathering**: Collects laptop info and employee ID
-- **Policy Compliance**: Correctly applies 3-year refresh policy with accurate eligibility determinations
-- **Option Presentation**: Presents appropriate laptop options based on user location
-- **Process Completion**: Completes flow (eligibility → options → selection → ticket creation)
-- **User Experience**: Maintains helpfulness, professionalism, clarity
-- **Flow Termination**: Ends with ticket number or DONEDONEDONE
-- **Ticket Number Validation**: ServiceNow format (REQ prefix)
-- **Correct Eligibility Validation**: Accurate 3-year policy timeframe
-- **No Errors Reported**: No system problems
-- **Correct Laptop Options for Location**: All location-specific models presented
-- **Confirmation Before Ticket Creation**: Agent asks user confirmation (no-employee-id flow)
-- **Employee ID Requested**: Agent requests employee ID (standard flow)
-
----
-
-## 5. HANDS-ON QUICKSTART
+## 3. HANDS-ON QUICKSTART
 
 This section walks you through deploying and testing the laptop refresh agent on OpenShift.
 
-### 5.1 Deploy to OpenShift
+### 3.1 Deploy to OpenShift
 
 #### Step 1: Choose Your Deployment Mode
 
@@ -606,6 +287,8 @@ For first deployment, we recommend **Testing Mode (Mock Eventing)**:
 - Tests event-driven patterns
 - Simpler than production infrastructure
 
+For detailed information about deployment modes, see the [Deployment Mode Guide](guides/DEPLOYMENT_MODE_GUIDE.md).
+
 #### Step 2: Set Required Environment Variables
 
 ```bash
@@ -613,7 +296,7 @@ For first deployment, we recommend **Testing Mode (Mock Eventing)**:
 export NAMESPACE=your-namespace
 
 # Set LLM configuration
-export LLM=llama-3-2-1b-instruct
+export LLM=llama-3-3-70b-instruct-w8a8
 export LLM_API_TOKEN=your-api-token
 export LLM_URL=https://your-llm-endpoint
 
@@ -621,8 +304,6 @@ export LLM_URL=https://your-llm-endpoint
 export SLACK_SIGNING_SECRET=your-slack-secret  # Optional
 export SNOW_API_KEY=your-servicenow-key       # Optional
 
-# Set container registry (if using custom builds)
-export REGISTRY=quay.io/your-org
 ```
 
 #### Step 3: Build Container Images (Optional)
@@ -631,6 +312,10 @@ If using pre-built images, skip this step.
 
 ```bash
 # Build all images
+# Set container registry make sure this is set when you run
+# helm-install-test in later steps
+export REGISTRY=quay.io/your-org
+
 make build-all-images
 
 # Push to registry
@@ -675,35 +360,20 @@ oc get routes -n $NAMESPACE
 - Routes accessible
 - Agent service initialization completed successfully
 
-#### Step 6: Test the Deployment
-
-```bash
-# Get the request manager route
-export REQUEST_MANAGER_URL=$(oc get route request-manager -n $NAMESPACE -o jsonpath='{.spec.host}')
-
-# Send test request
-curl -X POST https://$REQUEST_MANAGER_URL/api/v1/requests \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "Hello, I need help with my laptop",
-    "user_id": "test-user",
-    "integration_type": "cli"
-  }'
-```
-
-**Expected outcome:** Agent greeting response
-
 **You should now be able to:**
 - ✓ Deploy the system to OpenShift
-- ✓ Access agents via public routes
 - ✓ Monitor pods and services
 - ✓ Troubleshoot deployment issues
 
 ---
 
-### 5.2 Interact with the CLI
+### 3.2 Interact with the CLI
 
 Now that the system is deployed, let's interact with the agent through the CLI to test a complete laptop refresh workflow.
+
+A key design philosophy of this quickstart is to "meet employees where they are." Rather than creating new communication channels, the system integrates with existing tools like Slack and Email through a general request manager. This allows employees to interact using the communication platforms they already know and use daily.
+
+For initial testing and evaluation purposes, the quickstart includes a simple command line interface (CLI). We'll use the CLI for these first interactions to verify the system works correctly.
 
 #### Step 1: Start Interactive Chat Session
 
@@ -784,7 +454,7 @@ oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
 
 ---
 
-### 5.3 Integration with Slack (Optional)
+### 3.3 Integration with Slack (Optional)
 
 Slack integration enables real-world testing with actual users in your workspace.
 
@@ -849,7 +519,7 @@ In your Slack workspace:
 
 ---
 
-### 5.4 Integration with Real ServiceNow (Optional)
+### 3.4 Integration with Real ServiceNow (Optional)
 
 By default, the system uses mock ServiceNow data. To integrate with your actual ServiceNow instance see the following docs for full details. The sections which follow walk you through the streamlined processes for setting up and using a ServiceNow instance.
 - [ServiceNow PDI Bootstrap - Automated Setup](guides/SERVICE_NOW_BOOTSTRAP_AUTOMATED.md) - for a guide to automated ServiceNow Bootstrap (recommended)
@@ -926,7 +596,7 @@ Log into your ServiceNow instance and verify:
 
 ---
 
-### 5.5 Integration with Email (Optional)
+### 3.5 Integration with Email (Optional)
 
 Email integration enables two-way communication with the AI agent through email, allowing users to interact with the system via their email client.
 
@@ -1019,7 +689,7 @@ Reply to the agent's email to test conversation threading:
 
 ---
 
-### 5.6 Setting up Safety Shields (Optional)
+### 3.6 Setting up Safety Shields (Optional)
 
 Safety shields provide content moderation for AI agent interactions, validating user input and agent responses against safety policies using Llama Guard 3 or compatible models.
 
@@ -1045,7 +715,9 @@ Safety shields require an OpenAI-compatible moderation API endpoint:
 ```bash
 # Deploy with safety shields enabled
 make helm-install-test NAMESPACE=$NAMESPACE \
-  LLM=llama-3-2-1b-instruct \
+  LLM=llama-3-3-70b-instruct-w8a8
+  LLM_API_TOKEN=your-api-token
+  LLM_URL=https://your-llm-endpoint
   SAFETY=meta-llama/Llama-Guard-3-8B \
   SAFETY_URL=https://api.example.com/v1
 ```
@@ -1119,9 +791,16 @@ For comprehensive safety shields documentation, see the [Safety Shields Guide](g
 
 ---
 
-### 5.7 Run Evaluations
+### 3.7 Run Evaluations
 
-The evaluation framework validates agent behavior against business requirements and quality metrics.
+The evaluation framework validates agent behavior against business requirements and quality metrics. Generative AI agents are non-deterministic by nature, meaning their responses can vary across conversations even with identical inputs. Multiple different responses can all be "correct," making traditional software testing approaches insufficient. This probabilistic behavior creates unique challenges:
+
+- **Sensitivity to Change**: Small changes to prompts, models, or configurations can introduce subtle issues that are difficult to manually identify
+- **Business Requirements**: Agents must validate business-specific requirements such as policy compliance and information gathering
+- **Quality Assurance**: Ensures agents meet quality standards before deployment and catch regressions during updates
+- **Continuous Iteration**: Provides automated validation as you develop and iterate on your agentic IT process implementations
+
+The evaluation framework addresses these challenges by combining predefined test conversations with AI-generated scenarios, applying metrics to assess both conversational quality and business process compliance. This was a crucial tool in the development of this quickstart, enabling PR validation, model comparison, prompt evaluation, and identification of common conversation failures.
 
 #### Step 1: Configure Evaluation Environment
 
@@ -1195,13 +874,27 @@ cat results/deep_eval_results/deepeval_all_results.json
 ```
 
 **Key metrics to review:**
-- **Information Gathering**: Did agent collect required data? (Target: > 0.8)
-- **Policy Compliance**: Did agent follow 3-year refresh policy correctly? (Target: > 0.9)
-- **Option Presentation**: Were laptop options shown correctly? (Target: > 0.8)
-- **Process Completion**: Were tickets created successfully? (Target: > 0.85)
-- **User Experience**: Was agent helpful and clear? (Target: > 0.8)
-- **Correct Laptop Options for Location**: All region-specific models presented? (Target: 1.0)
-- **Ticket Number Validation**: ServiceNow format (REQ prefix)? (Target: 1.0)
+
+Standard Conversational Metrics:
+- **Turn Relevancy**: Are responses relevant to user messages? (Threshold: > 0.8)
+- **Role Adherence**: Do agents stay within their roles? (Threshold: > 0.5)
+- **Conversation Completeness**: Were all user requests addressed? (Threshold: > 0.8)
+
+Laptop Refresh Process Metrics:
+- **Information Gathering**: Did agent collect required data? (Threshold: > 0.8)
+- **Policy Compliance**: Did agent follow 3-year refresh policy correctly? (Threshold: > 0.8)
+- **Option Presentation**: Were laptop options shown correctly? (Threshold: > 0.8)
+- **Process Completion**: Were tickets created successfully? (Threshold: > 0.8)
+- **User Experience**: Was agent helpful and clear? (Threshold: > 0.8)
+
+Quality Assurance Metrics:
+- **Flow Termination**: Does conversation end properly? (Threshold: > 0.8)
+- **Ticket Number Validation**: ServiceNow format (REQ prefix)? (Threshold: 1.0)
+- **Correct Eligibility Validation**: Accurate 3-year policy timeframe? (Threshold: 1.0)
+- **No Errors Reported**: No system problems? (Threshold: 1.0)
+- **Correct Laptop Options for Location**: All region-specific models presented? (Threshold: 1.0)
+- **Confirmation Before Ticket Creation**: Agent requests approval before creating ticket? (Threshold: 1.0)
+- **Return to Router After Task Completion**: Proper routing when user says no? (Threshold: > 0.5)
 
 #### Step 6: Run Complete Evaluation Pipeline
 
@@ -1229,13 +922,17 @@ python evaluate.py --num-conversations 5
 
 ---
 
-### 5.8 Follow the Flow with Tracing
+### 3.8 Follow the Flow with Tracing
 
-When users or systems interact with an application, the underlying architecture processes requests that often involve coordination across multiple services to generate responses.
+Agentic systems involve complex interactions between multiple components—routing agents, specialist agents, knowledge bases, MCP servers, and external systems—making production debugging challenging without proper visibility. Distributed tracing addresses these challenges by providing:
 
-Distributed tracing connects individual work units (known as spans) — typically running across separate processes or machines — enabling visibility into the complete sequence of operations within a distributed transaction. Spans can be hierarchically structured and sequenced to represent cause-and-effect relationships.
+- **End-to-End Request Visibility**: Track the complete lifecycle of requests as they flow through Request Manager → Agent Service → Llama Stack → MCP Servers → External APIs
+- **Agent Handoff Monitoring**: Understand how routing agents hand off sessions to specialist agents and trace the decision-making process
+- **Performance Analysis**: Identify bottlenecks in the request flow, measure LLM inference time, and optimize knowledge base queries
+- **Production Debugging**: Diagnose failed external system integrations, understand conversation routing issues, and troubleshoot ticket creation failures
+- **User Interaction Patterns**: Analyze how users interact with the system across different channels and identify common conversation paths
 
-The system includes OpenTelemetry support for distributed tracing across all components, enabling you to track requests end-to-end: Request Manager, Agent Service, Integration Dispatcher, MCP Servers, and Llama Stack.
+The system includes OpenTelemetry support for distributed tracing across all components, enabling you to track requests end-to-end through Request Manager, Agent Service, Integration Dispatcher, MCP Servers, and Llama Stack. By integrating with OpenShift's observability stack, you gain unified monitoring across all platform components alongside your existing infrastructure metrics.
 
 #### Setting up Observability Infrastructure
 
@@ -1364,7 +1061,7 @@ All operations share the same trace ID, creating a complete distributed trace.
 
 ---
 
-## 6. PERFORMANCE & SCALING
+## 4. PERFORMANCE & SCALING
 
 The Self-Service Agent quickstart is designed for scalability using standard Kubernetes and cloud-native patterns. All core components can be scaled using familiar Kubernetes techniques—horizontal pod autoscaling, replica sets, and resource limits—without requiring custom scaling logic or architectural changes.
 
@@ -1378,87 +1075,48 @@ For comprehensive scaling guidance, detailed performance characteristics, compon
 
 ---
 
-## 7. GOING DEEPER: COMPONENT DOCUMENTATION
+## 5. GOING DEEPER: COMPONENT DOCUMENTATION
 
-Now that you have the system running, dive deeper into each component.
+Now that you have the system running, you can dive deeper into specific components and concepts.
 
-### 7.1 Core Platform
+For detailed component information, see the [Component Guide](guides/COMPONENT_GUIDE.md).
 
-**Request Manager**
-- Full documentation: `request-manager/README.md`
-- Topics: Session management, request normalization, routing logic
+### Guides
 
-**Agent Service**
-- Full documentation: `agent-service/README.md` (TBD)
-- Topics: LlamaStack integration, tool calling, streaming responses
+Step-by-step guides for integrations, deployment, and advanced features:
 
-**Integration Dispatcher**
-- Full documentation: `integration-dispatcher/README.md` (TBD)
-- Topics: Multi-channel delivery, integration handlers, user overrides
+- [Component Overview](guides/COMPONENT_GUIDE.md) - Comprehensive guide to all system components
+- [Deployment Modes](guides/DEPLOYMENT_MODE_GUIDE.md) - Understanding testing vs production deployment modes
+- [Evaluation Framework](guides/EVALUATIONS_GUIDE.md) - Comprehensive evaluation framework documentation
+- [Slack Integration](guides/SLACK_SETUP.md) - Set up Slack integration
+- [Email Integration](guides/EMAIL_SETUP.md) - Configure email integration
+- [ServiceNow Setup (Automated)](guides/SERVICE_NOW_BOOTSTRAP_AUTOMATED.md) - Automated ServiceNow configuration
+- [ServiceNow Setup (Manual)](guides/SERVICE_NOW_BOOTSTRAP_MANUAL.md) - Manual ServiceNow configuration
+- [Safety Shields](guides/SAFETY_SHIELDS_GUIDE.md) - Content moderation and safety configuration
+- [Performance & Scaling](guides/PERFORMANCE_SCALING_GUIDE.md) - Scaling guidance and best practices
+- [Authentication](guides/AUTHENTICATION_GUIDE.md) - Authentication patterns and configuration
+- [Integration Development](guides/INTEGRATION_GUIDE.md) - Building custom integrations
+- [Tool Integration](guides/TOOL_INTEGRATION_GUIDE.md) - Adding MCP server tools
 
-**Shared Libraries**
-- Full documentation: [`shared-clients/README.md`](shared-clients/README.md)
-- `shared-models`: Database models, schemas, migrations
-- `shared-clients`: HTTP client implementations
+### Technical Documentation
 
----
+Detailed technical documentation for developers:
 
-### 7.2 Agent Configuration
-
-**Agent Service**
-- Topics: Agent registration, knowledge base creation, LangGraph state machine
-
-**Agent Configurations**
-- Directory: `agent-service/config/agents/`
-- Examples: `routing-agent.yaml`, `laptop-refresh.yaml`
-
-**Prompt Configuration**
-- Full documentation: [`docs/PROMPT_CONFIGURATION_GUIDE.md`](docs/PROMPT_CONFIGURATION_GUIDE.md)
-- Topics: System prompts, few-shot examples, prompt engineering
-
-**Knowledge Bases**
-- Directory: `agent-service/config/knowledge_bases/`
-- Structure: One directory per knowledge base
-- Format: `.txt` files automatically indexed
-
-**MCP Servers**
-- Full documentation: [`mcp-servers/snow/README.md`](mcp-servers/snow/README.md)
-- Topics: ServiceNow integration, tool implementation
+- [Prompt Configuration](docs/PROMPT_CONFIGURATION_GUIDE.md) - Agent prompt engineering guide
+- [Tracing Implementation](docs/TRACING_IMPLEMENTATION.md) - OpenTelemetry tracing details
+- [Architecture Diagrams](docs/ARCHITECTURE_DIAGRAMS.md) - System architecture diagrams
+- [API Reference](docs/API_REFERENCE.md) - API documentation
+- [Contributing Guide](docs/CONTRIBUTING.md) - Development setup and contribution guidelines
+- [Development Guidelines](docs/GUIDELINES.md) - Code standards and best practices
 
 ---
 
-### 7.3 External Integrations
 
-**Slack Setup**
-- Full documentation: [`guides/SLACK_SETUP.md`](guides/SLACK_SETUP.md)
-- Topics: App creation, OAuth, event subscriptions
-
-**Email Setup**
-- Full documentation: [`guides/EMAIL_SETUP.md`](guides/EMAIL_SETUP.md)
-- Topics: SMTP configuration, IMAP polling, email threading
-
-**ServiceNow Integration**
-- (Documentation TBD)
-
----
-
-### 7.4 Quality & Operations
-
-**Evaluation Framework**
-- Full documentation: [`evaluations/README.md`](evaluations/README.md)
-- Topics: Conversation flows, metrics, generation, pipeline
-
-**Observability**
-- Full documentation: `tracing-config/README.md` (TBD)
-- Topics: OpenTelemetry, Jaeger, distributed tracing
-
----
-
-## 8. CUSTOMIZING FOR YOUR USE CASE
+## 6. CUSTOMIZING FOR YOUR USE CASE
 
 The laptop refresh example demonstrates all components. This section guides you in adapting the quickstart for your own IT process.
 
-### 8.1 Planning Your Use Case
+### Planning Your Use Case
 
 #### Step 1: Define Your IT Process
 
@@ -1525,9 +1183,9 @@ How will you evaluate the agent?
 - Did generated PIA meet compliance standards?
 - Was submission successful?
 
-## 9. NEXT STEPS AND ADDITIONAL RESOURCES
+## 7. NEXT STEPS AND ADDITIONAL RESOURCES
 
-### 9.1 What You've Accomplished
+### 7.1 What You've Accomplished
 
 By completing this quickstart, you have:
 
@@ -1537,11 +1195,11 @@ By completing this quickstart, you have:
 - ✓ Run evaluations to validate agent behavior
 - ✓ Learned how to customize the system for your own use cases
 
-### 9.2 Recommended Next Steps
+### 7.2 Recommended Next Steps
 
 **For Development Teams:**
 1. Review the [Contributing Guide](docs/CONTRIBUTING.md) for development setup and workflow
-2. Explore the component documentation in Section 7 for deeper technical details
+2. Explore the component documentation in Section 5 for deeper technical details
 3. Review the evaluation framework to understand quality metrics
 4. Experiment with customizing the laptop refresh agent prompts
 5. Set up observability and monitoring for your deployment
@@ -1553,8 +1211,8 @@ By completing this quickstart, you have:
 4. Plan integration with your existing IT service management systems
 
 **For Customizing to Your Use Case:**
-1. Follow the planning guide in Section 8.1
-2. Review the laptop refresh implementation as a reference (Section 4.2)
+1. Follow the planning guide in Section 6
+2. Review the laptop refresh implementation as a reference in the [Component Guide](guides/COMPONENT_GUIDE.md)
 3. Start with agent configuration and knowledge base development
 4. Build MCP servers for your external systems
 5. Develop use-case-specific evaluation metrics
