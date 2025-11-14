@@ -79,7 +79,7 @@ def _evaluate_conversations(
     results_dir: str = "results/conversation_results",
     output_dir: str = "results/deep_eval_results",
     context_dir: Optional[str] = None,
-    validate_full_laptop_details: bool = False,
+    validate_full_laptop_details: bool = True,
 ) -> int:
     """
     Main evaluation function that processes conversation files and generates assessment reports.
@@ -438,12 +438,19 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--validate-full-laptop-details",
         action="store_true",
-        default=False,
-        help="Enable validation that all 15 laptop specification fields are presented (default: False). "
-        "When enabled, enhances the 'Correct laptop options for user location' metric to verify "
+        dest="validate_full_laptop_details",
+        default=True,
+        help="Enable validation that all 15 laptop specification fields are presented (default: True). "
+        "The 'Correct laptop options for user location' metric verifies "
         "complete laptop specifications including: Manufacturer, Model, ServiceNow Code, Target User, "
         "Cost, Operating System, Display Size, Display Resolution, Graphics Card, Minimum Storage, "
         "Weight, Ports, Minimum Processor, Minimum Memory, and Dimensions.",
+    )
+    parser.add_argument(
+        "--no-validate-full-laptop-details",
+        action="store_false",
+        dest="validate_full_laptop_details",
+        help="Disable validation of the 15 laptop specification fields.",
     )
 
     return parser.parse_args()

@@ -547,18 +547,25 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--validate-full-laptop-details",
         action="store_true",
-        default=False,
-        help="Enable validation that all 15 laptop specification fields are presented (default: False). "
-        "When enabled, adds a metric to verify complete laptop specifications including: "
+        dest="validate_full_laptop_details",
+        default=True,
+        help="Enable validation that all 15 laptop specification fields are presented (default: True). "
+        "Validates complete laptop specifications including: "
         "Manufacturer, Model, ServiceNow Code, Target User, Cost, Operating System, Display Size, "
         "Display Resolution, Graphics Card, Minimum Storage, Weight, Ports, Minimum Processor, "
         "Minimum Memory, and Dimensions.",
+    )
+    parser.add_argument(
+        "--no-validate-full-laptop-details",
+        action="store_false",
+        dest="validate_full_laptop_details",
+        help="Disable validation of the 15 laptop specification fields.",
     )
     return parser.parse_args()
 
 
 def run_check_known_bad_conversations(
-    timeout: int = 600, validate_full_laptop_details: bool = False
+    timeout: int = 600, validate_full_laptop_details: bool = True
 ) -> int:
     """
     Check known bad conversations by running deepeval on them.
@@ -569,7 +576,7 @@ def run_check_known_bad_conversations(
 
     Args:
         timeout: Timeout in seconds for deepeval execution
-        validate_full_laptop_details: Enable validation of all 15 laptop specification fields (default: False)
+        validate_full_laptop_details: Enable validation of all 15 laptop specification fields (default: True)
 
     Returns:
         Exit code (0 if all known bad conversations failed as expected, 1 otherwise)
@@ -601,6 +608,8 @@ def run_check_known_bad_conversations(
     deep_eval_args = ["--results-dir", "results/known_bad_conversation_results"]
     if validate_full_laptop_details:
         deep_eval_args.append("--validate-full-laptop-details")
+    else:
+        deep_eval_args.append("--no-validate-full-laptop-details")
     # For the check option, we want to run deep_eval and analyze the results
     # even if it returns a non-zero exit code (which indicates it found issues)
     run_script("deep_eval.py", args=deep_eval_args, timeout=timeout)
@@ -835,7 +844,7 @@ def run_evaluation_pipeline(
     reset_conversation: bool = False,
     concurrency: int = 1,
     message_timeout: int = 60,
-    validate_full_laptop_details: bool = False,
+    validate_full_laptop_details: bool = True,
 ) -> int:
     """
     Run the complete evaluation pipeline.
@@ -854,7 +863,7 @@ def run_evaluation_pipeline(
         reset_conversation: Send 'reset' message at the start of each conversation
         concurrency: Number of parallel workers for generator.py (default: 1)
         message_timeout: Timeout for individual message send/response operations (default: 60)
-        validate_full_laptop_details: Enable validation of all 15 laptop specification fields (default: False)
+        validate_full_laptop_details: Enable validation of all 15 laptop specification fields (default: True)
 
     Returns:
         Exit code (0 for success, 1 for any failures)
@@ -920,6 +929,8 @@ def run_evaluation_pipeline(
     deep_eval_args: list[str] = []
     if validate_full_laptop_details:
         deep_eval_args.append("--validate-full-laptop-details")
+    else:
+        deep_eval_args.append("--no-validate-full-laptop-details")
     if not run_script("deep_eval.py", args=deep_eval_args, timeout=timeout):
         failed_steps.append("deep_eval.py")
         logger.error("❌ Step 3 failed")

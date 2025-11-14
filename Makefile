@@ -57,9 +57,10 @@ USE_REAL_SERVICENOW ?= false
 SERVICENOW_LAPTOP_REFRESH_ID ?=
 
 # Evaluation Configuration
-# If LG_PROMPT_LAPTOP_REFRESH is NOT set, enable full laptop details validation
-# This ensures validation is strict when using default prompts
-VALIDATE_LAPTOP_DETAILS_FLAG := $(if $(LG_PROMPT_LAPTOP_REFRESH),,--validate-full-laptop-details)
+# Enable full laptop details validation by default unless explicitly disabled
+# Set VALIDATE_FULL_LAPTOP_DETAILS=false to disable validation
+VALIDATE_FULL_LAPTOP_DETAILS ?= true
+VALIDATE_LAPTOP_DETAILS_FLAG := $(if $(filter true,$(VALIDATE_FULL_LAPTOP_DETAILS)),--validate-full-laptop-details,--no-validate-full-laptop-details)
 
 # Export to shell so kubectl can access them
 export SERVICENOW_INSTANCE_URL
@@ -254,8 +255,11 @@ help:
 	@echo "      LG_PROMPT_ROUTING               - Override routing agent"
 	@echo "      LG_PROMPT_EMAIL_UPDATE          - Override email-update agent"
 	@echo "    Usage: make helm-install-test LG_PROMPT_LAPTOP_REFRESH=config/lg-prompts/custom.yaml"
-	@echo "    Note: When LG_PROMPT_LAPTOP_REFRESH is NOT set, integration tests automatically enable"
-	@echo "          --validate-full-laptop-details to ensure strict validation with default prompts"
+	@echo ""
+	@echo "  Evaluation Configuration:"
+	@echo "    VALIDATE_FULL_LAPTOP_DETAILS    - Enable full laptop details validation (default: true)"
+	@echo "                                        Set to 'false' to disable: VALIDATE_FULL_LAPTOP_DETAILS=false"
+	@echo "                                        When enabled, integration tests validate all laptop specification fields"
 
 # Build function: $(call build_image,IMAGE_NAME,DESCRIPTION,CONTAINERFILE_PATH,BUILD_CONTEXT)
 define build_image
