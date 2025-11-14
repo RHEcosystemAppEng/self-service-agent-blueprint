@@ -1344,7 +1344,7 @@ Or its graph representation:
 
 #### Understanding Trace Context Propagation
 
-The system implements end-to-end trace context propagation:
+The system implements end-to-end trace [context propagation](https://opentelemetry.io/docs/concepts/context-propagation/):
 
 1. **Client → Request Manager**: Automatic via FastAPI instrumentation
 2. **Request Manager → Agent Service**: Automatic via HTTP client instrumentation
