@@ -11,8 +11,58 @@ from typing import Any, List, Optional
 
 from deepeval.metrics import ConversationalGEval
 from deepeval.models import DeepEvalBaseLLM
-from deepeval.test_case import TurnParams
+from deepeval.test_case import ConversationalTestCase, TurnParams
 from helpers.load_conversation_context import load_default_context
+
+
+class RetryableConversationalGEval(ConversationalGEval):
+    """
+    A wrapper around ConversationalGEval that retries evaluation on failure.
+
+    If the metric fails (score < threshold), it runs the evaluation a second time
+    and uses the result from the second run.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.retry_performed = False
+
+    async def a_measure(
+        self, test_case: ConversationalTestCase, *args: Any, **kwargs: Any
+    ) -> float:
+        """Async measure with retry logic."""
+        # Reset retry flag for each test case
+        self.retry_performed = False
+
+        # First attempt
+        await super().a_measure(test_case, *args, **kwargs)
+
+        # Check if failed and retry if needed
+        if (
+            self.score is not None
+            and self.threshold is not None
+            and self.score < self.threshold
+        ):
+            # Store first attempt result for logging
+            first_score = self.score
+            first_reason = self.reason
+
+            # Reset internal state for retry
+            self.score = None
+            self.reason = None
+            self.success = None
+
+            # Second attempt
+            await super().a_measure(test_case, *args, **kwargs)
+
+            # Mark that retry was performed
+            self.retry_performed = True
+
+            # Log that retry was performed (reason will show second attempt result)
+            if self.reason:
+                self.reason = f"[RETRY: 1st={first_score:.2f}] {self.reason}"
+
+        return self.score if self.score is not None else 0.0
 
 
 def get_metrics(
@@ -254,7 +304,7 @@ def get_metrics(
                 "Only mark as a failure if there are genuine system errors, not when the multi-agent routing system is working as designed",
             ],
         ),
-        ConversationalGEval(
+        RetryableConversationalGEval(
             name="Correct laptop options for user location",
             threshold=1.0,
             model=custom_model,

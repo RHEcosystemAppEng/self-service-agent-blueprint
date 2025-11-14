@@ -59,6 +59,9 @@ def extract_metrics_from_results(
                                 metric_data, "reason", "No reason provided"
                             )
                             metric_threshold = getattr(metric_data, "threshold", 0.5)
+                            metric_retry_performed = getattr(
+                                metric_data, "retry_performed", False
+                            )
 
                             extracted_metrics.append(
                                 {
@@ -71,6 +74,7 @@ def extract_metrics_from_results(
                                     "success": bool(metric_success),
                                     "reason": str(metric_reason),
                                     "threshold": float(metric_threshold),
+                                    "retry_performed": bool(metric_retry_performed),
                                 }
                             )
                             logger.debug(

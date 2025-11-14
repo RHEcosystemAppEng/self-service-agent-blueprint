@@ -122,15 +122,25 @@ def print_final_summary(
                     m for m in metrics_results if not m.get("success", False)
                 ]
 
+                # Check if any retries were performed
+                retry_count = sum(
+                    1 for m in metrics_results if m.get("retry_performed", False)
+                )
+
                 conversation_passed = len(failed_metrics) == 0
                 if not conversation_passed:
                     all_conversations_passed = False
 
                 status_icon = "✅" if conversation_passed else "❌"
+                retry_indicator = (
+                    f" ({retry_count} retry)"
+                    if retry_count == 1
+                    else f" ({retry_count} retries)" if retry_count > 1 else ""
+                )
                 print(
                     f"   {status_icon} {filename}: {
                         len(passed_metrics)}/{
-                        len(metrics_results)} metrics passed"
+                        len(metrics_results)} metrics passed{retry_indicator}"
                 )
 
                 # Show failed metrics for failed conversations

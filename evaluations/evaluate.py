@@ -729,16 +729,21 @@ def run_check_known_bad_conversations(
                     passed_metrics
                 )
 
+                # Check if any retries were performed
+                retry_count = sum(
+                    1 for m in metrics_results if m.get("retry_performed", False)
+                )
+
                 # Categorize conversations
                 # A conversation is "passing" only if ALL metrics passed (no failures)
                 # A conversation is "failing" if ANY metric failed
                 if len(failed_metrics) == 0:
                     passing_conversations.append(
-                        (filename, passed_metrics, metrics_results)
+                        (filename, passed_metrics, metrics_results, retry_count)
                     )
                 else:
                     failing_conversations.append(
-                        (filename, failed_metrics, metrics_results)
+                        (filename, failed_metrics, metrics_results, retry_count)
                     )
 
                 status_icon = "❌" if conversation_failed_as_expected else "⚠️"
@@ -768,18 +773,38 @@ def run_check_known_bad_conversations(
 
     if passing_conversations:
         print("\n✅ PASSING CONVERSATIONS:")
-        for filename, passed_metrics, total_metrics in passing_conversations:
+        for (
+            filename,
+            passed_metrics,
+            total_metrics,
+            retry_count,
+        ) in passing_conversations:
             pass_rate = len(passed_metrics) / len(total_metrics) * 100
+            retry_indicator = (
+                f" ({retry_count} retry)"
+                if retry_count == 1
+                else f" ({retry_count} retries)" if retry_count > 1 else ""
+            )
             print(
-                f"   • {filename}: {len(passed_metrics)}/{len(total_metrics)} metrics passed ({pass_rate:.1f}%)"
+                f"   • {filename}: {len(passed_metrics)}/{len(total_metrics)} metrics passed ({pass_rate:.1f}%){retry_indicator}"
             )
 
     if failing_conversations:
         print("\n❌ FAILING CONVERSATIONS:")
-        for filename, failed_metrics, total_metrics in failing_conversations:
+        for (
+            filename,
+            failed_metrics,
+            total_metrics,
+            retry_count,
+        ) in failing_conversations:
             fail_rate = len(failed_metrics) / len(total_metrics) * 100
+            retry_indicator = (
+                f" ({retry_count} retry)"
+                if retry_count == 1
+                else f" ({retry_count} retries)" if retry_count > 1 else ""
+            )
             print(
-                f"   • {filename}: {len(failed_metrics)}/{len(total_metrics)} metrics failed ({fail_rate:.1f}%)"
+                f"   • {filename}: {len(failed_metrics)}/{len(total_metrics)} metrics failed ({fail_rate:.1f}%){retry_indicator}"
             )
 
     # Show LLM evaluation failures
