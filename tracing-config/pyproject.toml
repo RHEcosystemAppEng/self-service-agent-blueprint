@@ -1,8 +1,7 @@
 [project]
 name = "tracing-config"
 version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
+description = "OpenTelemetry tracing configuration utilities for the Self-Service Agent system"
 authors = [
     { name = "Fabio Massimo Ercoli", email = "fabiomassimo.ercoli@gmail.com" }
 ]
