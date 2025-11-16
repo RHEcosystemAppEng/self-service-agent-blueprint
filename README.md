@@ -711,7 +711,7 @@ Use the CLI chat script to start an interactive conversation with the agent:
 
 ```bash
 # Get the request manager pod
-export REQUEST_MANAGER_POD=$(oc get pod -n $NAMESPACE -l app=request-manager -o jsonpath='{.items[0].metadata.name}')
+export REQUEST_MANAGER_POD=$(oc get pod -n $NAMESPACE -l app=self-service-agent-request-manager -o jsonpath='{.items[0].metadata.name}')
 
 # Start interactive chat session
 oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
