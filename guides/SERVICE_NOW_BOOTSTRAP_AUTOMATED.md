@@ -143,7 +143,7 @@ This will test:
 - Catalog Order endpoint authentication
 
 ### 7. Create mock evaluation users (optional)
-If you'd like to create test data that match mock data you may use [create_evaluation_users.py](../mcp-servers/snow/src/snow/data/create_evaluation_users.py). 
+If you'd like to create test data that match mock data you may use [create_evaluation_users.py](../scripts/servicenow-bootstrap/src/servicenow_bootstrap/create_evaluation_users.py). 
 - Currently this script needs to be run independently of the ServiceNow bootstrap
 - In the future this script will be integrated into the bootstrap
 

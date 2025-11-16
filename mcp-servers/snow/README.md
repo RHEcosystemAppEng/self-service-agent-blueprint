@@ -128,7 +128,6 @@ snow/
 - `SELF_SERVICE_AGENT_SNOW_SERVER_SERVICE_PORT_HTTP`: HTTP port (default: 8001)
 - `MCP_HOST`: Host address (default: "0.0.0.0")
 - `SERVICENOW_INSTANCE_URL`: ServiceNow instance URL (e.g., "https://dev295439.service-now.com/")
-- `USE_REAL_SERVICENOW`: if set to "true" will attempt to call the APIs of `SERVICENOW_INSTANCE_URL` (default: false)
 - `SERVICENOW_API_KEY`: ServiceNow API key
 - `SERVICENOW_API_KEY_HEADER`: Custom header name for API key (default: "x-sn-apikey")
 

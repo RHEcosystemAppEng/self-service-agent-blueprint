@@ -12,6 +12,7 @@ image:
   agentService: self-service-agent-service
   integrationDispatcher: self-service-agent-integration-dispatcher
   mockEventing: self-service-agent-mock-eventing
+  mockServiceNow: self-service-agent-mock-servicenow
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
@@ -204,8 +205,6 @@ mcp-servers:
       imagePullPolicy: Always
       env:
         MCP_TRANSPORT: "streamable-http"
-        USE_REAL_SERVICENOW: "false"
-        SERVICENOW_LAPTOP_REFRESH_ID: ""
         # Number of uvicorn worker processes (stateless-http allows multiple workers)
         # Note: The mcp-servers chart doesn't auto-convert uvicornWorkers field to env var,
         # so we set it directly in the env section
@@ -221,6 +220,28 @@ mcp-servers:
 # Enable/disable the llm-service dependency
 llm-service:
   enabled: true
+
+# Mock ServiceNow Server Configuration (for testing and development)
+mockServiceNow:
+  enabled: true  # Default to enabled for development and testing
+  replicas: 1
+  logLevel: "INFO"
+  uvicornWorkers: 1  # Single worker sufficient for mock server
+  resources: {}
+  # Health check configuration
+  healthChecks:
+    livenessProbe:
+      initialDelaySeconds: 15
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+    readinessProbe:
+      initialDelaySeconds: 5
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
 
 # Request Management Layer Configuration
 requestManagement:

@@ -860,9 +860,8 @@ By default, the system uses mock ServiceNow data. To integrate with your actual 
 ```bash
 # Set ServiceNow configuration
 export SERVICENOW_INSTANCE_URL=https://your-instance.service-now.com
-export SERVICENOW_USERNAME=your-servicenow-username
-export SERVICENOW_PASSWORD=your-servicenow-password
-export USE_REAL_SERVICENOW=true
+export SERVICENOW_API_KEY=your-servicenow-api-key
+export SERVICENOW_LAPTOP_REFRESH_ID=your-servicenow-laptop-refresh-id
 
 # Upgrade Helm deployment
 make helm-upgrade NAMESPACE=$NAMESPACE

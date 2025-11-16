@@ -18,6 +18,7 @@ AGENT_SERVICE_IMG ?= $(REGISTRY)/self-service-agent-service:$(VERSION)
 INTEGRATION_DISPATCHER_IMG ?= $(REGISTRY)/self-service-agent-integration-dispatcher:$(VERSION)
 MCP_SNOW_IMG ?= $(REGISTRY)/self-service-agent-snow-mcp:$(VERSION)
 MOCK_EVENTING_IMG ?= $(REGISTRY)/self-service-agent-mock-eventing:$(VERSION)
+MOCK_SERVICENOW_IMG ?= $(REGISTRY)/self-service-agent-mock-servicenow:$(VERSION)
 
 MAKEFLAGS += --no-print-directory
 
@@ -50,11 +51,10 @@ endif
 # Check if Slack should be enabled
 SLACK_ENABLED := $(if $(and $(SLACK_BOT_TOKEN),$(SLACK_SIGNING_SECRET)),true,false)
 
-# ServiceNow Configuration
-SERVICENOW_INSTANCE_URL ?=
-SERVICENOW_API_KEY ?=
-USE_REAL_SERVICENOW ?= false
-SERVICENOW_LAPTOP_REFRESH_ID ?=
+# ServiceNow Configuration (use mocks by default)
+SERVICENOW_INSTANCE_URL ?= http://self-service-agent-mock-servicenow:8080
+SERVICENOW_API_KEY ?= now_mock_api_key
+SERVICENOW_LAPTOP_REFRESH_ID ?= mock_laptop_refresh_id
 
 # Evaluation Configuration
 # If LG_PROMPT_LAPTOP_REFRESH is NOT set, enable full laptop details validation
@@ -131,6 +131,7 @@ help:
 	@echo "  build-integration-dispatcher-image   - Build the integration dispatcher container image (checks lockfiles first)"
 	@echo "  build-mcp-snow-image                 - Build the snow MCP server container image (checks lockfiles first)"
 	@echo "  build-mock-eventing-image            - Build the mock eventing service container image (checks lockfiles first)"
+	@echo "  build-mock-servicenow-image          - Build the mock ServiceNow server container image (checks lockfiles first)"
 	@echo "  build-request-mgr-image              - Build the request manager container image (checks lockfiles first)"
 	@echo ""
 	@echo "Helm Commands:"
@@ -154,6 +155,8 @@ help:
 	@echo "  install-shared-models               - Install dependencies for shared models"
 	@echo "  install-shared-clients              - Install dependencies for shared clients"
 	@echo "  install-servicenow-bootstrap       - Install dependencies for ServiceNow automation scripts"
+	@echo "  install-mock-employee-data          - Install dependencies for mock employee data"
+	@echo "  install-mock-servicenow             - Install dependencies for mock ServiceNow"
 	@echo ""
 	@echo "Reinstall Commands:"
 	@echo "  reinstall-all                       - Force reinstall dependencies for all projects (uv sync --reinstall)"
@@ -165,6 +168,8 @@ help:
 	@echo "  reinstall-shared-models             - Force reinstall shared models dependencies"
 	@echo "  reinstall-shared-clients            - Force reinstall shared clients dependencies"
 	@echo "  reinstall-servicenow-bootstrap     - Force reinstall ServiceNow automation dependencies"
+	@echo "  reinstall-mock-employee-data        - Force reinstall mock employee data dependencies"
+	@echo "  reinstall-mock-servicenow           - Force reinstall mock ServiceNow dependencies"
 	@echo ""
 	@echo "Push Commands:"
 	@echo "  push-all-images                     - Push all container images to registry"
@@ -189,6 +194,8 @@ help:
 	@echo "  test-request-manager                - Run tests for request manager"
 	@echo "  test-shared-models                  - Run tests for shared models"
 	@echo "  test-servicenow-bootstrap          - Run tests for ServiceNow automation scripts"
+	@echo "  test-mock-employee-data            - Run tests for mock employee data"
+	@echo "  test-mock-servicenow               - Run tests for mock ServiceNow"
 	@echo "  test-short-resp-integration-request-mgr - Run short responses integration tests with Request Manager"
 	@echo "  test-long-resp-integration-request-mgr - Run long responses integration tests with Request Manager"
 	@echo "  test-long-concurrent-integration-request-mgr - Run long concurrent responses integration tests with Request Manager (concurrency=4)"
@@ -219,6 +226,7 @@ help:
 	@echo "    AGENT_SERVICE_IMG                 - Full agent service image name (default: \$${REGISTRY}/self-service-agent-service:\$${VERSION})"
 	@echo "    INTEGRATION_DISPATCHER_IMG        - Full integration dispatcher image name (default: \$${REGISTRY}/self-service-agent-integration-dispatcher:\$${VERSION})"
 	@echo "    MCP_SNOW_IMG                      - Full snow MCP image name (default: \$${REGISTRY}/self-service-agent-snow-mcp:\$${VERSION})"
+	@echo "    MOCK_SERVICENOW_IMG               - Full mock ServiceNow image name (default: \$${REGISTRY}/self-service-agent-mock-servicenow:\$${VERSION})"
 	@echo "    REQUEST_MGR_IMG                   - Full request manager image name (default: \$${REGISTRY}/self-service-agent-request-manager:\$${VERSION})"
 	@echo ""
 	@echo "  Model Configuration:"
@@ -239,7 +247,6 @@ help:
 	@echo "    SERVICENOW_INSTANCE_URL           - ServiceNow instance URL (e.g., https://dev12345.service-now.com)"
 	@echo "    SERVICENOW_API_KEY                 - ServiceNow API key (required)"
 	@echo "    SERVICENOW_API_KEY_HEADER         - Custom header name (default: x-sn-apikey)"
-	@echo "    USE_REAL_SERVICENOW               - Use real ServiceNow API vs mock data (default: false)"
 	@echo "    SERVICENOW_LAPTOP_REFRESH_ID      - ServiceNow catalog item ID for laptop refresh requests (required)"
 	@echo ""
 	@echo "  Request Management Layer:"
@@ -336,7 +343,7 @@ endef
 
 # Build container images
 .PHONY: build-all-images
-build-all-images: build-request-mgr-image build-agent-service-image build-integration-dispatcher-image build-mcp-snow-image build-mock-eventing-image
+build-all-images: build-request-mgr-image build-agent-service-image build-integration-dispatcher-image build-mcp-snow-image build-mock-eventing-image build-mock-servicenow-image
 	@echo "All container images built successfully!"
 
 
@@ -367,9 +374,19 @@ build-mock-eventing-image: check-lockfile-mock-eventing check-lockfile-shared-mo
 		.
 	@echo "Successfully built mock eventing service image: $(MOCK_EVENTING_IMG)"
 
+.PHONY: build-mock-servicenow-image
+build-mock-servicenow-image: check-lockfile-mock-servicenow
+	@echo "Building mock ServiceNow server image using adapted template: $(MOCK_SERVICENOW_IMG)"
+	$(CONTAINER_TOOL) build -t $(MOCK_SERVICENOW_IMG) --platform=$(ARCH) \
+		-f mock-service-now/Containerfile \
+		--build-arg SERVICE_NAME=mock-service-now \
+		--build-arg MODULE_NAME=mock_servicenow.server \
+		.
+	@echo "Successfully built mock ServiceNow server image: $(MOCK_SERVICENOW_IMG)"
+
 # Push container images
 .PHONY: push-all-images
-push-all-images: push-request-mgr-image push-agent-service-image push-integration-dispatcher-image push-mcp-snow-image push-mock-eventing-image
+push-all-images: push-request-mgr-image push-agent-service-image push-integration-dispatcher-image push-mcp-snow-image push-mock-eventing-image push-mock-servicenow-image
 	@echo "All container images pushed successfully!"
 
 
@@ -395,6 +412,10 @@ push-mcp-snow-image:
 push-mock-eventing-image:
 	$(call push_image,$(MOCK_EVENTING_IMG) $(PUSH_EXTRA_AGRS),mock eventing service image)
 
+.PHONY: push-mock-servicenow-image
+push-mock-servicenow-image:
+	$(call push_image,$(MOCK_SERVICENOW_IMG) $(PUSH_EXTRA_AGRS),mock ServiceNow server image)
+
 # Code quality
 .PHONY: lint
 lint: format lint-global-tools lint-mypy-per-directory check-logging
@@ -414,12 +435,12 @@ lint-global-tools:
 .PHONY: check-logging
 check-logging:
 	@echo "Checking logging patterns..."
-	@python scripts/check_logging_patterns.py
+	@uv run python scripts/check_logging_patterns.py
 	@echo "✅ Logging pattern checks completed"
 
 # Per-directory mypy linting (project-specific configurations)
 .PHONY: lint-mypy-per-directory
-lint-mypy-per-directory: lint-shared-models lint-shared-clients lint-agent-service lint-request-manager lint-integration-dispatcher lint-mcp-snow lint-mock-eventing lint-tracing-config lint-evaluations lint-servicenow-bootstrap
+lint-mypy-per-directory: lint-shared-models lint-shared-clients lint-agent-service lint-request-manager lint-integration-dispatcher lint-mcp-snow lint-mock-eventing lint-tracing-config lint-evaluations lint-servicenow-bootstrap lint-mock-employee-data lint-mock-servicenow
 	@echo "✅ All mypy linting completed"
 
 # Common function for mypy linting
@@ -473,6 +494,14 @@ lint-evaluations:
 lint-servicenow-bootstrap:
 	$(call lint_mypy,scripts/servicenow-bootstrap)
 
+.PHONY: lint-mock-employee-data
+lint-mock-employee-data:
+	$(call lint_mypy,mock-employee-data)
+
+.PHONY: lint-mock-servicenow
+lint-mock-servicenow:
+	$(call lint_mypy,mock-service-now)
+
 
 .PHONY: format
 format:
@@ -484,7 +513,7 @@ format:
 
 # Install dependencies
 .PHONY: install-all
-install-all: install-shared-models install-shared-clients install-tracing-config install install-request-manager install-agent-service install-integration-dispatcher install-mcp-snow install-mock-eventing install-evaluations install-servicenow-bootstrap
+install-all: install-shared-models install-shared-clients install-tracing-config install install-request-manager install-agent-service install-integration-dispatcher install-mcp-snow install-mock-eventing install-mock-employee-data install-mock-servicenow install-evaluations install-servicenow-bootstrap
 	@echo "All dependencies installed successfully!"
 
 .PHONY: install-shared-models
@@ -513,7 +542,7 @@ reinstall:
 	@echo "All dependencies reinstalled with latest code!"
 
 .PHONY: reinstall-all
-reinstall-all: reinstall-shared-models reinstall-shared-clients reinstall reinstall-request-manager reinstall-agent-service reinstall-integration-dispatcher reinstall-mcp-snow reinstall-servicenow-bootstrap
+reinstall-all: reinstall-shared-models reinstall-shared-clients reinstall reinstall-request-manager reinstall-agent-service reinstall-integration-dispatcher reinstall-mcp-snow reinstall-mock-employee-data reinstall-mock-servicenow reinstall-servicenow-bootstrap
 	@echo "All project dependencies reinstalled successfully!"
 
 
@@ -559,6 +588,18 @@ reinstall-servicenow-bootstrap:
 	cd scripts/servicenow-bootstrap && uv sync --reinstall
 	@echo "ServiceNow automation dependencies reinstalled successfully!"
 
+.PHONY: reinstall-mock-employee-data
+reinstall-mock-employee-data:
+	@echo "Force reinstalling mock employee data dependencies..."
+	cd mock-employee-data && uv sync --reinstall
+	@echo "Mock employee data dependencies reinstalled successfully!"
+
+.PHONY: reinstall-mock-servicenow
+reinstall-mock-servicenow:
+	@echo "Force reinstalling mock ServiceNow dependencies..."
+	cd mock-service-now && uv sync --reinstall
+	@echo "Mock ServiceNow dependencies reinstalled successfully!"
+
 
 .PHONY: install-request-manager
 install-request-manager:
@@ -590,6 +631,18 @@ install-mock-eventing:
 	cd mock-eventing-service && uv sync
 	@echo "Mock eventing service dependencies installed successfully!"
 
+.PHONY: install-mock-employee-data
+install-mock-employee-data:
+	@echo "Installing mock employee data dependencies..."
+	cd mock-employee-data && uv sync
+	@echo "Mock employee data dependencies installed successfully!"
+
+.PHONY: install-mock-servicenow
+install-mock-servicenow:
+	@echo "Installing mock ServiceNow dependencies..."
+	cd mock-service-now && uv sync
+	@echo "Mock ServiceNow dependencies installed successfully!"
+
 .PHONY: install-tracing-config
 install-tracing-config:
 	@echo "Installing tracing-config dependencies..."
@@ -610,7 +663,7 @@ install-servicenow-bootstrap:
 
 # Test code
 .PHONY: test-all
-test-all: test-shared-models test-shared-clients test test-request-manager test-agent-service test-integration-dispatcher test-mcp-snow test-servicenow-bootstrap
+test-all: test-shared-models test-shared-clients test test-request-manager test-agent-service test-integration-dispatcher test-mcp-snow test-servicenow-bootstrap test-mock-employee-data test-mock-servicenow
 	@echo "All tests completed successfully!"
 
 # Lockfile management
@@ -697,7 +750,7 @@ update-lockfiles:
 	@echo "🎉 All lockfiles updated successfully!"
 
 # Individual service lockfile targets
-.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-snow check-lockfile-mock-eventing check-lockfile-servicenow-bootstrap
+.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-snow check-lockfile-mock-eventing check-lockfile-mock-servicenow check-lockfile-servicenow-bootstrap
 check-lockfile-root:
 	@echo "📦 Checking root project..."
 	@if uv lock --check; then \
@@ -727,11 +780,14 @@ check-lockfile-mcp-snow:
 check-lockfile-mock-eventing:
 	$(call check_lockfile,mock-eventing-service)
 
+check-lockfile-mock-servicenow:
+	$(call check_lockfile,mock-service-now)
+
 check-lockfile-servicenow-bootstrap:
 	$(call check_lockfile,scripts/servicenow-bootstrap)
 
 
-.PHONY: update-lockfile-shared-models update-lockfile-shared-clients update-lockfile-agent-service update-lockfile-request-manager update-lockfile-integration-dispatcher update-lockfile-mcp-snow update-lockfile-mock-eventing update-lockfile-servicenow-bootstrap
+.PHONY: update-lockfile-shared-models update-lockfile-shared-clients update-lockfile-agent-service update-lockfile-request-manager update-lockfile-integration-dispatcher update-lockfile-mcp-snow update-lockfile-mock-eventing update-lockfile-mock-servicenow update-lockfile-servicenow-bootstrap
 update-lockfile-shared-models:
 	$(call update_lockfile,shared-models)
 
@@ -752,6 +808,9 @@ update-lockfile-mcp-snow:
 
 update-lockfile-mock-eventing:
 	$(call update_lockfile,mock-eventing-service)
+
+update-lockfile-mock-servicenow:
+	$(call update_lockfile,mock-service-now)
 
 update-lockfile-servicenow-bootstrap:
 	$(call update_lockfile,scripts/servicenow-bootstrap)
@@ -806,6 +865,18 @@ test-servicenow-bootstrap:
 	cd scripts/servicenow-bootstrap && uv run python -m pytest tests/ || echo "No tests found for ServiceNow automation"
 	@echo "ServiceNow automation tests completed successfully!"
 
+.PHONY: test-mock-employee-data
+test-mock-employee-data:
+	@echo "Running mock employee data tests..."
+	cd mock-employee-data && uv run python -m pytest tests/ || echo "No tests found for mock employee data"
+	@echo "Mock employee data tests completed successfully!"
+
+.PHONY: test-mock-servicenow
+test-mock-servicenow:
+	@echo "Running mock ServiceNow tests..."
+	cd mock-service-now && uv run python -m pytest tests/ || echo "No tests found for mock ServiceNow"
+	@echo "Mock ServiceNow tests completed successfully!"
+
 .PHONY: sync-evaluations
 sync-evaluations:
 	@echo "Syncing evaluations libraries"
@@ -854,18 +925,15 @@ define helm_install_common
 	@$(eval GENERIC_ARGS := $(helm_generic_args))
 	@$(eval REPLICA_COUNT_ARGS := $(helm_replica_count_args))
 
-	@if [ "$(USE_REAL_SERVICENOW)" = "true" ]; then \
+	@if [ -n "$$SERVICENOW_INSTANCE_URL" ] || [ -n "$$SERVICENOW_API_KEY" ]; then \
 		echo "Creating ServiceNow credentials secret..."; \
-		if [ -n "$$SERVICENOW_INSTANCE_URL" ] || [ -n "$$SERVICENOW_API_KEY" ]; then \
-			kubectl create secret generic $(MAIN_CHART_NAME)-servicenow-credentials \
-				--from-literal=servicenow-instance-url="$${SERVICENOW_INSTANCE_URL:-}" \
-				--from-literal=servicenow-api-key="$${SERVICENOW_API_KEY:-}" \
-				-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
-		else \
-			echo "⚠️  WARNING: USE_REAL_SERVICENOW=true but ServiceNow credentials not provided"; \
-		fi; \
+		echo "  Instance URL: $$SERVICENOW_INSTANCE_URL"; \
+		kubectl create secret generic $(MAIN_CHART_NAME)-servicenow-credentials \
+			--from-literal=servicenow-instance-url="$${SERVICENOW_INSTANCE_URL:-}" \
+			--from-literal=servicenow-api-key="$${SERVICENOW_API_KEY:-}" \
+			-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
 	else \
-		echo "Skipping ServiceNow credentials secret (USE_REAL_SERVICENOW=false)"; \
+		echo "⚠️  WARNING: ServiceNow credentials not provided"; \
 	fi
 
 	@echo "Cleaning up any existing jobs..."
@@ -885,12 +953,9 @@ define helm_install_common
 		--set image.registry=$(REGISTRY) \
 		--set mcp-servers.mcp-servers.self-service-agent-snow.image.repository=$(REGISTRY)/self-service-agent-snow-mcp \
 		--set mcp-servers.mcp-servers.self-service-agent-snow.image.tag=$(VERSION) \
-		--set-string mcp-servers.mcp-servers.self-service-agent-snow.env.USE_REAL_SERVICENOW="$(USE_REAL_SERVICENOW)" \
 		--set-string mcp-servers.mcp-servers.self-service-agent-snow.env.SERVICENOW_LAPTOP_REFRESH_ID="$(SERVICENOW_LAPTOP_REFRESH_ID)" \
-		$(if $(filter true,$(USE_REAL_SERVICENOW)),\
-			--set mcp-servers.mcp-servers.self-service-agent-snow.envSecrets.SERVICENOW_INSTANCE_URL.name=$(MAIN_CHART_NAME)-servicenow-credentials \
-			--set mcp-servers.mcp-servers.self-service-agent-snow.envSecrets.SERVICENOW_INSTANCE_URL.key=servicenow-instance-url \
-		) \
+		--set mcp-servers.mcp-servers.self-service-agent-snow.envSecrets.SERVICENOW_INSTANCE_URL.name=$(MAIN_CHART_NAME)-servicenow-credentials \
+		--set mcp-servers.mcp-servers.self-service-agent-snow.envSecrets.SERVICENOW_INSTANCE_URL.key=servicenow-instance-url \
 		$(REQUEST_MANAGEMENT_ARGS) \
 		$(LOG_LEVEL_ARGS) \
 		$(GENERIC_ARGS) \
