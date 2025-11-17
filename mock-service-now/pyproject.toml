@@ -9,8 +9,6 @@ description = "Mock ServiceNow server for self-service agent blueprint"
 authors = [
     { name = "Red Hat Ecosystem App Engineering", email = "ecosystem-appeng@redhat.com" }
 ]
-readme = "README.md"
-license = { text = "Apache-2.0" }
 requires-python = ">=3.12"
 classifiers = [
     "Development Status :: 4 - Beta",
