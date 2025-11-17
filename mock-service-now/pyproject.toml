@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "mock-servicenow"
@@ -9,12 +9,11 @@ description = "Mock ServiceNow server for self-service agent blueprint"
 authors = [
     { name = "Red Hat Ecosystem App Engineering", email = "ecosystem-appeng@redhat.com" }
 ]
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
 requires-python = ">=3.12"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
 ]
@@ -41,11 +40,11 @@ dev = [
 Homepage = "https://github.com/RHEcosystemAppEng/self-service-agent-blueprint"
 Repository = "https://github.com/RHEcosystemAppEng/self-service-agent-blueprint"
 
-[tool.setuptools]
-package-dir = {"" = "src"}
+[tool.hatch.build.targets.wheel]
+packages = ["src/mock_servicenow"]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
