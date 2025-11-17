@@ -244,10 +244,10 @@ help:
 	@echo "    SLACK_SIGNING_SECRET              - Slack Signing Secret for request verification"
 	@echo ""
 	@echo "  ServiceNow Configuration:"
-	@echo "    SERVICENOW_INSTANCE_URL           - ServiceNow instance URL (e.g., https://dev12345.service-now.com)"
-	@echo "    SERVICENOW_API_KEY                 - ServiceNow API key (required)"
+	@echo "    SERVICENOW_INSTANCE_URL           - ServiceNow instance URL (default: http://self-service-agent-mock-servicenow:8080)"
+	@echo "    SERVICENOW_API_KEY                 - ServiceNow API key (default: now_mock_api_key)"
 	@echo "    SERVICENOW_API_KEY_HEADER         - Custom header name (default: x-sn-apikey)"
-	@echo "    SERVICENOW_LAPTOP_REFRESH_ID      - ServiceNow catalog item ID for laptop refresh requests (required)"
+	@echo "    SERVICENOW_LAPTOP_REFRESH_ID      - ServiceNow catalog item ID for laptop refresh requests (default: mock_laptop_refresh_id)"
 	@echo ""
 	@echo "  Request Management Layer:"
 	@echo "    KNATIVE_EVENTING                  - Enable Knative Eventing (default: true)"
@@ -925,16 +925,12 @@ define helm_install_common
 	@$(eval GENERIC_ARGS := $(helm_generic_args))
 	@$(eval REPLICA_COUNT_ARGS := $(helm_replica_count_args))
 
-	@if [ -n "$$SERVICENOW_INSTANCE_URL" ] || [ -n "$$SERVICENOW_API_KEY" ]; then \
-		echo "Creating ServiceNow credentials secret..."; \
-		echo "  Instance URL: $$SERVICENOW_INSTANCE_URL"; \
-		kubectl create secret generic $(MAIN_CHART_NAME)-servicenow-credentials \
-			--from-literal=servicenow-instance-url="$${SERVICENOW_INSTANCE_URL:-}" \
-			--from-literal=servicenow-api-key="$${SERVICENOW_API_KEY:-}" \
-			-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
-	else \
-		echo "⚠️  WARNING: ServiceNow credentials not provided"; \
-	fi
+	@echo "Creating ServiceNow credentials secret..."
+	@echo "  Instance URL: $$SERVICENOW_INSTANCE_URL"
+	@kubectl create secret generic $(MAIN_CHART_NAME)-servicenow-credentials \
+		--from-literal=servicenow-instance-url="$${SERVICENOW_INSTANCE_URL:-}" \
+		--from-literal=servicenow-api-key="$${SERVICENOW_API_KEY:-}" \
+		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
 
 	@echo "Cleaning up any existing jobs..."
 	@kubectl delete job -l app.kubernetes.io/component=init -n $(NAMESPACE) --ignore-not-found || true
