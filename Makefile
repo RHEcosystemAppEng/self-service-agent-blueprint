@@ -375,10 +375,10 @@ build-mock-eventing-image: check-lockfile-mock-eventing check-lockfile-shared-mo
 	@echo "Successfully built mock eventing service image: $(MOCK_EVENTING_IMG)"
 
 .PHONY: build-mock-servicenow-image
-build-mock-servicenow-image: check-lockfile-mock-servicenow
-	@echo "Building mock ServiceNow server image using adapted template: $(MOCK_SERVICENOW_IMG)"
+build-mock-servicenow-image: check-lockfile-mock-servicenow check-lockfile-mock-employee-data
+	@echo "Building mock ServiceNow server image using services template: $(MOCK_SERVICENOW_IMG)"
 	$(CONTAINER_TOOL) build -t $(MOCK_SERVICENOW_IMG) --platform=$(ARCH) \
-		-f mock-service-now/Containerfile \
+		-f Containerfile.services-template \
 		--build-arg SERVICE_NAME=mock-service-now \
 		--build-arg MODULE_NAME=mock_servicenow.server \
 		.
@@ -727,6 +727,8 @@ check-lockfiles:
 	@echo
 	$(call check_lockfile,mock-eventing-service)
 	@echo
+	$(call check_lockfile,mock-employee-data)
+	@echo
 	$(call check_lockfile,scripts/servicenow-bootstrap)
 	@echo
 	@echo
@@ -754,13 +756,15 @@ update-lockfiles:
 	@echo
 	$(call update_lockfile,mock-eventing-service)
 	@echo
+	$(call update_lockfile,mock-employee-data)
+	@echo
 	$(call update_lockfile,scripts/servicenow-bootstrap)
 	@echo
 	@echo
 	@echo "🎉 All lockfiles updated successfully!"
 
 # Individual service lockfile targets
-.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-snow check-lockfile-mock-eventing check-lockfile-mock-servicenow check-lockfile-servicenow-bootstrap
+.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-snow check-lockfile-mock-eventing check-lockfile-mock-employee-data check-lockfile-mock-servicenow check-lockfile-servicenow-bootstrap
 check-lockfile-root:
 	@echo "📦 Checking root project..."
 	@if uv lock --check; then \
@@ -790,6 +794,9 @@ check-lockfile-mcp-snow:
 check-lockfile-mock-eventing:
 	$(call check_lockfile,mock-eventing-service)
 
+check-lockfile-mock-employee-data:
+	$(call check_lockfile,mock-employee-data)
+
 check-lockfile-mock-servicenow:
 	$(call check_lockfile,mock-service-now)
 
@@ -797,7 +804,7 @@ check-lockfile-servicenow-bootstrap:
 	$(call check_lockfile,scripts/servicenow-bootstrap)
 
 
-.PHONY: update-lockfile-shared-models update-lockfile-shared-clients update-lockfile-agent-service update-lockfile-request-manager update-lockfile-integration-dispatcher update-lockfile-mcp-snow update-lockfile-mock-eventing update-lockfile-mock-servicenow update-lockfile-servicenow-bootstrap
+.PHONY: update-lockfile-shared-models update-lockfile-shared-clients update-lockfile-agent-service update-lockfile-request-manager update-lockfile-integration-dispatcher update-lockfile-mcp-snow update-lockfile-mock-eventing update-lockfile-mock-employee-data update-lockfile-mock-servicenow update-lockfile-servicenow-bootstrap
 update-lockfile-shared-models:
 	$(call update_lockfile,shared-models)
 
@@ -818,6 +825,9 @@ update-lockfile-mcp-snow:
 
 update-lockfile-mock-eventing:
 	$(call update_lockfile,mock-eventing-service)
+
+update-lockfile-mock-employee-data:
+	$(call update_lockfile,mock-employee-data)
 
 update-lockfile-mock-servicenow:
 	$(call update_lockfile,mock-service-now)

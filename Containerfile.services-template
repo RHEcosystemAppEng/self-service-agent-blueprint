@@ -15,6 +15,9 @@ WORKDIR /app
 # Copy shared database if needed (most services need it)
 COPY shared-models ./shared-models/
 
+# Copy mock-employee-data dependency
+COPY mock-employee-data/ ./mock-employee-data/
+
 # Copy shared clients package
 COPY shared-clients ./shared-clients/
 
@@ -39,6 +42,9 @@ WORKDIR /app
 
 # Copy shared database if needed
 COPY --from=builder /app/shared-models /app/shared-models
+
+# Copy mock-employee-data dependency
+COPY --from=builder /app/mock-employee-data /app/mock-employee-data
 
 # Copy shared clients package
 COPY --from=builder /app/shared-clients /app/shared-clients
