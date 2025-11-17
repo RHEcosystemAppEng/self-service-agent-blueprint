@@ -596,9 +596,14 @@ reinstall-mock-employee-data:
 
 .PHONY: reinstall-mock-servicenow
 reinstall-mock-servicenow:
-	@echo "Force reinstalling mock ServiceNow dependencies..."
-	cd mock-service-now && uv sync --reinstall
-	@echo "Mock ServiceNow dependencies reinstalled successfully!"
+	@if echo "$(SERVICENOW_INSTANCE_URL)" | grep -q "self-service-agent-mock-servicenow"; then \
+		echo "Force reinstalling mock ServiceNow dependencies..."; \
+		cd mock-service-now && uv sync --reinstall; \
+		echo "Mock ServiceNow dependencies reinstalled successfully!"; \
+	else \
+		echo "Skipping mock ServiceNow reinstallation - SERVICENOW_INSTANCE_URL does not contain 'self-service-agent-mock-servicenow'"; \
+		echo "Current SERVICENOW_INSTANCE_URL: $(SERVICENOW_INSTANCE_URL)"; \
+	fi
 
 
 .PHONY: install-request-manager
@@ -639,9 +644,14 @@ install-mock-employee-data:
 
 .PHONY: install-mock-servicenow
 install-mock-servicenow:
-	@echo "Installing mock ServiceNow dependencies..."
-	cd mock-service-now && uv sync
-	@echo "Mock ServiceNow dependencies installed successfully!"
+	@if echo "$(SERVICENOW_INSTANCE_URL)" | grep -q "self-service-agent-mock-servicenow"; then \
+		echo "Installing mock ServiceNow dependencies..."; \
+		cd mock-service-now && uv sync; \
+		echo "Mock ServiceNow dependencies installed successfully!"; \
+	else \
+		echo "Skipping mock ServiceNow installation - SERVICENOW_INSTANCE_URL does not contain 'self-service-agent-mock-servicenow'"; \
+		echo "Current SERVICENOW_INSTANCE_URL: $(SERVICENOW_INSTANCE_URL)"; \
+	fi
 
 .PHONY: install-tracing-config
 install-tracing-config:
