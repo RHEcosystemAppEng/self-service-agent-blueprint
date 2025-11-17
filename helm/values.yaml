@@ -285,31 +285,6 @@ requestManagement:
           failureThreshold: 5         # More failures allowed for dev instability
           successThreshold: 1
 
-    # KnativeKafka configuration (automatically enabled when eventing is enabled)
-    kafka:
-      # enabled is automatically set to true when eventing.enabled is true
-      # name: "self-service-agent-kafka-eventing"  # Defaults to include release namespace
-      replicas: 1
-      logLevel: "INFO"
-      
-      
-      # Broker configuration (Knative Kafka Broker - enables Kafka broker support)
-      broker:
-        numPartitions: 10
-      
-      
-      # Resource limits for KnativeKafka components
-      resources: {}
-      
-      # Security configuration
-      security:
-        protocol: "PLAINTEXT"  # or "SASL_PLAINTEXT", "SSL", "SASL_SSL"
-        sasl:
-          enabled: false
-          mechanism: "PLAIN"  # or "SCRAM-SHA-256", "SCRAM-SHA-512"
-          user: ""
-          secretName: ""
-          secretKey: ""
   
   # Kafka cluster configuration for KnativeKafka channels
   kafka:
