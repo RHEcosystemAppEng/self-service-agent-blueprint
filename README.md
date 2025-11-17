@@ -262,7 +262,7 @@ Now that you understand the architecture and capabilities of the self-service ag
 
 **Cluster Environment:**
 * **Testing Mode**: OpenShift/Kubernetes cluster (no special operators)
-* **Production Mode**: OpenShift cluster + [Serverless Operator](https://docs.openshift.com/serverless/latest/install/install-serverless-operator.html) + [Streams for Apache Kafka Operator](https://access.redhat.com/documentation/en-us/red_hat_streams_for_apache_kafka/2.7/html/deploying_and_managing_streams_for_apache_kafka_on_openshift/deploy-tasks_str)
+* **Production Mode**: OpenShift cluster + [Serverless Operator](https://docs.openshift.com/serverless/latest/install/install-serverless-operator.html) + [Streams for Apache Kafka Operator](https://access.redhat.com/documentation/en-us/red_hat_streams_for_apache_kafka/2.7/html/deploying_and_managing_streams_for_apache_kafka_on_openshift/deploy-tasks_str) + [Knative Eventing](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.35/html/installing_openshift_serverless/installing-knative-eventing)
 
 **Access & Credentials:**
 * OpenShift cluster access
