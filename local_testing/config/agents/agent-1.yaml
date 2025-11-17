@@ -1,9 +1,0 @@
-name: "agent-1"
-description: "Agent 1 is a helpful assistant that can answer questions and help with tasks."
-model: "llama3.2:3b"
-instructions: "You are a helpful agent"
-tool_choice: "auto"
-input_shields: []
-output_shields: []
-max_infer_iters: 10
-enable_session_persistence: false
