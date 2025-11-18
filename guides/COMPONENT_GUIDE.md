@@ -223,7 +223,7 @@ For a complete ingestion pipeline architecture and implementation guidance, see 
 - **Knowledge Base:** `laptop-refresh` knowledge base for policy questions
 - **Capabilities:** Queries knowledge base for policies, calls tools to check eligibility/retrieve options/create tickets
 
-**Documentation:** See [Prompt Configuration Guide](../docs/PROMPT_CONFIGURATION_GUIDE.md)
+**Documentation:** See [Prompt Configuration Guide](PROMPT_CONFIGURATION_GUIDE.md)
 
 ---
 

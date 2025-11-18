@@ -237,6 +237,6 @@ Result: BLOCKED (Violent Crimes is not ignored)
 
 ## Related Documentation
 
-- [Agent Configuration Guide](../docs/PROMPT_CONFIGURATION_GUIDE.md) - LangGraph and agent setup
+- [Agent Configuration Guide](PROMPT_CONFIGURATION_GUIDE.md) - LangGraph and agent setup
 - [API Reference](../docs/API_REFERENCE.md) - Complete API documentation
 - [Architecture Diagrams](../docs/ARCHITECTURE_DIAGRAMS.md) - System architecture

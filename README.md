@@ -24,18 +24,22 @@
    - [Setting up Safety Shields (Optional)](#36-setting-up-safety-shields-optional)
    - [Run Evaluations](#37-run-evaluations)
    - [Follow the Flow with Tracing](#38-follow-the-flow-with-tracing)
+   - [Trying out Smaller Prompts](#39-trying-out-smaller-prompts)
+   - [Cleaning up](#310-cleaning-up)
 
 4. [Performance & Scaling](#4-performance--scaling)
 
-5. [Going Deeper: Component Documentation](#5-going-deeper-component-documentation)
+5. [Security](#5-security)
+
+6. [Going Deeper: Component Documentation](#6-going-deeper-component-documentation)
    - [Guides](#guides)
    - [Technical Documentation](#technical-documentation)
 
-6. [Customizing for Your Use Case](#6-customizing-for-your-use-case)
+7. [Customizing for Your Use Case](#7-customizing-for-your-use-case)
 
-7. [Next Steps and Additional Resources](#7-next-steps-and-additional-resources)
-   - [What You've Accomplished](#71-what-youve-accomplished)
-   - [Recommended Next Steps](#72-recommended-next-steps)
+8. [Next Steps and Additional Resources](#8-next-steps-and-additional-resources)
+   - [What You've Accomplished](#81-what-youve-accomplished)
+   - [Recommended Next Steps](#82-recommended-next-steps)
 
 ---
 
@@ -93,6 +97,36 @@ By the end of this quickstart, you will have:
 - (Optional) Safety shields for content moderation
 - Understanding of how to customize for your own use cases
 
+#### Key Technologies You'll Learn
+
+Throughout this quickstart, you'll gain hands-on experience with modern AI and cloud-native technologies:
+
+**AI & LLM Technologies:**
+- **[Llama Stack](https://github.com/meta-llama/llama-stack)** - AI inference platform for running Llama models
+- **[LangGraph](https://langchain-ai.github.io/langgraph/)** - State machine framework for managing agent conversations and workflows
+- **[MCP (Model Context Protocol) Servers](https://modelcontextprotocol.io/)** - Standardized interface for connecting AI agents to external systems
+- **Knowledge Bases** - Vector-based retrieval for policy documents and process guidelines using Llama Stack vector stores
+- **[Llama 3](https://llama.meta.com/)** - 70B parameter language model for agent reasoning
+- **[Llama Guard 3](https://llama.meta.com/docs/model-cards-and-prompt-formats/llama-guard-3/)** - Safety model for content moderation
+
+**Observability & Evaluation:**
+- **[OpenTelemetry](https://opentelemetry.io/)** - Distributed tracing for monitoring complex agent interactions
+- **Evaluation Framework** - AI-specific testing with [DeepEval](https://docs.confident-ai.com/) for synthetic conversation generation and business metrics validation
+
+**Integration with existing systems:**
+- **[Slack](https://api.slack.com/) Integration** - Real-time conversational interfaces
+- **Email Integration** - Asynchronous communication workflows
+- **[ServiceNow](https://developer.servicenow.com/) Integration** - ITSM ticketing system connectivity
+
+**Cloud-Native Infrastructure:**
+- **[OpenShift](https://www.redhat.com/en/technologies/cloud-computing/openshift)/[Kubernetes](https://kubernetes.io/)** - Container orchestration and deployment platform
+- **[Knative Eventing](https://knative.dev/docs/eventing/)** - Event-driven architecture for production deployments
+- **[Apache Kafka](https://kafka.apache.org/)** - Distributed event streaming for asynchronous communication
+- **[Helm](https://helm.sh/)** - Kubernetes package manager for application deployment
+- **[PostgreSQL](https://www.postgresql.org/)** - Database for conversation state and checkpointing
+
+This technology stack provides a production-ready foundation for building scalable, observable AI agent systems.
+
 ### 1.6 Architecture Overview
 
 The self-service agent quickstart provides a reusable platform for building AI-driven IT processes:
@@ -128,6 +162,10 @@ The repository is organized into the following key directories:
 
 **MCP Servers:**
 - **`mcp-servers/snow/`** - ServiceNow integration MCP server
+
+**Mock Services & Test Data:**
+- **`mock-service-now/`** - Mock ServiceNow REST API server for testing without real ServiceNow instance
+- **`mock-employee-data/`** - Mock employee and laptop data library for testing integrations
 
 **Shared Libraries:**
 - **`shared-models/`** - Database models, Pydantic schemas, and Alembic migrations
@@ -285,8 +323,8 @@ spec:
 * Container registry (Quay.io or similar), OPTIONAL, only if you want to make changes
 * LLM API endpoint with credentials (Llama 3 70B model)
 * LLM API safety model endpoint with credentials, OPTIONAL if you want to enable safety shields (meta-llama/Llama-Guard-3-8B)
-* Slack workspace admin access, OPTIONAL if you want to explore integration with Slack
-* ServiceNow instance admin access, OPTIONAL if you want to explore integration with ServiceNow
+* Slack workspace admin access (we provide instructions on how to set up a test instance), OPTIONAL if you want to explore integration with Slack
+* ServiceNow instance admin access (we provide instructinos on how to set up a test instance), OPTIONAL if you want to explore integration with ServiceNow
 
 ---
 
@@ -313,18 +351,19 @@ export NAMESPACE=your-namespace
 
 # Set LLM configuration
 export LLM=llama-3-3-70b-instruct-w8a8
+export LLM_ID=llama-3-3-70b-instruct-w8a8
 export LLM_API_TOKEN=your-api-token
 export LLM_URL=https://your-llm-endpoint
 
-# Set integration secrets (optional for initial testing)
-export SLACK_SIGNING_SECRET=your-slack-secret  # Optional
-export SNOW_API_KEY=your-servicenow-key       # Optional
+# Set hugging face token, set to 1234 as not needed unless
+# you want to use locally hosted LLM
+export HF_TOKEN=1234 
 
 ```
 
 #### Step 3: Build Container Images (Optional)
 
-If using pre-built images, skip this step.
+If using pre-built images (Recommended until later steps), skip this step.
 
 ```bash
 # Build all images
@@ -387,7 +426,7 @@ oc get routes -n $NAMESPACE
 
 Now that the system is deployed, let's interact with the agent through the CLI to test a complete laptop refresh workflow.
 
-A key design philosophy of this quickstart is to "meet employees where they are." Rather than creating new communication channels, the system integrates with existing tools like Slack and Email through a general request manager. This allows employees to interact using the communication platforms they already know and use daily.
+A key design philosophy of this quickstart is to "meet employees where they are." Rather than creating new communication channels, the system integrates with existing tools like Slack and Email through a general purpose request manager. This allows employees to interact using the communication platforms they already know and use daily.
 
 For initial testing and evaluation purposes, the quickstart includes a simple command line interface (CLI). We'll use the CLI for these first interactions to verify the system works correctly.
 
@@ -416,12 +455,13 @@ Follow this conversation flow to test the complete laptop refresh process:
 
 **You:** `I need help with my laptop refresh`
 
-**Expected:** Agent greets you and retrieves your current laptop information
+**Expected:**
+- Agent greets you and retrieves your current laptop information
+- Agent checks your eligibility based on 3-year policy and gives you a summary
 
 **You:** `I would like to see available laptop options`
 
 **Expected:**
-- Agent checks your eligibility based on 3-year policy
 - Agent presents available laptop options for your region (NA, EMEA, APAC, or LATAM)
 - You see 4 laptop options with specifications and pricing
 
@@ -436,7 +476,7 @@ Follow this conversation flow to test the complete laptop refresh process:
 - Ticket number provided (format: REQ followed by digits)
 - Confirmation message with next steps
 
-**You:** `DONEDONEDONE`
+**You:** enter Cntrl-C twice
 
 **Expected:** Chat session ends
 
@@ -445,16 +485,26 @@ Follow this conversation flow to test the complete laptop refresh process:
 Test with different employee IDs to see varied scenarios:
 
 ```bash
-# Test with different user (EMEA region)
+# Test with different user (LATAM region)
 oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
   python test/chat-responses-request-mgr.py \
-  --user-id john.doe@company.com
+  --user-id maria.garcia@company.com
 
 # Test with user who may not be eligible
 oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
   python test/chat-responses-request-mgr.py \
-  --user-id maria.garcia@company.com
+  --user-id john.doe@company.com
+
 ```
+
+**Note:** Only the laptop refresh use case has been implemented. References to other options like changing your email are included to illustrate the capabilities of the routing agent. If you ask the routing agent for those features, you will remain with the routing agent and/or may see failed attempts to route to a specialist agent that does not exist.
+
+**Note:** The Request Manager retains conversation state across sessions. To restart from the beginning with the same user ID:
+
+1. Type: `reset`
+2. Type any message (e.g., `hello`) to start a fresh conversation
+
+This clears all conversation history and context for that user.
 
 **Expected outcome:**
 - Different laptop options based on region
@@ -472,53 +522,55 @@ oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
 
 ### 3.3 Integration with Slack (Optional)
 
-Slack integration enables real-world testing with actual users in your workspace.
+Slack integration enables real-world testing with actual users in your workspace. The quickstart assumes you
+have an existing Slack instance that you can use for testing, otherwise you can create a development instance
+by joining the [Slack Developer Program](https://api.slack.com/developer-program).
 
-#### Step 1: Set Up Slack App
+#### Step 1: Add your Slack email to the mock employee data
 
-See [`SLACK_SETUP.md`](guides/SLACK_SETUP.md) for detailed instructions.
+The quickstart uses the Slack user's email as the authoritative user ID,
+so you need to add your user to the MOCK_EMPLOYEE_DATA dictionary in [data.py](mock-employee-data/src/mock_employee_data/data.py). You can copy one of the existing entries and modify the email to match the email associated with your user in your test Slack instance. Do not remove any of the existing entries as they are needed for the later section on evaluations.
 
-**Summary:**
-1. Create Slack app at [api.slack.com/apps](https://api.slack.com/apps)
-2. Configure OAuth scopes (chat:write, channels:history, etc.)
-3. Enable Event Subscriptions
-4. Set Request URL to your Integration Dispatcher route
-5. Install app to workspace
-6. Copy signing secret and bot token
-
-#### Step 2: Update Deployment with Slack Credentials
+Once you have added your user, you need to build the updated container images and push them to a registry like quay.io. Make sure the images are public (if they are not public by default in your organization) so OpenShift can pull them. You can build and push the images as follows:
 
 ```bash
-# Set Slack credentials
-export SLACK_SIGNING_SECRET=your-signing-secret
-export SLACK_BOT_TOKEN=your-bot-token
+# Set container registry
+export REGISTRY=quay.io/your-org
 
-# Upgrade Helm deployment
-make helm-upgrade NAMESPACE=$NAMESPACE
+# Build all images
+make build-all-images
+
+# Push to registry
+make push-all-images
+
 ```
 
-#### Step 3: Verify Slack Integration
+When you uninstall/reinstall as part of the Slack app deployment in Step 2, your modified images will be used for the deployment.
 
-Check the Integration Dispatcher health endpoint to confirm Slack integration is active:
+#### Step 2: Set Up Slack App
 
-```bash
-# Check integration health
-kubectl exec deployment/self-service-agent-integration-dispatcher -n $NAMESPACE -- \
-  curl -s http://localhost:8080/health/detailed | jq '.integrations_available'
+See [`SLACK_SETUP.md`](guides/SLACK_SETUP.md) for detailed instructions on
+how to configure a Slack bot that will allow you to interact with the
+agent through Slack.
 
-# Look for "SLACK" in the integrations_available array
-```
-
-#### Step 4: Test Slack Interaction
+#### Step 3: Test Slack Interaction
 
 In your Slack workspace:
 
-1. Invite bot to a channel: `/invite @your-bot`
-2. Send message: `@your-bot I need a new laptop`
-3. Agent responds with greeting and laptop information
-4. Agent presents available laptop options
-5. Select a laptop: `I'd like option 1`
-6. Agent creates ServiceNow ticket and provides ticket number
+1. Direct message the Slack bot using @Self-Service Agent and say `hi`
+2. Routing agent responds asking what you would like to do
+3. Respond with 'I would like to refresh my laptop'
+4. Specialist agent responds with laptop information and summary of eligibility
+5. Indicate you would like to proceed
+6. Agent presents available laptop options
+7. Select a laptop: `I'd like option 1`
+8. Agent confirms the selected laptop and asks if you would like it
+   to create ServiceNow ticket for you.
+9. Say yes
+10. Agent creates ServiceNow ticket and provides ticket number
+
+Just like when you used the CLI earlier, the request manager maintains state and you can
+use `reset` to clear the conversation history.
 
 **Expected outcome:**
 - ✓ Bot responds in Slack thread
@@ -529,10 +581,6 @@ In your Slack workspace:
 
 **You should now be able to:**
 - ✓ Interact with agents via Slack
-- ✓ Test real-world user experience
-- ✓ Demonstrate system to stakeholders
-- ✓ Gather user feedback from actual employees
-
 ---
 
 ### 3.4 Integration with Real ServiceNow (Optional)
@@ -1076,6 +1124,161 @@ All operations share the same trace ID, creating a complete distributed trace.
 
 ---
 
+### 3.9 Trying out Smaller Prompts
+
+By default the quickstart uses a single state [large prompt](agent-service/config/lg-prompts/lg-prompt-big.yaml) which handles the full conversation flow. However, the quickstart also includes a [multi-part prompt](agent-service/config/lg-prompts/lg-prompt-small.yaml) in which each of the prompts are more limited. A multi-part prompt gives you more control over the flow and may be able to be run with a smaller model, may require fewer tokens (due to the smaller prompts being sent to the model). On the other hand it may be less flexible and may only handle flows that you have planned for in advance. You can read more about the advantages and disadvantages of the two approaches in the [Prompt Configuration Guide](guides/PROMPT_CONFIGURATION_GUIDE.md).
+
+#### Step 1: Redeploy with Smaller Prompt
+
+Redeploy with a fresh installation using the smaller prompt configuration:
+
+```bash
+# Set the smaller prompt configuration
+export LG_PROMPT_LAPTOP_REFRESH=/app/agent-service/config/lg-prompts/lg-prompt-small.yaml
+
+# Uninstall the current deployment
+make helm-uninstall NAMESPACE=$NAMESPACE
+
+# Reinstall with the new prompt configuration
+make helm-install-test NAMESPACE=$NAMESPACE
+```
+
+**Expected outcome:**
+- ✓ Helm uninstall completes successfully
+- ✓ Helm install completes successfully with new prompt configuration
+- ✓ All pods start and return to Running state
+
+#### Step 2: Verify Deployment
+
+Wait for the agent service to restart and verify it's running:
+
+```bash
+# Check pod status
+oc get pods -n $NAMESPACE -l app=self-service-agent-agent-service
+
+# Check agent service logs for successful startup
+oc logs -n $NAMESPACE -l app=self-service-agent-agent-service --tail=50
+```
+
+**Expected outcome:**
+- ✓ Agent service pod is in Running state
+- ✓ Logs show successful initialization without errors
+
+#### Step 3: Start Interactive Chat Session
+
+Use the CLI chat script to start an interactive conversation with the agent:
+
+```bash
+# Get the request manager pod
+export REQUEST_MANAGER_POD=$(oc get pod -n $NAMESPACE -l app=self-service-agent-request-manager -o jsonpath='{.items[0].metadata.name}')
+
+# Start interactive chat session
+oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
+  python test/chat-responses-request-mgr.py \
+  --user-id alice.johnson@company.com
+```
+
+**Expected outcome:**
+- Chat client starts in interactive mode
+- Agent sends initial greeting
+- You see a prompt where you can type messages
+
+#### Step 4: Complete Laptop Refresh Workflow
+
+Follow this conversation flow to test the complete laptop refresh process with the multi-part prompt (same workflow as in [Section 3.2](#32-interact-with-the-cli)):
+
+**You:** `I need help with my laptop refresh`
+
+**Expected:**
+- Agent greets you and retrieves your current laptop information
+- Agent checks your eligibility based on 3-year policy and gives you a summary
+
+**You:** `I would like to see available laptop options`
+
+**Expected:**
+- Agent presents available laptop options for your region (NA, EMEA, APAC, or LATAM)
+- You see 4 laptop options with specifications and pricing
+
+**You:** `I would like option 1, the Apple MacBook Air M3`
+
+**Expected:** Agent confirms your selection and asks for approval to create ServiceNow ticket
+
+**You:** `Yes, please create the ticket`
+
+**Expected:**
+- ServiceNow ticket created
+- Ticket number provided (format: REQ followed by digits)
+- Confirmation message with next steps
+
+**You:** enter Ctrl-C twice
+
+**Expected:** Chat session ends
+
+#### Step 5: Compare Agent Behavior
+
+Test the same scenarios you tried in [Section 3.2](#32-interact-with-the-cli) with the default prompt and observe differences:
+
+```bash
+# Test with different user (LATAM region)
+oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
+  python test/chat-responses-request-mgr.py \
+  --user-id maria.garcia@company.com
+
+# Test with user who may not be eligible
+oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
+  python test/chat-responses-request-mgr.py \
+  --user-id john.doe@company.com
+```
+
+**Things to observe:**
+- Response length and verbosity
+- Conversation flow and naturalness
+- Accuracy of information gathering
+- Policy compliance and decision-making
+
+**Note:** The Request Manager retains conversation state across sessions. To restart from the beginning with the same user ID:
+
+1. Type: `reset`
+2. Type any message (e.g., `hello`) to start a fresh conversation
+
+This clears all conversation history and context for that user.
+
+#### Step 6: (Optional) Switch Back to Default Prompt
+
+To return to the default prompt configuration:
+
+```bash
+# Unset the custom prompt variable
+unset LG_PROMPT_LAPTOP_REFRESH
+
+# Uninstall the current deployment
+make helm-uninstall NAMESPACE=$NAMESPACE
+
+# Reinstall with the default prompt configuration
+make helm-install-test NAMESPACE=$NAMESPACE
+```
+
+**You should now be able to:**
+- ✓ Deploy with alternative prompt configurations
+- ✓ Compare agent behavior with different prompts
+- ✓ Experiment with prompt optimization
+- ✓ Understand the impact of prompt design on agent performance
+
+---
+
+### 3.10 Cleaning up
+
+You can stop the deployed quickstart by running:
+
+```bash
+make helm-uninstall NAMESPACE=$NAMESPACE
+```
+
+This will remove all deployed services, pods, and resources from your namespace.
+
+
+---
+
 ## 4. PERFORMANCE & SCALING
 
 The Self-Service Agent quickstart is designed for scalability using standard Kubernetes and cloud-native patterns. All core components can be scaled using familiar Kubernetes techniques—horizontal pod autoscaling, replica sets, and resource limits—without requiring custom scaling logic or architectural changes.
@@ -1090,7 +1293,28 @@ For comprehensive scaling guidance, detailed performance characteristics, compon
 
 ---
 
-## 5. GOING DEEPER: COMPONENT DOCUMENTATION
+## 5. SECURITY
+
+Security is a key aspect of production deployments. While this quickstart works to avoid common security issues, the security requirements and
+implementation will often be specific to your organization. A few aspects that you will need to extend the quickstart if/when you use it in production
+would include:
+
+1. **Management of sensitive information in logs and traces**: The quickstart does not currently redact information from logs or traces. This means
+that you will either need to manage access to traces and logs to account for potentially sensitive information like employee name and email address
+or extend it to redact information based on your organizations policies.
+2. **Credential management**: Credentials are set in the quickstart in order to make it easy for people to get started and easily deploy the quickstart.
+When deploying to production you will need to manage credentials in accordance with your organizations requirements including potentially managing
+them through vaults and planning for credential rotation. These more advanced techniques are not covered in the quickstart.
+3. **Database, Kafka configuration**: Production configuration and security hardening for components like the database and Kafka, are not covered
+as they will often be existing components within an organization which have already been configured and hardened to meet the organizations requirements
+for scaling and security.
+4. **Network security**: While access to pods within the deployment has been restricted by network policy to only other pods within the deployment
+namespace with the exception of the route which allows slack to communicate with the deployment, you should review and apply any standard network policies
+that your organization has for OpenShift deployments.
+
+---
+
+## 6. GOING DEEPER: COMPONENT DOCUMENTATION
 
 Now that you have the system running, you can dive deeper into specific components and concepts.
 
@@ -1117,7 +1341,7 @@ Step-by-step guides for integrations, deployment, and advanced features:
 
 Detailed technical documentation for developers:
 
-- [Prompt Configuration](docs/PROMPT_CONFIGURATION_GUIDE.md) - Agent prompt engineering guide
+- [Prompt Configuration](guides/PROMPT_CONFIGURATION_GUIDE.md) - Agent prompt engineering guide
 - [Tracing Implementation](docs/TRACING_IMPLEMENTATION.md) - OpenTelemetry tracing details
 - [Architecture Diagrams](docs/ARCHITECTURE_DIAGRAMS.md) - System architecture diagrams
 - [API Reference](docs/API_REFERENCE.md) - API documentation
@@ -1127,7 +1351,7 @@ Detailed technical documentation for developers:
 ---
 
 
-## 6. CUSTOMIZING FOR YOUR USE CASE
+## 7. CUSTOMIZING FOR YOUR USE CASE
 
 The laptop refresh example demonstrates all components. This section guides you in adapting the quickstart for your own IT process.
 
@@ -1198,9 +1422,9 @@ How will you evaluate the agent?
 - Did generated PIA meet compliance standards?
 - Was submission successful?
 
-## 7. NEXT STEPS AND ADDITIONAL RESOURCES
+## 8. NEXT STEPS AND ADDITIONAL RESOURCES
 
-### 7.1 What You've Accomplished
+### 8.1 What You've Accomplished
 
 By completing this quickstart, you have:
 
@@ -1210,11 +1434,11 @@ By completing this quickstart, you have:
 - ✓ Run evaluations to validate agent behavior
 - ✓ Learned how to customize the system for your own use cases
 
-### 7.2 Recommended Next Steps
+### 8.2 Recommended Next Steps
 
 **For Development Teams:**
 1. Review the [Contributing Guide](docs/CONTRIBUTING.md) for development setup and workflow
-2. Explore the component documentation in Section 5 for deeper technical details
+2. Explore the component documentation in Section 6 for deeper technical details
 3. Review the evaluation framework to understand quality metrics
 4. Experiment with customizing the laptop refresh agent prompts
 5. Set up observability and monitoring for your deployment
@@ -1226,7 +1450,7 @@ By completing this quickstart, you have:
 4. Plan integration with your existing IT service management systems
 
 **For Customizing to Your Use Case:**
-1. Follow the planning guide in Section 6
+1. Follow the planning guide in Section 7
 2. Review the laptop refresh implementation as a reference in the [Component Guide](guides/COMPONENT_GUIDE.md)
 3. Start with agent configuration and knowledge base development
 4. Build MCP servers for your external systems

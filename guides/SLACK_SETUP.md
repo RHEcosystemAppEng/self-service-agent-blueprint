@@ -9,8 +9,6 @@ The Slack integration provides two-way communication between users and the AI ag
 ## Prerequisites
 
 - Slack workspace with admin permissions
-- Deployed Self-Service Agent system
-- Integration Dispatcher route URL
 
 ## Quick Setup
 
@@ -20,20 +18,65 @@ The Slack integration provides two-way communication between users and the AI ag
 2. Click **"Create New App"**
 3. Choose **"From an app manifest"**
 4. Select your workspace
-5. Copy and paste the contents of [`slack-app-manifest.json`](slack-app-manifest.json)
+5. Copy and paste the contents of [`slack-app-manifest.json`](../slack-app-manifest.json)
 6. Click **"Next" → "Create"**
 
-### Step 2: Get Integration Dispatcher Route
+### Step 2: Install App
+
+1. Go to **"Install App"**
+2. Click **"Install to Workspace"**
+3. Authorize the app
+
+### Step 3: Get Credentials
+
+1. **Bot User OAuth Token** (starts with `xoxb-`, shown when you install)
+2. **Signing Secret** (from **Basic Information** → **App Credentials** → **Signing Secret**)
+
+### Step 4: Deploy with Slack Configuration
+
+Remove the deployment, export the Slack signing secret and tokens replacing XXXXXX
+and YYYYYY with the tokens from step 3 and then re-install:
+
+```bash
+make helm-uninstall NAMESPACE=$NAMESPACE
+
+export SLACK_BOT_TOKEN=xoxb-XXXXXX
+export SLACK_SIGNING_SECRET=YYYYYY
+
+make helm-install-test NAMESPACE=$NAMESPACE
+```
+
+Make sure to save the URLs printed out after the install completes, as shown below. The URLs will be specific to your namespace and cluster. You will be using the three Slack URLs in the next step.
+
+```
+--- Your Integration Dispatcher URLs are: ---
+  OpenAPI Schema: https://ssa-integration-dispatcher-test.apps.ai-dev02.kni.syseng.devcluster.openshift.com/docs
+  Health: https://ssa-integration-dispatcher-test.apps.ai-dev02.kni.syseng.devcluster.openshift.com/health
+  Slack Events: https://ssa-integration-dispatcher-test.apps.ai-dev02.kni.syseng.devcluster.openshift.com/slack/events
+  Slack Interactive: https://ssa-integration-dispatcher-test.apps.ai-dev02.kni.syseng.devcluster.openshift.com/slack/interactive
+  Slack Commands: https://ssa-integration-dispatcher-test.apps.ai-dev02.kni.syseng.devcluster.openshift.com/slack/commands
+```
+
+If necessary, you can get the URL part that is specific to your deployment with:
 
 ```bash
 kubectl get route -n ${NAMESPACE:-default} | grep integration-dispatcher
 ```
 
-The URL will be: `https://ssa-integration-dispatcher-${NAMESPACE}.${DOMAIN}`
+### Step 5: Verify Configuration
 
-### Step 3: Configure Request URLs
+```bash
+# Check integration health
+kubectl exec deployment/self-service-agent-integration-dispatcher -n $NAMESPACE -- \
+  curl -s http://localhost:8080/health/detailed | jq '.integrations_available'
 
-After creating the app, update the placeholder URLs:
+```
+
+Look for `"SLACK"` in the `integrations_available` array.
+
+### Step 6: Update Slack App URLs
+
+Go back to the Slack API configuration pages and update the placeholder URLs as follows:
 
 1. **Event Subscriptions**:
    - Update Request URL to: `https://your-integration-dispatcher-route/slack/events`
@@ -47,48 +90,9 @@ After creating the app, update the placeholder URLs:
   - Update Request URL to: `https://your-integration-dispatcher-route/slack/commands`
   - Click **"Save Changes"**
 
-### Step 4: Install App
+At this point you should have a working Slack bot and can start to interact with the
+self-service-agent through the Slack interface.
 
-1. Go to **"Install App"**
-2. Click **"Install to Workspace"**
-3. Authorize the app
-
-### Step 5: Get Credentials
-
-1. **Bot User OAuth Token** (starts with `xoxb-`)
-2. **Signing Secret** (from Basic Information)
-
-### Step 6: Deploy with Slack Configuration
-
-Pass configuration directly via `EXTRA_HELM_ARGS`:
-
-```bash
-make helm-install-test NAMESPACE=your-namespace \
-  EXTRA_HELM_ARGS="\
-    --set-string security.slack.botToken=xoxb-your-actual-bot-token \
-    --set-string security.slack.signingSecret=your-actual-signing-secret"
-```
-
-**Note:**
-- Use `--set-string` for all values to ensure proper string handling
-
-### Step 7: Restart Integration Dispatcher
-
-```bash
-kubectl rollout restart deployment/self-service-agent-integration-dispatcher -n ${NAMESPACE:-default}
-```
-
-### Step 8: Verify Configuration
-
-```bash
-# Check Integration Dispatcher logs
-kubectl logs deployment/self-service-agent-integration-dispatcher -n ${NAMESPACE:-default} | grep -i slack
-
-# Check integration health
-curl http://localhost:8080/health
-```
-
-Look for `"SLACK"` in the `integrations_available` array.
 
 ## Integration Defaults
 
