@@ -35,6 +35,26 @@ jobs:
             exit 1
           fi
 
+      - name: Validate ServiceNow secrets
+        shell: bash
+        env:
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SERVICENOW_API_KEY: ${{ secrets.SERVICENOW_API_KEY }}
+          SERVICENOW_LAPTOP_REFRESH_ID: ${{ secrets.SERVICENOW_LAPTOP_REFRESH_ID }}
+        run: |
+          if [ -z "${SERVICENOW_INSTANCE_URL}" ]; then
+            echo "SERVICENOW_INSTANCE_URL secret is missing or empty. Set it in repository or organization secrets."
+            exit 1
+          fi
+          if [ -z "${SERVICENOW_API_KEY}" ]; then
+            echo "SERVICENOW_API_KEY secret is missing or empty. Set it in repository or organization secrets."
+            exit 1
+          fi
+          if [ -z "${SERVICENOW_LAPTOP_REFRESH_ID}" ]; then
+            echo "SERVICENOW_LAPTOP_REFRESH_ID secret is missing or empty. Set it in repository or organization secrets."
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v5
 
@@ -73,6 +93,9 @@ jobs:
           LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL_70B }}
           LLM_ID: ${{ vars.LLM_ID_INFERENCE }}
           LLM: ${{ vars.LLM_ID_INFERENCE }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SERVICENOW_API_KEY: ${{ secrets.SERVICENOW_API_KEY }}
+          SERVICENOW_LAPTOP_REFRESH_ID: ${{ secrets.SERVICENOW_LAPTOP_REFRESH_ID }}
 
       - name: Install evaluations dependencies
         shell: bash
