@@ -238,11 +238,7 @@ class ServiceNowCatalogAutomation:
                 "value": choice["value"],
                 "order": (i + 1) * 100,
                 "price": choice.get("price", 0.0),
-                "recurring_price": choice.get("recurring_price", 0.0),
                 "price_currency": choice.get("price_currency", "USD"),
-                "recurring_price_currency": choice.get(
-                    "recurring_price_currency", "USD"
-                ),
             }
 
             self.create_choice_option(choice_data)
@@ -276,15 +272,9 @@ class ServiceNowCatalogAutomation:
 
             # Add pricing fields if they exist
             if "price" in choice_data:
-                choice_payload["price"] = choice_data["price"]
-            if "recurring_price" in choice_data:
-                choice_payload["recurring_price"] = choice_data["recurring_price"]
+                choice_payload["misc"] = choice_data["price"]
             if "price_currency" in choice_data:
                 choice_payload["price_currency"] = choice_data["price_currency"]
-            if "recurring_price_currency" in choice_data:
-                choice_payload["recurring_price_currency"] = choice_data[
-                    "recurring_price_currency"
-                ]
 
             # Create choice
             create_url = f"{self.instance_url}/api/now/table/question_choice"
