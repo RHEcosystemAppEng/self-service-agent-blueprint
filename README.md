@@ -681,7 +681,6 @@ Log into your ServiceNow instance and:
 
 <img src="guides/images/request-details.png" alt="Requests Table" width="450">
 
-
 **You should now be able to:**
 - ✓ Connect to production ServiceNow instance
 - ✓ Create real tickets from agent conversations
