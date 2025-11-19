@@ -1185,3 +1185,30 @@ else
 OC = $(shell which oc)
 endif
 endif
+
+# Jaeger deployment targets
+.PHONY: jaeger-deploy
+jaeger-deploy:
+	@echo "Deploying Jaeger all-in-one to namespace $(NAMESPACE)..."
+	@kubectl create deployment jaeger --image=cr.jaegertracing.io/jaegertracing/jaeger:2.12.0 -n $(NAMESPACE) || echo "Deployment already exists"
+	@kubectl expose deployment jaeger --port=16686 --name=jaeger-ui -n $(NAMESPACE) || echo "Service already exists"
+	@kubectl expose deployment jaeger --port=4318 --name=jaeger-otlp-http -n $(NAMESPACE) || echo "OTLP HTTP service already exists"
+	@kubectl expose deployment jaeger --port=4317 --name=jaeger-otlp-grpc -n $(NAMESPACE) || echo "OTLP gRPC service already exists"
+	@oc create route edge jaeger-ui --service=jaeger-ui -n $(NAMESPACE) || echo "Route already exists"
+	@echo "✅ Jaeger deployed successfully!"
+	@echo ""
+	@echo "📊 Jaeger UI: https://$$(oc get route jaeger-ui -n $(NAMESPACE) -o jsonpath='{.spec.host}')"
+	@echo ""
+	@echo "To enable tracing in the self-service-agent, redeploy with:"
+	@echo "  export OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger-otlp-http.$(NAMESPACE).svc.cluster.local:4318"
+	@echo "  make helm-install-test NAMESPACE=$(NAMESPACE)"
+	@echo ""
+	@echo "Note: The endpoint should NOT include '/v1/traces' - the application adds this automatically"
+
+.PHONY: jaeger-undeploy
+jaeger-undeploy:
+	@echo "Removing Jaeger from namespace $(NAMESPACE)..."
+	@oc delete route jaeger-ui -n $(NAMESPACE) || echo "Route not found"
+	@kubectl delete service jaeger-ui jaeger-otlp-http jaeger-otlp-grpc -n $(NAMESPACE) || echo "Services not found"
+	@kubectl delete deployment jaeger -n $(NAMESPACE) || echo "Deployment not found"
+	@echo "✅ Jaeger removed successfully!"

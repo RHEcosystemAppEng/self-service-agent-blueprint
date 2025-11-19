@@ -21,8 +21,8 @@
    - [Integration with Slack (Optional)](#33-integration-with-slack-optional)
    - [Integration with Real ServiceNow (Optional)](#34-integration-with-real-servicenow-optional)
    - [Integration with Email (Optional)](#35-integration-with-email-optional)
-   - [Setting up Safety Shields (Optional)](#36-setting-up-safety-shields-optional)
-   - [Run Evaluations](#37-run-evaluations)
+   - [Run Evaluations](#36-run-evaluations)
+   - [Setting up Safety Shields (Optional)](#37-setting-up-safety-shields-optional)
    - [Follow the Flow with Tracing](#38-follow-the-flow-with-tracing)
    - [Trying out Smaller Prompts](#39-trying-out-smaller-prompts)
    - [Cleaning up](#310-cleaning-up)
@@ -782,9 +782,222 @@ Reply to the agent's email to test conversation threading:
 
 ---
 
-### 3.6 Setting up Safety Shields (Optional)
+### 3.6 Run Evaluations
+
+The evaluation framework validates agent behavior against business requirements and quality metrics. Generative AI agents are non-deterministic by nature, meaning their responses can vary across conversations even with identical inputs. Multiple different responses can all be "correct," making traditional software testing approaches insufficient. This probabilistic behavior creates unique challenges:
+
+- **Sensitivity to Change**: Small changes to prompts, models, or configurations can introduce subtle regressions that are difficult to detect through manual testing
+- **Business Requirements Validation**: Traditional testing can't verify that agents correctly follow domain-specific policies and business rules across varied conversations
+- **Quality Assurance Complexity**: Manual testing is time-consuming and can't cover the wide range of conversation paths and edge cases
+- **Iterative Development**: Without automated validation, it's difficult to confidently make improvements without risking regressions
+
+The evaluation framework addresses these challenges by combining predefined test conversations with AI-generated scenarios, applying metrics to assess both conversational quality and business process compliance. This was a crucial tool in the development of this quickstart, enabling PR validation, model comparison, prompt evaluation, and identification of common conversation failures.
+
+This section walks you through generating conversations with the deployed system and evaluating them. More detailed information on the evaluation system is in the [Evaluation Framework Guide](guides/EVALUATIONS_GUIDE.md).
+
+#### Step 1: Configure Evaluation Environment
+
+Start by setting up your environment with the references to the LLM that will be used for evaluation. In most
+cases you will need to use a model which is as strong or stronger than the model used for the agent. We recommend
+that you use llama-3-3-70b-instruct-w8a8 as is recommended for the agent. 
+
+```bash
+cd evaluations/
+
+# Set LLM endpoint for evaluation (can use different model than agent)
+export LLM_API_TOKEN=your-api-token
+export LLM_URL=https://your-evaluation-llm-endpoint
+export LLM_ID=llama-3-3-70b-instruct-w8a8
+
+uv venv
+source .venv/bin/activate
+uv sync
+```
+
+#### Step 2: Run Predefined Conversation Flows
+
+Execute the predefined conversation flows against your deployed agent:
+
+```bash
+# Run predefined conversations
+python run_conversations.py
+```
+
+This runs the pre-defined conversations in [evaluations/conversations_config/conversations/](https://github.com/RHEcosystemAppEng/self-service-agent-blueprint/tree/main/evaluations/conversations_config/conversations).
+
+**Expected outcome:**
+- ✓ Conversations executed against deployed agent
+- ✓ Results saved to `results/conversation_results/`
+- ✓ Files like `success-flow-1.json`, `edge-case-ineligible.json`
+
+Review a conversation result:
+```bash
+cat results/conversation_results/success-flow-1.json
+```
+
+You should see the complete conversation with agent responses at each turn. This is how you can test conversation flows
+that can be defined in advance.
+
+#### Step 3: Generate Synthetic Test Conversations
+
+In addition to pre-defined flows we want to be able to test conversations with more variability.
+Create additional test scenarios using the conversation generator (generate.py):
+
+```bash
+# Generate 5 synthetic conversations
+python generator.py 5 --max-turns 20
+```
+
+**Expected outcome:**
+- ✓ 5 generated conversations saved to `results/conversation_results/`
+- ✓ Diverse scenarios with varied user inputs
+
+#### Step 4: Evaluate All Conversations
+
+Run the evaluation metrics against all conversation results:
+
+```bash
+# Evaluate with business metrics
+python deep_eval.py
+```
+
+**Expected outcome:**
+- ✓ Each conversation evaluated against 15 metrics
+- ✓ Results saved to `results/deep_eval_results/`
+- ✓ Aggregate metrics in `deepeval_all_results.json`
+
+#### Step 5: Review Evaluation Results
+
+The results were displayed on the screen at the end of the run and are
+also stored in results/deep_eval_results/deepeval_all_results.json.
+
+```bash
+# View evaluation summary
+cat results/deep_eval_results/deepeval_all_results.json
+```
+
+**Key metrics to review:**
+
+Standard Conversational Metrics:
+- **Turn Relevancy**: Are responses relevant to user messages? (Threshold: > 0.8)
+- **Role Adherence**: Do agents stay within their roles? (Threshold: > 0.5)
+- **Conversation Completeness**: Were all user requests addressed? (Threshold: > 0.8)
+
+Laptop Refresh Process Metrics:
+- **Information Gathering**: Did agent collect required data? (Threshold: > 0.8)
+- **Policy Compliance**: Did agent follow 3-year refresh policy correctly? (Threshold: > 0.8)
+- **Option Presentation**: Were laptop options shown correctly? (Threshold: > 0.8)
+- **Process Completion**: Were tickets created successfully? (Threshold: > 0.8)
+- **User Experience**: Was agent helpful and clear? (Threshold: > 0.8)
+
+Quality Assurance Metrics:
+- **Flow Termination**: Does conversation end properly? (Threshold: > 0.8)
+- **Ticket Number Validation**: ServiceNow format (REQ prefix)? (Threshold: 1.0)
+- **Correct Eligibility Validation**: Accurate 3-year policy timeframe? (Threshold: 1.0)
+- **No Errors Reported**: No system problems? (Threshold: 1.0)
+- **Correct Laptop Options for Location**: All region-specific models presented? (Threshold: 1.0)
+- **Confirmation Before Ticket Creation**: Agent requests approval before creating ticket? (Threshold: 1.0)
+- **Return to Router After Task Completion**: Proper routing when user says no? (Threshold: > 1.0)
+
+Each of these metrics is defined in [evaluations/get_deepeval_metrics.py](https://github.com/RHEcosystemAppEng/self-service-agent-blueprint/blob/main/evaluations/get_deepeval_metrics.py). Metrics tell a judge LLM how to evaluate the conversation. As an example:
+
+```python
+        ConversationalGEval(
+            name="Policy Compliance",
+            threshold=0.8,
+            model=custom_model,
+            evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
+            evaluation_steps=[
+                "First, review the laptop refresh policy in the additional context below to understand the eligibility criteria. The policy specifies how many years a laptop must be in use before it is eligible for refresh.",
+                "Verify the assistant correctly applies the laptop refresh policy when determining eligibility.",
+                "If the agent states the laptop age (e.g., '2 years and 11 months old', '5 years old', '3.5 years old'), verify the eligibility determination is logically accurate based on the policy in the additional context:",
+                "  - Compare the stated laptop age against the refresh cycle specified in the policy",
+                "  - Laptops younger than the refresh cycle should be marked as NOT eligible or not yet eligible",
+                "  - Laptops that meet or exceed the refresh cycle age should be marked as eligible",
+                "Check for logical contradictions: If the agent states a laptop age and eligibility status that contradict each other based on the policy (e.g., says '2 years 11 months old' but states 'eligible' when the policy requires 3 years), this is a FAILURE.",
+                "Verify the assistant provides clear policy explanations when discussing eligibility.",
+                f"\n\nadditional-context-start\n{default_context}\nadditional-context-end",
+            ],
+        ),
+```
+
+When metrics fail, the rationale for the failure will be explained by the judge LLM. An easy way to see an example of this is to run
+
+```
+python evaluate.py --check
+```
+
+which runs known bad conversations to validate that they are flagged as bad by the metrics. The known bad conversations are in
+[evaluations/results/known_bad_conversation_results/](evaluations/results/known_bad_conversation_results). An example of a failure
+would be:
+
+```bash
+   ⚠️ wrong_eligibility.json: 1/15 metrics failed (as expected: False)
+      Failed metrics:
+        • Policy Compliance [Conversational GEval] (score: 0.000) - The conversation completely fails to meet the criteria because the assistant incorrectly determines the user's eligibility for a laptop refresh, stating the laptop is eligible when it is only 2 years and 11 months old, which is less than the 3-year refresh cycle specified in the policy.
+
+```
+
+Running python evaluate.py --check validates that your model is strong enough to catch the cases covered by the metrics. If you use a weaker model
+you may find that some of these conversations pass instead of failing. This option was used during development to ensure that as we changed the metrics they still worked as expected.
+
+
+#### Step 6: Run Complete Evaluation Pipeline
+
+In the earlier steps we ran each of the evaluation components on their own. Most often we want to run the full pipeline
+on a PR or after having made significant changes. You can do this with evaluate.py.
+
+Run the full pipeline in one command (this will take a little while):
+
+```bash
+# Complete pipeline: predefined + generated + evaluation
+python evaluate.py --num-conversations 5
+```
+
+**Expected outcome:**
+- ✓ Predefined flows executed
+- ✓ 5 synthetic conversations generated
+- ✓ All conversations evaluated
+- ✓ Comprehensive results report with aggregate metrics
+- ✓ Identification of failing conversations for debugging
+
+
+The [Makefile](Makefile) includes a number of targets that can be used to run evaluations either on PRs or on a scheduled basis:
+
+```bash
+# Run a quick evaluation with 1 synthetic conversation
+make test-short-resp-integration-request-mgr
+
+# Run evaluation with 20 synthetic conversations
+make test-long-resp-integration-request-mgr
+
+# Run evaluation with 4 concurrent sessions for a total of 40 synthetic conversations
+make test-long-concurrent-integration-request-mgr
+```
+
+These targets automatically:
+- Set up the evaluation environment
+- Run predefined conversations
+- Generate synthetic conversations (1, 20, or 40 depending on target)
+- Execute all evaluation metrics
+- Display results with pass/fail status
+
+**You should now be able to:**
+- ✓ Execute evaluation pipelines
+- ✓ Generate synthetic test conversations
+- ✓ Evaluate agent performance with business metrics
+- ✓ Identify areas for improvement
+- ✓ Validate agent behavior before production deployment
+- ✓ Catch regressions when updating prompts or models
+- ✓ Configure your CI to run evaluations
+
+---
+
+### 3.7 Setting up Safety Shields (Optional)
 
 Safety shields provide content moderation for AI agent interactions, validating user input and agent responses against safety policies using Llama Guard 3 or compatible models.
+
+Depending on your model, prompting approach and trust in your end users they may also be critical for avoiding [prompt injection](https://www.ibm.com/think/topics/prompt-injection) attacks. A common model used with llama stack to prevent these types of attack is [PromptGuard](https://arxiv.org/abs/2509.08910). The quickstart currently allows Llama Guard to be easily configured and we plan to add similar ease of use for PromptGuard in a later version as we have found that when using llama 70b the protection provided by PromptGuard is needed when using the "big" prompt as outlined in [section 3.9 Trying out Smaller Prompts](#39-trying-out-smaller-prompts).
 
 #### When to Enable Safety Shields
 
@@ -799,42 +1012,55 @@ Common safety models like llama-guard that are desired for interaction with exte
 be suited for the content of common IT processes. We have disabled a number of the categories
 for which we regularly saw false positives.
 
+In the case of an internal self-service IT agent, due to the risk of false positives we would generally avoid using Llama Guard. On the other hand, we would recommend using something like PromptGuard unless the model being used has enough built-in protections.
+
 For development and testing, shields can be disabled for faster iteration.
 
-#### Step 1: Deploy with Safety Shield Configuration
+#### Step 1: Setup Safety Shield Configuration
 
 Safety shields require an OpenAI-compatible moderation API endpoint:
 
 ```bash
-# Deploy with safety shields enabled
-make helm-install-test NAMESPACE=$NAMESPACE \
-  LLM=llama-3-3-70b-instruct-w8a8
-  LLM_API_TOKEN=your-api-token
-  LLM_URL=https://your-llm-endpoint
-  SAFETY=meta-llama/Llama-Guard-3-8B \
-  SAFETY_URL=https://api.example.com/v1
+# provide information needed to access safety shields
+export SAFETY=meta-llama/Llama-Guard-3-8B
+export SAFETY_URL=https://api.example.com/v1
+
+# deploy with safety shields enabled
+make helm-uninstall NAMESPACE=$NAMESPACE
+make helm-install-test NAMESPACE=$NAMESPACE
 ```
 
 **Note**:
 - Replace `https://api.example.com/v1` with your actual moderation API endpoint
 - The endpoint must support the OpenAI-compatible `/v1/moderations` API
-- For in-cluster deployments, you can use a vLLM instance (e.g., `http://vllm-service:8000/v1`)
 - If `SAFETY` and `SAFETY_URL` are not set, shields will be automatically disabled even if configured in agent YAML files
 
 #### Step 2: Configure Agent-Level Shields
 
-Edit your agent configuration file (e.g., `agent-service/config/agents/laptop-refresh-agent.yaml`):
+You can skip this step if you are using meta-llama/Llama-Guard-3-8B and have set the SAFETY and SAFETY_URL
+fields as shown above.
+
+The default configuration for the laptop refresh specialist agent is to use meta-llama/Llama-Guard-3-8B
+if it has been enabled. If you want to use another safety shield you will need to: 
+
+1. Edit your agent configuration file (e.g., `agent-service/config/agents/laptop-refresh-agent.yaml`):
 
 ```yaml
-name: "laptop-refresh"
-description: "An agent that can help with laptop refresh requests."
-
-# Input shields - validate user input before processing
 input_shields: ["meta-llama/Llama-Guard-3-8B"]
-
-# Output shields - validate agent responses before delivery
 output_shields: []
+# Categories to ignore for false positives (too aggressive for business workflows)
+# Input shield ignores: categories to allow in user input
+ignored_input_shield_categories:
+  - "Code Interpreter Abuse"  # Normal tool/MCP usage flagged incorrectly
+  - "Specialized Advice"  # IT support requests flagged as specialized advice
+  - "Privacy"  # Employee info requests are legitimate in IT support context
+  - "Self-Harm"  # False positives on common words like "yes"
+# Output shield ignores: categories to allow in agent responses
+ignored_output_shield_categories: []
+
 ```
+
+Update the shield names in the configuration to use your preferred safety models.
 
 **Shield Configuration Options:**
 - **`input_shields`**: List of models to validate user messages (recommended)
@@ -842,7 +1068,24 @@ output_shields: []
 - **`ignored_input_shield_categories`**: Categories to allow in user input (handles false positives)
 - **`ignored_output_shield_categories`**: Categories to allow in agent responses
 
-#### Step 3: Test Safety Shields
+2. Rebuild the container images:
+
+```bash
+export REGISTRY=quay.io/your-org
+make build-all-images
+make push-all-images
+```
+
+#### Step 3: Deploy with Safety Shields
+
+Deploy with safety shields enabled:
+
+```bash
+make helm-uninstall NAMESPACE=$NAMESPACE
+make helm-install-test NAMESPACE=$NAMESPACE
+```
+
+#### Step 4: Test Safety Shields
 
 After deploying with shields enabled, test that they're working:
 
@@ -854,6 +1097,20 @@ oc logs deployment/self-service-agent-agent-service -n $NAMESPACE | grep -i shie
 # INFO: Input shields configured: ['meta-llama/Llama-Guard-3-8B']
 # INFO: Ignored input categories: {'Code Interpreter Abuse', 'Privacy', ...}
 ```
+
+You can now run a conversation and see the effect of the Safety shield:
+
+```bash
+export REQUEST_MANAGER_POD=$(oc get pod -n $NAMESPACE -l app=self-service-agent-request-manager -o jsonpath='{.items[0].metadata.name}')
+
+# Start interactive chat session
+oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
+  python test/chat-responses-request-mgr.py \
+  --user-id alice.johnson@company.com
+```
+
+If necessary remember to use `reset` to restart the conversation and then when you get to the laptop refresh specialist try out with some
+messages that could trigger the shields. For example "how would I hurt a penguin" should result in something like "I cannot help you with that".
 
 #### Common Shield Categories
 
@@ -884,137 +1141,6 @@ For comprehensive safety shields documentation, see the [Safety Shields Guide](g
 
 ---
 
-### 3.7 Run Evaluations
-
-The evaluation framework validates agent behavior against business requirements and quality metrics. Generative AI agents are non-deterministic by nature, meaning their responses can vary across conversations even with identical inputs. Multiple different responses can all be "correct," making traditional software testing approaches insufficient. This probabilistic behavior creates unique challenges:
-
-- **Sensitivity to Change**: Small changes to prompts, models, or configurations can introduce subtle issues that are difficult to manually identify
-- **Business Requirements**: Agents must validate business-specific requirements such as policy compliance and information gathering
-- **Quality Assurance**: Ensures agents meet quality standards before deployment and catch regressions during updates
-- **Continuous Iteration**: Provides automated validation as you develop and iterate on your agentic IT process implementations
-
-The evaluation framework addresses these challenges by combining predefined test conversations with AI-generated scenarios, applying metrics to assess both conversational quality and business process compliance. This was a crucial tool in the development of this quickstart, enabling PR validation, model comparison, prompt evaluation, and identification of common conversation failures.
-
-#### Step 1: Configure Evaluation Environment
-
-```bash
-cd evaluations/
-
-# Set LLM endpoint for evaluation (can use different model than agent)
-export LLM_API_TOKEN=your-evaluation-llm-token
-export LLM_URL=https://your-evaluation-llm-endpoint
-export LLM_ID=your-model-id
-
-# Install evaluation dependencies (using pip for evaluation framework)
-# Note: The evaluation framework uses pip; the main services use uv
-pip install -e .
-```
-
-#### Step 2: Run Predefined Conversation Flows
-
-Execute the predefined conversation flows against your deployed agent:
-
-```bash
-# Run predefined conversations
-python run_conversations.py
-```
-
-**Expected outcome:**
-- ✓ Conversations executed against deployed agent
-- ✓ Results saved to `results/conversation_results/`
-- ✓ Files like `success-flow.json`, `edge-case-ineligible.json`
-
-Review a conversation result:
-```bash
-cat results/conversation_results/success-flow.json
-```
-
-You should see the complete conversation with agent responses at each turn.
-
-#### Step 3: Generate Synthetic Test Conversations
-
-Create additional test scenarios using the conversation generator:
-
-```bash
-# Generate 5 synthetic conversations
-python generator.py 5 --max-turns 20
-```
-
-**Expected outcome:**
-- ✓ 5 generated conversations saved to `results/conversation_results/`
-- ✓ Diverse scenarios with varied user inputs
-- ✓ Different edge cases automatically explored
-
-#### Step 4: Evaluate All Conversations
-
-Run the evaluation metrics against all conversation results:
-
-```bash
-# Evaluate with business metrics
-python deep_eval.py
-```
-
-**Expected outcome:**
-- ✓ Each conversation evaluated against 15 metrics
-- ✓ Results saved to `results/deep_eval_results/`
-- ✓ Aggregate metrics in `deepeval_all_results.json`
-
-#### Step 5: Review Evaluation Results
-
-```bash
-# View evaluation summary
-cat results/deep_eval_results/deepeval_all_results.json
-```
-
-**Key metrics to review:**
-
-Standard Conversational Metrics:
-- **Turn Relevancy**: Are responses relevant to user messages? (Threshold: > 0.8)
-- **Role Adherence**: Do agents stay within their roles? (Threshold: > 0.5)
-- **Conversation Completeness**: Were all user requests addressed? (Threshold: > 0.8)
-
-Laptop Refresh Process Metrics:
-- **Information Gathering**: Did agent collect required data? (Threshold: > 0.8)
-- **Policy Compliance**: Did agent follow 3-year refresh policy correctly? (Threshold: > 0.8)
-- **Option Presentation**: Were laptop options shown correctly? (Threshold: > 0.8)
-- **Process Completion**: Were tickets created successfully? (Threshold: > 0.8)
-- **User Experience**: Was agent helpful and clear? (Threshold: > 0.8)
-
-Quality Assurance Metrics:
-- **Flow Termination**: Does conversation end properly? (Threshold: > 0.8)
-- **Ticket Number Validation**: ServiceNow format (REQ prefix)? (Threshold: 1.0)
-- **Correct Eligibility Validation**: Accurate 3-year policy timeframe? (Threshold: 1.0)
-- **No Errors Reported**: No system problems? (Threshold: 1.0)
-- **Correct Laptop Options for Location**: All region-specific models presented? (Threshold: 1.0)
-- **Confirmation Before Ticket Creation**: Agent requests approval before creating ticket? (Threshold: 1.0)
-- **Return to Router After Task Completion**: Proper routing when user says no? (Threshold: > 0.5)
-
-#### Step 6: Run Complete Evaluation Pipeline
-
-Run the full pipeline in one command:
-
-```bash
-# Complete pipeline: predefined + generated + evaluation
-python evaluate.py --num-conversations 5
-```
-
-**Expected outcome:**
-- ✓ Predefined flows executed
-- ✓ 5 synthetic conversations generated
-- ✓ All conversations evaluated
-- ✓ Comprehensive results report with aggregate metrics
-- ✓ Identification of failing conversations for debugging
-
-**You should now be able to:**
-- ✓ Execute evaluation pipelines
-- ✓ Generate synthetic test conversations
-- ✓ Evaluate agent performance with business metrics
-- ✓ Identify areas for improvement
-- ✓ Validate agent behavior before production deployment
-- ✓ Catch regressions when updating prompts or models
-
----
-
 ### 3.8 Follow the Flow with Tracing
 
 Agentic systems involve complex interactions between multiple components—routing agents, specialist agents, knowledge bases, MCP servers, and external systems—making production debugging challenging without proper visibility. Distributed tracing addresses these challenges by providing:
@@ -1031,21 +1157,28 @@ The system includes OpenTelemetry support for distributed tracing across all com
 
 Before enabling distributed tracing, you need to set up an OpenTelemetry collector to receive, process, and visualize traces.
 
-if you want a more detailed information/understanding you can check out [this quickstart](https://github.com/rh-ai-quickstart/lls-observability), we've extracted the key steps below
+If you want more detailed information and understanding you can check out [this quickstart](https://github.com/rh-ai-quickstart/lls-observability).
+
+For the purpose of this quickstart we've outlined two options for deploying Jaeger in order to collect traces:
+
+* Option 1: Simple Jaeger All-in-One (Development/Testing)
+* Option 2: OpenShift Observability with Tempo (Production)
+
+You can use either one while following through the quickstart.
 
 **Option 1: Simple Jaeger All-in-One (Development/Testing)**
 
-For quick setup, deploy Jaeger with built-in OTLP support. The all-in-one image includes collector, storage, query service, and UI in a single container.
+This option uses an all in one image that includes the collector, storage, query service, and UI in a single container as outlined
+in [Jaeger Getting Started Guide](https://www.jaegertracing.io/docs/latest/getting-started/). It is not suitable for production
+as it is limited to in-memory storage as an example.
+
+We've included a Makefile target to make it easy to install and uninstall. 
+
+To deploy run:
 
 ```bash
-# Deploy Jaeger (example deployment available in official docs)
-export NAMESPACE=your-namespace
-export OTEL_EXPORTER_OTLP_ENDPOINT="http://jaeger-collector.${NAMESPACE}.svc.cluster.local:4318"
+make jaeger-deploy NAMESPACE=$NAMESPACE
 ```
-
-**Limitations:** In-memory storage, not suitable for production.
-
-**Reference:** [Jaeger Getting Started Guide](https://www.jaegertracing.io/docs/latest/getting-started/)
 
 **Option 2: OpenShift Observability with Tempo (Production)**
 
@@ -1057,21 +1190,18 @@ For production deployments, use the Red Hat OpenShift distributed tracing platfo
 3. Create OpenTelemetry Collector to forward traces to Tempo
 4. Access Jaeger UI through the exposed route
 
-**Reference:** [OpenShift Distributed Tracing Platform Documentation](https://docs.openshift.com/container-platform/latest/observability/distr_tracing/distr_tracing_tempo/distr-tracing-tempo-installing.html)
+The full steps needed to deploy are outlined in [OpenShift Distributed Tracing Platform Documentation](https://docs.openshift.com/container-platform/latest/observability/distr_tracing/distr_tracing_tempo/distr-tracing-tempo-installing.html)
 
 #### Enabling Tracing in Your Deployment
 
-Once your observability infrastructure is ready, enable tracing by setting the OTLP endpoint:
+Once your observability infrastructure is ready, enable tracing by setting the OTLP endpoint (as shown
+after running make jaeger-deploy if you are using Option1) and redeploy the quickstart:
 
-```bash
-# Set the OTLP endpoint
-export OTEL_EXPORTER_OTLP_ENDPOINT="http://otel-collector.openshift-tracing-system.svc.cluster.local:4318"
-
-# Deploy with tracing enabled
-make helm-install-test NAMESPACE=$NAMESPACE \
-  OTEL_EXPORTER_OTLP_ENDPOINT="$OTEL_EXPORTER_OTLP_ENDPOINT"
 ```
-
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://your-jaeger-url-as-provided-by-jaeger-deploy:4318
+make helm-uninstall NAMESPACE=$NAMESPACE
+make helm-install-test NAMESPACE=$NAMESPACE
+```
 The endpoint will be automatically propagated to all components.
 
 #### Accessing and Viewing Traces
@@ -1091,8 +1221,9 @@ echo "Jaeger UI: https://$JAEGER_UI_URL"
 
 **View Traces:**
 
-1. Generate traces by interacting with the agent (via CLI, Slack, or API)
-2. Open Jaeger UI and select service `self-service-agent-request-manager`
+1. Generate traces by interacting with the agent (via CLI, Slack, or API) as described earlier in the
+   quickstart
+2. Open Jaeger UI and select service `request-manager`
 3. Click "Find Traces" to see recent requests
 4. Click on a trace to view the complete flow including:
    - Request Manager → Agent Service → Llama Stack → MCP Servers
@@ -1101,7 +1232,24 @@ echo "Jaeger UI: https://$JAEGER_UI_URL"
 
 Key spans to look for: `POST /api/v1/requests`, `mcp.tool.get_employee_laptop_info`, `mcp.tool.open_laptop_refresh_ticket`
 
+You can also try selecting other services to find traces that involved a particular component. For example selecting `snow-mcp-server` and then
+Find Traces will show you just the traces that interacted with ServiceNow. If you have only done a single conversation that would include
+one to look up the employee information and one to create the laptop request.
+
+Note that each user request and response from the agent will be in their own trace.
+
 **Troubleshooting:** If traces don't appear, verify `OTEL_EXPORTER_OTLP_ENDPOINT` is set on deployments and check service logs for OpenTelemetry initialization messages
+
+**Cleaning Up:**
+
+If you are finished experimenting with traces and used option 1 to install Jaeger you can stop the Jaeger deployment by running:
+
+```bash
+unset OTEL_EXPORTER_OTLP_ENDPOINT
+make jaeger-undeploy NAMESPACE=$NAMESPACE
+```
+
+You can also leave it running if you want to come back to look at traces later on.
 
 #### Example Trace Hierarchy
 
@@ -1178,23 +1326,7 @@ make helm-install-test NAMESPACE=$NAMESPACE
 - ✓ Helm install completes successfully with new prompt configuration
 - ✓ All pods start and return to Running state
 
-#### Step 2: Verify Deployment
-
-Wait for the agent service to restart and verify it's running:
-
-```bash
-# Check pod status
-oc get pods -n $NAMESPACE -l app=self-service-agent-agent-service
-
-# Check agent service logs for successful startup
-oc logs -n $NAMESPACE -l app=self-service-agent-agent-service --tail=50
-```
-
-**Expected outcome:**
-- ✓ Agent service pod is in Running state
-- ✓ Logs show successful initialization without errors
-
-#### Step 3: Start Interactive Chat Session
+#### Step 2: Start Interactive Chat Session
 
 Use the CLI chat script to start an interactive conversation with the agent:
 
@@ -1213,7 +1345,7 @@ oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
 - Agent sends initial greeting
 - You see a prompt where you can type messages
 
-#### Step 4: Complete Laptop Refresh Workflow
+#### Step 3: Complete Laptop Refresh Workflow
 
 Follow this conversation flow to test the complete laptop refresh process with the multi-part prompt (same workflow as in [Section 3.2](#32-interact-with-the-cli)):
 
@@ -1244,34 +1376,33 @@ Follow this conversation flow to test the complete laptop refresh process with t
 
 **Expected:** Chat session ends
 
-#### Step 5: Compare Agent Behavior
-
-Test the same scenarios you tried in [Section 3.2](#32-interact-with-the-cli) with the default prompt and observe differences:
-
-```bash
-# Test with different user (LATAM region)
-oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
-  python test/chat-responses-request-mgr.py \
-  --user-id maria.garcia@company.com
-
-# Test with user who may not be eligible
-oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
-  python test/chat-responses-request-mgr.py \
-  --user-id john.doe@company.com
-```
-
 **Things to observe:**
 - Response length and verbosity
 - Conversation flow and naturalness
 - Accuracy of information gathering
 - Policy compliance and decision-making
 
-**Note:** The Request Manager retains conversation state across sessions. To restart from the beginning with the same user ID:
+**Behavioral Differences:**
 
-1. Type: `reset`
-2. Type any message (e.g., `hello`) to start a fresh conversation
+While the conversation may seem similar when using the two prompts, the multi-part prompt is more tightly controlled. For example, if you ask a random question it will be handled within the confines of the known states.
 
-This clears all conversation history and context for that user.
+**Multi-part prompt example:**
+```
+User: what is the fastest bird in the world
+Agent: Please let me know if you'd like to proceed with reviewing the available laptop options (yes/no).
+```
+
+**Big prompt example:**
+```
+User: what is the fastest bird in the world
+Agent: I'm happy to help you with your question, but I specialize in laptop refresh and replacement requests. If you'd like to know more about the fastest bird in the world, I can offer to send you back to the routing agent who can connect you with the right specialist. Would you like me to do that?
+```
+
+With the big prompt, we had to specifically instruct it not to answer random questions, whereas the multi-part prompt naturally stays within its defined states.
+
+**Cost Comparison:**
+
+Another important consideration is token usage and cost. The multi-part prompt uses fewer total tokens since each individual prompt sent to the model is smaller, although it makes more requests to the LLM as it flows through different states. To explore this aspect, you can run evaluations as outlined in [Section 3.6 Run Evaluations](#36-run-evaluations) and compare the application tokens used by the big and multi-part prompts.
 
 #### Step 6: (Optional) Switch Back to Default Prompt
 
