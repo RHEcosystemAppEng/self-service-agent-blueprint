@@ -18,19 +18,110 @@
     "name": "PC Refresh",
     "short_description": "Flow to request a PC refresh",
     "laptop_choices": [
-      "Apple MacBook Air M3",
-      "Apple MacBook Pro 14 M3 Pro",
-      "Lenovo ThinkPad T14 Gen 5 Intel",
-      "Lenovo ThinkPad P1 Gen 7",
-      "Apple MacBook Air M2",
-      "Apple MacBook Pro 14 M3",
-      "Lenovo ThinkPad T14 Gen 4 Intel",
-      "Lenovo ThinkPad P16s Gen 2",
-      "Apple MacBook Pro 16 M3 Max",
-      "Lenovo ThinkPad T14s Gen 5 AMD",
-      "Lenovo ThinkPad P16 Gen 2",
-      "Lenovo ThinkPad T14 Gen 5 AMD",
-      "Lenovo ThinkPad P1 Gen 6"
+      {
+        "label": "Apple MacBook Air M3",
+        "value": "apple_mac_book_air_m_3",
+        "price": 1099.0,
+        "recurring_price": 0.0,
+        "price_currency": "USD",
+        "recurring_price_currency": "USD"
+      },
+      {
+        "label": "Apple MacBook Pro 14 M3 Pro",
+        "value": "apple_mac_book_pro_14_m3_pro",
+        "price": 1999.0,
+        "recurring_price": 0.0,
+        "price_currency": "USD",
+        "recurring_price_currency": "USD"
+      },
+      {
+        "label": "Lenovo ThinkPad T14 Gen 5 Intel",
+        "value": "lenovo_thinkpad_t14_gen_5_intel",
+        "price": 1200.0,
+        "recurring_price": 0.0,
+        "price_currency": "USD",
+        "recurring_price_currency": "USD"
+      },
+      {
+        "label": "Lenovo ThinkPad P1 Gen 7",
+        "value": "lenovo_thinkpad_p1_gen_7",
+        "price": 2500.0,
+        "recurring_price": 0.0,
+        "price_currency": "USD",
+        "recurring_price_currency": "USD"
+      },
+      {
+        "label": "Apple MacBook Air M2",
+        "value": "apple_mac_book_air_m2",
+        "price": 999.0,
+        "recurring_price": 0.0,
+        "price_currency": "USD",
+        "recurring_price_currency": "USD"
+      },
+      {
+        "label": "Apple MacBook Pro 14 M3",
+        "value": "apple_mac_book_pro_14_m3",
+        "price": 1599.0,
+        "recurring_price": 0.0,
+        "price_currency": "USD",
+        "recurring_price_currency": "USD"
+      },
+      {
+        "label": "Lenovo ThinkPad T14 Gen 4 Intel",
+        "value": "lenovo_thinkpad_t14_gen_4_intel",
+        "price": 1100.0,
+        "recurring_price": 0.0,
+        "price_currency": "USD",
+        "recurring_price_currency": "USD"
+      },
+      {
+        "label": "Lenovo ThinkPad P16s Gen 2",
+        "value": "lenovo_thinkpad_p16s_gen_2",
+        "price": 1800.0,
+        "recurring_price": 0.0,
+        "price_currency": "USD",
+        "recurring_price_currency": "USD"
+      },
+      {
+        "label": "Apple MacBook Pro 16 M3 Max",
+        "value": "apple_mac_book_pro_16_m3_max",
+        "price": 3999.0,
+        "recurring_price": 0.0,
+        "price_currency": "USD",
+        "recurring_price_currency": "USD"
+      },
+      {
+        "label": "Lenovo ThinkPad T14s Gen 5 AMD",
+        "value": "lenovo_thinkpad_t14s_gen_5_amd",
+        "price": 1300.0,
+        "recurring_price": 0.0,
+        "price_currency": "USD",
+        "recurring_price_currency": "USD"
+      },
+      {
+        "label": "Lenovo ThinkPad P16 Gen 2",
+        "value": "lenovo_thinkpad_p16_gen_2",
+        "price": 2200.0,
+        "recurring_price": 0.0,
+        "price_currency": "USD",
+        "recurring_price_currency": "USD"
+      },
+      {
+        "label": "Lenovo ThinkPad T14 Gen 5 AMD",
+        "value": "lenovo_thinkpad_t14_gen_5_amd",
+        "price": 1150.0,
+        "recurring_price": 0.0,
+        "price_currency": "USD",
+        "recurring_price_currency": "USD"
+      },
+      {
+        "label": "Lenovo ThinkPad P1 Gen 6",
+        "value": "lenovo_thinkpad_p1_gen_6",
+        "price": 2300.0,
+        "recurring_price": 0.0,
+        "price_currency": "USD",
+        "recurring_price_currency": "USD"
+      }
     ]
   }
 }

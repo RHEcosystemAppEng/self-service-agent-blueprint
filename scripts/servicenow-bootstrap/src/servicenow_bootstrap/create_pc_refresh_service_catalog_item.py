@@ -215,7 +215,9 @@ class ServiceNowCatalogAutomation:
                 print(f"Response: {e.response.text}")
             raise
 
-    def create_choice_question(self, item_sys_id: str, choices: List[str]) -> str:
+    def create_choice_question(
+        self, item_sys_id: str, choices: List[Dict[str, Any]]
+    ) -> str:
         """Create the laptop choices question variable."""
         variable_data = {
             "name": "laptop_choices",
@@ -232,9 +234,15 @@ class ServiceNowCatalogAutomation:
         for i, choice in enumerate(choices):
             choice_data = {
                 "question": variable_sys_id,
-                "text": choice,
-                "value": choice.lower().replace(" ", "_").replace("-", "_"),
+                "text": choice["label"],
+                "value": choice["value"],
                 "order": (i + 1) * 100,
+                "price": choice.get("price", 0.0),
+                "recurring_price": choice.get("recurring_price", 0.0),
+                "price_currency": choice.get("price_currency", "USD"),
+                "recurring_price_currency": choice.get(
+                    "recurring_price_currency", "USD"
+                ),
             }
 
             self.create_choice_option(choice_data)
@@ -255,19 +263,47 @@ class ServiceNowCatalogAutomation:
             data = response.json()
 
             if data.get("result"):
+                print(f"✅ Choice option '{choice_data['text']}' already exists")
                 return  # Choice already exists
+
+            # Prepare choice data with pricing information
+            choice_payload = {
+                "question": choice_data["question"],
+                "text": choice_data["text"],
+                "value": choice_data["value"],
+                "order": choice_data["order"],
+            }
+
+            # Add pricing fields if they exist
+            if "price" in choice_data:
+                choice_payload["price"] = choice_data["price"]
+            if "recurring_price" in choice_data:
+                choice_payload["recurring_price"] = choice_data["recurring_price"]
+            if "price_currency" in choice_data:
+                choice_payload["price_currency"] = choice_data["price_currency"]
+            if "recurring_price_currency" in choice_data:
+                choice_payload["recurring_price_currency"] = choice_data[
+                    "recurring_price_currency"
+                ]
 
             # Create choice
             create_url = f"{self.instance_url}/api/now/table/question_choice"
-            response = self.session.post(create_url, json=choice_data)
+            response = self.session.post(create_url, json=choice_payload)
             response.raise_for_status()
 
-            print(f"✅ Created choice option: {choice_data['text']}")
+            price_info = (
+                f" (${choice_data.get('price', 0):.2f})"
+                if "price" in choice_data
+                else ""
+            )
+            print(f"✅ Created choice option: {choice_data['text']}{price_info}")
 
         except requests.RequestException as e:
             print(
                 f"⚠️  Error creating choice '{choice_data.get('text', 'unknown')}': {e}"
             )
+            if hasattr(e, "response") and e.response is not None:
+                print(f"Response: {e.response.text}")
 
     def create_requested_for_variable(self, item_sys_id: str) -> str:
         """Create the 'Requested for' variable."""
