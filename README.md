@@ -585,11 +585,22 @@ use `reset` to clear the conversation history.
 
 ### 3.4 Integration with Real ServiceNow (Optional)
 
-By default, the system uses mock ServiceNow data. To integrate with your actual ServiceNow instance see the following docs for full details. The sections which follow walk you through the streamlined processes for setting up and using a ServiceNow instance.
+By default, the system uses mock ServiceNow data. To integrate with a real ServiceNow instance see the following docs for full details.
+If you have integrated with slack you will need to set TEST_USERS as covered in the section on Slack integration before following the steps to create and configure your instance.
+
+```
+TEST_USERS=myemail@emaildomain.com
+```
+
+#### Step 1: Create ServiceNow Instance
+
+The are two options for setting up a test ServiceNow instance. We recommend you use the Automated Setup,
+but you can use the manual setup if you want to better understand how the instance
+is being setup and configured. These guides include the required steps:
 - [ServiceNow PDI Bootstrap - Automated Setup](guides/SERVICE_NOW_BOOTSTRAP_AUTOMATED.md) - for a guide to automated ServiceNow Bootstrap (recommended)
 - [ServiceNow PDI Bootstrap - Manual Setup](guides/SERVICE_NOW_BOOTSTRAP_MANUAL.md) - for a guide to manual ServiceNow Bootstrap
 
-#### Step 1: Configure ServiceNow Credentials
+#### Step 2: Configure ServiceNow Credentials
 
 ```bash
 # Set ServiceNow configuration
@@ -597,11 +608,12 @@ export SERVICENOW_INSTANCE_URL=https://your-instance.service-now.com
 export SERVICENOW_API_KEY=your-servicenow-api-key
 export SERVICENOW_LAPTOP_REFRESH_ID=your-servicenow-laptop-refresh-id
 
-# Upgrade Helm deployment
-make helm-upgrade NAMESPACE=$NAMESPACE
+# redeploy the quickstart
+make helm-uninstall NAMESPACE=$NAMESPACE
+make helm-install-test NAMESPACE=$NAMESPACE
 ```
 
-#### Step 2: Verify ServiceNow Connection
+#### Step 3: Verify ServiceNow Connection
 
 Check the ServiceNow MCP server logs to confirm connection:
 
@@ -613,7 +625,7 @@ oc logs deployment/mcp-snow -n $NAMESPACE
 # Example: "ServiceNow API request completed - employee ID: alice.johnson@company.com"
 ```
 
-#### Step 3: Test with Real ServiceNow
+#### Step 4: Test with Real ServiceNow
 
 Use the CLI chat client to initiate a laptop refresh request with your real ServiceNow account:
 
@@ -643,7 +655,9 @@ Then complete the laptop refresh workflow:
 - Ticket appears in your ServiceNow instance
 - You receive ServiceNow notifications via email
 
-#### Step 4: Verify in ServiceNow
+#### Step 5: Verify in ServiceNow
+
+created. To do this go to All->Requests
 
 Log into your ServiceNow instance and verify:
 - Ticket was created in the correct category
