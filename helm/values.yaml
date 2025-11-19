@@ -227,6 +227,7 @@ mockServiceNow:
   replicas: 1
   logLevel: "INFO"
   uvicornWorkers: 1  # Single worker sufficient for mock server
+  testUsers: ""  # Comma-separated list of email addresses to add to mock employee data for testing
   resources: {}
   # Health check configuration
   healthChecks:

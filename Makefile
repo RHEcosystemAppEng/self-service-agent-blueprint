@@ -55,6 +55,7 @@ SLACK_ENABLED := $(if $(and $(SLACK_BOT_TOKEN),$(SLACK_SIGNING_SECRET)),true,fal
 SERVICENOW_INSTANCE_URL ?= http://self-service-agent-mock-servicenow:8080
 SERVICENOW_API_KEY ?= now_mock_api_key
 SERVICENOW_LAPTOP_REFRESH_ID ?= mock_laptop_refresh_id
+TEST_USERS ?=
 
 # Evaluation Configuration
 # Enable full laptop details validation by default unless explicitly disabled
@@ -65,6 +66,7 @@ VALIDATE_LAPTOP_DETAILS_FLAG := $(if $(filter true,$(VALIDATE_FULL_LAPTOP_DETAIL
 # Export to shell so kubectl can access them
 export SERVICENOW_INSTANCE_URL
 export SERVICENOW_API_KEY
+export TEST_USERS
 
 helm_pgvector_args = \
     --set pgvector.secret.user=$(POSTGRES_USER) \
@@ -115,6 +117,9 @@ helm_replica_count_args = \
 	$(if $(REPLICA_COUNT),--set requestManagement.requestManager.replicas=$(REPLICA_COUNT),) \
 	$(if $(REPLICA_COUNT),--set requestManagement.integrationDispatcher.replicas=$(REPLICA_COUNT),) \
 	$(if $(REPLICA_COUNT),--set requestManagement.agentService.replicas=$(REPLICA_COUNT),)
+
+helm_test_users_args = \
+	$(if $(TEST_USERS),--set-string mockServiceNow.testUsers="$(TEST_USERS)",)
 
 # Version target
 .PHONY: version
@@ -249,6 +254,7 @@ help:
 	@echo "    SERVICENOW_API_KEY                 - ServiceNow API key (default: now_mock_api_key)"
 	@echo "    SERVICENOW_API_KEY_HEADER         - Custom header name (default: x-sn-apikey)"
 	@echo "    SERVICENOW_LAPTOP_REFRESH_ID      - ServiceNow catalog item ID for laptop refresh requests (default: mock_laptop_refresh_id)"
+	@echo "    TEST_USERS                        - Comma-separated list of email addresses to add to mock employee data for testing"
 	@echo ""
 	@echo "  Request Management Layer:"
 	@echo "    KNATIVE_EVENTING                  - Enable Knative Eventing (default: true)"
@@ -948,6 +954,7 @@ define helm_install_common
 	@$(eval LOG_LEVEL_ARGS := $(if $(LOG_LEVEL),--set logLevel=$(LOG_LEVEL),))
 	@$(eval GENERIC_ARGS := $(helm_generic_args))
 	@$(eval REPLICA_COUNT_ARGS := $(helm_replica_count_args))
+	@$(eval TEST_USERS_ARGS := $(helm_test_users_args))
 
 	@echo "Creating ServiceNow credentials secret..."
 	@echo "  Instance URL: $$SERVICENOW_INSTANCE_URL"
@@ -980,6 +987,7 @@ define helm_install_common
 		$(LOG_LEVEL_ARGS) \
 		$(GENERIC_ARGS) \
 		$(REPLICA_COUNT_ARGS) \
+		$(TEST_USERS_ARGS) \
 		$(if $(filter-out "",$(2)),$(2),) \
 		$(EXTRA_HELM_ARGS)
 	@echo "Waiting for request manager deployment..."
