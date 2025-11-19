@@ -50,12 +50,14 @@ Make sure to save the URLs printed out after the install completes, as shown bel
 
 ```
 --- Your Integration Dispatcher URLs are: ---
-  OpenAPI Schema: https://ssa-integration-dispatcher-test.apps.ai-dev02.kni.syseng.devcluster.openshift.com/docs
-  Health: https://ssa-integration-dispatcher-test.apps.ai-dev02.kni.syseng.devcluster.openshift.com/health
-  Slack Events: https://ssa-integration-dispatcher-test.apps.ai-dev02.kni.syseng.devcluster.openshift.com/slack/events
-  Slack Interactive: https://ssa-integration-dispatcher-test.apps.ai-dev02.kni.syseng.devcluster.openshift.com/slack/interactive
-  Slack Commands: https://ssa-integration-dispatcher-test.apps.ai-dev02.kni.syseng.devcluster.openshift.com/slack/commands
+  OpenAPI Schema: your-integration-dispatcher-route/docs
+  Health: your-integration-dispatcher-route/health
+  Slack Events: https://your-integration-dispatcher-route/slack/events
+  Slack Interactive: https://your-integration-dispatcher-route/interactive
+  Slack Commands: https://your-integration-dispatcher-route/slack/commands
 ```
+
+Where your-integration-dispatcher-route will be the route specific to your deployment.
 
 If necessary, you can get the URL part that is specific to your deployment with:
 
