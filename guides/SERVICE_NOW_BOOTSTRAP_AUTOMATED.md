@@ -16,6 +16,7 @@ The scripts automate most of the manual steps described in the [ServiceNow PDI B
 - **Catalog Item Creation**: Creates the PC Refresh catalog item
 - **Catalog Variables**: Sets up "Requested for" and "Laptop Choices" variables
 - **Choice Options**: Populates laptop choice options
+- **Evaluation Users**: Creates test users and laptop computers based on mock employee data
 
 ## 📋 Prerequisites
 
@@ -142,14 +143,18 @@ This will test:
 - Catalog Items Table access
 - Catalog Order endpoint authentication
 
-### 7. Create mock evaluation users (optional)
-If you'd like to create test data that match mock data you may use [create_evaluation_users.py](../scripts/servicenow-bootstrap/src/servicenow_bootstrap/create_evaluation_users.py). 
-- Currently this script needs to be run independently of the ServiceNow bootstrap
-- In the future this script will be integrated into the bootstrap
+### 7. Verification
+The setup process automatically creates evaluation users and test data that match the mock employee data used by the blueprint. You can verify these were created by:
+
+1. **Check ServiceNow Users**: Go to "All" → Search for "Users" → Verify test users exist
+2. **Check Computer Assets**: Go to "All" → Search for "Computers" → Verify laptop assets were created
+3. **Review Setup Summary**: The setup output shows detailed statistics of what was created
+
+If you need to skip evaluation users creation, use the `--skip-evaluation-users` flag.
 
 ## 📜 Individual Scripts
 
-You can also run individual automation modules using Python's module syntax:
+You can also run individual automation modules using Python's module syntax. Note that all these steps are included in the main `setup.py` script, but can be run separately if needed:
 
 ### Create MCP Agent User
 ```bash
@@ -168,6 +173,15 @@ Sets up API keys, authentication profiles, and access policies.
 uv run python -m servicenow_bootstrap.create_pc_refresh_service_catalog_item --config config.json
 ```
 Creates the PC Refresh catalog item with variables and choices.
+
+### Create Evaluation Users
+```bash
+uv run python -m servicenow_bootstrap.create_evaluation_users
+```
+Creates test users and laptop computers based on mock employee data. Requires the same environment variables as the main setup:
+- `SERVICENOW_INSTANCE_URL`: Your ServiceNow instance URL
+- `SERVICENOW_USERNAME`: Admin username
+- `SERVICENOW_PASSWORD`: Admin password
 
 ### Setup Validations
 ```bash
@@ -191,6 +205,9 @@ uv run -m servicenow_bootstrap.setup --config config.json --skip-api
 
 # Skip catalog creation
 uv run -m servicenow_bootstrap.setup --config config.json --skip-catalog
+
+# Skip evaluation users creation
+uv run -m servicenow_bootstrap.setup --config config.json --skip-evaluation-users
 
 # Run without confirmation prompts
 uv run -m servicenow_bootstrap.setup --config config.json --no-confirm

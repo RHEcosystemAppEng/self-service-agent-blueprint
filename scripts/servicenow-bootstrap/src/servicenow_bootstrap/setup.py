@@ -9,6 +9,7 @@ import json
 import sys
 from typing import Any, Dict
 
+from .create_evaluation_users import ServiceNowUserCreator
 from .create_mcp_agent_api_key import ServiceNowAPIAutomation
 from .create_mcp_agent_user import ServiceNowUserAutomation
 from .create_pc_refresh_service_catalog_item import ServiceNowCatalogAutomation
@@ -104,6 +105,7 @@ Examples:
   setup-servicenow --config config.json
   setup-servicenow --config config.json --skip-user
   setup-servicenow --config config.json --skip-api --skip-catalog
+  setup-servicenow --config config.json --skip-evaluation-users
         """,
     )
 
@@ -116,6 +118,11 @@ Examples:
     )
     parser.add_argument(
         "--skip-catalog", action="store_true", help="Skip catalog creation step"
+    )
+    parser.add_argument(
+        "--skip-evaluation-users",
+        action="store_true",
+        help="Skip evaluation users creation step",
     )
     parser.add_argument(
         "--no-confirm", action="store_true", help="Skip confirmation prompts"
@@ -148,6 +155,8 @@ Examples:
         steps_to_run.append("Configure API keys and authentication")
     if not args.skip_catalog:
         steps_to_run.append("Create PC Refresh catalog item")
+    if not args.skip_evaluation_users:
+        steps_to_run.append("Create evaluation users and test data")
 
     if not steps_to_run:
         print("\n⚠️  All steps are being skipped. Nothing to do!")
@@ -189,6 +198,26 @@ Examples:
             catalog_results = catalog_automation.setup_catalog()
             results["catalog"] = catalog_results
 
+        # Step 4: Create evaluation users
+        if not args.skip_evaluation_users:
+            print_step(4, "Create Evaluation Users and Test Data")
+            user_creator = ServiceNowUserCreator(
+                config["servicenow"]["instance_url"],
+                config["servicenow"]["admin_username"],
+                config["servicenow"]["admin_password"],
+            )
+            user_creator.create_all_users(skip_existing=True)
+            user_creator.print_summary()
+
+            # Store results for summary
+            results["evaluation_users"] = {
+                "users_created": str(len(user_creator.created_users)),
+                "computers_created": str(len(user_creator.created_computers)),
+                "models_created": str(len(user_creator.created_models)),
+                "locations_created": str(len(user_creator.created_locations)),
+                "errors": str(len(user_creator.errors)),
+            }
+
         # Print final summary
         print("\n" + "=" * 60)
         print("🎉 Setup completed successfully!")
@@ -208,11 +237,23 @@ Examples:
                 f"📦 Catalog item created: {config['catalog']['name']} (set SERVICENOW_LAPTOP_REFRESH_ID={results['catalog']['catalog_item_sys_id']})"
             )
 
+        if results.get("evaluation_users"):
+            eval_results = results["evaluation_users"]
+            print(
+                f"👥 Evaluation users created: {eval_results['users_created']} users, {eval_results['computers_created']} computers"
+            )
+            if int(eval_results["errors"]) > 0:
+                print(f"⚠️  Evaluation users had {eval_results['errors']} errors")
+
         print("\n📝 Next steps:")
         print("1. Log into your ServiceNow instance to verify the setup")
         print("2. Set proper access controls on the catalog item")
         print("3. Test the catalog item in the Service Portal")
         print("4. Update your blueprint configuration with the new credentials")
+        if results.get("evaluation_users"):
+            print(
+                "5. Verify the evaluation users and test data are properly configured"
+            )
 
     except KeyboardInterrupt:
         print("\n\n🛑 Setup interrupted by user.")
