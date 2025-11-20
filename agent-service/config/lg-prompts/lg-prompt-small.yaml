@@ -261,6 +261,8 @@ states:
         next_state: "end"
       FAREWELL:
         response: "Thank you for using the laptop refresh service. Have a great day!"
+        data_storage:
+          _should_return_to_routing: true
         next_state: "end"
       PROCEED_ANYWAY:
         response: "I understand you'd like to proceed. While you're not currently eligible under the standard policy, I can show you the available options. Please note that any request would need special approval and may be subject to additional justification requirements. Would you like to see the available laptop options?"
@@ -308,10 +310,11 @@ states:
         data_storage:
           user_wants_to_proceed: true
       "NO":
-        response: "No problem! If you change your mind or need help with anything else, feel free to ask."
-        next_state: "end"
+        response: "No problem! you will now be sent back to the router agent."
         data_storage:
           user_wants_to_proceed: false
+          _should_return_to_routing: true
+        next_state: "end"
       "UNCLEAR":
         response: "Please let me know if you'd like to proceed with reviewing the available laptop options (yes/no)."
         next_state: "waiting_proceed_confirmation"
@@ -543,7 +546,9 @@ states:
         data_storage:
           ticket_created: true
       "NO":
-        prompt: "Acknowledge that the user doesn't want to create a ticket and offer to help with anything else."
+        response: "No problem! you will now be sent back to the router agent."
+        data_storage:
+          _should_return_to_routing: true
         next_state: "end"
       "UNCLEAR":
         prompt: "The user said '{user_input}' when asked about creating a ticket. Ask them to clarify: do they want to create the ServiceNow ticket? (yes/no)"
@@ -658,4 +663,27 @@ states:
     type: "terminal"
     reset_behavior:
       reset_state: "lookup_employee"  # Start with employee lookup using authoritative user ID
-      clear_data: ["messages", "employee_info", "laptop_eligibility", "selected_laptop", "selected_laptop_details", "laptop_options", "eligibility_status", "ticket_created", "ticket_number", "current_state", "user_wants_to_proceed"]
+      clear_data:
+        # System fields
+        - "messages"
+        - "current_state"
+        # Business logic fields
+        - "employee_info"
+        - "laptop_eligibility"
+        - "eligibility_status"
+        - "selected_laptop"
+        - "selected_laptop_details"
+        - "laptop_options"
+        - "ticket_created"
+        - "ticket_number"
+        - "user_wants_to_proceed"
+        # Retry counters
+        - "laptop_options_retry_count"
+        - "eligibility_check_retry_count"
+        - "ticket_creation_retry_count"
+        # Internal state tracking
+        - "_last_waiting_node"
+        - "_last_processed_human_count"
+        - "_consumed_this_invoke"
+        # NOTE: _should_return_to_routing is NOT cleared here - it needs to persist
+        # until the next request so the session manager can detect it and route back
