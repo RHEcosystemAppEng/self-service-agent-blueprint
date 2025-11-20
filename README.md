@@ -22,9 +22,9 @@
    - [Integration with Real ServiceNow (Optional)](#34-integration-with-real-servicenow-optional)
    - [Integration with Email (Optional)](#35-integration-with-email-optional)
    - [Run Evaluations](#36-run-evaluations)
-   - [Setting up Safety Shields (Optional)](#37-setting-up-safety-shields-optional)
-   - [Follow the Flow with Tracing](#38-follow-the-flow-with-tracing)
-   - [Trying out Smaller Prompts](#39-trying-out-smaller-prompts)
+   - [Follow the Flow with Tracing](#37-follow-the-flow-with-tracing)
+   - [Trying out Smaller Prompts](#38-trying-out-smaller-prompts)
+   - [Setting up Safety Shields (Optional)](#39-setting-up-safety-shields-optional)
    - [Cleaning up](#310-cleaning-up)
 
 4. [Performance & Scaling](#4-performance--scaling)
@@ -526,26 +526,20 @@ Slack integration enables real-world testing with actual users in your workspace
 have an existing Slack instance that you can use for testing, otherwise you can create a development instance
 by joining the [Slack Developer Program](https://api.slack.com/developer-program).
 
-#### Step 1: Add your Slack email to the mock employee data
+#### Step 1: Tell the quickstart about your Slack email
 
-The quickstart uses the Slack user's email as the authoritative user ID,
-so you need to add your user to the MOCK_EMPLOYEE_DATA dictionary in [data.py](mock-employee-data/src/mock_employee_data/data.py). You can copy one of the existing entries and modify the email to match the email associated with your user in your test Slack instance. Do not remove any of the existing entries as they are needed for the later section on evaluations.
+The quickstart uses the user's email as the authoritative user ID, therefore, the deployment needs to
+know about the email associated with your Slack account. If you can set it to one of the emails
+in the MOCK_EMPLOYEE_DATA dictionary in [data.py](mock-employee-data/src/mock_employee_data/data.py) it will
+use the data for that email. Otherwise you need to set TEST_USERS so that it includes your email. The mock
+data lookups and real lookups from a ServiceNow instance will fill in laptop data for emails set in TEST_USERS.
 
-Once you have added your user, you need to build the updated container images and push them to a registry like quay.io. Make sure the images are public (if they are not public by default in your organization) so OpenShift can pull them. You can build and push the images as follows:
-
-```bash
-# Set container registry
-export REGISTRY=quay.io/your-org
-
-# Build all images
-make build-all-images
-
-# Push to registry
-make push-all-images
+To configure those emails export TEST_USERS as follows before running any of the other steps, replacing myemail@emaildomain.com
+with your email:
 
 ```
-
-When you uninstall/reinstall as part of the Slack app deployment in Step 2, your modified images will be used for the deployment.
+export TEST_USERS=myemail@emaildomain.com
+```
 
 #### Step 2: Set Up Slack App
 
@@ -585,22 +579,37 @@ use `reset` to clear the conversation history.
 
 ### 3.4 Integration with Real ServiceNow (Optional)
 
-By default, the system uses mock ServiceNow data. To integrate with a real ServiceNow instance see the following docs for full details.
-If you have integrated with slack you will need to set TEST_USERS as covered in the section on Slack integration before following the steps to create and configure your instance.
+The quickstart uses the user's email as the authoritative user ID. If you plan to interact with the
+quickstart using Slack or email, the deployment needs to know about the email associated with your Slack or email account.
+This is because unlike the command line, you don't have an option to set the email for the user.
+
+The scripts used to setup a Real ServiceNow instance need to know the email you will be using with Slack or
+email so that employee data can be configured for users with those emails.
+
+To configure those emails export TEST_USERS as follows before running any of the other steps, replacing myemail@emaildomain.com
+with your email:
 
 ```
-TEST_USERS=myemail@emaildomain.com
+export TEST_USERS=myemail@emaildomain.com
 ```
 
 #### Step 1: Create ServiceNow Instance
 
-The are two options for setting up a test ServiceNow instance. We recommend you use the Automated Setup,
+There are two options for setting up a test ServiceNow instance. We recommend you use the Automated Setup,
 but you can use the manual setup if you want to better understand how the instance
 is being setup and configured. These guides include the required steps:
 - [ServiceNow PDI Bootstrap - Automated Setup](guides/SERVICE_NOW_BOOTSTRAP_AUTOMATED.md) - for a guide to automated ServiceNow Bootstrap (recommended)
 - [ServiceNow PDI Bootstrap - Manual Setup](guides/SERVICE_NOW_BOOTSTRAP_MANUAL.md) - for a guide to manual ServiceNow Bootstrap
 
 #### Step 2: Configure ServiceNow Credentials
+
+In step one you will have noted these values:
+
+* SERVICENOW_INSTANCE_URL
+* SERVICENOW_API_KEY
+* SERVICENOW_LAPTOP_REFRESH_ID
+
+Make sure they are exported in your environment and uninstall and reinstall the quickstart
 
 ```bash
 # Set ServiceNow configuration
@@ -619,7 +628,7 @@ Check the ServiceNow MCP server logs to confirm connection:
 
 ```bash
 # View MCP server logs
-oc logs deployment/mcp-snow -n $NAMESPACE
+oc logs deployment/mcp-self-service-agent-snow -n $NAMESPACE
 
 # Look for successful ServiceNow API calls
 # Example: "ServiceNow API request completed - employee ID: alice.johnson@company.com"
@@ -631,12 +640,12 @@ Use the CLI chat client to initiate a laptop refresh request with your real Serv
 
 ```bash
 # Get the request manager pod
-export REQUEST_MANAGER_POD=$(oc get pod -n $NAMESPACE -l app=request-manager -o jsonpath='{.items[0].metadata.name}')
+export REQUEST_MANAGER_POD=$(oc get pod -n $NAMESPACE -l app=self-service-agent-request-manager -o jsonpath='{.items[0].metadata.name}')
 
 # Start chat session with your email
 oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
   python test/chat-responses-request-mgr.py \
-  --user-id your-email@company.com
+  --user-id alice.johnson@company.com
 ```
 
 Then complete the laptop refresh workflow:
@@ -655,7 +664,7 @@ Then complete the laptop refresh workflow:
 - Ticket appears in your ServiceNow instance
 - You receive ServiceNow notifications via email
 
-#### Step 5: Verify in ServiceNow Ticket Created
+#### Step 5: Verify Ticket Created in ServiceNow
 
 Take note of the ServiceNow ticket number the agent returns:
 
@@ -693,6 +702,17 @@ Log into your ServiceNow instance and:
 
 Email integration enables two-way communication with the AI agent through email, allowing users to interact with the system via their email client.
 
+The quickstart uses the user's email as the authoritative user ID, therefore, the deployment needs to
+know about the email associated with your email account. You need to set TEST_USERS so that it includes your email. The mock
+data lookups and real lookups from a ServiceNow instance will fill in laptop data for emails set in TEST_USERS.
+
+To configure those emails export TEST_USERS as follows before running any of the other steps, replacing myemail@emaildomain.com
+with your email:
+
+```
+export TEST_USERS=myemail@emaildomain.com
+```
+
 #### Step 1: Set Up Email Configuration
 
 See [`EMAIL_SETUP.md`](guides/EMAIL_SETUP.md) for detailed instructions.
@@ -706,6 +726,11 @@ See [`EMAIL_SETUP.md`](guides/EMAIL_SETUP.md) for detailed instructions.
 #### Step 2: Update Deployment with Email Credentials
 
 ```bash
+# add your users to those that will get responses from moc and service
+# now requests. This must match the email from which you will be sending
+# an email to the system
+export TEST_USERS=myemail@emaildomain.com
+
 # Set email configuration
 export SMTP_HOST=smtp.gmail.com
 export SMTP_PORT=587
@@ -714,8 +739,11 @@ export SMTP_PASSWORD=your-app-password
 export IMAP_HOST=imap.gmail.com
 export IMAP_PORT=993
 
+# Uninstall
+make helm-uninstall NAMESPACE=$NAMESPACE
+
 # Upgrade Helm deployment with email configuration
-make helm-upgrade NAMESPACE=$NAMESPACE \
+make helm-install-test NAMESPACE=$NAMESPACE \
   EXTRA_HELM_ARGS="\
     --set-string security.email.smtpHost=$SMTP_HOST \
     --set-string security.email.smtpPort=$SMTP_PORT \
@@ -768,6 +796,11 @@ Reply to the agent's email to test conversation threading:
 1. Reply to the agent's email (maintains In-Reply-To header)
 2. Continue the conversation: "I'd like to see available laptop options"
 3. Agent responds in the same email thread
+
+This is an example of what the messages may look like (it will depend
+on your email client):
+
+![Email Example](guides/images/email-example.png)
 
 **Expected outcome:**
 - ✓ Email threading works correctly
@@ -993,155 +1026,7 @@ These targets automatically:
 
 ---
 
-### 3.7 Setting up Safety Shields (Optional)
-
-Safety shields provide content moderation for AI agent interactions, validating user input and agent responses against safety policies using Llama Guard 3 or compatible models.
-
-Depending on your model, prompting approach and trust in your end users they may also be critical for avoiding [prompt injection](https://www.ibm.com/think/topics/prompt-injection) attacks. A common model used with llama stack to prevent these types of attack is [PromptGuard](https://arxiv.org/abs/2509.08910). The quickstart currently allows Llama Guard to be easily configured and we plan to add similar ease of use for PromptGuard in a later version as we have found that when using llama 70b the protection provided by PromptGuard is needed when using the "big" prompt as outlined in [section 3.9 Trying out Smaller Prompts](#39-trying-out-smaller-prompts).
-
-#### When to Enable Safety Shields
-
-Consider enabling safety shields for:
-- **Customer-facing agents**: Public or external user interactions
-- **Compliance requirements**: Organizations with strict content policies
-- **High-risk applications**: Agents handling sensitive topics
-
-**Note:** Safety shields come with the possibility of false positives. False positives that result in
-blocking input or output messages can mess up the IT process flow resulting in process failures.
-Common safety models like llama-guard that are desired for interaction with external users may not
-be suited for the content of common IT processes. We have disabled a number of the categories
-for which we regularly saw false positives.
-
-In the case of an internal self-service IT agent, due to the risk of false positives we would generally avoid using Llama Guard. On the other hand, we would recommend using something like PromptGuard unless the model being used has enough built-in protections.
-
-For development and testing, shields can be disabled for faster iteration.
-
-#### Step 1: Setup Safety Shield Configuration
-
-Safety shields require an OpenAI-compatible moderation API endpoint:
-
-```bash
-# provide information needed to access safety shields
-export SAFETY=meta-llama/Llama-Guard-3-8B
-export SAFETY_URL=https://api.example.com/v1
-
-# deploy with safety shields enabled
-make helm-uninstall NAMESPACE=$NAMESPACE
-make helm-install-test NAMESPACE=$NAMESPACE
-```
-
-**Note**:
-- Replace `https://api.example.com/v1` with your actual moderation API endpoint
-- The endpoint must support the OpenAI-compatible `/v1/moderations` API
-- If `SAFETY` and `SAFETY_URL` are not set, shields will be automatically disabled even if configured in agent YAML files
-
-#### Step 2: Configure Agent-Level Shields
-
-You can skip this step if you are using meta-llama/Llama-Guard-3-8B and have set the SAFETY and SAFETY_URL
-fields as shown above.
-
-The default configuration for the laptop refresh specialist agent is to use meta-llama/Llama-Guard-3-8B
-if it has been enabled. If you want to use another safety shield you will need to: 
-
-1. Edit your agent configuration file (e.g., `agent-service/config/agents/laptop-refresh-agent.yaml`):
-
-```yaml
-input_shields: ["meta-llama/Llama-Guard-3-8B"]
-output_shields: []
-# Categories to ignore for false positives (too aggressive for business workflows)
-# Input shield ignores: categories to allow in user input
-ignored_input_shield_categories:
-  - "Code Interpreter Abuse"  # Normal tool/MCP usage flagged incorrectly
-  - "Specialized Advice"  # IT support requests flagged as specialized advice
-  - "Privacy"  # Employee info requests are legitimate in IT support context
-  - "Self-Harm"  # False positives on common words like "yes"
-# Output shield ignores: categories to allow in agent responses
-ignored_output_shield_categories: []
-
-```
-
-Update the shield names in the configuration to use your preferred safety models.
-
-**Shield Configuration Options:**
-- **`input_shields`**: List of models to validate user messages (recommended)
-- **`output_shields`**: List of models to validate agent responses (optional, impacts performance)
-- **`ignored_input_shield_categories`**: Categories to allow in user input (handles false positives)
-- **`ignored_output_shield_categories`**: Categories to allow in agent responses
-
-2. Rebuild the container images:
-
-```bash
-export REGISTRY=quay.io/your-org
-make build-all-images
-make push-all-images
-```
-
-#### Step 3: Deploy with Safety Shields
-
-Deploy with safety shields enabled:
-
-```bash
-make helm-uninstall NAMESPACE=$NAMESPACE
-make helm-install-test NAMESPACE=$NAMESPACE
-```
-
-#### Step 4: Test Safety Shields
-
-After deploying with shields enabled, test that they're working:
-
-```bash
-# Check agent service logs for shield initialization
-oc logs deployment/self-service-agent-agent-service -n $NAMESPACE | grep -i shield
-
-# Expected output:
-# INFO: Input shields configured: ['meta-llama/Llama-Guard-3-8B']
-# INFO: Ignored input categories: {'Code Interpreter Abuse', 'Privacy', ...}
-```
-
-You can now run a conversation and see the effect of the Safety shield:
-
-```bash
-export REQUEST_MANAGER_POD=$(oc get pod -n $NAMESPACE -l app=self-service-agent-request-manager -o jsonpath='{.items[0].metadata.name}')
-
-# Start interactive chat session
-oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
-  python test/chat-responses-request-mgr.py \
-  --user-id alice.johnson@company.com
-```
-
-If necessary remember to use `reset` to restart the conversation and then when you get to the laptop refresh specialist try out with some
-messages that could trigger the shields. For example "how would I hurt a penguin" should result in something like "I cannot help you with that".
-
-#### Common Shield Categories
-
-Llama Guard 3 checks for these categories:
-- Violent Crimes
-- Non-Violent Crimes
-- Sex-Related Crimes
-- Child Sexual Exploitation
-- Defamation
-- Specialized Advice (Financial, Medical, Legal)
-- Privacy Violations
-- Intellectual Property
-- Indiscriminate Weapons
-- Hate Speech
-- Suicide & Self-Harm
-- Sexual Content
-- Elections
-- Code Interpreter Abuse
-
-For comprehensive safety shields documentation, see the [Safety Shields Guide](guides/SAFETY_SHIELDS_GUIDE.md).
-
-**You should now be able to:**
-- ✓ Configure safety shields for content moderation
-- ✓ Customize shield behavior per agent
-- ✓ Handle false positives with ignored categories
-- ✓ Monitor and troubleshoot shield operations
-- ✓ Balance safety and usability for your use case
-
----
-
-### 3.8 Follow the Flow with Tracing
+### 3.7 Follow the Flow with Tracing
 
 Agentic systems involve complex interactions between multiple components—routing agents, specialist agents, knowledge bases, MCP servers, and external systems—making production debugging challenging without proper visibility. Distributed tracing addresses these challenges by providing:
 
@@ -1302,7 +1187,7 @@ All operations share the same trace ID, creating a complete distributed trace.
 
 ---
 
-### 3.9 Trying out Smaller Prompts
+### 3.8 Trying out Smaller Prompts
 
 By default the quickstart uses a single state [large prompt](agent-service/config/lg-prompts/lg-prompt-big.yaml) which handles the full conversation flow. However, the quickstart also includes a [multi-part prompt](agent-service/config/lg-prompts/lg-prompt-small.yaml) in which each of the prompts are more limited. A multi-part prompt gives you more control over the flow and may be able to be run with a smaller model, may require fewer tokens (due to the smaller prompts being sent to the model). On the other hand it may be less flexible and may only handle flows that you have planned for in advance. You can read more about the advantages and disadvantages of the two approaches in the [Prompt Configuration Guide](guides/PROMPT_CONFIGURATION_GUIDE.md).
 
@@ -1424,6 +1309,154 @@ make helm-install-test NAMESPACE=$NAMESPACE
 - ✓ Compare agent behavior with different prompts
 - ✓ Experiment with prompt optimization
 - ✓ Understand the impact of prompt design on agent performance
+
+---
+
+### 3.9 Setting up Safety Shields (Optional)
+
+Safety shields provide content moderation for AI agent interactions, validating user input and agent responses against safety policies using Llama Guard 3 or compatible models.
+
+Depending on your model, prompting approach and trust in your end users they may also be critical for avoiding [prompt injection](https://www.ibm.com/think/topics/prompt-injection) attacks. A common model used with llama stack to prevent these types of attack is [PromptGuard](https://arxiv.org/abs/2509.08910). The quickstart currently allows Llama Guard to be easily configured and we plan to add similar ease of use for PromptGuard in a later version as we have found that when using llama 70b the protection provided by PromptGuard is needed when using the "big" prompt as outlined in [section 3.8 Trying out Smaller Prompts](#38-trying-out-smaller-prompts).
+
+#### When to Enable Safety Shields
+
+Consider enabling safety shields for:
+- **Customer-facing agents**: Public or external user interactions
+- **Compliance requirements**: Organizations with strict content policies
+- **High-risk applications**: Agents handling sensitive topics
+
+**Note:** Safety shields come with the possibility of false positives. False positives that result in
+blocking input or output messages can mess up the IT process flow resulting in process failures.
+Common safety models like llama-guard that are desired for interaction with external users may not
+be suited for the content of common IT processes. We have disabled a number of the categories
+for which we regularly saw false positives.
+
+In the case of an internal self-service IT agent, due to the risk of false positives we would generally avoid using Llama Guard. On the other hand, we would recommend using something like PromptGuard unless the model being used has enough built-in protections.
+
+For development and testing, shields can be disabled for faster iteration.
+
+#### Step 1: Setup Safety Shield Configuration
+
+Safety shields require an OpenAI-compatible moderation API endpoint:
+
+```bash
+# provide information needed to access safety shields
+export SAFETY=meta-llama/Llama-Guard-3-8B
+export SAFETY_URL=https://api.example.com/v1
+
+# deploy with safety shields enabled
+make helm-uninstall NAMESPACE=$NAMESPACE
+make helm-install-test NAMESPACE=$NAMESPACE
+```
+
+**Note**:
+- Replace `https://api.example.com/v1` with your actual moderation API endpoint
+- The endpoint must support the OpenAI-compatible `/v1/moderations` API
+- If `SAFETY` and `SAFETY_URL` are not set, shields will be automatically disabled even if configured in agent YAML files
+
+#### Step 2: Configure Agent-Level Shields
+
+You can skip this step if you are using meta-llama/Llama-Guard-3-8B and have set the SAFETY and SAFETY_URL
+fields as shown above.
+
+The default configuration for the laptop refresh specialist agent is to use meta-llama/Llama-Guard-3-8B
+if it has been enabled. If you want to use another safety shield you will need to:
+
+1. Edit your agent configuration file (e.g., `agent-service/config/agents/laptop-refresh-agent.yaml`):
+
+```yaml
+input_shields: ["meta-llama/Llama-Guard-3-8B"]
+output_shields: []
+# Categories to ignore for false positives (too aggressive for business workflows)
+# Input shield ignores: categories to allow in user input
+ignored_input_shield_categories:
+  - "Code Interpreter Abuse"  # Normal tool/MCP usage flagged incorrectly
+  - "Specialized Advice"  # IT support requests flagged as specialized advice
+  - "Privacy"  # Employee info requests are legitimate in IT support context
+  - "Self-Harm"  # False positives on common words like "yes"
+# Output shield ignores: categories to allow in agent responses
+ignored_output_shield_categories: []
+
+```
+
+Update the shield names in the configuration to use your preferred safety models.
+
+**Shield Configuration Options:**
+- **`input_shields`**: List of models to validate user messages (recommended)
+- **`output_shields`**: List of models to validate agent responses (optional, impacts performance)
+- **`ignored_input_shield_categories`**: Categories to allow in user input (handles false positives)
+- **`ignored_output_shield_categories`**: Categories to allow in agent responses
+
+2. Rebuild the container images:
+
+```bash
+export REGISTRY=quay.io/your-org
+make build-all-images
+make push-all-images
+```
+
+#### Step 3: Deploy with Safety Shields
+
+Deploy with safety shields enabled:
+
+```bash
+make helm-uninstall NAMESPACE=$NAMESPACE
+make helm-install-test NAMESPACE=$NAMESPACE
+```
+
+#### Step 4: Test Safety Shields
+
+After deploying with shields enabled, test that they're working:
+
+```bash
+# Check agent service logs for shield initialization
+oc logs deployment/self-service-agent-agent-service -n $NAMESPACE | grep -i shield
+
+# Expected output:
+# INFO: Input shields configured: ['meta-llama/Llama-Guard-3-8B']
+# INFO: Ignored input categories: {'Code Interpreter Abuse', 'Privacy', ...}
+```
+
+You can now run a conversation and see the effect of the Safety shield:
+
+```bash
+export REQUEST_MANAGER_POD=$(oc get pod -n $NAMESPACE -l app=self-service-agent-request-manager -o jsonpath='{.items[0].metadata.name}')
+
+# Start interactive chat session
+oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
+  python test/chat-responses-request-mgr.py \
+  --user-id alice.johnson@company.com
+```
+
+If necessary remember to use `reset` to restart the conversation and then when you get to the laptop refresh specialist try out with some
+messages that could trigger the shields. For example "how would I hurt a penguin" should result in something like "I cannot help you with that".
+
+#### Common Shield Categories
+
+Llama Guard 3 checks for these categories:
+- Violent Crimes
+- Non-Violent Crimes
+- Sex-Related Crimes
+- Child Sexual Exploitation
+- Defamation
+- Specialized Advice (Financial, Medical, Legal)
+- Privacy Violations
+- Intellectual Property
+- Indiscriminate Weapons
+- Hate Speech
+- Suicide & Self-Harm
+- Sexual Content
+- Elections
+- Code Interpreter Abuse
+
+For comprehensive safety shields documentation, see the [Safety Shields Guide](guides/SAFETY_SHIELDS_GUIDE.md).
+
+**You should now be able to:**
+- ✓ Configure safety shields for content moderation
+- ✓ Customize shield behavior per agent
+- ✓ Handle false positives with ignored categories
+- ✓ Monitor and troubleshoot shield operations
+- ✓ Balance safety and usability for your use case
 
 ---
 

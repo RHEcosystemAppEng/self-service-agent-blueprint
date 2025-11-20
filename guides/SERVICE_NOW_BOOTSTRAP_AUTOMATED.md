@@ -46,6 +46,12 @@ export SERVICENOW_USERNAME="admin"
 export SERVICENOW_PASSWORD="your-admin-password"
 ```
 
+**NOTE:** For the password, on Linux you must escape special characters with a `\` character and do not include quotes around the password value. For example, for the password `%p+wXR2uh3D`, use:
+
+```bash
+export SERVICENOW_PASSWORD=\%p\+wXR2uh3D
+```
+
 #### Configuration File
 
 The [config.json](../scripts/servicenow-bootstrap/config.json) file contains static configuration settings and is ready to use.
