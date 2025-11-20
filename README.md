@@ -655,12 +655,11 @@ Then complete the laptop refresh workflow:
 - Ticket appears in your ServiceNow instance
 - You receive ServiceNow notifications via email
 
+#### Step 5: Verify in ServiceNow Ticket Created
 
-- Example for ticket creation message:
+Take note of the ServiceNow ticket number the agent returns:
 
 <img src="guides/images/ticket-created-msg.png" alt="Ticket Created Message" width="850">
-
-#### Step 5: Verify in ServiceNow Ticket Created
 
 Log into your ServiceNow instance and:
 
