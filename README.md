@@ -655,21 +655,21 @@ Then complete the laptop refresh workflow:
 - Ticket appears in your ServiceNow instance
 - You receive ServiceNow notifications via email
 
-<img src="guides/images/ticket-created-msg.png" alt="Ticket Created Message" width="550">
+<img src="guides/images/ticket-created-msg.png" alt="Ticket Created Message" width="850">
 
 #### Step 5: Verify in ServiceNow Ticket Created
 
-To do this go to All -> search for "Requests" -> Click "Requests" link under Service Catalog/Open Records/Requests
+Log into your ServiceNow instance and:
+
+- Go to All -> search for "Requests" -> Click "Requests" link under Service Catalog/Open Records/Requests
 
 <img src="guides/images/requests-link.png" alt="Requests" width="450">
 
-Log into your ServiceNow instance and verify:
-
-- Ticket was created with a matching number:
+- Verify the ticket was created with a matching number:
 
 <img src="guides/images/requests-table.png" alt="Requests Table" width="450">
 
-- Ticket price matches the laptop model
+- Verify the ticket's price matches the laptop model
 
 <img src="guides/images/request-price.png" alt="Requests Table" width="450">
 
