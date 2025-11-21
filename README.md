@@ -1327,77 +1327,62 @@ Consider enabling safety shields for:
 
 **Note:** Safety shields come with the possibility of false positives. False positives that result in
 blocking input or output messages can mess up the IT process flow resulting in process failures.
-Common safety models like llama-guard that are desired for interaction with external users may not
+Common safety models like llama-guard that are designed for interaction with external users may not
 be suited for the content of common IT processes. We have disabled a number of the categories
 for which we regularly saw false positives.
 
-In the case of an internal self-service IT agent, due to the risk of false positives we would generally avoid using Llama Guard. On the other hand, we would recommend using something like PromptGuard unless the model being used has enough built-in protections.
+In the case of an internal self-service IT agent, due to the risk of false positives we would generally avoid using Llama Guard. On the other hand, we would recommend using something like PromptGuard unless the model being used has enough built-in protections to prompt injection.
 
 For development and testing, shields can be disabled for faster iteration.
 
 #### Step 1: Setup Safety Shield Configuration
 
-Safety shields require an OpenAI-compatible moderation API endpoint:
+Safety shields require an OpenAI-compatible moderation API endpoint that is compatible with llama stacks shields. If you
+have shared instance of meta-llama/Llama-Guard-3-8B you could make the quickstart use it as follows:
+
+##### Option 1 - shared meta-llama/Llama-Guard-3-8B model
+
+If you have a shared shared meta-llama/Llama-Guard-3-8B you can configured the quickstart to use it by exporting these
+environment variables and reinstalling
 
 ```bash
 # provide information needed to access safety shields
 export SAFETY=meta-llama/Llama-Guard-3-8B
+export SAFETY_ID=meta-llama/Llama-Guard-3-8B
 export SAFETY_URL=https://api.example.com/v1
-
-# deploy with safety shields enabled
-make helm-uninstall NAMESPACE=$NAMESPACE
-make helm-install-test NAMESPACE=$NAMESPACE
+export SAFETY_API_TOKEN=your-token
 ```
 
 **Note**:
-- Replace `https://api.example.com/v1` with your actual moderation API endpoint
-- The endpoint must support the OpenAI-compatible `/v1/moderations` API
-- If `SAFETY` and `SAFETY_URL` are not set, shields will be automatically disabled even if configured in agent YAML files
+- Replace `https://api.example.com/v1` with your actual moderation API endpoint. The endpoint must support
+  the OpenAI-compatible `/v1/moderations` API
+- Replace SAFETY_API_TOKEN if it is needed for the model, otherwise it can be omitted.
+
+##### Option 2 - local meta-llama/Llama-Guard-3-8B model
+
+If you don't have a shared meta-llama/Llama-Guard-3-8B and are deploying to an OpenShift AI cluster with GPUs you can
+alternatively use the following which will spin up a container running meta-llama/Llama-Guard-3-8B as part of the deployment.
+SAFETY_TOLERATION must match the taint key on GPU nodes in your OpenShift cluster (e.g., g5-gpu for nodes tainted with g5-gpu=true:NoSchedule).
+You will also need to provide a valid hugging face token as this is needed to download the meta-llama/Llama-Guard-3-8B model.
+
+```
+export HF_TOKEN=your-hugging-face-token
+export SAFETY_ID=meta-llama/Llama-Guard-3-8B
+export SAFETY_TOLERATION=g5-gpu
+export SAFETY=llama-guard-3-8b
+```
 
 #### Step 2: Configure Agent-Level Shields
 
-You can skip this step if you are using meta-llama/Llama-Guard-3-8B and have set the SAFETY and SAFETY_URL
-fields as shown above.
-
 The default configuration for the laptop refresh specialist agent is to use meta-llama/Llama-Guard-3-8B
-if it has been enabled. If you want to use another safety shield you will need to:
+if it has been enabled. If you want to use another safety shield you will need update the configurations in:
 
-1. Edit your agent configuration file (e.g., `agent-service/config/agents/laptop-refresh-agent.yaml`):
-
-```yaml
-input_shields: ["meta-llama/Llama-Guard-3-8B"]
-output_shields: []
-# Categories to ignore for false positives (too aggressive for business workflows)
-# Input shield ignores: categories to allow in user input
-ignored_input_shield_categories:
-  - "Code Interpreter Abuse"  # Normal tool/MCP usage flagged incorrectly
-  - "Specialized Advice"  # IT support requests flagged as specialized advice
-  - "Privacy"  # Employee info requests are legitimate in IT support context
-  - "Self-Harm"  # False positives on common words like "yes"
-# Output shield ignores: categories to allow in agent responses
-ignored_output_shield_categories: []
-
-```
-
-Update the shield names in the configuration to use your preferred safety models.
-
-**Shield Configuration Options:**
-- **`input_shields`**: List of models to validate user messages (recommended)
-- **`output_shields`**: List of models to validate agent responses (optional, impacts performance)
-- **`ignored_input_shield_categories`**: Categories to allow in user input (handles false positives)
-- **`ignored_output_shield_categories`**: Categories to allow in agent responses
-
-2. Rebuild the container images:
-
-```bash
-export REGISTRY=quay.io/your-org
-make build-all-images
-make push-all-images
-```
+* agent-service/config/agents/routing-agent.yaml
+* agent-service/config/agents/laptop-refresh-agent.yaml
 
 #### Step 3: Deploy with Safety Shields
 
-Deploy with safety shields enabled:
+After configuring the environment variables from either Option 1 (shared model) or Option 2 (local model), deploy with safety shields enabled:
 
 ```bash
 make helm-uninstall NAMESPACE=$NAMESPACE
@@ -1409,12 +1394,16 @@ make helm-install-test NAMESPACE=$NAMESPACE
 After deploying with shields enabled, test that they're working:
 
 ```bash
-# Check agent service logs for shield initialization
-oc logs deployment/self-service-agent-agent-service -n $NAMESPACE | grep -i shield
+# Check logs for shield initialization
+oc logs deployment/llamastack -n $NAMESPACE | grep -i shield
+```
 
-# Expected output:
-# INFO: Input shields configured: ['meta-llama/Llama-Guard-3-8B']
-# INFO: Ignored input categories: {'Code Interpreter Abuse', 'Privacy', ...}
+Expected output:
+
+```
+Defaulted container "llama-stack" out of: llama-stack, wait-for-models (init)
+         shields:                                                                                                                                     
+           shield_id: meta-llama/Llama-Guard-3-8B     
 ```
 
 You can now run a conversation and see the effect of the Safety shield:
@@ -1428,7 +1417,7 @@ oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
   --user-id alice.johnson@company.com
 ```
 
-If necessary remember to use `reset` to restart the conversation and then when you get to the laptop refresh specialist try out with some
+If necessary, remember to use `reset` to restart the conversation and then when you get to the laptop refresh specialist try out with some
 messages that could trigger the shields. For example "how would I hurt a penguin" should result in something like "I cannot help you with that".
 
 #### Common Shield Categories
