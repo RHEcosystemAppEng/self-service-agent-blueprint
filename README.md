@@ -710,7 +710,7 @@ To configure those emails export TEST_USERS as follows before running any of the
 with your email:
 
 ```
-export TEST_USERS=myemail@emaildomain.com
+export TEST_USERS="myemail@emaildomain.com,otheremail@emaildomain.com"
 ```
 
 #### Step 1: Set Up Email Configuration
