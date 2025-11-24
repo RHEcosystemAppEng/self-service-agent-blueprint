@@ -34,7 +34,7 @@ spec:
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: ssa-integration-dispatcher-slack
+  name: ssa-integration-dispatcher
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "self-service-agent.labels" . | nindent 4 }}
