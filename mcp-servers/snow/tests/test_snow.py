@@ -37,8 +37,9 @@ def test_open_laptop_refresh_ticket_success(
     business_justification = "Current laptop is outdated and affecting productivity"
     servicenow_laptop_code = "apple_mac_book_pro_14_m_3_pro"
 
-    # Mock the mcp.laptop_refresh_id attribute
+    # Mock the mcp attributes
     mock_mcp.laptop_refresh_id = "test_laptop_refresh_id"
+    mock_mcp.laptop_request_limits = 2
 
     # Mock ServiceNow client responses
     mock_client_instance = MagicMock()
@@ -84,8 +85,9 @@ def test_open_laptop_refresh_ticket_required_model(
     business_justification = "Hardware failure requiring replacement"
     servicenow_laptop_code = "lenovo_think_pad_t_14_gen_5_intel"
 
-    # Mock the mcp.laptop_refresh_id attribute
+    # Mock the mcp attributes
     mock_mcp.laptop_refresh_id = "test_laptop_refresh_id"
+    mock_mcp.laptop_request_limits = 2
 
     # Mock ServiceNow client responses
     mock_client_instance = MagicMock()
@@ -162,8 +164,9 @@ def test_get_employee_laptop_info_success(
     mock_servicenow_client: Mock, mock_mcp: Mock
 ) -> None:
     """Test successful laptop info retrieval."""
-    # Mock the mcp.laptop_refresh_id attribute
+    # Mock the mcp attributes
     mock_mcp.laptop_refresh_id = "test_laptop_refresh_id"
+    mock_mcp.laptop_request_limits = 2
 
     # Mock ServiceNow client responses
     mock_client_instance = MagicMock()
