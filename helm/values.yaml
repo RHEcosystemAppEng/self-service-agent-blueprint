@@ -312,6 +312,12 @@ requestManagement:
   # Network Policies Configuration
   networkPolicies:
     enabled: true  # Enable network policies for cross-namespace communication
+    # Platform-specific ingress controller configuration
+    # Options: "openshift", "kind", "none"
+    # - openshift: Uses OpenShift Router labels (default for production)
+    # - kind: Allows ingress from ingress-nginx namespace (for local testing)
+    # - none: Disables ingress controller network policy (use for port-forward testing)
+    platform: "openshift"
     additionalIngressRules: []  # Additional ingress rules if needed
   
   # Request Manager Service
@@ -358,6 +364,7 @@ requestManagement:
     # External Access Configuration
     externalAccess:
       enabled: true  # Set to true to create external access via OpenShift Route
+      restrictPaths: true  # Set to true to only expose /slack/* endpoints externally (recommended for security)
     # Health check configuration (dev-optimized for resource-constrained environments)
     healthChecks:
       livenessProbe:

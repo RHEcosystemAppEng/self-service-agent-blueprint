@@ -1,10 +1,48 @@
 {{- if .Values.requestManagement.enabled }}
 {{- if .Values.requestManagement.networkPolicies.enabled }}
 ---
+# Default deny-all ingress policy for all pods in the namespace
+# This ensures that only explicitly allowed traffic can reach pods
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "self-service-agent.fullname" . }}-allow-knative-eventing-to-agent
+  name: {{ include "self-service-agent.fullname" . }}-default-deny-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    component: network-policy
+spec:
+  podSelector: {}  # Applies to all pods in the namespace
+  policyTypes:
+  - Ingress
+
+---
+# Allow all pods within the namespace to communicate with each other
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-allow-same-namespace
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    component: network-policy
+spec:
+  podSelector: {}  # Applies to all pods in the namespace
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow traffic from pods in the same namespace
+  - from:
+    - podSelector: {}
+
+---
+# Allow ingress from knative-eventing namespace to all services that receive CloudEvents
+# This includes agent-service, request-manager, and integration-dispatcher
+# Restricts to only kafka-broker-dispatcher pods for tighter security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-allow-knative-eventing
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "self-service-agent.labels" . | nindent 4 }}
@@ -12,44 +50,109 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: {{ include "self-service-agent.fullname" . }}-agent-service
       {{- include "self-service-agent.selectorLabels" . | nindent 6 }}
-      component: agent-service
   policyTypes:
   - Ingress
   ingress:
-  # Allow access from knative-eventing namespace (for Kafka broker dispatcher)
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          name: knative-eventing
-    ports:
-    - protocol: TCP
-      port: 8080
-    - protocol: TCP
-      port: 80
-  # Allow access from knative-eventing namespace (alternative label)
+  # Allow access from Kafka broker dispatcher pods in knative-eventing namespace only
   - from:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: knative-eventing
+      podSelector:
+        matchLabels:
+          app: kafka-broker-dispatcher
     ports:
     - protocol: TCP
       port: 8080
     - protocol: TCP
       port: 80
-  # Allow access from same namespace
+  # Fallback: Allow from knative-eventing with legacy label (for compatibility)
   - from:
     - namespaceSelector:
         matchLabels:
-          kubernetes.io/metadata.name: {{ .Release.Namespace }}
+          name: knative-eventing
+      podSelector:
+        matchLabels:
+          app: kafka-broker-dispatcher
     ports:
     - protocol: TCP
       port: 8080
     - protocol: TCP
       port: 80
+
+{{- if ne .Values.requestManagement.networkPolicies.platform "none" }}
+---
+# Allow ingress from Ingress Controller for external routes
+# Platform-specific configuration for OpenShift, kind, or other Kubernetes environments
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-allow-ingress-controller
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "self-service-agent.selectorLabels" . | nindent 6 }}
+  policyTypes:
+  - Ingress
+  ingress:
+{{- if eq .Values.requestManagement.networkPolicies.platform "openshift" }}
+  # Allow access from OpenShift router namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          network.openshift.io/policy-group: ingress
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 80
+{{- else if eq .Values.requestManagement.networkPolicies.platform "kind" }}
+  # Allow access from kind ingress-nginx namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 80
+  # Also allow from ingress-nginx with app label (for older kind versions)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 80
+{{- end }}
+{{- end }}
+
 {{- if .Values.requestManagement.networkPolicies.additionalIngressRules }}
-  # Additional ingress rules from values
+---
+# Additional custom ingress rules from values
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-additional-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "self-service-agent.selectorLabels" . | nindent 6 }}
+  policyTypes:
+  - Ingress
+  ingress:
   {{- toYaml .Values.requestManagement.networkPolicies.additionalIngressRules | nindent 2 }}
 {{- end }}
 {{- end }}

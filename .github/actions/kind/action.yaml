@@ -41,5 +41,5 @@ runs:
       shell: bash  
 
     - name: Helm Install (using local registry)
-      run: make helm-install-test NAMESPACE=${{inputs.namespace}} REGISTRY=localhost:5001 LLM=${{inputs.llm}} LLM_ID=${{inputs.llm_id}} LLM_URL=${{inputs.llm_url}} LLM_API_TOKEN=$LLM_API_TOKEN EXTRA_HELM_ARGS="--set requestManagement.requestManager.externalAccess.enabled=false --set requestManagement.integrationDispatcher.externalAccess.enabled=false"
+      run: make helm-install-test NAMESPACE=${{inputs.namespace}} REGISTRY=localhost:5001 LLM=${{inputs.llm}} LLM_ID=${{inputs.llm_id}} LLM_URL=${{inputs.llm_url}} LLM_API_TOKEN=$LLM_API_TOKEN EXTRA_HELM_ARGS="--set requestManagement.networkPolicies.platform=kind --set requestManagement.requestManager.externalAccess.enabled=false --set requestManagement.integrationDispatcher.externalAccess.enabled=false"
       shell: bash

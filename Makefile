@@ -343,14 +343,26 @@ define PRINT_REQUEST_MANAGER_URL
 endef
 
 define PRINT_INTEGRATION_DISPATCHER_URL
-	$(call PRINT_SERVICE_URLS,Integration Dispatcher,$(INGRESS_PREFIX)-integration-dispatcher, \
+	@echo "--- Your Integration Dispatcher URLs are: ---"
+	@sleep 10
+	@EXTERNAL_HOST=$$($(call GET_EXTERNAL_HOST,$(INGRESS_PREFIX)-integration-dispatcher-slack)); \
+	if [ -z "$$EXTERNAL_HOST" ]; then \
+		EXTERNAL_HOST=$$($(call GET_EXTERNAL_HOST,$(INGRESS_PREFIX)-integration-dispatcher)); \
+	fi; \
+	if [ -n "$$EXTERNAL_HOST" ]; then \
+		echo "  OpenAPI Schema: https://$$EXTERNAL_HOST/docs"; \
+		echo "  Health: https://$$EXTERNAL_HOST/health"; \
 		echo "  Slack Events: https://$$EXTERNAL_HOST/slack/events"; \
 		echo "  Slack Interactive: https://$$EXTERNAL_HOST/slack/interactive"; \
-		echo "  Slack Commands: https://$$EXTERNAL_HOST/slack/commands";, \
-		integration-dispatcher, \
+		echo "  Slack Commands: https://$$EXTERNAL_HOST/slack/commands"; \
+	else \
+		echo "  External access not configured - using cluster-internal URLs:"; \
+		echo "  OpenAPI Schema: http://$(MAIN_CHART_NAME)-integration-dispatcher.$(NAMESPACE).svc.cluster.local/docs"; \
+		echo "  Health: http://$(MAIN_CHART_NAME)-integration-dispatcher.$(NAMESPACE).svc.cluster.local/health"; \
 		echo "  Slack Events: http://$(MAIN_CHART_NAME)-integration-dispatcher.$(NAMESPACE).svc.cluster.local/slack/events"; \
 		echo "  Slack Interactive: http://$(MAIN_CHART_NAME)-integration-dispatcher.$(NAMESPACE).svc.cluster.local/slack/interactive"; \
-		echo "  Slack Commands: http://$(MAIN_CHART_NAME)-integration-dispatcher.$(NAMESPACE).svc.cluster.local/slack/commands";)
+		echo "  Slack Commands: http://$(MAIN_CHART_NAME)-integration-dispatcher.$(NAMESPACE).svc.cluster.local/slack/commands"; \
+	fi
 endef
 
 # Build container images
