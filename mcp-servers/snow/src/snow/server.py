@@ -10,6 +10,7 @@ from typing import Any, AsyncGenerator, Literal
 
 from mcp.server.fastmcp import Context, FastMCP
 from shared_models import configure_logging
+from snow.servicenow import headers
 from snow.servicenow.client import ServiceNowClient
 from snow.servicenow.models import OpenServiceNowLaptopRefreshRequestParams
 from snow.tracing import trace_mcp_tool
@@ -138,64 +139,6 @@ def _create_servicenow_ticket(
         raise  # Re-raise to allow fallback handling
 
 
-def _extract_authoritative_user_id(ctx: Context[Any, Any]) -> str | None:
-    """Extract authoritative user ID from request context headers.
-
-    Args:
-        ctx: Request context containing headers
-
-    Returns:
-        Authoritative user ID if found, None otherwise
-    """
-    try:
-        request_context = ctx.request_context
-        if hasattr(request_context, "request") and request_context.request:
-            request = request_context.request
-            if hasattr(request, "headers"):
-                headers = request.headers
-                user_id = headers.get("AUTHORITATIVE_USER_ID") or headers.get(
-                    "authoritative_user_id"
-                )
-                return str(user_id) if user_id is not None else None
-    except Exception as e:
-        logger.debug(
-            "Error extracting headers from request context",
-            error=str(e),
-            error_type=type(e).__name__,
-        )
-
-    return None
-
-
-def _extract_servicenow_token(ctx: Context[Any, Any]) -> str | None:
-    """Extract ServiceNow API token from request context headers.
-
-    This implements pass-through authentication where the client (agent-service)
-    reads the API key from its environment and passes it via the X-ServiceNow-Token header.
-
-    Args:
-        ctx: Request context containing headers
-
-    Returns:
-        ServiceNow API token if found, None otherwise
-    """
-    try:
-        request_context = ctx.request_context
-        if hasattr(request_context, "request") and request_context.request:
-            request = request_context.request
-            if hasattr(request, "headers"):
-                headers = request.headers
-                # Check both uppercase and lowercase variants
-                token = headers.get("SERVICE_NOW_TOKEN")
-                return str(token) if token is not None else None
-    except Exception as e:
-        logger.debug(
-            "Error extracting ServiceNow token from request context", error=str(e)
-        )
-
-    return None
-
-
 def _get_servicenow_laptop_info(
     authoritative_user_id: str, api_token: str | None = None
 ) -> str:
@@ -262,8 +205,8 @@ def open_laptop_refresh_ticket(
             "ServiceNow laptop code cannot be empty. Must be a valid ServiceNow laptop choice code like 'apple_mac_book_air_m_3'."
         )
 
-    authoritative_user_id = _extract_authoritative_user_id(ctx)
-    api_token = _extract_servicenow_token(ctx)
+    authoritative_user_id = headers.extract_authoritative_user_id(ctx)
+    api_token = headers.extract_servicenow_token(ctx)
 
     if not authoritative_user_id:
         raise ValueError(
@@ -318,8 +261,8 @@ def get_employee_laptop_info(
         # Returns laptop info for alice.johnson@company.com
     """
     # Extract authoritative user ID from request headers - CENTRALIZED HANDLING
-    authoritative_user_id = _extract_authoritative_user_id(ctx)
-    api_token = _extract_servicenow_token(ctx)
+    authoritative_user_id = headers.extract_authoritative_user_id(ctx)
+    api_token = headers.extract_servicenow_token(ctx)
 
     if not authoritative_user_id:
         raise ValueError(
