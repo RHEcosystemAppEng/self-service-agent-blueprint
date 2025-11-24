@@ -5,7 +5,8 @@ ServiceNow laptop refresh tickets.
 """
 
 import os
-from typing import Any, Literal
+from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator, Literal
 
 from mcp.server.fastmcp import Context, FastMCP
 from shared_models import configure_logging
@@ -19,13 +20,47 @@ SERVICE_NAME = "snow-mcp-server"
 logger = configure_logging(SERVICE_NAME)
 auto_tracing_run(SERVICE_NAME, logger)
 
+
+@asynccontextmanager
+async def lifespan(app: FastMCP) -> AsyncGenerator[None, None]:
+    """Initialize and validate ServiceNow configuration at startup."""
+    # Startup: Validate and store required environment variables
+    logger.info("Initializing ServiceNow configuration")
+
+    laptop_refresh_id = os.getenv("SERVICENOW_LAPTOP_REFRESH_ID")
+    if not laptop_refresh_id:
+        logger.error(
+            "SERVICENOW_LAPTOP_REFRESH_ID environment variable is not set. "
+            "Please set it to the ServiceNow catalog item ID for laptop refresh requests."
+        )
+        raise ValueError(
+            "SERVICENOW_LAPTOP_REFRESH_ID environment variable is required but not set. "
+            "Please configure it in your deployment."
+        )
+
+    # Store the laptop_refresh_id on the app instance
+    setattr(app, "laptop_refresh_id", laptop_refresh_id)
+    logger.info(
+        "ServiceNow configuration initialized", laptop_refresh_id=laptop_refresh_id
+    )
+
+    try:
+        yield
+    finally:
+        # Cleanup
+        logger.info("Shutting down ServiceNow MCP server")
+
+
 MCP_TRANSPORT: Literal["stdio", "sse", "streamable-http"] = os.environ.get("MCP_TRANSPORT", "sse")  # type: ignore[assignment]
 MCP_PORT = int(
     os.environ.get("SELF_SERVICE_AGENT_SNOW_SERVER_SERVICE_PORT_HTTP", "8001")
 )
 MCP_HOST = os.environ.get("MCP_HOST", "0.0.0.0")
 mcp = FastMCP(
-    "Snow Server", host=MCP_HOST, stateless_http=(MCP_TRANSPORT == "streamable-http")
+    "Snow Server",
+    host=MCP_HOST,
+    stateless_http=(MCP_TRANSPORT == "streamable-http"),
+    lifespan=lifespan,
 )
 
 
@@ -43,7 +78,7 @@ def _create_servicenow_ticket(
         ServiceNow ticket creation result message
     """
     try:
-        client = ServiceNowClient(api_token)
+        client = ServiceNowClient(api_token, getattr(mcp, "laptop_refresh_id"))
 
         # Look up user sys_id by email as currently only email is supported
         # authoritative user id
@@ -176,7 +211,7 @@ def _get_servicenow_laptop_info(
         Formatted laptop information string including employee details and hardware specifications
     """
     try:
-        client = ServiceNowClient(api_token)
+        client = ServiceNowClient(api_token, getattr(mcp, "laptop_refresh_id"))
 
         laptop_info = client.get_employee_laptop_info(authoritative_user_id)
         if laptop_info:
