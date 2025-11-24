@@ -27,12 +27,18 @@ class MockContext:
         self.request_context = MockRequestContext(headers)
 
 
+@patch("snow.server.mcp")
 @patch("snow.server.ServiceNowClient")
-def test_open_laptop_refresh_ticket_success(mock_servicenow_client: Mock) -> None:
+def test_open_laptop_refresh_ticket_success(
+    mock_servicenow_client: Mock, mock_mcp: Mock
+) -> None:
     """Test successful ticket creation."""
     employee_name = "John Doe"
     business_justification = "Current laptop is outdated and affecting productivity"
     servicenow_laptop_code = "apple_mac_book_pro_14_m_3_pro"
+
+    # Mock the mcp.laptop_refresh_id attribute
+    mock_mcp.laptop_refresh_id = "test_laptop_refresh_id"
 
     # Mock ServiceNow client responses
     mock_client_instance = MagicMock()
@@ -67,14 +73,19 @@ def test_open_laptop_refresh_ticket_success(mock_servicenow_client: Mock) -> Non
     assert "REQ" in result  # Ticket number format
 
 
+@patch("snow.server.mcp")
 @patch("snow.server.ServiceNowClient")
 def test_open_laptop_refresh_ticket_required_model(
     mock_servicenow_client: Mock,
+    mock_mcp: Mock,
 ) -> None:
     """Test ticket creation with required ServiceNow laptop code."""
     employee_name = "Jane Smith"
     business_justification = "Hardware failure requiring replacement"
     servicenow_laptop_code = "lenovo_think_pad_t_14_gen_5_intel"
+
+    # Mock the mcp.laptop_refresh_id attribute
+    mock_mcp.laptop_refresh_id = "test_laptop_refresh_id"
 
     # Mock ServiceNow client responses
     mock_client_instance = MagicMock()
@@ -145,9 +156,15 @@ def test_open_laptop_refresh_ticket_empty_servicenow_code() -> None:
         )
 
 
+@patch("snow.server.mcp")
 @patch("snow.server.ServiceNowClient")
-def test_get_employee_laptop_info_success(mock_servicenow_client: Mock) -> None:
+def test_get_employee_laptop_info_success(
+    mock_servicenow_client: Mock, mock_mcp: Mock
+) -> None:
     """Test successful laptop info retrieval."""
+    # Mock the mcp.laptop_refresh_id attribute
+    mock_mcp.laptop_refresh_id = "test_laptop_refresh_id"
+
     # Mock ServiceNow client responses
     mock_client_instance = MagicMock()
     mock_servicenow_client.return_value = mock_client_instance
