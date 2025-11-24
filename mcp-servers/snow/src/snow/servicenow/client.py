@@ -4,7 +4,7 @@ ServiceNow API client for laptop refresh requests.
 
 import os
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 from shared_models import configure_logging
@@ -89,6 +89,65 @@ class ServiceNowClient:
             timeout=int(os.getenv("SERVICENOW_TIMEOUT", "30")),
         )
 
+    def _has_existing_request_for_laptop_model(
+        self, existing_requests: List[Dict[str, Any]], laptop_model: str
+    ) -> tuple[bool, Optional[Dict[str, Any]]]:
+        """
+        Check if there's already an open request for the same laptop model.
+
+        Args:
+            existing_requests: List of existing open requests for the user.
+            laptop_model: The laptop model to check for.
+
+        Returns:
+            Tuple of (bool, Optional[Dict]):
+            - True if existing request found, False otherwise
+            - The existing request data if found, None otherwise
+        """
+        for request in existing_requests:
+            # Extract laptop choice from request variables
+            variables = request.get("variables", {})
+            if isinstance(variables, str):
+                # Sometimes variables might be returned as a string, try to parse it
+                try:
+                    import json
+
+                    variables = json.loads(variables)
+                except (json.JSONDecodeError, TypeError):
+                    variables = {}
+
+            existing_laptop_choice = variables.get("laptop_choices", "")
+            if existing_laptop_choice == laptop_model:
+                logger.info(
+                    "Found existing open request for same laptop model",
+                    existing_request_number=request.get("number", "N/A"),
+                    laptop_model=laptop_model,
+                )
+                return True, request
+
+        return False, None
+
+    def _would_exceed_request_limit(
+        self, existing_requests: List[Dict[str, Any]]
+    ) -> bool:
+        """
+        Check if adding a new request would exceed the request limits.
+
+        Args:
+            existing_requests: List of existing open requests for the user.
+
+        Returns:
+            True if adding a new request would exceed the limit, False otherwise.
+        """
+        if len(existing_requests) >= self.laptop_request_limits:
+            logger.warning(
+                "Request limit exceeded",
+                existing_requests=len(existing_requests),
+                limit=self.laptop_request_limits,
+            )
+            return True
+        return False
+
     def open_laptop_refresh_request(
         self, params: OpenServiceNowLaptopRefreshRequestParams
     ) -> Dict[str, Any]:
@@ -119,39 +178,24 @@ class ServiceNowClient:
 
         # Step 2: Check if there's already an open request for the same laptop model
         current_laptop_model = params.laptop_choices
-        for request in existing_requests:
-            # Extract laptop choice from request variables
-            variables = request.get("variables", {})
-            if isinstance(variables, str):
-                # Sometimes variables might be returned as a string, try to parse it
-                try:
-                    import json
-
-                    variables = json.loads(variables)
-                except (json.JSONDecodeError, TypeError):
-                    variables = {}
-
-            existing_laptop_choice = variables.get("laptop_choices", "")
-            if existing_laptop_choice == current_laptop_model:
-                logger.info(
-                    "Found existing open request for same laptop model",
-                    existing_request_number=request.get("number", "N/A"),
-                    laptop_model=current_laptop_model,
-                )
-                return {
-                    "success": True,
-                    "message": f"Existing open request found for the same laptop model: {request.get('number', 'N/A')}",
-                    "data": {"existing_request": request},
-                    "existing_ticket": True,
-                }
+        has_existing_model_request, existing_request = (
+            self._has_existing_request_for_laptop_model(
+                existing_requests, current_laptop_model
+            )
+        )
+        if has_existing_model_request:
+            assert (
+                existing_request is not None
+            ), "existing_request should not be None when has_existing_model_request is True"
+            return {
+                "success": True,
+                "message": f"Existing open request found for the same laptop model: {existing_request.get('number', 'N/A')}",
+                "data": {"existing_request": existing_request},
+                "existing_ticket": True,
+            }
 
         # Step 3: Check if adding a new request would exceed the limits
-        if len(existing_requests) >= self.laptop_request_limits:
-            logger.warning(
-                "Request limit exceeded",
-                existing_requests=len(existing_requests),
-                limit=self.laptop_request_limits,
-            )
+        if self._would_exceed_request_limit(existing_requests):
             return {
                 "success": False,
                 "message": f"Cannot open new laptop request. User already has {len(existing_requests)} open request(s), which meets or exceeds the limit of {self.laptop_request_limits}.",
