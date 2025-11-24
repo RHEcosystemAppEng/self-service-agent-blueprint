@@ -39,10 +39,16 @@ async def lifespan(app: FastMCP) -> AsyncGenerator[None, None]:
             "Please configure it in your deployment."
         )
 
-    # Store the laptop_refresh_id on the app instance
+    # Get laptop request limits with default value
+    laptop_request_limits = int(os.getenv("SERVICENOW_LAPTOP_REQUEST_LIMITS", "2"))
+
+    # Store the laptop_refresh_id and limits on the app instance
     setattr(app, "laptop_refresh_id", laptop_refresh_id)
+    setattr(app, "laptop_request_limits", laptop_request_limits)
     logger.info(
-        "ServiceNow configuration initialized", laptop_refresh_id=laptop_refresh_id
+        "ServiceNow configuration initialized",
+        laptop_refresh_id=laptop_refresh_id,
+        laptop_request_limits=laptop_request_limits,
     )
 
     try:
@@ -79,7 +85,11 @@ def _create_servicenow_ticket(
         ServiceNow ticket creation result message
     """
     try:
-        client = ServiceNowClient(api_token, getattr(mcp, "laptop_refresh_id"))
+        client = ServiceNowClient(
+            api_token,
+            getattr(mcp, "laptop_refresh_id"),
+            getattr(mcp, "laptop_request_limits"),
+        )
 
         # Look up user sys_id by email as currently only email is supported
         # authoritative user id
@@ -154,7 +164,11 @@ def _get_servicenow_laptop_info(
         Formatted laptop information string including employee details and hardware specifications
     """
     try:
-        client = ServiceNowClient(api_token, getattr(mcp, "laptop_refresh_id"))
+        client = ServiceNowClient(
+            api_token,
+            getattr(mcp, "laptop_refresh_id"),
+            getattr(mcp, "laptop_request_limits"),
+        )
 
         laptop_info = client.get_employee_laptop_info(authoritative_user_id)
         if laptop_info:

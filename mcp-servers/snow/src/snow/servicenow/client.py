@@ -28,7 +28,10 @@ class ServiceNowClient:
     """
 
     def __init__(
-        self, api_token: str | None = None, laptop_refresh_id: str | None = None
+        self,
+        api_token: str | None = None,
+        laptop_refresh_id: str | None = None,
+        laptop_request_limits: int = 2,
     ) -> None:
         """
         Initialize the ServiceNow client with API token and laptop refresh ID.
@@ -38,6 +41,8 @@ class ServiceNowClient:
                        This is required and must be provided for authentication.
             laptop_refresh_id: ServiceNow catalog item ID for laptop refresh requests.
                               This is required and should be provided at server startup.
+            laptop_request_limits: Maximum number of open laptop requests allowed per user.
+                                 Defaults to 2.
 
         Raises:
             ValueError: If api_token or laptop_refresh_id is not provided.
@@ -48,6 +53,7 @@ class ServiceNowClient:
             raise ValueError("ServiceNow laptop refresh ID is required.")
 
         self.laptop_refresh_id = laptop_refresh_id
+        self.laptop_request_limits = laptop_request_limits
         self.config = self._load_config(api_token=api_token)
         self.auth_manager = AuthManager(self.config.auth, self.config.instance_url)
 
@@ -88,6 +94,7 @@ class ServiceNowClient:
     ) -> Dict[str, Any]:
         """
         Open a ServiceNow laptop refresh request.
+        Before opening, checks for existing open requests to avoid duplicates and enforce limits.
 
         Args:
             params: Parameters for the laptop refresh request.
@@ -96,6 +103,66 @@ class ServiceNowClient:
             Dictionary containing the result of the operation.
         """
         logger.info("Opening ServiceNow laptop refresh request")
+
+        # Step 1: Check for existing open requests for this user
+        user_sys_id = params.who_is_this_request_for
+        logger.info("Checking for existing open requests", user_sys_id=user_sys_id)
+
+        existing_requests_result = self.get_open_laptop_requests_for_user(user_sys_id)
+        if not existing_requests_result["success"]:
+            return existing_requests_result
+
+        existing_requests = existing_requests_result["requests"]
+        logger.info(
+            "Found existing open request(s)", existing_requests=len(existing_requests)
+        )
+
+        # Step 2: Check if there's already an open request for the same laptop model
+        current_laptop_model = params.laptop_choices
+        for request in existing_requests:
+            # Extract laptop choice from request variables
+            variables = request.get("variables", {})
+            if isinstance(variables, str):
+                # Sometimes variables might be returned as a string, try to parse it
+                try:
+                    import json
+
+                    variables = json.loads(variables)
+                except (json.JSONDecodeError, TypeError):
+                    variables = {}
+
+            existing_laptop_choice = variables.get("laptop_choices", "")
+            if existing_laptop_choice == current_laptop_model:
+                logger.info(
+                    "Found existing open request for same laptop model",
+                    existing_request_number=request.get("number", "N/A"),
+                    laptop_model=current_laptop_model,
+                )
+                return {
+                    "success": True,
+                    "message": f"Existing open request found for the same laptop model: {request.get('number', 'N/A')}",
+                    "data": {"existing_request": request},
+                    "existing_ticket": True,
+                }
+
+        # Step 3: Check if adding a new request would exceed the limits
+        if len(existing_requests) >= self.laptop_request_limits:
+            logger.warning(
+                "Request limit exceeded",
+                existing_requests=len(existing_requests),
+                limit=self.laptop_request_limits,
+            )
+            return {
+                "success": False,
+                "message": f"Cannot open new laptop request. User already has {len(existing_requests)} open request(s), which meets or exceeds the limit of {self.laptop_request_limits}.",
+                "data": {
+                    "existing_requests": existing_requests,
+                    "limit": self.laptop_request_limits,
+                },
+            }
+
+        # Step 4: Proceed with creating a new request
+        logger.info("Proceeding to create new laptop request")
 
         # Use the laptop refresh ID that was provided at initialization
         logger.info(
@@ -144,6 +211,7 @@ class ServiceNowClient:
                 "success": True,
                 "message": "Successfully opened laptop refresh request",
                 "data": result,
+                "existing_ticket": False,
             }
 
         except requests.exceptions.RequestException as e:
@@ -410,3 +478,65 @@ class ServiceNowClient:
                 error_type=type(e).__name__,
             )
             return f"Error: Failed to format laptop information - {str(e)}"
+
+    def get_open_laptop_requests_for_user(self, user_sys_id: str) -> Dict[str, Any]:
+        """
+        Fetches open laptop refresh requests for a specific user.
+
+        Args:
+            user_sys_id: The sys_id of the user to search for open requests.
+
+        Returns:
+            Dictionary containing the result of the operation with success, message, and requests data.
+        """
+        if not user_sys_id:
+            return {"success": False, "message": "User sys_id parameter is required"}
+
+        # Build query parameters to find open requests for the user
+        # Look for requests where:
+        # - requested_for (or who_is_this_request_for) equals user_sys_id
+        # - state is not closed/cancelled (typically open states are 1, 2, 3)
+        # - cat_item points to the laptop refresh catalog item
+        params = {
+            "sysparm_query": f"requested_for={user_sys_id}^cat_item={self.laptop_refresh_id}^stateIN1,2,3",
+            "sysparm_display_value": "true",
+            "sysparm_fields": "sys_id,number,state,requested_for,cat_item,variables,opened_at,short_description",
+        }
+
+        try:
+            data = self._get("/api/now/table/sc_request", params)
+
+            if not data:
+                return {
+                    "success": False,
+                    "message": "Failed to connect to ServiceNow API",
+                }
+
+            if data and data.get("result"):
+                requests = data["result"]
+                return {
+                    "success": True,
+                    "message": f"Found {len(requests)} open laptop request(s) for user",
+                    "requests": requests,
+                }
+            else:
+                logger.info(
+                    "No open laptop requests found for user", user_sys_id=user_sys_id
+                )
+                return {
+                    "success": True,
+                    "message": "No open laptop requests found for user",
+                    "requests": [],
+                }
+
+        except Exception as e:
+            logger.error(
+                "Failed to get open laptop requests for user",
+                user_sys_id=user_sys_id,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            return {
+                "success": False,
+                "message": f"Failed to get open laptop requests: {str(e)}",
+            }
