@@ -362,9 +362,9 @@ requestManagement:
     uvicornWorkers: 4  # Number of uvicorn worker processes for handling concurrent requests
     resources: {}
     # External Access Configuration
+    # When enabled, only /slack/* endpoints are externally accessible (path-restricted for security)
     externalAccess:
       enabled: true  # Set to true to create external access via OpenShift Route
-      restrictPaths: true  # Set to true to only expose /slack/* endpoints externally (recommended for security)
     # Health check configuration (dev-optimized for resource-constrained environments)
     healthChecks:
       livenessProbe:

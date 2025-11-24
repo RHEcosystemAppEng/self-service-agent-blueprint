@@ -29,9 +29,8 @@ spec:
 {{- end }}
 
 {{- if and .Values.requestManagement.enabled .Values.requestManagement.integrationDispatcher.externalAccess.enabled }}
-{{- if .Values.requestManagement.integrationDispatcher.externalAccess.restrictPaths }}
 ---
-# Restricted Route: Only Slack webhook endpoints are externally accessible
+# Path-restricted Route: Only Slack webhook endpoints are externally accessible
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
@@ -53,28 +52,4 @@ spec:
   tls:
     termination: edge
     insecureEdgeTerminationPolicy: Redirect
-{{- else }}
----
-# Unrestricted Route: All endpoints are externally accessible
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
-  name: ssa-integration-dispatcher
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "self-service-agent.labels" . | nindent 4 }}
-    app.kubernetes.io/component: integration-dispatcher
-  annotations:
-    haproxy.router.openshift.io/timeout: "180s"
-spec:
-  to:
-    kind: Service
-    name: {{ include "self-service-agent.fullname" . }}-integration-dispatcher
-    weight: 100
-  port:
-    targetPort: http
-  tls:
-    termination: edge
-    insecureEdgeTerminationPolicy: Redirect
-{{- end }}
 {{- end }}
