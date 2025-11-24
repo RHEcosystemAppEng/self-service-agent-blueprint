@@ -1,9 +1,12 @@
 """Tests for Snow Server MCP server."""
 
+from typing import Any, Dict, List
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from snow.server import get_employee_laptop_info, open_laptop_refresh_ticket
+from snow.servicenow.client import ServiceNowClient
+from snow.servicenow.models import OpenServiceNowLaptopRefreshRequestParams
 
 
 class MockRequest:
@@ -201,3 +204,388 @@ def test_get_employee_laptop_info_success(
     mock_client_instance.get_employee_laptop_info.assert_called_once_with(
         "alice.johnson@company.com"
     )
+
+
+# Tests for open_laptop_refresh_request function
+
+
+@patch("snow.servicenow.client.requests.post")
+def test_open_laptop_refresh_request_same_laptop_existing_request(
+    mock_post: Mock,
+) -> None:
+    """Test returning existing ticket when same laptop model request already exists."""
+    # Setup test data
+    api_token = "test_token"
+    laptop_refresh_id = "test_refresh_id"
+    laptop_request_limits = 2
+
+    # Mock parameters
+    params = OpenServiceNowLaptopRefreshRequestParams(
+        who_is_this_request_for="user123",
+        laptop_choices="apple_mac_book_pro_14_m_3_pro",
+    )
+
+    # Mock existing requests with same laptop model
+    existing_requests = [
+        {
+            "number": "REQ0010001",
+            "sys_id": "existing_request_id",
+            "variables": {
+                "laptop_choices": "apple_mac_book_pro_14_m_3_pro"  # Same laptop model
+            },
+        }
+    ]
+
+    # Create ServiceNowClient instance
+    client = ServiceNowClient(
+        api_token=api_token,
+        laptop_refresh_id=laptop_refresh_id,
+        laptop_request_limits=laptop_request_limits,
+    )
+
+    # Mock get_open_laptop_requests_for_user to return existing requests
+    with patch.object(client, "get_open_laptop_requests_for_user") as mock_get_requests:
+        mock_get_requests.return_value = {
+            "success": True,
+            "requests": existing_requests,
+        }
+
+        # Call the function
+        result = client.open_laptop_refresh_request(params)
+
+        # Assertions
+        assert result["success"] is True
+        assert "existing_request" in result["data"]
+        assert result["existing_ticket"] is True
+        assert (
+            "Existing open request found for the same laptop model" in result["message"]
+        )
+        assert "REQ0010001" in result["message"]
+
+        # Verify that no new request was made
+        mock_post.assert_not_called()
+
+        # Verify get_open_laptop_requests_for_user was called
+        mock_get_requests.assert_called_once_with("user123")
+
+
+@patch("snow.servicenow.client.requests.post")
+def test_open_laptop_refresh_request_exceeds_limit(
+    mock_post: Mock,
+) -> None:
+    """Test error when adding new request would exceed the laptop request limit."""
+    # Setup test data
+    api_token = "test_token"
+    laptop_refresh_id = "test_refresh_id"
+    laptop_request_limits = 2  # Set limit to 2
+
+    # Mock parameters for a different laptop
+    params = OpenServiceNowLaptopRefreshRequestParams(
+        who_is_this_request_for="user123",
+        laptop_choices="lenovo_think_pad_t_14_gen_5_intel",  # Different laptop
+    )
+
+    # Mock existing requests - user already has 2 open requests (at the limit)
+    existing_requests = [
+        {
+            "number": "REQ0010001",
+            "sys_id": "existing_request_id_1",
+            "variables": {
+                "laptop_choices": "apple_mac_book_pro_14_m_3_pro"  # Different laptop
+            },
+        },
+        {
+            "number": "REQ0010002",
+            "sys_id": "existing_request_id_2",
+            "variables": {
+                "laptop_choices": "dell_latitude_7420"  # Another different laptop
+            },
+        },
+    ]
+
+    # Create ServiceNowClient instance
+    client = ServiceNowClient(
+        api_token=api_token,
+        laptop_refresh_id=laptop_refresh_id,
+        laptop_request_limits=laptop_request_limits,
+    )
+
+    # Mock get_open_laptop_requests_for_user to return existing requests
+    with patch.object(client, "get_open_laptop_requests_for_user") as mock_get_requests:
+        mock_get_requests.return_value = {
+            "success": True,
+            "requests": existing_requests,
+        }
+
+        # Call the function
+        result = client.open_laptop_refresh_request(params)
+
+        # Assertions
+        assert result["success"] is False
+        assert "Cannot open new laptop request" in result["message"]
+        assert (
+            "2 open request(s), which meets or exceeds the limit of 2"
+            in result["message"]
+        )
+        assert result["data"]["existing_requests"] == existing_requests
+        assert result["data"]["limit"] == 2
+
+        # Verify that no new request was made
+        mock_post.assert_not_called()
+
+        # Verify get_open_laptop_requests_for_user was called
+        mock_get_requests.assert_called_once_with("user123")
+
+
+@patch("snow.servicenow.client.requests.post")
+def test_open_laptop_refresh_request_within_limits_creates_new_ticket(
+    mock_post: Mock,
+) -> None:
+    """Test creating new ticket when different laptop requested and within limits."""
+    # Setup test data
+    api_token = "test_token"
+    laptop_refresh_id = "test_refresh_id"
+    laptop_request_limits = 2  # Set limit to 2
+
+    # Mock parameters for a different laptop
+    params = OpenServiceNowLaptopRefreshRequestParams(
+        who_is_this_request_for="user123",
+        laptop_choices="lenovo_think_pad_t_14_gen_5_intel",  # Different laptop
+    )
+
+    # Mock existing requests - user has only 1 open request (under the limit)
+    existing_requests = [
+        {
+            "number": "REQ0010001",
+            "sys_id": "existing_request_id_1",
+            "variables": {
+                "laptop_choices": "apple_mac_book_pro_14_m_3_pro"  # Different laptop
+            },
+        }
+    ]
+
+    # Mock successful ServiceNow API response
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "result": {"request_number": "REQ0010003", "sys_id": "new_request_id"}
+    }
+    mock_post.return_value = mock_response
+
+    # Create ServiceNowClient instance
+    client = ServiceNowClient(
+        api_token=api_token,
+        laptop_refresh_id=laptop_refresh_id,
+        laptop_request_limits=laptop_request_limits,
+    )
+
+    # Mock get_open_laptop_requests_for_user to return existing requests
+    with patch.object(client, "get_open_laptop_requests_for_user") as mock_get_requests:
+        mock_get_requests.return_value = {
+            "success": True,
+            "requests": existing_requests,
+        }
+
+        # Call the function
+        result = client.open_laptop_refresh_request(params)
+
+        # Assertions
+        assert result["success"] is True
+        assert result["existing_ticket"] is False
+        assert "Successfully opened laptop refresh request" in result["message"]
+        assert result["data"]["result"]["request_number"] == "REQ0010003"
+        assert result["data"]["result"]["sys_id"] == "new_request_id"
+
+        # Verify that a new request was made to ServiceNow
+        mock_post.assert_called_once()
+
+        # Verify the request was made to the correct URL
+        call_args = mock_post.call_args
+        assert (
+            f"/api/sn_sc/servicecatalog/items/{laptop_refresh_id}/order_now"
+            in call_args[0][0]
+        )
+
+        # Verify request body contains correct parameters
+        request_body = call_args[1]["json"]
+        assert request_body["sysparm_quantity"] == 1
+        assert (
+            request_body["variables"]["laptop_choices"]
+            == "lenovo_think_pad_t_14_gen_5_intel"
+        )
+        assert request_body["variables"]["who_is_this_request_for"] == "user123"
+
+        # Verify get_open_laptop_requests_for_user was called
+        mock_get_requests.assert_called_once_with("user123")
+
+
+@patch("snow.servicenow.client.requests.post")
+def test_open_laptop_refresh_request_no_existing_requests(
+    mock_post: Mock,
+) -> None:
+    """Test creating ticket when user has no existing requests."""
+    # Setup test data
+    api_token = "test_token"
+    laptop_refresh_id = "test_refresh_id"
+    laptop_request_limits = 2
+
+    # Mock parameters
+    params = OpenServiceNowLaptopRefreshRequestParams(
+        who_is_this_request_for="user123",
+        laptop_choices="apple_mac_book_pro_14_m_3_pro",
+    )
+
+    # Mock no existing requests
+    existing_requests: List[Dict[str, Any]] = []
+
+    # Mock successful ServiceNow API response
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "result": {"request_number": "REQ0010004", "sys_id": "new_request_id"}
+    }
+    mock_post.return_value = mock_response
+
+    # Create ServiceNowClient instance
+    client = ServiceNowClient(
+        api_token=api_token,
+        laptop_refresh_id=laptop_refresh_id,
+        laptop_request_limits=laptop_request_limits,
+    )
+
+    # Mock get_open_laptop_requests_for_user to return no existing requests
+    with patch.object(client, "get_open_laptop_requests_for_user") as mock_get_requests:
+        mock_get_requests.return_value = {
+            "success": True,
+            "requests": existing_requests,
+        }
+
+        # Call the function
+        result = client.open_laptop_refresh_request(params)
+
+        # Assertions
+        assert result["success"] is True
+        assert result["existing_ticket"] is False
+        assert "Successfully opened laptop refresh request" in result["message"]
+        assert result["data"]["result"]["request_number"] == "REQ0010004"
+        assert result["data"]["result"]["sys_id"] == "new_request_id"
+
+        # Verify that a new request was made to ServiceNow
+        mock_post.assert_called_once()
+
+        # Verify the request was made to the correct URL
+        call_args = mock_post.call_args
+        assert (
+            f"/api/sn_sc/servicecatalog/items/{laptop_refresh_id}/order_now"
+            in call_args[0][0]
+        )
+
+        # Verify request body contains correct parameters
+        request_body = call_args[1]["json"]
+        assert request_body["sysparm_quantity"] == 1
+        assert (
+            request_body["variables"]["laptop_choices"]
+            == "apple_mac_book_pro_14_m_3_pro"
+        )
+        assert request_body["variables"]["who_is_this_request_for"] == "user123"
+
+        # Verify get_open_laptop_requests_for_user was called
+        mock_get_requests.assert_called_once_with("user123")
+
+
+@patch("snow.servicenow.client.requests.post")
+def test_open_laptop_refresh_request_get_existing_requests_failure(
+    mock_post: Mock,
+) -> None:
+    """Test error handling when get_open_laptop_requests_for_user fails."""
+    # Setup test data
+    api_token = "test_token"
+    laptop_refresh_id = "test_refresh_id"
+    laptop_request_limits = 2
+
+    # Mock parameters
+    params = OpenServiceNowLaptopRefreshRequestParams(
+        who_is_this_request_for="user123",
+        laptop_choices="apple_mac_book_pro_14_m_3_pro",
+    )
+
+    # Create ServiceNowClient instance
+    client = ServiceNowClient(
+        api_token=api_token,
+        laptop_refresh_id=laptop_refresh_id,
+        laptop_request_limits=laptop_request_limits,
+    )
+
+    # Mock get_open_laptop_requests_for_user to return failure
+    with patch.object(client, "get_open_laptop_requests_for_user") as mock_get_requests:
+        mock_get_requests.return_value = {
+            "success": False,
+            "message": "Failed to fetch existing requests",
+        }
+
+        # Call the function
+        result = client.open_laptop_refresh_request(params)
+
+        # Assertions
+        assert result["success"] is False
+        assert result["message"] == "Failed to fetch existing requests"
+
+        # Verify that no new request was made
+        mock_post.assert_not_called()
+
+        # Verify get_open_laptop_requests_for_user was called
+        mock_get_requests.assert_called_once_with("user123")
+
+
+@patch("snow.servicenow.client.requests.post")
+def test_open_laptop_refresh_request_api_failure(
+    mock_post: Mock,
+) -> None:
+    """Test error handling when ServiceNow API request fails."""
+    import requests
+
+    # Setup test data
+    api_token = "test_token"
+    laptop_refresh_id = "test_refresh_id"
+    laptop_request_limits = 2
+
+    # Mock parameters
+    params = OpenServiceNowLaptopRefreshRequestParams(
+        who_is_this_request_for="user123",
+        laptop_choices="apple_mac_book_pro_14_m_3_pro",
+    )
+
+    # Mock no existing requests
+    existing_requests: List[Dict[str, Any]] = []
+
+    # Mock API request failure
+    mock_post.side_effect = requests.exceptions.RequestException("Connection error")
+
+    # Create ServiceNowClient instance
+    client = ServiceNowClient(
+        api_token=api_token,
+        laptop_refresh_id=laptop_refresh_id,
+        laptop_request_limits=laptop_request_limits,
+    )
+
+    # Mock get_open_laptop_requests_for_user to return no existing requests
+    with patch.object(client, "get_open_laptop_requests_for_user") as mock_get_requests:
+        mock_get_requests.return_value = {
+            "success": True,
+            "requests": existing_requests,
+        }
+
+        # Call the function
+        result = client.open_laptop_refresh_request(params)
+
+        # Assertions
+        assert result["success"] is False
+        assert "Error opening laptop refresh request" in result["message"]
+        assert "Connection error" in result["message"]
+        assert result["data"] is None
+
+        # Verify that a request was attempted
+        mock_post.assert_called_once()
+
+        # Verify get_open_laptop_requests_for_user was called
+        mock_get_requests.assert_called_once_with("user123")
