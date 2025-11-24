@@ -19,6 +19,7 @@ INTEGRATION_DISPATCHER_IMG ?= $(REGISTRY)/self-service-agent-integration-dispatc
 MCP_SNOW_IMG ?= $(REGISTRY)/self-service-agent-snow-mcp:$(VERSION)
 MOCK_EVENTING_IMG ?= $(REGISTRY)/self-service-agent-mock-eventing:$(VERSION)
 MOCK_SERVICENOW_IMG ?= $(REGISTRY)/self-service-agent-mock-servicenow:$(VERSION)
+PROMPTGUARD_IMG ?= $(REGISTRY)/self-service-agent-promptguard:$(VERSION)
 
 MAKEFLAGS += --no-print-directory
 
@@ -95,7 +96,14 @@ helm_llama_stack_args = \
     $(if $(LLAMASTACK_CLIENT_PORT),--set llamastack.port=$(LLAMASTACK_CLIENT_PORT),) \
     $(if $(LLAMASTACK_API_KEY),--set llamastack.apiKey='$(LLAMASTACK_API_KEY)',) \
     $(if $(LLAMASTACK_OPENAI_BASE_PATH),--set llamastack.openaiBasePath='$(LLAMASTACK_OPENAI_BASE_PATH)',) \
-    $(if $(LLAMASTACK_TIMEOUT),--set llamastack.timeout=$(LLAMASTACK_TIMEOUT),)
+    $(if $(LLAMASTACK_TIMEOUT),--set llamastack.timeout=$(LLAMASTACK_TIMEOUT),) \
+    $(if $(PROMPTGUARD_ENABLED),--set promptGuard.enabled=$(PROMPTGUARD_ENABLED),) \
+    $(if $(PROMPTGUARD_ENABLED),--set llama-stack.models.llama-prompt-guard-2-86m.enabled=$(PROMPTGUARD_ENABLED),) \
+    $(if $(PROMPTGUARD_ENABLED),--set llama-stack.models.llama-prompt-guard-2-86m.url="http://self-service-agent-promptguard.$(NAMESPACE).svc.cluster.local:8000/v1",) \
+    $(if $(PROMPTGUARD_ENABLED),--set global.models.llama-prompt-guard-2-86m.enabled=$(PROMPTGUARD_ENABLED),) \
+    $(if $(PROMPTGUARD_ENABLED),--set global.models.llama-prompt-guard-2-86m.url="http://self-service-agent-promptguard.$(NAMESPACE).svc.cluster.local:8000/v1",) \
+    $(if $(HF_TOKEN),--set promptGuard.huggingfaceToken.secretName=hf-token,) \
+    $(if $(HF_TOKEN),--set promptGuard.huggingfaceToken.secretKey=token,)
 
 helm_request_management_args = \
     $(if $(REQUEST_MANAGEMENT),--set requestManagement.enabled=$(REQUEST_MANAGEMENT),) \
@@ -140,6 +148,7 @@ help:
 	@echo "  build-mcp-snow-image                 - Build the snow MCP server container image (checks lockfiles first)"
 	@echo "  build-mock-eventing-image            - Build the mock eventing service container image (checks lockfiles first)"
 	@echo "  build-mock-servicenow-image          - Build the mock ServiceNow server container image (checks lockfiles first)"
+	@echo "  build-promptguard-image              - Build the PromptGuard service container image (checks lockfiles first)"
 	@echo "  build-request-mgr-image              - Build the request manager container image (checks lockfiles first)"
 	@echo ""
 	@echo "Helm Commands:"
@@ -185,6 +194,7 @@ help:
 	@echo "  push-integration-dispatcher-image   - Push the integration dispatcher container image to registry"
 	@echo "  push-mcp-snow-image                 - Push the snow MCP server container image to registry"
 	@echo "  push-mock-eventing-image            - Push the mock eventing service container image to registry"
+	@echo "  push-promptguard-image              - Push the PromptGuard service container image to registry"
 	@echo "  push-request-mgr-image              - Push the request manager container image to registry"
 	@echo ""
 	@echo "Test Commands:"
@@ -355,7 +365,7 @@ endef
 
 # Build container images
 .PHONY: build-all-images
-build-all-images: build-request-mgr-image build-agent-service-image build-integration-dispatcher-image build-mcp-snow-image build-mock-eventing-image build-mock-servicenow-image
+build-all-images: build-request-mgr-image build-agent-service-image build-integration-dispatcher-image build-mcp-snow-image build-mock-eventing-image build-mock-servicenow-image build-promptguard-image
 	@echo "All container images built successfully!"
 
 
@@ -396,9 +406,17 @@ build-mock-servicenow-image: check-lockfile-mock-servicenow check-lockfile-mock-
 		.
 	@echo "Successfully built mock ServiceNow server image: $(MOCK_SERVICENOW_IMG)"
 
+.PHONY: build-promptguard-image
+build-promptguard-image: check-lockfile-promptguard check-lockfile-shared-models
+	@echo "Building PromptGuard service image: $(PROMPTGUARD_IMG)"
+	$(CONTAINER_TOOL) build -t $(PROMPTGUARD_IMG) --platform=$(ARCH) \
+		-f promptguard-service/Containerfile \
+		.
+	@echo "Successfully built PromptGuard service image: $(PROMPTGUARD_IMG)"
+
 # Push container images
 .PHONY: push-all-images
-push-all-images: push-request-mgr-image push-agent-service-image push-integration-dispatcher-image push-mcp-snow-image push-mock-eventing-image push-mock-servicenow-image
+push-all-images: push-request-mgr-image push-agent-service-image push-integration-dispatcher-image push-mcp-snow-image push-mock-eventing-image push-mock-servicenow-image push-promptguard-image
 	@echo "All container images pushed successfully!"
 
 
@@ -427,6 +445,10 @@ push-mock-eventing-image:
 .PHONY: push-mock-servicenow-image
 push-mock-servicenow-image:
 	$(call push_image,$(MOCK_SERVICENOW_IMG) $(PUSH_EXTRA_AGRS),mock ServiceNow server image)
+
+.PHONY: push-promptguard-image
+push-promptguard-image:
+	$(call push_image,$(PROMPTGUARD_IMG) $(PUSH_EXTRA_AGRS),PromptGuard service image)
 
 # Code quality
 .PHONY: lint
@@ -617,6 +639,11 @@ reinstall-mock-servicenow:
 		echo "Current SERVICENOW_INSTANCE_URL: $(SERVICENOW_INSTANCE_URL)"; \
 	fi
 
+.PHONY: reinstall-promptguard
+reinstall-promptguard:
+	@echo "Force reinstalling PromptGuard service dependencies..."
+	cd promptguard-service && uv sync --reinstall
+	@echo "PromptGuard service dependencies force reinstalled successfully!"
 
 .PHONY: install-request-manager
 install-request-manager:
@@ -664,6 +691,12 @@ install-mock-servicenow:
 		echo "Skipping mock ServiceNow installation - SERVICENOW_INSTANCE_URL does not contain 'self-service-agent-mock-servicenow'"; \
 		echo "Current SERVICENOW_INSTANCE_URL: $(SERVICENOW_INSTANCE_URL)"; \
 	fi
+
+.PHONY: install-promptguard
+install-promptguard:
+	@echo "Installing PromptGuard service dependencies..."
+	cd promptguard-service && uv sync
+	@echo "PromptGuard service dependencies installed successfully!"
 
 .PHONY: install-tracing-config
 install-tracing-config:
@@ -776,7 +809,7 @@ update-lockfiles:
 	@echo "🎉 All lockfiles updated successfully!"
 
 # Individual service lockfile targets
-.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-snow check-lockfile-mock-eventing check-lockfile-mock-employee-data check-lockfile-mock-servicenow check-lockfile-servicenow-bootstrap
+.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-snow check-lockfile-mock-eventing check-lockfile-mock-employee-data check-lockfile-mock-servicenow check-lockfile-promptguard check-lockfile-servicenow-bootstrap
 check-lockfile-root:
 	@echo "📦 Checking root project..."
 	@if uv lock --check; then \
@@ -811,6 +844,9 @@ check-lockfile-mock-employee-data:
 
 check-lockfile-mock-servicenow:
 	$(call check_lockfile,mock-service-now)
+
+check-lockfile-promptguard:
+	$(call check_lockfile,promptguard-service)
 
 check-lockfile-servicenow-bootstrap:
 	$(call check_lockfile,scripts/servicenow-bootstrap)
@@ -938,6 +974,20 @@ namespace:
 	@kubectl create namespace $(NAMESPACE) &> /dev/null && kubectl label namespace $(NAMESPACE) modelmesh-enabled=false ||:
 	@kubectl config set-context --current --namespace=$(NAMESPACE) &> /dev/null ||:
 
+# Create HuggingFace token secret if HF_TOKEN is provided
+.PHONY: hf-token-secret
+hf-token-secret:
+ifdef HF_TOKEN
+	@echo "Creating HuggingFace token secret..."
+	@kubectl create secret generic hf-token \
+		--from-literal=token=$(HF_TOKEN) \
+		-n $(NAMESPACE) \
+		--dry-run=client -o yaml | kubectl apply -f -
+	@echo "✅ HuggingFace token secret created/updated"
+else
+	@echo "ℹ️  No HF_TOKEN provided, skipping secret creation"
+endif
+
 .PHONY: helm-depend
 helm-depend:
 	@echo "Updating Helm dependencies"
@@ -1007,7 +1057,7 @@ endef
 PROMPT_OVERRIDES := $(foreach var,$(filter LG_PROMPT_%,$(.VARIABLES)),--set requestManagement.agentService.promptOverrides.lg-prompt-$(shell echo $(var:LG_PROMPT_%=%) | tr '[:upper:]' '[:lower:]' | tr '_' '-')=$($(var)))
 
 .PHONY: helm-install-test
-helm-install-test: namespace helm-depend
+helm-install-test: namespace helm-depend hf-token-secret
 	$(call helm_install_common,"with mock eventing service - testing/CI",\
 		-f helm/values-test.yaml \
 		--set requestManagement.knative.mockEventing.enabled=true \
@@ -1018,7 +1068,7 @@ helm-install-test: namespace helm-depend
 
 # Install with full Knative eventing (production mode)
 .PHONY: helm-install-prod
-helm-install-prod: namespace helm-depend
+helm-install-prod: namespace helm-depend hf-token-secret
 	@echo "Installing with retry logic for triggers..."
 	@for i in 1 2 3; do \
 		echo "Attempt $$i of 3..."; \
