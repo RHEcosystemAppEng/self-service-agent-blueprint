@@ -112,6 +112,48 @@ http.request /api/chat (agent-service)                    [trace_id: abc123]
 
 All spans share the same `trace_id`, creating a complete distributed trace.
 
+## Accessing and Viewing Traces
+
+Once tracing is enabled and traces are being exported, you can view them using Jaeger or any other OTLP-compatible tracing UI.
+
+### Using Jaeger
+
+Jaeger is the default distributed tracing UI used in this system. To access traces:
+
+1. **Access the Jaeger UI**: Navigate to your Jaeger instance (typically running on port 16686)
+   - Local development: `http://localhost:16686`
+   - OpenShift: Access via the Jaeger route in your namespace
+
+2. **Find Traces**: In the Jaeger UI:
+   - Select the service from the dropdown (e.g., `agent-service`, `snow-mcp`)
+   - Filter by operation (e.g., `/api/chat`, `open_laptop_refresh_ticket`)
+   - Set time range to find recent traces
+   - Click "Find Traces" to search
+
+3. **View Trace Details**: Click on any trace to see:
+   - Complete request flow across all services
+   - Timing breakdown for each span
+   - HTTP headers and metadata
+   - Error details if any span failed
+   - The complete distributed context with shared `trace_id`
+
+4. **Analyze Performance**:
+   - Identify slow operations by comparing span durations
+   - Find bottlenecks in the request path
+   - Track how long tool calls take vs LLM processing
+   - See the complete latency breakdown from client to backend systems
+
+### Alternative Trace Viewers
+
+The system uses OpenTelemetry with OTLP export, making it compatible with various tracing backends:
+
+- **Jaeger**: Default UI, excellent for distributed tracing visualization
+- **Grafana Tempo**: For integrated observability with metrics and logs
+- **OpenTelemetry Collector**: Can export to multiple backends simultaneously
+- **OpenShift Console**: Built-in observability features in OpenShift environments
+
+All trace viewers that support OTLP can consume the traces from this system without code changes.
+
 ## Configuration
 
 ### Enable Tracing

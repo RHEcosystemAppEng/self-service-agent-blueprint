@@ -1089,7 +1089,9 @@ make helm-install-test NAMESPACE=$NAMESPACE
 ```
 The endpoint will be automatically propagated to all components.
 
-#### Accessing and Viewing Traces
+#### Accessing and Viewing Traces uses Jaeger UI
+
+Once tracing is enabled and traces are being exported, you can view them using the Jaeger UI. Jaeger is the distributed tracing system used to visualize request flows across all components.
 
 **Get the Jaeger UI URL:**
 
@@ -1097,18 +1099,18 @@ The endpoint will be automatically propagated to all components.
 # For Jaeger All-in-One
 export JAEGER_UI_URL=$(oc get route jaeger-ui -n $NAMESPACE -o jsonpath='{.spec.host}')
 
-# For OpenShift Tempo
+# For OpenShift Tempo (uses Jaeger UI)
 export JAEGER_UI_URL=$(oc get route tempo-tempo-stack-jaegerui -n openshift-tracing-system -o jsonpath='{.spec.host}')
 
 # Open in browser
 echo "Jaeger UI: https://$JAEGER_UI_URL"
 ```
 
-**View Traces:**
+**View Traces in Jaeger:**
 
 1. Generate traces by interacting with the agent (via CLI, Slack, or API) as described earlier in the
    quickstart
-2. Open Jaeger UI and select service `request-manager`
+2. Open the Jaeger UI in your browser and select service `request-manager`
 3. Click "Find Traces" to see recent requests
 4. Click on a trace to view the complete flow including:
    - Request Manager → Agent Service → Llama Stack → MCP Servers
@@ -1123,7 +1125,7 @@ one to look up the employee information and one to create the laptop request.
 
 Note that each user request and response from the agent will be in their own trace.
 
-**Troubleshooting:** If traces don't appear, verify `OTEL_EXPORTER_OTLP_ENDPOINT` is set on deployments and check service logs for OpenTelemetry initialization messages
+**Troubleshooting:** If traces don't appear in Jaeger, verify `OTEL_EXPORTER_OTLP_ENDPOINT` is set on deployments and check service logs for OpenTelemetry initialization messages
 
 **Cleaning Up:**
 
@@ -1153,7 +1155,7 @@ http.request POST /api/v1/requests (request-manager)          [120ms]
                   └─ http.request POST servicenow.com/api     [6ms]
 ```
 
-**Visual Example:**
+**Viewing Traces with Jaeger:**
 
 Here's what a complete trace looks like in Jaeger:
 
@@ -1164,6 +1166,32 @@ In this example, the overall request time (4:16) is dominated by the LLM inferen
 Or its graph representation:
 
 ![Tracing Graph](guides/images/tracing-graph.png)
+
+#### Viewing Traces in OpenShift Console
+
+If you're using OpenShift with the distributed tracing platform (Tempo), you can access traces directly through the OpenShift console under **Observe → Traces**:
+
+![OpenShift Observe Traces](guides/images/ocp-observe-traces.png)
+
+This view provides:
+- **Duration Graph**: Visual timeline showing trace distribution and duration over time
+- **Trace List**: Filterable table of all traces with span counts, durations, and timestamps
+- **Service Filtering**: Ability to filter traces by service (request-manager, agent-service, llamastack, snow-mcp-server, etc.)
+- **Quick Access**: Click any trace to view detailed span breakdown
+
+**Detailed Trace View:**
+
+Clicking on a specific trace in the OpenShift console reveals the complete span hierarchy:
+
+![OpenShift Observe Trace Detail](guides/images/ocp-observe-traces-detail.png)
+
+This detailed view shows:
+- **Waterfall Diagram**: Visual representation of all spans with accurate timing and nesting
+- **Service Operations**: Clear breakdown of operations across request-manager, agent-service, llamastack, and MCP servers
+- **Performance Bottlenecks**: Easily identify which operations consume the most time (typically LLM inference)
+- **Request Flow**: See the complete path from initial request through agent processing, knowledge base queries, and external system calls
+
+The OpenShift console integration provides a production-ready interface for monitoring and debugging your AI agent system without requiring separate tooling.
 
 #### Understanding Trace Context Propagation
 
