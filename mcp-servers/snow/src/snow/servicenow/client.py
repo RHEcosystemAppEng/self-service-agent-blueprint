@@ -27,19 +27,27 @@ class ServiceNowClient:
     ServiceNow API client for making requests to ServiceNow instance.
     """
 
-    def __init__(self, api_token: str | None = None) -> None:
+    def __init__(
+        self, api_token: str | None = None, laptop_refresh_id: str | None = None
+    ) -> None:
         """
-        Initialize the ServiceNow client with API token.
+        Initialize the ServiceNow client with API token and laptop refresh ID.
 
         Args:
             api_token: ServiceNow API token from request header (SERVICE_NOW_TOKEN).
                        This is required and must be provided for authentication.
+            laptop_refresh_id: ServiceNow catalog item ID for laptop refresh requests.
+                              This is required and should be provided at server startup.
 
         Raises:
-            ValueError: If api_token is not provided.
+            ValueError: If api_token or laptop_refresh_id is not provided.
         """
         if not api_token:
             raise ValueError("ServiceNow API token is required.")
+        if not laptop_refresh_id:
+            raise ValueError("ServiceNow laptop refresh ID is required.")
+
+        self.laptop_refresh_id = laptop_refresh_id
         self.config = self._load_config(api_token=api_token)
         self.auth_manager = AuthManager(self.config.auth, self.config.instance_url)
 
@@ -89,22 +97,12 @@ class ServiceNowClient:
         """
         logger.info("Opening ServiceNow laptop refresh request")
 
-        # Get laptop refresh ID from environment variable
-        laptop_refresh_id = os.getenv("SERVICENOW_LAPTOP_REFRESH_ID")
-        if not laptop_refresh_id:
-            logger.error(
-                "SERVICENOW_LAPTOP_REFRESH_ID environment variable is not set. "
-                "Please set it to the ServiceNow catalog item ID for laptop refresh requests."
-            )
-            raise ValueError(
-                "SERVICENOW_LAPTOP_REFRESH_ID environment variable is required but not set. "
-                "Please configure it in your deployment."
-            )
+        # Use the laptop refresh ID that was provided at initialization
         logger.info(
             "Using ServiceNow laptop refresh catalog item ID",
-            laptop_refresh_id=laptop_refresh_id,
+            laptop_refresh_id=self.laptop_refresh_id,
         )
-        url = f"{self.config.instance_url}/api/sn_sc/servicecatalog/items/{laptop_refresh_id}/order_now"
+        url = f"{self.config.instance_url}/api/sn_sc/servicecatalog/items/{self.laptop_refresh_id}/order_now"
 
         # Prepare request body with proper structure for order_now endpoint
         # ServiceNow expects variables as a nested object under "variables" key
