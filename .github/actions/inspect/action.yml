@@ -10,11 +10,5 @@ runs:
   using: composite
   steps:
     - name: Inspect Cluster
-      run: oc adm inspect ns
+      run: echo "inspect disabled"
       shell: bash
-
-    - name: Inspect Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ inputs.artifactPrefix }}-oc-inspect
-        path: inspect.*
