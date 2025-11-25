@@ -345,13 +345,13 @@ endef
 define PRINT_INTEGRATION_DISPATCHER_URL
 	@echo "--- Your Integration Dispatcher URLs are: ---"
 	@sleep 10
-	@EXTERNAL_HOST=$$($(call GET_EXTERNAL_HOST,$(INGRESS_PREFIX)-integration-dispatcher-slack)); \
+	@EXTERNAL_HOST=$$($(call GET_EXTERNAL_HOST,$(INGRESS_PREFIX)-integration-dispatcher)); \
 	if [ -z "$$EXTERNAL_HOST" ]; then \
 		EXTERNAL_HOST=$$($(call GET_EXTERNAL_HOST,$(INGRESS_PREFIX)-integration-dispatcher)); \
 	fi; \
 	if [ -n "$$EXTERNAL_HOST" ]; then \
-		echo "  OpenAPI Schema: https://$$EXTERNAL_HOST/docs"; \
-		echo "  Health: https://$$EXTERNAL_HOST/health"; \
+		echo "  OpenAPI Schema: http://$(MAIN_CHART_NAME)-integration-dispatcher.$(NAMESPACE).svc.cluster.local/docs"; \
+		echo "  Health: http://$(MAIN_CHART_NAME)-integration-dispatcher.$(NAMESPACE).svc.cluster.local/health"; \
 		echo "  Slack Events: https://$$EXTERNAL_HOST/slack/events"; \
 		echo "  Slack Interactive: https://$$EXTERNAL_HOST/slack/interactive"; \
 		echo "  Slack Commands: https://$$EXTERNAL_HOST/slack/commands"; \
