@@ -39,8 +39,11 @@ async def lifespan(app: FastMCP) -> AsyncGenerator[None, None]:
             "Please configure it in your deployment."
         )
 
-    # Get laptop request limits with default value
-    laptop_request_limits = int(os.getenv("SERVICENOW_LAPTOP_REQUEST_LIMITS", "2"))
+    # Get laptop request limits with None if not set (no default limit)
+    laptop_request_limits_env = os.getenv("SERVICENOW_LAPTOP_REQUEST_LIMITS")
+    laptop_request_limits = (
+        int(laptop_request_limits_env) if laptop_request_limits_env else None
+    )
 
     # Store the laptop_refresh_id and limits on the app instance
     setattr(app, "laptop_refresh_id", laptop_refresh_id)
