@@ -55,6 +55,7 @@ async def root() -> Dict[str, Any]:
             "service_catalog": "/api/sn_sc/servicecatalog/items/{item_id}/order_now",
             "users": "/api/now/table/sys_user",
             "computers": "/api/now/table/cmdb_ci_computer",
+            "request_items": "/api/now/table/sc_req_item",
             "docs": "/docs",
         },
     }
@@ -189,6 +190,26 @@ async def get_computers(
 
     # Return ServiceNow-style response
     return {"result": computers}
+
+
+@app.get("/api/now/table/sc_req_item")
+async def get_request_items(
+    request: Request,
+    api_key: Optional[str] = Depends(get_api_key),
+) -> Dict[str, Any]:
+    """Get request items from the sc_req_item table.
+
+    This endpoint mimics ServiceNow's Table API for sc_req_item.
+    For simplicity, it always returns an empty result set.
+    """
+    # Parse query parameters for logging
+    query_params = dict(request.query_params)
+    logger.debug("Request items query parameters", query_params=query_params)
+
+    logger.info("Request items endpoint called - returning empty result")
+
+    # Return empty result as requested
+    return {"result": []}
 
 
 @app.exception_handler(Exception)
