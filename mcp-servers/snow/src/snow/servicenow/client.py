@@ -105,18 +105,10 @@ class ServiceNowClient:
             - The existing request data if found, None otherwise
         """
         for request in existing_requests:
-            # Extract laptop choice from request variables
-            variables = request.get("variables", {})
-            if isinstance(variables, str):
-                # Sometimes variables might be returned as a string, try to parse it
-                try:
-                    import json
+            # Extract laptop choice from request - using new sc_req_item format
+            # The API returns variables.laptop_choices as a direct field
+            existing_laptop_choice = request.get("variables.laptop_choices", "")
 
-                    variables = json.loads(variables)
-                except (json.JSONDecodeError, TypeError):
-                    variables = {}
-
-            existing_laptop_choice = variables.get("laptop_choices", "")
             if existing_laptop_choice == laptop_model:
                 logger.info(
                     "Found existing open request for same laptop model",
@@ -536,19 +528,18 @@ class ServiceNowClient:
         if not user_sys_id:
             return {"success": False, "message": "User sys_id parameter is required"}
 
-        # Build query parameters to find open requests for the user
-        # Look for requests where:
-        # - requested_for (or who_is_this_request_for) equals user_sys_id
-        # - state is not closed/cancelled (typically open states are 1, 2, 3)
+        # Build query parameters to find open request items for the user
+        # Look for request items where:
+        # - requested_for equals user_sys_id
+        # - state is open (typically states 1, 2)
         # - cat_item points to the laptop refresh catalog item
         params = {
-            "sysparm_query": f"requested_for={user_sys_id}^cat_item={self.laptop_refresh_id}^stateIN1,2,3",
-            "sysparm_display_value": "true",
-            "sysparm_fields": "sys_id,number,state,requested_for,cat_item,variables,opened_at,short_description",
+            "sysparm_query": f"requested_for={user_sys_id}^stateIN1,2^cat_item={self.laptop_refresh_id}",
+            "sysparm_fields": "number,variables.laptop_choices,state",
         }
 
         try:
-            data = self._get("/api/now/table/sc_request", params)
+            data = self._get("/api/now/table/sc_req_item", params)
 
             if not data:
                 return {
