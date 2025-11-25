@@ -998,6 +998,14 @@ define helm_install_common
 	@kubectl rollout status deploy/$(MAIN_CHART_NAME)-integration-dispatcher -n $(NAMESPACE) --timeout 10m
 	@echo "Waiting for agent service deployment..."
 	@kubectl rollout status deploy/$(MAIN_CHART_NAME)-agent-service -n $(NAMESPACE) --timeout 10m
+	@echo "Waiting for llamastack deployment..."
+	@kubectl rollout status deploy/$(MAIN_CHART_NAME)-llama-stack -n $(NAMESPACE) --timeout 10m
+	@echo "Waiting for mcp-self-service-agent-snow deployment..."
+	@kubectl rollout status deploy/mcp-self-service-agent-snow -n $(NAMESPACE) --timeout 10m
+	@echo "Waiting for pgvector statefulset..."
+	@kubectl rollout status statefulset/$(MAIN_CHART_NAME)-pgvector -n $(NAMESPACE) --timeout 10m
+	@echo "Waiting for db-migration job..."
+	@kubectl wait --for=condition=complete --timeout=10m job/$(MAIN_CHART_NAME)-db-migration -n $(NAMESPACE) || echo "DB migration job check completed (may have already run)"
 	$(if $(filter true,$(3)),@echo "Waiting for mock eventing deployment..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-mock-eventing -n $(NAMESPACE) --timeout 5m,)
 	@echo "$(MAIN_CHART_NAME) $(1) installed successfully"
 endef
