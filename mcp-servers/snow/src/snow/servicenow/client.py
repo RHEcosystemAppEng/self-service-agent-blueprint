@@ -530,11 +530,11 @@ class ServiceNowClient:
 
         # Build query parameters to find open request items for the user
         # Look for request items where:
-        # - requested_for equals user_sys_id
+        # - who_is_this_request_for equals user_sys_id
         # - state is open (typically states 1, 2)
         # - cat_item points to the laptop refresh catalog item
         params = {
-            "sysparm_query": f"requested_for={user_sys_id}^stateIN1,2^cat_item={self.laptop_refresh_id}",  # TODO who_is_this_request_for
+            "sysparm_query": f"who_is_this_request_for={user_sys_id}^stateIN1,2^cat_item={self.laptop_refresh_id}",
             "sysparm_fields": "number,variables.laptop_choices,state",
         }
 
