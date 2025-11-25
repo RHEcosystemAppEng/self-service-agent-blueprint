@@ -953,7 +953,7 @@ namespace:
 .PHONY: helm-depend
 helm-depend:
 	@echo "Updating Helm dependencies"
-	@helm dependency update helm &> /dev/null
+	@helm dependency update helm
 
 .PHONY: helm-list-models
 helm-list-models: helm-depend
