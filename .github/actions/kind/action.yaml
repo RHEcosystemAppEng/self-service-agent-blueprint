@@ -28,10 +28,6 @@ runs:
       run: bash ./scripts/ci/kind-with-registry.sh
       shell: bash
 
-    - name: Helm Depend
-      run: make helm-depend
-      shell: bash
-
     - name: Build local images
       run: make build-all-images REGISTRY=localhost:5001
       shell: bash
