@@ -128,8 +128,12 @@ snow/
 - `SELF_SERVICE_AGENT_SNOW_SERVER_SERVICE_PORT_HTTP`: HTTP port (default: 8001)
 - `MCP_HOST`: Host address (default: "0.0.0.0")
 - `SERVICENOW_INSTANCE_URL`: ServiceNow instance URL (e.g., "https://dev295439.service-now.com/")
+- `SERVICENOW_LAPTOP_REFRESH_ID`: ServiceNow catalog item ID for laptop refresh requests (required)
 - `SERVICENOW_API_KEY`: ServiceNow API key
 - `SERVICENOW_API_KEY_HEADER`: Custom header name for API key (default: "x-sn-apikey")
+- `SERVICENOW_LAPTOP_REQUEST_LIMITS`: Maximum number of open laptop requests allowed per user (optional, no limit if not set)
+- `SERVICENOW_DEBUG`: Enable debug logging (default: "false")
+- `SERVICENOW_TIMEOUT`: Request timeout in seconds (default: "30")
 
 ### API Key Authentication
 
