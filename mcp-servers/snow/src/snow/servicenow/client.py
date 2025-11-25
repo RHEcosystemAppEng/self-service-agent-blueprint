@@ -31,7 +31,7 @@ class ServiceNowClient:
         self,
         api_token: str | None = None,
         laptop_refresh_id: str | None = None,
-        laptop_request_limits: int = 2,
+        laptop_request_limits: int | None = None,
     ) -> None:
         """
         Initialize the ServiceNow client with API token and laptop refresh ID.
@@ -42,7 +42,7 @@ class ServiceNowClient:
             laptop_refresh_id: ServiceNow catalog item ID for laptop refresh requests.
                               This is required and should be provided at server startup.
             laptop_request_limits: Maximum number of open laptop requests allowed per user.
-                                 Defaults to 2.
+                                 If None, no limits are enforced. Defaults to None.
 
         Raises:
             ValueError: If api_token or laptop_refresh_id is not provided.
@@ -130,7 +130,12 @@ class ServiceNowClient:
 
         Returns:
             True if adding a new request would exceed the limit, False otherwise.
+            If laptop_request_limits is None, no limits are enforced and this returns False.
         """
+        # If no limits are configured, allow unlimited requests
+        if self.laptop_request_limits is None:
+            return False
+
         if len(existing_requests) >= self.laptop_request_limits:
             logger.warning(
                 "Request limit exceeded",
