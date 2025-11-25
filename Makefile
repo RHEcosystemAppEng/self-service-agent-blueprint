@@ -999,7 +999,7 @@ define helm_install_common
 		"deploy/$(MAIN_CHART_NAME)-agent-service:agent service" \
 		"deploy/$(MAIN_CHART_NAME)-llama-stack:llama stack" \
 		"deploy/mcp-self-service-agent-snow:mcp-self-service-agent-snow" \
-		"statefulset/$(MAIN_CHART_NAME)-pgvector:pgvector" \
+		"statefulset/pgvector:pgvector" \
 		"job/$(MAIN_CHART_NAME)-db-migration:db-migration"; do \
 		name=$${resource#*:}; \
 		res=$${resource%:*}; \
