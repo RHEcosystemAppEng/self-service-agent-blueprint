@@ -57,7 +57,7 @@ def test_open_laptop_refresh_ticket_success(
     # Mock ticket creation response
     mock_client_instance.open_laptop_refresh_request.return_value = {
         "success": True,
-        "data": {"result": {"request_number": "REQ0010037", "sys_id": "1001"}},
+        "data": {"result": {"request_number": "RITM0010037", "sys_id": "1001"}},
     }
 
     # Create mock context with AUTHORITATIVE_USER_ID header
@@ -74,7 +74,7 @@ def test_open_laptop_refresh_ticket_success(
     assert "opened for employee" in result
     assert "alice.johnson@company.com" in result  # authoritative_user_id
     assert "System ID: 1001" in result  # employee_id from mock data
-    assert "REQ" in result  # Ticket number format
+    assert "RITM" in result  # Ticket number format
 
 
 @patch("snow.server.mcp")
@@ -105,7 +105,7 @@ def test_open_laptop_refresh_ticket_required_model(
     # Mock ticket creation response
     mock_client_instance.open_laptop_refresh_request.return_value = {
         "success": True,
-        "data": {"result": {"request_number": "REQ0010038", "sys_id": "1001"}},
+        "data": {"result": {"request_number": "RITM0010038", "sys_id": "1001"}},
     }
 
     # Create mock context with AUTHORITATIVE_USER_ID header
@@ -122,7 +122,7 @@ def test_open_laptop_refresh_ticket_required_model(
     assert "opened for employee" in result
     assert "alice.johnson@company.com" in result  # authoritative_user_id
     assert "System ID: 1001" in result  # employee_id from mock data
-    assert "REQ" in result  # Ticket number format
+    assert "RITM" in result  # Ticket number format
 
 
 def test_open_laptop_refresh_ticket_empty_employee_name() -> None:
@@ -228,11 +228,9 @@ def test_open_laptop_refresh_request_same_laptop_existing_request(
     # Mock existing requests with same laptop model
     existing_requests = [
         {
-            "number": "REQ0010001",
-            "sys_id": "existing_request_id",
-            "variables": {
-                "laptop_choices": "apple_mac_book_pro_14_m_3_pro"  # Same laptop model
-            },
+            "number": "RITM0010001",
+            "variables.laptop_choices": "apple_mac_book_pro_14_m_3_pro",  # Same laptop model
+            "state": "1",
         }
     ]
 
@@ -260,7 +258,7 @@ def test_open_laptop_refresh_request_same_laptop_existing_request(
         assert (
             "Existing open request found for the same laptop model" in result["message"]
         )
-        assert "REQ0010001" in result["message"]
+        assert "RITM0010001" in result["message"]
 
         # Verify that no new request was made
         mock_post.assert_not_called()
@@ -288,18 +286,14 @@ def test_open_laptop_refresh_request_exceeds_limit(
     # Mock existing requests - user already has 2 open requests (at the limit)
     existing_requests = [
         {
-            "number": "REQ0010001",
-            "sys_id": "existing_request_id_1",
-            "variables": {
-                "laptop_choices": "apple_mac_book_pro_14_m_3_pro"  # Different laptop
-            },
+            "number": "RITM0010001",
+            "variables.laptop_choices": "apple_mac_book_pro_14_m_3_pro",  # Different laptop
+            "state": "1",
         },
         {
-            "number": "REQ0010002",
-            "sys_id": "existing_request_id_2",
-            "variables": {
-                "laptop_choices": "dell_latitude_7420"  # Another different laptop
-            },
+            "number": "RITM0010002",
+            "variables.laptop_choices": "dell_latitude_7420",  # Another different laptop
+            "state": "1",
         },
     ]
 
@@ -356,11 +350,9 @@ def test_open_laptop_refresh_request_within_limits_creates_new_ticket(
     # Mock existing requests - user has only 1 open request (under the limit)
     existing_requests = [
         {
-            "number": "REQ0010001",
-            "sys_id": "existing_request_id_1",
-            "variables": {
-                "laptop_choices": "apple_mac_book_pro_14_m_3_pro"  # Different laptop
-            },
+            "number": "RITM0010001",
+            "variables.laptop_choices": "apple_mac_book_pro_14_m_3_pro",  # Different laptop
+            "state": "1",
         }
     ]
 
@@ -368,7 +360,7 @@ def test_open_laptop_refresh_request_within_limits_creates_new_ticket(
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {
-        "result": {"request_number": "REQ0010003", "sys_id": "new_request_id"}
+        "result": {"request_number": "RITM0010003", "sys_id": "new_request_id"}
     }
     mock_post.return_value = mock_response
 
@@ -393,7 +385,7 @@ def test_open_laptop_refresh_request_within_limits_creates_new_ticket(
         assert result["success"] is True
         assert result["existing_ticket"] is False
         assert "Successfully opened laptop refresh request" in result["message"]
-        assert result["data"]["result"]["request_number"] == "REQ0010003"
+        assert result["data"]["result"]["request_number"] == "RITM0010003"
         assert result["data"]["result"]["sys_id"] == "new_request_id"
 
         # Verify that a new request was made to ServiceNow
@@ -442,7 +434,7 @@ def test_open_laptop_refresh_request_no_existing_requests(
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {
-        "result": {"request_number": "REQ0010004", "sys_id": "new_request_id"}
+        "result": {"request_number": "RITM0010004", "sys_id": "new_request_id"}
     }
     mock_post.return_value = mock_response
 
@@ -467,7 +459,7 @@ def test_open_laptop_refresh_request_no_existing_requests(
         assert result["success"] is True
         assert result["existing_ticket"] is False
         assert "Successfully opened laptop refresh request" in result["message"]
-        assert result["data"]["result"]["request_number"] == "REQ0010004"
+        assert result["data"]["result"]["request_number"] == "RITM0010004"
         assert result["data"]["result"]["sys_id"] == "new_request_id"
 
         # Verify that a new request was made to ServiceNow
