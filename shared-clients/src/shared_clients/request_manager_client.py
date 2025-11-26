@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Request Manager client library for the self-service agent blueprint.
+Request Manager client library for the self-service agent quickstart.
 
 This module provides reusable client classes for interacting with the Request Manager
 service, including both generic and CLI-specific implementations.

@@ -980,7 +980,7 @@ class EmailService:
                 subject=subject[:50],
             )
 
-            # Send via CloudEvent instead of direct HTTP call
+            # Send via CloudEvent
             success = await self._send_cloudevent(event_data)
             if success:
                 logger.info(

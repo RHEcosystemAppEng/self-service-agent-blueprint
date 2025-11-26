@@ -1,15 +1,4 @@
-"""Session Management for Agent Service.
-
-This module provides session management for both LlamaStack Agent API and Responses API.
-
-Architecture:
-- BaseSessionManager: Core database operations for Request Manager sessions
-- ResponsesSessionManager: Extends base with LangGraph conversation management
-
-Usage:
-- LlamaStack Agent API: Use BaseSessionManager for database operations only
-- Responses API: Use ResponsesSessionManager for full conversation management
-"""
+"""Session Management for Agent Service."""
 
 import logging
 import uuid
@@ -60,16 +49,12 @@ class BaseSessionManager:
     - Current agent assignment tracking
     - Request count tracking
 
-    Used by LlamaStack Agent API for database-only operations.
     """
 
     def __init__(self, db_session: AsyncSession) -> None:
         """Initialize base session manager for database operations only."""
         self.db_session = db_session
 
-    # =============================================================================
-    # LLAMASTACK AGENT API - DATABASE OPERATIONS
-    # =============================================================================
     async def create_session(self, session_data: SessionCreate) -> SessionResponse:
         """Create a new Request Manager session in the database."""
         session = RequestSession(
@@ -221,9 +206,6 @@ class ResponsesSessionManager(BaseSessionManager):
             self.agent_manager = None
             self.agents = []
 
-    # =============================================================================
-    # RESPONSES API - CONVERSATION MANAGEMENT
-    # =============================================================================
     async def handle_responses_message(
         self,
         text: str,
@@ -770,7 +752,6 @@ class ResponsesSessionManager(BaseSessionManager):
     async def _handle_routing(self, processed_response: str, text: str) -> str:
         """Handle agent routing logic using unified routing detection."""
 
-        # Debug logging with structured format
         logger.debug(
             "Responses API routing check",
             user_id=self.user_id,
@@ -780,7 +761,6 @@ class ResponsesSessionManager(BaseSessionManager):
             is_routing_session=self._is_routing_session(),
         )
 
-        # Debug LangGraph state machine state
         if self.conversation_session:
             try:
                 current_state = self.conversation_session.app.get_state(

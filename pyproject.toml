@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 [project]
 name = "self-service-agent-test"
 version = "0.1.0"
-description = "Test utilities for self-service agent blueprint"
+description = "Test utilities for self-service agent quickstart"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

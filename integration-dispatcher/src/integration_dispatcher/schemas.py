@@ -88,6 +88,3 @@ class HealthCheck(BaseModel):
     services: Dict[
         str, Any
     ]  # Changed to Any to support nested objects like email_capabilities
-
-
-# ErrorResponse is now imported from shared_models.models

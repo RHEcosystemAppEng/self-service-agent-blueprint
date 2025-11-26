@@ -1,7 +1,7 @@
 [project]
 name = "self-service-agent-shared-models"
 version = "0.1.3"
-description = "Shared models and schemas for Self-Service Agent Blueprint"
+description = "Shared models and schemas for self-service agent quickstart"
 authors = [
     {name = "Self-Service Agent Team", email = "team@example.com"}
 ]

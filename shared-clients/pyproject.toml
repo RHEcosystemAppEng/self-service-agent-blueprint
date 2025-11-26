@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "self-service-agent-shared-clients"
 version = "0.1.0"
-description = "Shared client libraries for the self-service agent blueprint"
+description = "Shared client libraries for the self-service agent quickstart"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

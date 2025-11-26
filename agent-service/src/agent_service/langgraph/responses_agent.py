@@ -15,7 +15,6 @@ logger = configure_logging("agent-service")
 class Agent:
     """
     Agent that loads configuration from agent YAML files and provides LlamaStack integration.
-    (Same as original implementation)
     """
 
     def __init__(

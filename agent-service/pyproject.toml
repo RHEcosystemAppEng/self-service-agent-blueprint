@@ -1,7 +1,7 @@
 [project]
 name = "self-service-agent-service"
 version = "0.1.0"
-description = "CloudEvent-driven Agent Service for Self-Service Agent Blueprint"
+description = "CloudEvent-driven Agent Service for for the self-service agent quickstart"
 authors = [
     {name = "Self-Service Agent Team", email = "team@example.com"}
 ]

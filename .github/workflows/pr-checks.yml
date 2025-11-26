@@ -71,6 +71,15 @@ jobs:
             exit 1
           }
 
+      - name: Check logging patterns
+        run: |
+          echo "🔍 Checking logging patterns..."
+          make check-logging || {
+            echo "::warning::Logging pattern violations found"
+            echo "Run 'make lint' locally to see details"
+            exit 1
+          }
+
   pull-request-tests:
     name: Run unit-tests
     runs-on: ubuntu-latest

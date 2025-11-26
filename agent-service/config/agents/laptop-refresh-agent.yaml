@@ -12,7 +12,6 @@ ignored_input_shield_categories:
   - "Self-Harm"  # False positives on common words like "yes"
 # Output shield ignores: categories to allow in agent responses
 ignored_output_shield_categories: []
-model-no-used: appeng-ai-quickstarts-vertexai/vertex_ai/gemini-2.5-flash
 lg_state_machine_config: "config/lg-prompts/lg-prompt-big.yaml"
 sampling_params:
   strategy:

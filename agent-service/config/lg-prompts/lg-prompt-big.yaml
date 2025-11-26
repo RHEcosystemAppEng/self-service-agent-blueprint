@@ -1,5 +1,4 @@
 # State Machine Configuration for Large Prompt Laptop Refresh Agent
-# Uses the comprehensive laptop-refresh-llama-3-3-70b-instruct-w8a8.txt prompt
 
 # Global settings
 settings:

@@ -1,7 +1,7 @@
 [project]
 name = "self-service-agent-request-manager"
 version = "0.1.0"
-description = "Request Management Layer for Self-Service Agent Blueprint"
+description = "Request Management Layer for self-service agent quickstart"
 authors = [
     {name = "Self-Service Agent Team", email = "team@example.com"}
 ]

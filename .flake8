@@ -46,8 +46,3 @@ show-pep8 = True
 
 # Count the number of occurrences of each error/warning code
 statistics = True
-
-# Custom logging pattern checks
-# LOG001: No direct 'import logging' (use configure_logging from shared_models)
-# LOG002: No print() in src/ directories (use logger instead)
-# LOG003: No f-strings in logger calls (use structured logging with keyword args)

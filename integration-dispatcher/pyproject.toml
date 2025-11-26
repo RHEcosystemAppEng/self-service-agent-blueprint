@@ -1,7 +1,7 @@
 [project]
 name = "self-service-agent-integration-dispatcher"
 version = "0.1.0"
-description = "Multi-tenant Integration Dispatcher for Self-Service Agent Blueprint"
+description = "Multi-tenant Integration Dispatcher for the self-service agent quickstart"
 authors = [
     {name = "Self-Service Agent Team", email = "team@example.com"}
 ]
