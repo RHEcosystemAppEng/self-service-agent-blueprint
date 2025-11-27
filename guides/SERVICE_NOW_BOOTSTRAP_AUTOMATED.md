@@ -101,7 +101,10 @@ The script will:
 
 
 ### 5. Complete manual steps
-1. **PC Refresh**: Click "All" -> Search for "Catalog Builder" -> Click "PC Refresh" -> Click "Edit catalog item" -> Click "Access" -> Set the [following](SERVICE_NOW_BOOTSTRAP_MANUAL.md#access) -> Click "Review and submit" -> Click "Submit"
+1. **PC Refresh**: Click "All" -> Search for "Catalog Builder" -> Click "PC Refresh" -> Click "Edit catalog item" -> Click "Access" -> 
+   1. Set **Available for:** Browse → Select "Any User" → Click "Save selection"
+   2. Set **Not available for:** Browse → Select "Guest User" → Click "Save selection"
+   3. Click "Review and submit" -> Click "Submit"
 2. **REST API Access**: Click "All" -> Search for "REST API Access Policies" -> 
    1. **Configue MCP Agent - SC**:
       1. **Set REST API:** Click "MCP Agent - SC" -> Click "REST API" dropdown -> Select "Service Catalog API"
