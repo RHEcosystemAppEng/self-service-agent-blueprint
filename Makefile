@@ -1218,6 +1218,40 @@ endif
 jaeger-deploy:
 	@echo "Deploying Jaeger all-in-one to namespace $(NAMESPACE)..."
 	@kubectl create deployment jaeger --image=cr.jaegertracing.io/jaegertracing/jaeger:2.12.0 -n $(NAMESPACE) || echo "Deployment already exists"
+	@echo "Adding network policy labels to Jaeger deployment..."
+	@kubectl label deployment jaeger -n $(NAMESPACE) \
+		app.kubernetes.io/instance=self-service-agent \
+		app.kubernetes.io/name=self-service-agent \
+		--overwrite || true
+	@kubectl patch deployment jaeger -n $(NAMESPACE) --type=json -p='[{"op":"add","path":"/spec/template/metadata/labels/app.kubernetes.io~1instance","value":"self-service-agent"},{"op":"add","path":"/spec/template/metadata/labels/app.kubernetes.io~1name","value":"self-service-agent"}]' || true
+	@echo "Creating network policy for Jaeger UI external access..."
+	@# Network policy allows OpenShift router to access Jaeger UI on port 16686
+	@# This is required because the default network policies only allow ports 8080/80
+	@printf '%s\n' \
+		'apiVersion: networking.k8s.io/v1' \
+		'kind: NetworkPolicy' \
+		'metadata:' \
+		'  name: jaeger-allow-ingress' \
+		'  namespace: $(NAMESPACE)' \
+		'  labels:' \
+		'    app: jaeger' \
+		'spec:' \
+		'  podSelector:' \
+		'    matchLabels:' \
+		'      app.kubernetes.io/instance: self-service-agent' \
+		'      app.kubernetes.io/name: self-service-agent' \
+		'      app: jaeger' \
+		'  policyTypes:' \
+		'  - Ingress' \
+		'  ingress:' \
+		'  - from:' \
+		'    - namespaceSelector:' \
+		'        matchLabels:' \
+		'          network.openshift.io/policy-group: ingress' \
+		'    ports:' \
+		'    - protocol: TCP' \
+		'      port: 16686' \
+		| kubectl apply -f - || echo "Network policy creation failed, may already exist"
 	@kubectl expose deployment jaeger --port=16686 --name=jaeger-ui -n $(NAMESPACE) || echo "Service already exists"
 	@kubectl expose deployment jaeger --port=4318 --name=jaeger-otlp-http -n $(NAMESPACE) || echo "OTLP HTTP service already exists"
 	@kubectl expose deployment jaeger --port=4317 --name=jaeger-otlp-grpc -n $(NAMESPACE) || echo "OTLP gRPC service already exists"
@@ -1237,5 +1271,6 @@ jaeger-undeploy:
 	@echo "Removing Jaeger from namespace $(NAMESPACE)..."
 	@oc delete route jaeger-ui -n $(NAMESPACE) || echo "Route not found"
 	@kubectl delete service jaeger-ui jaeger-otlp-http jaeger-otlp-grpc -n $(NAMESPACE) || echo "Services not found"
+	@kubectl delete networkpolicy jaeger-allow-ingress -n $(NAMESPACE) || echo "Network policy not found"
 	@kubectl delete deployment jaeger -n $(NAMESPACE) || echo "Deployment not found"
 	@echo "✅ Jaeger removed successfully!"

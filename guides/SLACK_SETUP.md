@@ -62,14 +62,14 @@ Where your-integration-dispatcher-route will be the route specific to your deplo
 If necessary, you can get the URL part that is specific to your deployment with:
 
 ```bash
-kubectl get route -n ${NAMESPACE:-default} | grep integration-dispatcher
+oc get route -n ${NAMESPACE:-default} | grep integration-dispatcher
 ```
 
 ### Step 5: Verify Configuration
 
 ```bash
 # Check integration health
-kubectl exec deployment/self-service-agent-integration-dispatcher -n $NAMESPACE -- \
+oc exec deployment/self-service-agent-integration-dispatcher -n $NAMESPACE -- \
   curl -s http://localhost:8080/health/detailed | jq '.integrations_available'
 
 ```
@@ -95,6 +95,8 @@ Go back to the Slack API configuration pages and update the placeholder URLs as 
 At this point you should have a working Slack bot and can start to interact with the
 self-service-agent through the Slack interface.
 
+If you are setting up your Slack instance as part of following the flow in README.md the setup
+is now complate and you can return the next step in the README.md.
 
 ## Integration Defaults
 
@@ -207,10 +209,10 @@ curl http://localhost:8081/api/v1/users/U09E98M70JK/integration-defaults
 ### Monitor Delivery
 ```bash
 # Watch Integration Dispatcher logs
-kubectl logs -f deployment/self-service-agent-integration-dispatcher -n ${NAMESPACE:-default}
+oc logs -f deployment/self-service-agent-integration-dispatcher -n ${NAMESPACE:-default}
 
 # Look for successful delivery
-kubectl logs deployment/self-service-agent-integration-dispatcher -n ${NAMESPACE:-default} | grep -i "delivered to slack"
+oc logs deployment/self-service-agent-integration-dispatcher -n ${NAMESPACE:-default} | grep -i "delivered to slack"
 ```
 
 ## Troubleshooting

@@ -141,6 +141,9 @@ This will test:
 - Catalog Items Table access
 - Catalog Order endpoint authentication
 
+If you are setting up your Service Now instance as part of following the flow in README.md the setup
+is now complate and you can return the next step in the README.md.
+
 ### 7. Verification
 The setup process automatically creates evaluation users and test data that match the mock employee data used by the blueprint. You can verify these were created by:
 
@@ -152,7 +155,7 @@ If you need to skip evaluation users creation, use the `--skip-evaluation-users`
 
 ## 📜 Individual Scripts
 
-You can also run individual automation modules using Python's module syntax. Note that all these steps are included in the main `setup.py` script, but can be run separately if needed:
+You can also run individual automation modules using Python's module syntax. Note that all these steps are included when you run `uv run -m servicenow_bootstrap.setup --config config.json`, but can be run separately if needed:
 
 ### Create MCP Agent User
 ```bash

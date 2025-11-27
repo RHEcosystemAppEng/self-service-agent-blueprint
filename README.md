@@ -16,16 +16,17 @@
 2. [Prerequisites](#2-prerequisites)
 
 3. [Hands-On Quickstart](#3-hands-on-quickstart)
-   - [Deploy to OpenShift](#31-deploy-to-openshift)
-   - [Interact with the CLI](#32-interact-with-the-cli)
-   - [Integration with Slack (Optional)](#33-integration-with-slack-optional)
-   - [Integration with Real ServiceNow (Optional)](#34-integration-with-real-servicenow-optional)
-   - [Integration with Email (Optional)](#35-integration-with-email-optional)
-   - [Run Evaluations](#36-run-evaluations)
-   - [Follow the Flow with Tracing](#37-follow-the-flow-with-tracing)
-   - [Trying out Smaller Prompts](#38-trying-out-smaller-prompts)
-   - [Setting up Safety Shields (Optional)](#39-setting-up-safety-shields-optional)
-   - [Cleaning up](#310-cleaning-up)
+   - [Clone the Repository](#31-clone-the-repository)
+   - [Deploy to OpenShift](#32-deploy-to-openshift)
+   - [Interact with the CLI](#33-interact-with-the-cli)
+   - [Integration with Slack (Optional)](#34-integration-with-slack-optional)
+   - [Integration with Real ServiceNow (Optional)](#35-integration-with-real-servicenow-optional)
+   - [Integration with Email (Optional)](#36-integration-with-email-optional)
+   - [Run Evaluations](#37-run-evaluations)
+   - [Follow the Flow with Tracing](#38-follow-the-flow-with-tracing)
+   - [Trying out Smaller Prompts](#39-trying-out-smaller-prompts)
+   - [Setting up Safety Shields (Optional)](#310-setting-up-safety-shields-optional)
+   - [Cleaning up](#311-cleaning-up)
 
 4. [Performance & Scaling](#4-performance--scaling)
 
@@ -83,7 +84,7 @@ This quickstart provides the framework, components and knowledge to accelerate y
 
 The quickstart provides implementations of the common components along with the process specific pieces needed to support the laptop refresh IT process as a concrete implementation.
 
-**Time to complete:** 30-60 minutes (depending on deployment mode)
+**Time to complete:** 60-90 minutes (depending on deployment mode)
 
 By the end of this quickstart, you will have:
 - A fully functional AI agent system deployed on OpenShift
@@ -105,13 +106,13 @@ Throughout this quickstart, you'll gain hands-on experience with modern AI and c
 - **[Llama Stack](https://github.com/meta-llama/llama-stack)** - AI inference platform for running Llama models
 - **[LangGraph](https://langchain-ai.github.io/langgraph/)** - State machine framework for managing agent conversations and workflows
 - **[MCP (Model Context Protocol) Servers](https://modelcontextprotocol.io/)** - Standardized interface for connecting AI agents to external systems
-- **Knowledge Bases** - Vector-based retrieval for policy documents and process guidelines using Llama Stack vector stores
+- **[RAG based Knowledge Bases](https://www.redhat.com/en/topics/ai/what-is-retrieval-augmented-generation)** - Vector-based retrieval for policy documents and process guidelines using Llama Stack vector stores
 - **[Llama 3](https://llama.meta.com/)** - 70B parameter language model for agent reasoning
 - **[Llama Guard 3](https://llama.meta.com/docs/model-cards-and-prompt-formats/llama-guard-3/)** - Safety model for content moderation
 
 **Observability & Evaluation:**
 - **[OpenTelemetry](https://opentelemetry.io/)** - Distributed tracing for monitoring complex agent interactions
-- **Evaluation Framework** - AI-specific testing with [DeepEval](https://docs.confident-ai.com/) for synthetic conversation generation and business metrics validation
+- **Evaluation Framework** - AI-specific testing with [DeepEval](https://github.com/confident-ai/deepeval) for synthetic conversation generation and business metrics validation
 
 **Integration with existing systems:**
 - **[Slack](https://api.slack.com/) Integration** - Real-time conversational interfaces
@@ -295,6 +296,7 @@ Now that you understand the architecture and capabilities of the self-service ag
 * [Podman](https://podman.io/getting-started/installation) - Container runtime for building images
 * [Helm](https://helm.sh/docs/intro/install/) - Kubernetes package manager
 * [oc CLI](https://docs.openshift.com/container-platform/latest/cli_reference/openshift_cli/getting-started-cli.html) - OpenShift command line tool
+* [kubectl CLI](https://kubernetes.io/docs/tasks/tools/#kubectl) - Kubernetes command line tool
 * [git](https://git-scm.com/downloads) - Version control
 * make - Build automation (usually pre-installed on Linux/macOS, see [GNU Make](https://www.gnu.org/software/make/))
 
@@ -332,7 +334,23 @@ spec:
 
 This section walks you through deploying and testing the laptop refresh agent on OpenShift.
 
-### 3.1 Deploy to OpenShift
+### 3.1 Clone the Repository
+
+First, clone the repository and navigate to the project directory:
+
+```bash
+# Clone the repository
+git clone https://github.com/RHEcosystemAppEng/self-service-agent-blueprint.git
+
+# Navigate to the project directory
+cd self-service-agent-blueprint
+```
+
+**Expected outcome:**
+- ✓ Repository cloned to local machine
+- ✓ Working directory set to project root
+
+### 3.2 Deploy to OpenShift
 
 #### Step 1: Choose Your Deployment Mode
 
@@ -363,7 +381,7 @@ export HF_TOKEN=1234
 
 #### Step 3: Build Container Images (Optional)
 
-If using pre-built images (Recommended until later steps), skip this step.
+If using pre-built images which is recommended until later steps, **skip this step**.
 
 ```bash
 # Build all images
@@ -422,7 +440,7 @@ oc get routes -n $NAMESPACE
 
 ---
 
-### 3.2 Interact with the CLI
+### 3.3 Interact with the CLI
 
 Now that the system is deployed, let's interact with the agent through the CLI to test a complete laptop refresh workflow.
 
@@ -465,7 +483,7 @@ Follow this conversation flow to test the complete laptop refresh process:
 - Agent presents available laptop options for your region (NA, EMEA, APAC, or LATAM)
 - You see 4 laptop options with specifications and pricing
 
-**You:** `I would like option 1, the Apple MacBook Air M3`
+**You:** `I would like option 1, the Apple MacBook Air M2`
 
 **Expected:** Agent confirms your selection and asks for approval to create ServiceNow ticket
 
@@ -520,7 +538,7 @@ This clears all conversation history and context for that user.
 
 ---
 
-### 3.3 Integration with Slack (Optional)
+### 3.4 Integration with Slack (Optional)
 
 Slack integration enables real-world testing with actual users in your workspace. The quickstart assumes you
 have an existing Slack instance that you can use for testing, otherwise you can create a development instance
@@ -577,7 +595,7 @@ use `reset` to clear the conversation history.
 - ✓ Interact with agents via Slack
 ---
 
-### 3.4 Integration with Real ServiceNow (Optional)
+### 3.5 Integration with Real ServiceNow (Optional)
 
 The quickstart uses the user's email as the authoritative user ID. If you plan to interact with the
 quickstart using Slack or email, the deployment needs to know about the email associated with your Slack or email account.
@@ -622,19 +640,7 @@ make helm-uninstall NAMESPACE=$NAMESPACE
 make helm-install-test NAMESPACE=$NAMESPACE
 ```
 
-#### Step 3: Verify ServiceNow Connection
-
-Check the ServiceNow MCP server logs to confirm connection:
-
-```bash
-# View MCP server logs
-oc logs deployment/mcp-self-service-agent-snow -n $NAMESPACE
-
-# Look for successful ServiceNow API calls
-# Example: "ServiceNow API request completed - employee ID: alice.johnson@company.com"
-```
-
-#### Step 4: Test with Real ServiceNow
+#### Step 3: Test with Real ServiceNow
 
 Use the CLI chat client to initiate a laptop refresh request with your real ServiceNow account:
 
@@ -664,7 +670,7 @@ Then complete the laptop refresh workflow:
 - Ticket appears in your ServiceNow instance
 - You receive ServiceNow notifications via email
 
-#### Step 5: Verify Ticket Created in ServiceNow
+#### Step 4: Verify Ticket Created in ServiceNow
 
 Take note of the ServiceNow ticket number the agent returns:
 
@@ -680,10 +686,6 @@ Log into your ServiceNow instance and:
 
 <img src="guides/images/requests-table.png" alt="Requests Table" width="450">
 
-- Verify the ticket's price matches the laptop model
-
-<img src="guides/images/request-price.png" alt="Requests Table" width="450">
-
 - Click the requested items link and verify correct user and laptop model are selected:
 
 <img src="guides/images/request-item.png" alt="Requests Table" width="450">
@@ -698,7 +700,7 @@ Log into your ServiceNow instance and:
 
 ---
 
-### 3.5 Integration with Email (Optional)
+### 3.6 Integration with Email (Optional)
 
 Email integration enables two-way communication with the AI agent through email, allowing users to interact with the system via their email client.
 
@@ -710,7 +712,7 @@ To configure those emails export TEST_USERS as follows before running any of the
 with your email:
 
 ```
-export TEST_USERS="myemail@emaildomain.com,otheremail@emaildomain.com"
+export TEST_USERS="myemail@emaildomain.com"
 ```
 
 #### Step 1: Set Up Email Configuration
@@ -766,7 +768,7 @@ Check the Integration Dispatcher health endpoint to confirm email integration is
 
 ```bash
 # Check integration health and email capabilities
-kubectl exec deployment/self-service-agent-integration-dispatcher -n $NAMESPACE -- \
+oc exec deployment/self-service-agent-integration-dispatcher -n $NAMESPACE -- \
   curl -s http://localhost:8080/health/detailed | jq '{integrations_available, email_capabilities: .services.email_capabilities}'
 
 # Look for:
@@ -815,7 +817,7 @@ on your email client):
 
 ---
 
-### 3.6 Run Evaluations
+### 3.7 Run Evaluations
 
 The evaluation framework validates agent behavior against business requirements and quality metrics. Generative AI agents are non-deterministic by nature, meaning their responses can vary across conversations even with identical inputs. Multiple different responses can all be "correct," making traditional software testing approaches insufficient. This probabilistic behavior creates unique challenges:
 
@@ -1026,7 +1028,7 @@ These targets automatically:
 
 ---
 
-### 3.7 Follow the Flow with Tracing
+### 3.8 Follow the Flow with Tracing
 
 Agentic systems involve complex interactions between multiple components—routing agents, specialist agents, knowledge bases, MCP servers, and external systems—making production debugging challenging without proper visibility. Distributed tracing addresses these challenges by providing:
 
@@ -1109,7 +1111,16 @@ echo "Jaeger UI: https://$JAEGER_UI_URL"
 **View Traces in Jaeger:**
 
 1. Generate traces by interacting with the agent (via CLI, Slack, or API) as described earlier in the
-   quickstart
+   quickstart. To use the CLI you can use:
+```bash
+# Get the request manager pod
+export REQUEST_MANAGER_POD=$(oc get pod -n $NAMESPACE -l app=self-service-agent-request-manager -o jsonpath='{.items[0].metadata.name}')
+   
+# Start chat session with your email
+oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
+  python test/chat-responses-request-mgr.py \
+  --user-id alice.johnson@company.com
+```
 2. Open the Jaeger UI in your browser and select service `request-manager`
 3. Click "Find Traces" to see recent requests
 4. Click on a trace to view the complete flow including:
@@ -1215,7 +1226,7 @@ All operations share the same trace ID, creating a complete distributed trace.
 
 ---
 
-### 3.8 Trying out Smaller Prompts
+### 3.9 Trying out Smaller Prompts
 
 By default the quickstart uses a single state [large prompt](agent-service/config/lg-prompts/lg-prompt-big.yaml) which handles the full conversation flow. However, the quickstart also includes a [multi-part prompt](agent-service/config/lg-prompts/lg-prompt-small.yaml) in which each of the prompts are more limited. A multi-part prompt gives you more control over the flow and may be able to be run with a smaller model, may require fewer tokens (due to the smaller prompts being sent to the model). On the other hand it may be less flexible and may only handle flows that you have planned for in advance. You can read more about the advantages and disadvantages of the two approaches in the [Prompt Configuration Guide](guides/PROMPT_CONFIGURATION_GUIDE.md).
 
@@ -1260,7 +1271,7 @@ oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
 
 #### Step 3: Complete Laptop Refresh Workflow
 
-Follow this conversation flow to test the complete laptop refresh process with the multi-part prompt (same workflow as in [Section 3.2](#32-interact-with-the-cli)):
+Follow this conversation flow to test the complete laptop refresh process with the multi-part prompt (same workflow as in [Section 3.3](#33-interact-with-the-cli)):
 
 **You:** `I need help with my laptop refresh`
 
@@ -1315,9 +1326,9 @@ With the big prompt, we had to specifically instruct it not to answer random que
 
 **Cost Comparison:**
 
-Another important consideration is token usage and cost. The multi-part prompt uses fewer total tokens since each individual prompt sent to the model is smaller, although it makes more requests to the LLM as it flows through different states. To explore this aspect, you can run evaluations as outlined in [Section 3.6 Run Evaluations](#36-run-evaluations) and compare the application tokens used by the big and multi-part prompts.
+Another important consideration is token usage and cost. The multi-part prompt uses fewer total tokens since each individual prompt sent to the model is smaller, although it makes more requests to the LLM as it flows through different states. To explore this aspect, you can run evaluations as outlined in [Section 3.7 Run Evaluations](#37-run-evaluations) and compare the application tokens used by the big and multi-part prompts.
 
-#### Step 6: (Optional) Switch Back to Default Prompt
+#### Step 6: Switch Back to Default Prompt
 
 To return to the default prompt configuration:
 
@@ -1340,11 +1351,11 @@ make helm-install-test NAMESPACE=$NAMESPACE
 
 ---
 
-### 3.9 Setting up Safety Shields (Optional)
+### 3.10 Setting up Safety Shields (Optional)
 
 Safety shields provide content moderation for AI agent interactions, validating user input and agent responses against safety policies using Llama Guard 3 or compatible models.
 
-Depending on your model, prompting approach and trust in your end users they may also be critical for avoiding [prompt injection](https://www.ibm.com/think/topics/prompt-injection) attacks. A common model used with llama stack to prevent these types of attack is [PromptGuard](https://arxiv.org/abs/2509.08910). The quickstart currently allows Llama Guard to be easily configured and we plan to add similar ease of use for PromptGuard in a later version as we have found that when using llama 70b the protection provided by PromptGuard is needed when using the "big" prompt as outlined in [section 3.8 Trying out Smaller Prompts](#38-trying-out-smaller-prompts).
+Depending on your model, prompting approach and trust in your end users they may also be critical for avoiding [prompt injection](https://www.ibm.com/think/topics/prompt-injection) attacks. A common model used with llama stack to prevent these types of attack is [PromptGuard](https://arxiv.org/abs/2509.08910). The quickstart currently allows Llama Guard to be easily configured and we plan to add similar ease of use for PromptGuard in a later version as we have found that when using llama 70b the protection provided by PromptGuard is needed when using the "big" prompt as outlined in [section 3.9 Trying out Smaller Prompts](#39-trying-out-smaller-prompts).
 
 #### When to Enable Safety Shields
 
@@ -1365,8 +1376,8 @@ For development and testing, shields can be disabled for faster iteration.
 
 #### Step 1: Setup Safety Shield Configuration
 
-Safety shields require an OpenAI-compatible moderation API endpoint that is compatible with llama stacks shields. If you
-have shared instance of meta-llama/Llama-Guard-3-8B you could make the quickstart use it as follows:
+Safety shields require an OpenAI-compatible moderation API endpoint that is compatible with llama stacks shields. The
+quickstart supports two options for using safety shields as outlined in the sections which follow.
 
 ##### Option 1 - shared meta-llama/Llama-Guard-3-8B model
 
@@ -1416,6 +1427,8 @@ After configuring the environment variables from either Option 1 (shared model) 
 make helm-uninstall NAMESPACE=$NAMESPACE
 make helm-install-test NAMESPACE=$NAMESPACE
 ```
+
+**NOTE:** This deployment will take significantly longer if you are using Option 2 (local model) as it has to download LlamaGuard from hHuggingFace.
 
 #### Step 4: Test Safety Shields
 
@@ -1477,7 +1490,7 @@ For comprehensive safety shields documentation, see the [Safety Shields Guide](g
 
 ---
 
-### 3.10 Cleaning up
+### 3.11 Cleaning up
 
 You can stop the deployed quickstart by running:
 
@@ -1494,11 +1507,11 @@ This will remove all deployed services, pods, and resources from your namespace.
 
 The Self-Service Agent quickstart is designed for scalability using standard Kubernetes and cloud-native patterns. All core components can be scaled using familiar Kubernetes techniques—horizontal pod autoscaling, replica sets, and resource limits—without requiring custom scaling logic or architectural changes.
 
-**Component Scaling:** The quickstart's services follow standard cloud-native design principles. Most services (mock-eventing, agent-service, integration-dispatcher) can scale both vertically (multiple uvicorn workers per pod) and horizontally (multiple pod replicas) to handle increased load. MCP servers use the FastMCP framework with Server-Sent Events (SSE) transport, which requires single-worker deployments but scales effectively through horizontal replication.
+**Component Scaling:** The quickstart's services follow standard cloud-native design principles. The services can scale both vertically (multiple uvicorn workers per pod) and horizontally (multiple pod replicas) to handle increased load. MCP servers specifically use stateless streaming HTTP so that they can scale in the same way (unlike the Server-Sent Events transport whoes state limits how you can scale).
 
 **Infrastructure Scaling:** For supporting infrastructure components, apply industry-standard scaling techniques. PostgreSQL databases can leverage connection pooling, read replicas, and vertical scaling following standard PostgreSQL best practices. When using production mode with Knative Eventing, Apache Kafka benefits from standard Kafka scaling strategies including partitioning, consumer groups, and multi-broker clusters. These are well-documented patterns with extensive ecosystem support.
 
-**Performance Optimization:** Analysis of some evaluation runs shows that 99.7% of request processing time is spent in Llama Stack inference, with the request-manager and event delivery adding only negligible overhead (~12ms total). This means performance optimization efforts should focus primarily on LLM inference scaling—using GPU acceleration, deploying multiple Llama Stack replicas, and selecting appropriately-sized models. The quickstart's architecture ensures that scaling Llama Stack directly translates to end-to-end performance improvements without infrastructure bottlenecks.
+**Performance Optimization:** Analysis of some evaluation runs shows that 99.7% of request processing time is spent in Llama Stack inference, with the request-manager and event delivery adding only negligible overhead (~12ms total). This means performance optimization efforts should focus primarily on LLM inference scaling—using GPU acceleration to start and selecting appropriately-sized models. The quickstart's architecture ensures that scaling Llama Stack directly translates to end-to-end performance improvements without infrastructure bottlenecks.
 
 For comprehensive scaling guidance, detailed performance characteristics, component-by-component scaling analysis, configuration examples for different deployment sizes, and links to Red Hat and Llama Stack documentation, see the **[Performance and Scaling Guide](guides/PERFORMANCE_SCALING_GUIDE.md)**.
 
@@ -1520,8 +1533,8 @@ them through vaults and planning for credential rotation. These more advanced te
 as they will often be existing components within an organization which have already been configured and hardened to meet the organizations requirements
 for scaling and security.
 4. **Network security**: While access to pods within the deployment has been restricted by network policy to only other pods within the deployment
-namespace with the exception of the route which allows slack to communicate with the deployment, you should review and apply any standard network policies
-that your organization has for OpenShift deployments.
+namespace with the exception of the kafka namespace and the route which allows slack to communicate with the deployment,
+you should review and apply any standard network policies that your organization has for OpenShift deployments.
 
 ---
 
@@ -1537,6 +1550,7 @@ Step-by-step guides for integrations, deployment, and advanced features:
 
 - [Component Overview](guides/COMPONENT_GUIDE.md) - Comprehensive guide to all system components
 - [Deployment Modes](guides/DEPLOYMENT_MODE_GUIDE.md) - Understanding testing vs production deployment modes
+- [Prompt Configuration](guides/PROMPT_CONFIGURATION_GUIDE.md) - Agent prompt engineering guide
 - [Evaluation Framework](guides/EVALUATIONS_GUIDE.md) - Comprehensive evaluation framework documentation
 - [Slack Integration](guides/SLACK_SETUP.md) - Set up Slack integration
 - [Email Integration](guides/EMAIL_SETUP.md) - Configure email integration
@@ -1546,13 +1560,12 @@ Step-by-step guides for integrations, deployment, and advanced features:
 - [Performance & Scaling](guides/PERFORMANCE_SCALING_GUIDE.md) - Scaling guidance and best practices
 - [Authentication](guides/AUTHENTICATION_GUIDE.md) - Authentication patterns and configuration
 - [Integration Development](guides/INTEGRATION_GUIDE.md) - Building custom integrations
-- [Tool Integration](guides/TOOL_INTEGRATION_GUIDE.md) - Adding MCP server tools
+- [Tool Integration](guides/TOOL_INTEGRATION_GUIDE.md) - Adding integration with external tools for handling requests
 
 ### Technical Documentation
 
 Detailed technical documentation for developers:
 
-- [Prompt Configuration](guides/PROMPT_CONFIGURATION_GUIDE.md) - Agent prompt engineering guide
 - [Tracing Implementation](docs/TRACING_IMPLEMENTATION.md) - OpenTelemetry tracing details
 - [Architecture Diagrams](docs/ARCHITECTURE_DIAGRAMS.md) - System architecture diagrams
 - [API Reference](docs/API_REFERENCE.md) - API documentation
