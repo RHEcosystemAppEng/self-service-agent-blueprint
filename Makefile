@@ -55,6 +55,8 @@ SLACK_ENABLED := $(if $(and $(SLACK_BOT_TOKEN),$(SLACK_SIGNING_SECRET)),true,fal
 SERVICENOW_INSTANCE_URL ?= http://self-service-agent-mock-servicenow:8080
 SERVICENOW_API_KEY ?= now_mock_api_key
 SERVICENOW_LAPTOP_REFRESH_ID ?= mock_laptop_refresh_id
+SERVICENOW_LAPTOP_AVOID_DUPLICATES ?= false
+SERVICENOW_LAPTOP_REQUEST_LIMITS ?= None
 TEST_USERS ?=
 
 # Evaluation Configuration
@@ -66,6 +68,8 @@ VALIDATE_LAPTOP_DETAILS_FLAG := $(if $(filter true,$(VALIDATE_FULL_LAPTOP_DETAIL
 # Export to shell so kubectl can access them
 export SERVICENOW_INSTANCE_URL
 export SERVICENOW_API_KEY
+export SERVICENOW_LAPTOP_AVOID_DUPLICATES
+export SERVICENOW_LAPTOP_REQUEST_LIMITS
 export TEST_USERS
 
 helm_pgvector_args = \
@@ -256,6 +260,8 @@ help:
 	@echo "    SERVICENOW_API_KEY                 - ServiceNow API key (default: now_mock_api_key)"
 	@echo "    SERVICENOW_API_KEY_HEADER         - Custom header name (default: x-sn-apikey)"
 	@echo "    SERVICENOW_LAPTOP_REFRESH_ID      - ServiceNow catalog item ID for laptop refresh requests (default: mock_laptop_refresh_id)"
+	@echo "    SERVICENOW_LAPTOP_AVOID_DUPLICATES - Whether to prevent creating duplicate laptop requests for the same model (default: false)"
+	@echo "    SERVICENOW_LAPTOP_REQUEST_LIMITS  - Maximum number of open laptop requests allowed per user (default: None)"
 	@echo "    TEST_USERS                        - Comma-separated list of email addresses to add to mock employee data for testing"
 	@echo ""
 	@echo "  Request Management Layer:"
@@ -995,6 +1001,8 @@ define helm_install_common
 		--set mcp-servers.mcp-servers.self-service-agent-snow.image.repository=$(REGISTRY)/self-service-agent-snow-mcp \
 		--set mcp-servers.mcp-servers.self-service-agent-snow.image.tag=$(VERSION) \
 		--set-string mcp-servers.mcp-servers.self-service-agent-snow.env.SERVICENOW_LAPTOP_REFRESH_ID="$(SERVICENOW_LAPTOP_REFRESH_ID)" \
+		--set-string mcp-servers.mcp-servers.self-service-agent-snow.env.SERVICENOW_LAPTOP_AVOID_DUPLICATES="$(SERVICENOW_LAPTOP_AVOID_DUPLICATES)" \
+		--set-string mcp-servers.mcp-servers.self-service-agent-snow.env.SERVICENOW_LAPTOP_REQUEST_LIMITS="$(SERVICENOW_LAPTOP_REQUEST_LIMITS)" \
 		--set mcp-servers.mcp-servers.self-service-agent-snow.envSecrets.SERVICENOW_INSTANCE_URL.name=$(MAIN_CHART_NAME)-servicenow-credentials \
 		--set mcp-servers.mcp-servers.self-service-agent-snow.envSecrets.SERVICENOW_INSTANCE_URL.key=servicenow-instance-url \
 		$(REQUEST_MANAGEMENT_ARGS) \
