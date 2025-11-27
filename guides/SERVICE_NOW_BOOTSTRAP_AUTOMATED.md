@@ -59,11 +59,6 @@ cd scripts/servicenow-bootstrap
 uv sync
 ```
 
-For development dependencies (optional):
-```bash
-uv sync --group dev
-```
-
 ### 3. Run Complete Setup
 
 Execute the main orchestration script:
