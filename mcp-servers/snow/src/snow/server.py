@@ -45,13 +45,26 @@ async def lifespan(app: FastMCP) -> AsyncGenerator[None, None]:
         int(laptop_request_limits_env) if laptop_request_limits_env else None
     )
 
-    # Store the laptop_refresh_id and limits on the app instance
+    # Get laptop avoid duplicates setting with default value of False
+    laptop_avoid_duplicates_env = os.getenv(
+        "SERVICENOW_LAPTOP_AVOID_DUPLICATES", "false"
+    )
+    laptop_avoid_duplicates = laptop_avoid_duplicates_env.lower() in (
+        "true",
+        "1",
+        "yes",
+        "on",
+    )
+
+    # Store the laptop_refresh_id, limits, and avoid_duplicates setting on the app instance
     setattr(app, "laptop_refresh_id", laptop_refresh_id)
     setattr(app, "laptop_request_limits", laptop_request_limits)
+    setattr(app, "laptop_avoid_duplicates", laptop_avoid_duplicates)
     logger.info(
         "ServiceNow configuration initialized",
         laptop_refresh_id=laptop_refresh_id,
         laptop_request_limits=laptop_request_limits,
+        laptop_avoid_duplicates=laptop_avoid_duplicates,
     )
 
     try:
@@ -92,6 +105,7 @@ def _create_servicenow_ticket(
             api_token,
             getattr(mcp, "laptop_refresh_id"),
             getattr(mcp, "laptop_request_limits"),
+            getattr(mcp, "laptop_avoid_duplicates"),
         )
 
         # Look up user sys_id by email as currently only email is supported
@@ -171,6 +185,7 @@ def _get_servicenow_laptop_info(
             api_token,
             getattr(mcp, "laptop_refresh_id"),
             getattr(mcp, "laptop_request_limits"),
+            getattr(mcp, "laptop_avoid_duplicates"),
         )
 
         laptop_info = client.get_employee_laptop_info(authoritative_user_id)

@@ -32,6 +32,7 @@ class ServiceNowClient:
         api_token: str | None = None,
         laptop_refresh_id: str | None = None,
         laptop_request_limits: int | None = None,
+        laptop_avoid_duplicates: bool = False,
     ) -> None:
         """
         Initialize the ServiceNow client with API token and laptop refresh ID.
@@ -43,6 +44,8 @@ class ServiceNowClient:
                               This is required and should be provided at server startup.
             laptop_request_limits: Maximum number of open laptop requests allowed per user.
                                  If None, no limits are enforced. Defaults to None.
+            laptop_avoid_duplicates: Whether to avoid creating duplicate laptop requests
+                                   for the same laptop model. Defaults to False.
 
         Raises:
             ValueError: If api_token or laptop_refresh_id is not provided.
@@ -54,6 +57,7 @@ class ServiceNowClient:
 
         self.laptop_refresh_id = laptop_refresh_id
         self.laptop_request_limits = laptop_request_limits
+        self.laptop_avoid_duplicates = laptop_avoid_duplicates
         self.config = self._load_config(api_token=api_token)
         self.auth_manager = AuthManager(self.config.auth, self.config.instance_url)
 
@@ -104,6 +108,10 @@ class ServiceNowClient:
             - True if existing request found, False otherwise
             - The existing request data if found, None otherwise
         """
+        # If avoid_duplicates is disabled, skip the duplicate check entirely
+        if not self.laptop_avoid_duplicates:
+            return False, None
+
         for request in existing_requests:
             # Extract laptop choice from request - using new sc_req_item format
             # The API returns variables.laptop_choices as a direct field
