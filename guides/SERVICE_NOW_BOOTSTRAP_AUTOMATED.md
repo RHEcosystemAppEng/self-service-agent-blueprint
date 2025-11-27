@@ -20,13 +20,7 @@ The scripts automate most of the manual steps described in the [ServiceNow PDI B
 
 ## 📋 Prerequisites
 
-1. **Python 3.12+** and **uv** package manager:
-   ```bash
-   # From the root 
-   make install-all # or install-servicenow-bootstrap
-   ```
-
-2. **ServiceNow PDI Instance**:
+1. **ServiceNow PDI Instance**:
    - Follow [Step 1](SERVICE_NOW_BOOTSTRAP_MANUAL.md#step-1---signup--pdi-new-instance) of the ServiceNow PDI Bootstrap - Manual Setup
      - After the instance is ready click "Manage my instance" and note your: Instance URL, Admin Password
 
