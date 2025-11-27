@@ -43,6 +43,7 @@ def test_open_laptop_refresh_ticket_success(
     # Mock the mcp attributes
     mock_mcp.laptop_refresh_id = "test_laptop_refresh_id"
     mock_mcp.laptop_request_limits = 2
+    mock_mcp.laptop_avoid_duplicates = False
 
     # Mock ServiceNow client responses
     mock_client_instance = MagicMock()
@@ -91,6 +92,7 @@ def test_open_laptop_refresh_ticket_required_model(
     # Mock the mcp attributes
     mock_mcp.laptop_refresh_id = "test_laptop_refresh_id"
     mock_mcp.laptop_request_limits = 2
+    mock_mcp.laptop_avoid_duplicates = False
 
     # Mock ServiceNow client responses
     mock_client_instance = MagicMock()
@@ -170,6 +172,7 @@ def test_get_employee_laptop_info_success(
     # Mock the mcp attributes
     mock_mcp.laptop_refresh_id = "test_laptop_refresh_id"
     mock_mcp.laptop_request_limits = 2
+    mock_mcp.laptop_avoid_duplicates = False
 
     # Mock ServiceNow client responses
     mock_client_instance = MagicMock()
@@ -234,11 +237,12 @@ def test_open_laptop_refresh_request_same_laptop_existing_request(
         }
     ]
 
-    # Create ServiceNowClient instance
+    # Create ServiceNowClient instance with duplicate avoidance enabled
     client = ServiceNowClient(
         api_token=api_token,
         laptop_refresh_id=laptop_refresh_id,
         laptop_request_limits=laptop_request_limits,
+        laptop_avoid_duplicates=True,
     )
 
     # Mock get_open_laptop_requests_for_user to return existing requests
@@ -297,11 +301,12 @@ def test_open_laptop_refresh_request_exceeds_limit(
         },
     ]
 
-    # Create ServiceNowClient instance
+    # Create ServiceNowClient instance with duplicate avoidance disabled to test limit behavior
     client = ServiceNowClient(
         api_token=api_token,
         laptop_refresh_id=laptop_refresh_id,
         laptop_request_limits=laptop_request_limits,
+        laptop_avoid_duplicates=False,
     )
 
     # Mock get_open_laptop_requests_for_user to return existing requests
@@ -364,11 +369,12 @@ def test_open_laptop_refresh_request_within_limits_creates_new_ticket(
     }
     mock_post.return_value = mock_response
 
-    # Create ServiceNowClient instance
+    # Create ServiceNowClient instance with duplicate avoidance disabled to test new ticket creation
     client = ServiceNowClient(
         api_token=api_token,
         laptop_refresh_id=laptop_refresh_id,
         laptop_request_limits=laptop_request_limits,
+        laptop_avoid_duplicates=False,
     )
 
     # Mock get_open_laptop_requests_for_user to return existing requests
@@ -443,6 +449,7 @@ def test_open_laptop_refresh_request_no_existing_requests(
         api_token=api_token,
         laptop_refresh_id=laptop_refresh_id,
         laptop_request_limits=laptop_request_limits,
+        laptop_avoid_duplicates=False,
     )
 
     # Mock get_open_laptop_requests_for_user to return no existing requests
@@ -506,6 +513,7 @@ def test_open_laptop_refresh_request_get_existing_requests_failure(
         api_token=api_token,
         laptop_refresh_id=laptop_refresh_id,
         laptop_request_limits=laptop_request_limits,
+        laptop_avoid_duplicates=False,
     )
 
     # Mock get_open_laptop_requests_for_user to return failure
@@ -558,6 +566,7 @@ def test_open_laptop_refresh_request_api_failure(
         api_token=api_token,
         laptop_refresh_id=laptop_refresh_id,
         laptop_request_limits=laptop_request_limits,
+        laptop_avoid_duplicates=False,
     )
 
     # Mock get_open_laptop_requests_for_user to return no existing requests
@@ -578,6 +587,87 @@ def test_open_laptop_refresh_request_api_failure(
 
         # Verify that a request was attempted
         mock_post.assert_called_once()
+
+        # Verify get_open_laptop_requests_for_user was called
+        mock_get_requests.assert_called_once_with("user123")
+
+
+@patch("snow.servicenow.client.requests.post")
+def test_open_laptop_refresh_request_duplicate_avoidance_disabled(
+    mock_post: Mock,
+) -> None:
+    """Test creating new ticket when same laptop model request exists but duplicate avoidance is disabled."""
+    # Setup test data
+    api_token = "test_token"
+    laptop_refresh_id = "test_refresh_id"
+    laptop_request_limits = 5  # Set high limit so it doesn't interfere
+
+    # Mock parameters - same laptop as existing request
+    params = OpenServiceNowLaptopRefreshRequestParams(
+        who_is_this_request_for="user123",
+        laptop_choices="apple_mac_book_pro_14_m_3_pro",  # Same laptop model as existing
+    )
+
+    # Mock existing requests with same laptop model
+    existing_requests = [
+        {
+            "number": "RITM0010001",
+            "variables.laptop_choices": "apple_mac_book_pro_14_m_3_pro",  # Same laptop model
+            "state": "1",
+        }
+    ]
+
+    # Mock successful ServiceNow API response
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "result": {"request_number": "RITM0010005", "sys_id": "new_request_id"}
+    }
+    mock_post.return_value = mock_response
+
+    # Create ServiceNowClient instance with duplicate avoidance disabled
+    client = ServiceNowClient(
+        api_token=api_token,
+        laptop_refresh_id=laptop_refresh_id,
+        laptop_request_limits=laptop_request_limits,
+        laptop_avoid_duplicates=False,
+    )
+
+    # Mock get_open_laptop_requests_for_user to return existing requests
+    with patch.object(client, "get_open_laptop_requests_for_user") as mock_get_requests:
+        mock_get_requests.return_value = {
+            "success": True,
+            "requests": existing_requests,
+        }
+
+        # Call the function
+        result = client.open_laptop_refresh_request(params)
+
+        # Assertions - should create new ticket despite duplicate
+        assert result["success"] is True
+        assert result["existing_ticket"] is False
+        assert "Successfully opened laptop refresh request" in result["message"]
+        assert result["data"]["result"]["request_number"] == "RITM0010005"
+        assert result["data"]["result"]["sys_id"] == "new_request_id"
+
+        # Verify that a new request was made to ServiceNow (allowing duplicate)
+        mock_post.assert_called_once()
+
+        # Verify the request was made to the correct URL
+        call_args = mock_post.call_args
+        assert (
+            f"/api/sn_sc/servicecatalog/items/{laptop_refresh_id}/order_now"
+            in call_args[0][0]
+        )
+
+        # Verify request body contains correct parameters
+        request_body = call_args[1]["json"]
+        assert request_body["sysparm_quantity"] == 1
+        assert (
+            request_body["variables"]["laptop_choices"]
+            == "apple_mac_book_pro_14_m_3_pro"
+        )
+        assert request_body["variables"]["who_is_this_request_for"] == "user123"
 
         # Verify get_open_laptop_requests_for_user was called
         mock_get_requests.assert_called_once_with("user123")

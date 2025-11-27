@@ -132,6 +132,7 @@ snow/
 - `SERVICENOW_API_KEY`: ServiceNow API key
 - `SERVICENOW_API_KEY_HEADER`: Custom header name for API key (default: "x-sn-apikey")
 - `SERVICENOW_LAPTOP_REQUEST_LIMITS`: Maximum number of open laptop requests allowed per user (optional, no limit if not set)
+- `SERVICENOW_LAPTOP_AVOID_DUPLICATES`: Whether to prevent creating duplicate laptop requests for the same model (default: "false")
 - `SERVICENOW_DEBUG`: Enable debug logging (default: "false")
 - `SERVICENOW_TIMEOUT`: Request timeout in seconds (default: "30")
 
