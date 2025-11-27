@@ -105,7 +105,7 @@ The script will:
 2. **REST API Access**: Click "All" -> Search for "REST API Access Policies" -> 
    1. **Configue MCP Agent - SC**:
       1. **Set REST API:** Click "MCP Agent - SC" -> Click "REST API" dropdown -> Select "Service Catalog API"
-      2. **Set Authentication Profiles** Double Click "Insert new row.." -> Search for "Basic Auth" -> Click Green Checkmark (repeat this step for "API Key")
+      2. **Set Authentication Profiles** Double Click "Insert new row.." -> Search for "API Key" -> Click Green Checkmark
       3. Click "Update"
    2. **Configue "MCP Agent - Table"** 
       1. **Set REST API:**  Click "REST API" dropdown -> Select "Table API"
