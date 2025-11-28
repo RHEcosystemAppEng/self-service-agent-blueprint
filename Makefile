@@ -1267,7 +1267,7 @@ endif
 
 # Jaeger deployment targets
 .PHONY: jaeger-deploy
-jaeger-deploy:
+jaeger-deploy: namespace
 	@echo "Deploying Jaeger all-in-one to namespace $(NAMESPACE)..."
 	@kubectl create deployment jaeger --image=cr.jaegertracing.io/jaegertracing/jaeger:2.12.0 -n $(NAMESPACE) || echo "Deployment already exists"
 	@echo "Adding network policy labels to Jaeger deployment..."
