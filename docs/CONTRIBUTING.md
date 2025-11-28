@@ -65,6 +65,7 @@ Ensure you have the required tools installed:
 - uv (Python package manager)
 - Podman
 - OpenShift CLI (oc)
+- kubectl
 - Helm
 - Git
 - Make
@@ -73,7 +74,7 @@ Ensure you have the required tools installed:
 
 1. **Clone the repository:**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/RHEcosystemAppEng/self-service-agent-blueprint.git
    cd self-service-agent-blueprint
    ```
 
@@ -91,13 +92,7 @@ Ensure you have the required tools installed:
    make install-mcp-snow          # ServiceNow MCP dependencies
    ```
 
-3. **Set up pre-commit hooks (if available):**
-   ```bash
-   # Install pre-commit hooks for code quality
-   pre-commit install
-   ```
-
-4. **Run tests:**
+3. **Run tests:**
    ```bash
    make test-all
    ```
@@ -189,7 +184,6 @@ make build-all-images           # Build all container images
 
 **Build individual images:**
 ```bash
-make build-agent-image          # Build self-service agent image
 make build-request-mgr-image    # Build request manager image
 make build-agent-service-image  # Build agent service image
 make build-integration-dispatcher-image  # Build integration dispatcher image
@@ -222,7 +216,6 @@ make push-all-images            # Push all images to registry
 
 **Push individual images:**
 ```bash
-make push-agent-image           # Push self-service agent image
 make push-request-mgr-image     # Push request manager image
 make push-agent-service-image   # Push agent service image
 make push-integration-dispatcher-image  # Push integration dispatcher image
@@ -267,8 +260,19 @@ make helm-status                # Check deployment status
    ```
 
 6. **Deploy to OpenShift test environment:**
+
+   Set required environment variables:
    ```bash
    export NAMESPACE=dev-test
+   export LLM=llama-3-3-70b-instruct-w8a8
+   export LLM_ID=llama-3-3-70b-instruct-w8a8
+   export LLM_API_TOKEN=your-api-token
+   export LLM_URL=https://your-llm-endpoint
+   export HF_TOKEN=1234
+   ```
+
+   Deploy with Helm:
+   ```bash
    make helm-install-test NAMESPACE=$NAMESPACE
    ```
 
@@ -279,7 +283,7 @@ make helm-status                # Check deployment status
 
 7. **Run evaluations to ensure quality:**
    ```bash
-   make test-short-integration-request-mgr
+   make test-short-resp-integration-request-mgr
    ```
 
    **Important:** All evaluations must pass before submitting your PR. This validates that your changes maintain agent quality and don't introduce regressions.
@@ -300,7 +304,6 @@ make helm-status                # Check deployment status
    - `fix:` - Bug fixes
    - `docs:` - Documentation changes
    - `test:` - Test additions or fixes
-   - `refactor:` - Code refactoring
    - `chore:` - Maintenance tasks
 
 10. **Push to your fork:**
@@ -392,7 +395,7 @@ make helm-status                # Check deployment status
 
 If you have questions about contributing:
 
-- Review the [Quickstart Guide](README.md) for system overview and architecture
+- Review the [Quickstart Guide](../README.md) for system overview and architecture
 - Check existing documentation in `docs/`
 - Review component-specific README files
 - Check existing issues for similar questions
@@ -400,7 +403,7 @@ If you have questions about contributing:
 
 ### Helpful Documentation
 
-- [README.md](README.md) - Quickstart guide and system overview
+- [README.md](../README.md) - Quickstart guide and system overview
 - [CLAUDE.md](CLAUDE.md) - Development guidance for Claude Code
 - [GUIDELINES.md](GUIDELINES.md) - Code practices and project structure guidelines
 - [API_REFERENCE.md](API_REFERENCE.md) - Complete API documentation
@@ -413,7 +416,7 @@ If you have questions about contributing:
 
 ## License
 
-By contributing to this project, you agree that your contributions will be licensed under the [Apache License 2.0](LICENSE.md).
+By contributing to this project, you agree that your contributions will be licensed under the Apache License 2.0.
 
 ---
 

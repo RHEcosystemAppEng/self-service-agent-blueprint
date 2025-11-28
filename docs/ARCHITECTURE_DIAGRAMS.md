@@ -4,13 +4,13 @@ This document illustrates the two primary flow patterns in the self-service agen
 
 ## Session Management Responsibilities
 
-**Request Manager**: Manages request-level sessions for tracking user interactions across integrations (Slack, Email, CLI, etc.). Each session represents a conversation thread with a user and tracks request counts, user context, and integration-specific metadata.
+**Request Manager**: Handles request routing, normalization, and logging. Routes incoming requests from various integrations (Slack, Email, CLI, Web, etc.) to the Agent Service via CloudEvents.
 
-**Agent Service**: Manages LlamaStack agent sessions for AI conversation continuity. Each LlamaStack session maintains the AI agent's conversation history and context for generating coherent responses.
+**Agent Service**: Manages conversation sessions (RequestSession table) and LlamaStack agent sessions. Each session represents a conversation thread with a user and tracks request counts, user context, integration-specific metadata, conversation history, and LlamaStack conversation context for generating coherent multi-turn responses.
 
-## Flow 1: System-Initiated Events (Slack Only)
+## Flow 1: System-Initiated Events (Slack and Other Integrations)
 
-This flow handles inbound events and messages from Slack (the only integration that can receive incoming requests).
+This flow handles inbound events and messages from external integrations. While Slack is the primary system-initiated integration shown in this flow diagram, the system also supports other incoming integrations like Email.
 
 **Production Mode (Eventing Configuration):**
 ```
@@ -102,15 +102,13 @@ This flow handles requests initiated directly by users through command-line tool
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Response      │    │   Database      │    │   Agent         │
 │                 │    │                 │    │   Service       │
-│ SYNC:           │    │ • Request Store │    │                 │
-│ • 200 OK        │    │ • Session Data  │    │ • AI Processing │
-│ • Complete      │    │ • User Config   │    │ • LLM Calls     │
-│   Result        │    │ • Integration   │    │ • Tool Usage    │
-│                 │    │   Settings      │    │ • Response Gen  │
-│ ASYNC:          │    │                 │    │                 │
-│ • 202 Accepted  │    │                 │    │                 │
-│ • request_id    │    │                 │    │                 │
-│ • session_id    │    │                 │    │                 │
+│ • 200 OK        │    │ • Request Store │    │                 │
+│ • Complete      │    │ • Session Data  │    │ • AI Processing │
+│   Response      │    │ • User Config   │    │ • LLM Calls     │
+│ • request_id    │    │ • Integration   │    │ • Tool Usage    │
+│ • session_id    │    │   Settings      │    │ • Response Gen  │
+│ • Full Result   │    │                 │    │ • RequestLog    │
+│                 │    │                 │    │   Update        │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                                 │                       │
                                 │                       │ CloudEvent
@@ -126,75 +124,47 @@ This flow handles requests initiated directly by users through command-line tool
                        │   Delivery      │    │                 │
                        └─────────────────┘    └─────────────────┘
                                 │
-                   ┌────────────┴────────────┐
-                   │                         │
-                   ▼ (if integration_type)   ▼ (if polling)
-          ┌─────────────────┐       ┌─────────────────┐
-          │   Integration   │       │   Database      │
-          │   Handlers      │       │   Storage       │
-          │                 │       │                 │
-          │ • SLACK         │       │ • Store Result  │
-          │ • EMAIL         │       │ • Update Status │
-          │ • WEBHOOK       │       │ • Available for │
-          │ • TEST          │       │   API Polling   │
-          └─────────────────┘       └─────────────────┘
-                   │                         │
-                   ▼                         ▼
-          ┌─────────────────┐       ┌─────────────────┐
-          │   Final         │       │   User Polls    │
-          │   Delivery      │       │   for Result    │
-          │                 │       │                 │
-          │ • Slack DM      │       │ • GET /status   │
-          │ • Email Inbox   │       │ • GET /result   │
-          │ • Webhook POST  │       │ • API Response  │
-          │ • Test Output   │       │                 │
-          └─────────────────┘       └─────────────────┘
+                                │ (if integration_type specified)
+                                ▼
+                       ┌─────────────────┐
+                       │   Integration   │
+                       │   Handlers      │
+                       │                 │
+                       │ • SLACK         │
+                       │ • EMAIL         │
+                       │ • WEBHOOK       │
+                       │ • TEST          │
+                       └─────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │   Final         │
+                       │   Delivery      │
+                       │                 │
+                       │ • Slack DM      │
+                       │ • Email Inbox   │
+                       │ • Webhook POST  │
+                       │ • Test Output   │
+                       └─────────────────┘
 ```
 
 ### Key Characteristics:
 - **Entry Point**: Request Manager (HTTP API)
 - **Use Cases**: CLI tools, scripts, web UIs, programmatic access
-- **Flow**: Request → Normalize → Event → AI Processing → Integration Delivery
-- **Response**: Immediate HTTP response with tracking IDs
+- **Flow**: Request → Normalize → Event → AI Processing → Response
+- **Response**: Synchronous HTTP 200 with complete result
 
-### Response Patterns for Async Requests:
+### Response Behavior
 
-**Pattern A: Integration-Based Delivery (Shown Above)**
-- User specifies `integration_type` in request (e.g., "slack", "email", "webhook")
-- Response delivered through that integration channel
-- User gets immediate tracking IDs, result delivered via integration
+**Synchronous Processing:**
+- Request Manager waits for Agent Service to complete processing
+- Returns 200 OK with full response including request_id, session_id, and complete AI result
+- Internal eventing architecture is transparent to the caller
 
-**Pattern B: Polling-Based Retrieval**
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   CLI/Script    │    │   Request       │    │   Database      │
-│                 │───▶│   Manager       │───▶│                 │
-│ • POST request  │    │                 │    │ • Store Result  │
-│ • Get IDs       │    │ • Return IDs    │    │ • Update Status │
-│ • Poll for      │    │ • GET /status   │    │ • Session Data  │
-│   completion    │    │ • GET /result   │    │                 │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         │ 1. POST /api/v1/...   │                       │
-         │ 2. 202 + IDs          │                       │
-         │ 3. GET /status        │ Query Status          │
-         │ 4. GET /result        │ Fetch Result          │
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Final Result  │    │   Status/Result │    │   Agent         │
-│                 │◀───│   Endpoints     │    │   Service       │
-│ • Complete      │    │                 │    │                 │
-│   Response      │    │ • /requests/    │    │ • Writes Result │
-│ • Session Data  │    │   {id}/status   │    │   to Database   │
-│ • Metadata      │    │ • /requests/    │    │ • Updates       │
-│                 │    │   {id}/result   │    │   Status        │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
-
-**When to Use Each Pattern:**
-- **Integration Delivery**: When user wants result in Slack, email, or webhook
-- **Polling**: When user wants to retrieve result programmatically via API
+**Optional Integration Delivery:**
+- If `integration_type` is specified in request (e.g., "slack", "email", "webhook")
+- Response is also delivered through that integration channel
+- User receives immediate HTTP response AND gets result via specified integration
 
 ---
 
@@ -396,7 +366,7 @@ The Integration Dispatcher acts as the **delivery gateway** ensuring responses r
 |--------|----------------------|------------------------------|
 | **Entry Point** | Slack Events (`/slack/*`) | HTTP API (`/api/v1/requests/*`) |
 | **Initiator** | External system/integration | External client/user |
-| **Response** | Delivered via same integration | HTTP response with IDs |
+| **Response** | Delivered via same integration | HTTP 200 with complete result |
 | **Use Cases** | Slack events, commands, interactions | CLI, scripts, web UI, API |
 | **User Context** | Looked up from integration | Provided in request |
 | **Session** | Linked to integration thread | New or specified |
@@ -429,7 +399,7 @@ Both flows converge at the Agent Service and use the same event-driven architect
 
 ### **4. Service Responsibilities**
 - **Agent Service**: AI processing, session management, LlamaStack integration
-- **Request Manager**: Request logging, event deduplication, request tracking, session management
+- **Request Manager**: Request logging, event deduplication, request tracking
 - **Integration Dispatcher**: **Outgoing response delivery**, integration defaults, user overrides, Slack event processing
 - **Shared Libraries**: Common functionality and inter-service communication
 

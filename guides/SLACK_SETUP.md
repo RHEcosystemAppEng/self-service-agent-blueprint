@@ -177,16 +177,16 @@ curl -X POST http://localhost:8080/api/v1/users/john.doe/integrations \
 The system includes a pre-configured Slack app manifest (`slack-app-manifest.json`) with the following features:
 
 ### OAuth & Permissions
-- **Bot Token Scopes**: `app_mentions:read`, `channels:history`, `chat:write`, `commands`, `groups:history`, `im:history`, `im:read`, `im:write`, `mpim:history`, `mpim:read`, `mpim:write`, `users:read`
+- **Bot Token Scopes**: `app_mentions:read`, `channels:history`, `channels:read`, `chat:write`, `chat:write.public`, `commands`, `groups:read`, `im:history`, `im:read`, `im:write`, `users:read`, `users:read.email`
 
 ### Event Subscriptions
-- **Bot Events**: `app_mention`, `message.channels`, `message.groups`, `message.im`, `message.mpim`
+- **Bot Events**: `app_mention`, `message.channels`, `message.im`
 
 ### Slash Commands
 - **Command**: `/agent`
-- **Request URL**: `https://your-integration-dispatcher-route/slack/events`
+- **Request URL**: `https://your-integration-dispatcher-route/slack/commands`
 - **Short Description**: "Interact with the self-service agent"
-- **Usage Hint**: "[your message]"
+- **Usage Hint**: "[your request or question]"
 
 ### Interactivity & Shortcuts
 - **Request URL**: `https://your-integration-dispatcher-route/slack/interactive`

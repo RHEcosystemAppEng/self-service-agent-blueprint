@@ -404,7 +404,7 @@ The system uses the existing `llama_agents` PostgreSQL database with these table
 - channel_id, thread_id (String(255), Optional - for Slack/Teams)
 - external_session_id (String(255), Optional)
 - current_agent_id (String(255), Optional)
-- llama_stack_session_id (String(255), Optional)
+- conversation_thread_id (String(255), Optional)
 - integration_metadata (JSON)
 - user_context (JSON)
 - conversation_context (JSON)
@@ -460,7 +460,6 @@ The system uses the existing `llama_agents` PostgreSQL database with these table
 ### delivery_logs
 ```sql
 - id (Integer, Primary Key)
-- delivery_id (String(36), Unique, Indexed)
 - user_id (String(255), Indexed)
 - integration_type (Enum: SLACK, EMAIL, SMS, WEBHOOK, TEST)
 - status (Enum: SUCCESS, FAILED, PENDING, RETRYING, EXPIRED)
@@ -649,4 +648,3 @@ curl -X POST http://localhost:8080/api/v1/users/john.doe/integration-defaults/re
 - [Authentication Guide](AUTHENTICATION_GUIDE.md) - Authentication setup and configuration
 - [API Reference](../docs/API_REFERENCE.md) - Complete API documentation
 - [Slack Setup](SLACK_SETUP.md) - Slack-specific configuration
-- [Tool Integration Guide](TOOL_INTEGRATION_GUIDE.md) - Tool integration patterns

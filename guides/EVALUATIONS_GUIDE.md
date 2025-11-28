@@ -168,7 +168,7 @@ The framework executes conversations against agents deployed in OpenShift. You'l
 The evaluation framework requires a running instance of the self-service agent in OpenShift:
 
 - Agent must be accessible via `oc exec` commands
-- Agent should have the test script available (default: `chat.py`)
+- Agent should have the test script available (default: `chat-responses-request-mgr.py`)
 - Agent pods must be in Running state
 - Agent should be able to process conversation requests
 
@@ -245,7 +245,6 @@ Predefined conversations are hand-crafted test cases that validate critical user
     },
     "conversation": [
         {"role": "user", "content": "refresh"},
-        {"role": "user", "content": "1001"},
         {"role": "user", "content": "I would like to see the options"},
         {"role": "user", "content": "3"},
         {"role": "user", "content": "proceed"}
@@ -444,11 +443,17 @@ python evaluate.py --num-conversations 50
 # Adjust maximum conversation turns
 python evaluate.py --max-turns 30
 
-# Use a different test script in OpenShift
-python evaluate.py --test-script my_agent.py
-
 # Test known bad conversations (validation check)
 python evaluate.py --check
+
+# Run with concurrent conversation generation (4 workers)
+python evaluate.py -n 10 --concurrency 4  # Generates 40 total conversations
+
+# Increase message timeout for slower agents
+python evaluate.py --message-timeout 120
+
+# Disable full laptop details validation
+python evaluate.py --no-validate-full-laptop-details
 ```
 
 **Understanding the Output**
@@ -459,12 +464,12 @@ When you run the evaluation pipeline, you'll see output organized by steps:
 🎯 Starting Evaluation Pipeline
 ================================================================================
 📋 Step 1/3: Running predefined conversation flows...
-🚀 Starting: python run_conversations.py --test-script chat.py
+🚀 Starting: python run_conversations.py --test-script chat-responses-request-mgr.py
    [Output from conversation execution...]
 ✅ Completed: run_conversations.py (Duration: 45.32s)
 
 📋 Step 2/3: Generating 20 additional test conversations...
-🚀 Starting: python generator.py 20 --max-turns 20 --test-script chat.py
+🚀 Starting: python generator.py 20 --max-turns 20 --test-script chat-responses-request-mgr.py
    [Output from conversation generation...]
 ✅ Completed: generator.py (Duration: 180.45s)
 
@@ -946,7 +951,7 @@ When you run a conversation, the framework:
 
 1. **Establishes Connection**: Uses `oc exec` to create an interactive shell in the agent pod
 2. **Sets Environment**: Configures `AUTHORITATIVE_USER_ID` to simulate the test user
-3. **Starts Test Script**: Launches the specified test script (e.g., `chat.py`)
+3. **Starts Test Script**: Launches the specified test script (e.g., `chat-responses-request-mgr.py`)
 4. **Manages Session**: Maintains stdin/stdout pipes for message exchange
 5. **Tracks Tokens**: Parses token usage information from agent responses
 6. **Closes Session**: Gracefully terminates the connection when complete
@@ -971,13 +976,13 @@ The framework executes a command similar to:
 ```bash
 oc exec -it deploy/self-service-agent-request-manager -- bash -c \
   "AGENT_MESSAGE_TERMINATOR=:DONE AUTHORITATIVE_USER_ID=alice.johnson@company.com \
-   /app/.venv/bin/python /app/test/chat.py"
+   /app/.venv/bin/python /app/test/chat-responses-request-mgr.py"
 ```
 
 This creates an interactive session where:
 - `AGENT_MESSAGE_TERMINATOR=:DONE`: Marks the end of agent responses
 - `AUTHORITATIVE_USER_ID=alice.johnson@company.com`: Sets the user identity
-- `/app/.venv/bin/python /app/test/chat.py`: Runs the test script
+- `/app/.venv/bin/python /app/test/chat-responses-request-mgr.py`: Runs the test script
 
 **Token Tracking**
 
@@ -1025,15 +1030,15 @@ python run_conversations.py --test-script chat-responses-request-mgr.py
 python run_conversations.py --reset-conversation
 
 # Combine multiple options
-python run_conversations.py --test-script my_agent.py --reset-conversation
+python run_conversations.py --test-script chat-responses-request-mgr.py --reset-conversation
 ```
 
 **Option Details**
 
 - `--test-script <name>`: Specifies which Python script to execute in the OpenShift pod
-  - Default: `chat.py`
+  - Default: `chat-responses-request-mgr.py`
   - The script must be available in the `/app/test/` directory in the pod
-  - Common alternatives: `chat-responses-request-mgr.py` for testing with request manager
+  - Alternative: `chat.py` for simpler testing scenarios
 
 - `--reset-conversation`: Sends a "reset" message at the start of each conversation
   - Ensures each conversation starts with a fresh session
@@ -1043,7 +1048,7 @@ python run_conversations.py --test-script my_agent.py --reset-conversation
 **Example Run**
 
 ```bash
-$ python run_conversations.py --test-script chat.py --reset-conversation
+$ python run_conversations.py --test-script chat-responses-request-mgr.py --reset-conversation
 
 INFO:helpers.run_conversation_flow:Found 2 JSON files to process
 INFO:helpers.run_conversation_flow:Processing success-flow-1.json with 4 questions using authoritative_user_id: alice.johnson@company.com
@@ -1196,7 +1201,7 @@ python generator.py 5 --test-script chat-responses-request-mgr.py
 python generator.py 3 --reset-conversation
 
 # Combine multiple options
-python generator.py 10 --max-turns 20 --test-script chat.py --reset-conversation
+python generator.py 10 --max-turns 20 --test-script chat-responses-request-mgr.py --reset-conversation
 ```
 
 **Option Details**
@@ -1215,7 +1220,7 @@ python generator.py 10 --max-turns 20 --test-script chat.py --reset-conversation
 
 - **`--test-script <name>`**:
   - Specifies which Python script to execute in the OpenShift pod
-  - Default: `chat.py`
+  - Default: `chat-responses-request-mgr.py`
   - Same as `run_conversations.py` option
   - Must be available in `/app/test/` directory in the pod
 
@@ -1259,7 +1264,63 @@ INFO:__main__:Sequential generation completed. Generated 3 total test cases
   API calls: 15
 ```
 
-### 6.2 How Conversation Generation Works
+### 6.2 Concurrent Generation
+
+The generator supports concurrent execution to significantly speed up conversation generation when you need to create many test cases.
+
+**How Concurrent Mode Works**
+
+When you use the `--concurrency N` flag:
+
+1. **User Partitioning**: The available user IDs are divided into N groups with no overlap
+2. **Parallel Workers**: N worker processes run simultaneously, each with its own OpenShift client
+3. **Independent Generation**: Each worker generates the requested number of conversations using only its assigned users
+4. **Result Aggregation**: All conversations and token counts are combined at the end
+
+**Example Usage**
+
+```bash
+# Generate 40 total conversations using 4 workers (10 each)
+python generator.py 10 --concurrency 4 --max-turns 20
+
+# Each worker gets a subset of users:
+# - Worker 0: users 0-4
+# - Worker 1: users 5-9
+# - Worker 2: users 10-14
+# - Worker 3: users 15-19
+```
+
+**Important Constraints**
+
+- **Concurrency cannot exceed available users**: If you have 20 user IDs and set `--concurrency 25`, the script will error
+- **Each worker needs at least one user**: Ensure sufficient users in `authoritative_user_ids`
+- **Total conversations**: `concurrency × num_conversations` (e.g., 4 workers × 10 = 40 total)
+
+**Performance Benefits**
+
+Concurrent generation can dramatically reduce evaluation time:
+
+```bash
+# Sequential: ~180 seconds for 20 conversations
+python generator.py 20 --max-turns 20
+
+# Concurrent: ~50 seconds for 20 conversations (4 workers, 5 each)
+python generator.py 5 --concurrency 4 --max-turns 20
+```
+
+**When to Use Concurrent Mode**
+
+- **Large test suites**: Generating 50+ conversations
+- **CI/CD pipelines**: When evaluation time is critical
+- **Iterative testing**: Rapid feedback during development
+
+**When to Use Sequential Mode**
+
+- **Debugging**: Easier to follow single conversation flow
+- **Limited users**: Fewer than 5-10 available user IDs
+- **Resource constraints**: When parallel OpenShift connections might overload the system
+
+### 6.3 How Conversation Generation Works
 
 The conversation generation system combines AI-driven user simulation with live agent testing to create realistic test scenarios.
 
@@ -1333,7 +1394,7 @@ async def _model_callback(input: str, turns: List[Turn], thread_id: str) -> Turn
     return Turn(role="assistant", content=response)
 ```
 
-### 6.3 Generated File Naming
+### 6.4 Generated File Naming
 
 Generated conversation files follow this naming pattern:
 
@@ -1404,6 +1465,25 @@ Each metric evaluates a conversation and returns:
 1. **Score**: A numerical value (typically 0.0 to 1.0) indicating quality
 2. **Success**: Boolean indicating whether the score meets the threshold
 3. **Reason**: Detailed explanation of why the metric passed or failed
+
+**Automatic Retry on Failure**
+
+The framework includes an extension to the DeepEval ConverationalGEval. It can be used to
+retry the evaluation based on the metric if it fails the first time. 
+
+- **First Attempt**: The metric runs normally
+- **On Failure**: If the score is below the threshold, the metric automatically runs a second time
+- **Result**: The second attempt's result is used, with a notation indicating a retry occurred
+- **Benefit**: Reduces false negatives from LLM evaluation variability
+
+Example output with retry:
+
+```
+❌ FAIL Ticket number validation [Conversational GEval]: 0.000 (threshold: 1.0)
+   Reason: [RETRY: 1st=0.00] The conversation does not mention the ticket number...
+```
+
+The `[RETRY: 1st=0.00]` prefix shows that the metric was retried and what the first attempt scored. This feature is transparent and requires no configuration.
 
 **LLM-Based Assessment**
 
@@ -1540,6 +1620,7 @@ For the laptop refresh use case we defined custom ConversationalGEval metrics de
 - **No Errors Reported by Agent** - Validates absence of system errors
 - **Correct Laptop Options for User Location** - Validates complete regional option lists
 - **Confirmation Before Ticket Creation** - Validates explicit user confirmation before creating tickets
+- **Return to Router After Task Completion** - Validates proper routing back to router agent when user declines further assistance
 
 ---
 
@@ -1847,6 +1928,39 @@ evaluation_steps=[
    first asking for confirmation and waiting for user response.
 ```
 
+---
+
+#### Return to Router After Task Completion
+
+**Purpose**: Validates that users are properly returned to the routing agent when they decline further assistance.
+
+**Threshold**: 1.0 (strict - must be perfect)
+
+**Evaluation Steps**:
+```python
+evaluation_steps=[
+    "Only fail if: (1) agent asks 'Is there anything else I can help you with?' AND (2) user says 'no' AND (3) routing agent does NOT appear.",
+    "If agent does not ask the question, pass.",
+    "If conversation ends after the question with no user response, pass.",
+    "If user responds but does not say 'no' (says 'yes', asks another question, etc.), pass.",
+    "If user says 'no' and routing agent appears (text contains 'routing agent' or mentions both 'laptop refresh' and 'email'), pass.",
+    "Fail only if all three conditions are met: agent asks, user says no, no routing agent appears.",
+]
+```
+
+**What It Checks**:
+- When user says "no" to "anything else I can help you with", they should be returned to routing agent
+- Routing agent should re-appear to offer other services
+- Proper multi-agent flow completion
+
+**Example Failure**:
+
+```
+❌ FAIL Return to Router After Task Completion [Conversational GEval]: 0.000 (threshold: 1.0)
+   Reason: The agent asked 'Is there anything else I can help you with?', the user
+   responded 'no', but the routing agent did not appear to offer other services.
+```
+
 ## 8. Context and Additional Data
 
 It is often useful to use additional context in an eval. This allows metrics to validate agent responses against specific business rules, policies, and data that aren't visible in the conversation itself.
@@ -1863,7 +1977,6 @@ In the evaluations for this quickstart we have used additional context for 2 of 
 
 2. **Policy Documents**:
    - `refresh_policy.txt` - Corporate laptop refresh policy
-
 
 The assumption is that the model used for evaluations is potentially `stronger` than the model used in the agent, and we can therefore, provide the full policy and laptop options in the context to help the evaluation validate that the agent provided the appropriate laptop options.
 
@@ -1906,7 +2019,7 @@ ConversationalGEval(
     threshold=1.0,
     evaluation_steps=[
         f"Validate that if the agent states the number of years after which laptops "
-        f"are refreshed, what is says is consistent with the additional context. "
+        f"are refreshed, what it says is consistent with the additional context. "
         f"\n\nadditional-context-start\n{default_context}\nadditional-context-end",
     ],
     evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
@@ -1980,7 +2093,7 @@ python evaluate.py --reset-conversation
 python evaluate.py --check
 
 # Combine multiple options
-python evaluate.py -n 30 --max-turns 25 --timeout 900 --test-script chat.py
+python evaluate.py -n 30 --max-turns 25 --timeout 900 --test-script chat-responses-request-mgr.py
 ```
 
 **Option Details**
@@ -2002,7 +2115,7 @@ python evaluate.py -n 30 --max-turns 25 --timeout 900 --test-script chat.py
 
 - **`--test-script <name>`**:
   - Test script to execute in OpenShift pod
-  - Default: `chat.py`
+  - Default: `chat-responses-request-mgr.py`
   - Passed to both `run_conversations.py` and `generator.py`
 
 - **`--reset-conversation`**:
@@ -2023,12 +2136,12 @@ $ python evaluate.py -n 5 --max-turns 15
 🎯 Starting Evaluation Pipeline
 ================================================================================
 📋 Step 1/3: Running predefined conversation flows...
-🚀 Starting: python run_conversations.py --test-script chat.py
+🚀 Starting: python run_conversations.py --test-script chat-responses-request-mgr.py
    [Conversation execution output...]
 ✅ Completed: run_conversations.py (Duration: 32.15s)
 
 📋 Step 2/3: Generating 5 additional test conversations...
-🚀 Starting: python generator.py 5 --max-turns 15 --test-script chat.py
+🚀 Starting: python generator.py 5 --max-turns 15 --test-script chat-responses-request-mgr.py
    [Generation output...]
 ✅ Completed: generator.py (Duration: 95.42s)
 
@@ -2083,7 +2196,7 @@ Removing 8 token usage files from previous runs
 **Example Output**:
 
 ```
-🚀 Starting: python run_conversations.py --test-script chat.py
+🚀 Starting: python run_conversations.py --test-script chat-responses-request-mgr.py
 INFO:helpers.run_conversation_flow:Found 3 JSON files to process
 INFO:helpers.run_conversation_flow:Processing success-flow-1.json...
 INFO:helpers.run_conversation_flow:Results saved to results/conversation_results/success-flow-1.json
@@ -2108,7 +2221,7 @@ INFO:helpers.run_conversation_flow:Results saved to results/conversation_results
 **Example Output**:
 
 ```
-🚀 Starting: python generator.py 5 --max-turns 15 --test-script chat.py
+🚀 Starting: python generator.py 5 --max-turns 15 --test-script chat-responses-request-mgr.py
 INFO:__main__:Generating 5 conversation(s) sequentially
 INFO:__main__:Generating conversation 1 of 5...
 INFO:__main__:Conversation 1 simulation completed successfully

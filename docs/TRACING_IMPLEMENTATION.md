@@ -51,28 +51,37 @@ When the Agent Service configures MCP tools for Llama Stack, it injects the curr
 **Location:** `agent-service/src/agent_service/langgraph/responses_agent.py`
 
 ```python
-# Build headers dictionary
-headers: Dict[str, str] = {}
+# Build headers dictionary dynamically per request
+tool_headers = {}
 
 # Add authoritative_user_id if provided
 if authoritative_user_id:
-    headers["AUTHORITATIVE_USER_ID"] = authoritative_user_id
+    tool_headers["AUTHORITATIVE_USER_ID"] = authoritative_user_id
 
 # Add tracing headers if tracing is active
 if tracingIsActive():
     # Inject current tracing context into headers
     # This will add traceparent and tracestate headers
-    inject(headers)
-    logger.debug(f"Injected tracing headers for MCP server {server_name}: {list(headers.keys())}")
+    inject(tool_headers)
+    logger.debug(
+        "Injected tracing headers for MCP server",
+        server_name=server_name,
+        header_keys=list(tool_headers.keys()),
+    )
 
-# Only add headers dict if it's not empty
-if headers:
-    mcp_tool["headers"] = headers
+# Add ServiceNow API key header for pass-through authentication
+snow_api_key = os.environ.get("SERVICENOW_API_KEY")
+if snow_api_key:
+    tool_headers["SERVICE_NOW_TOKEN"] = snow_api_key
+
+# Apply headers if any are present
+if tool_headers:
+    mcp_tool["headers"] = tool_headers
 ```
 
 **What happens:**
 1. When an MCP tool is configured, the current OpenTelemetry context is extracted
-2. `inject(headers)` adds `traceparent` and `tracestate` to the headers dict
+2. `inject(tool_headers)` adds `traceparent` and `tracestate` to the tool_headers dict
 3. These headers are passed to Llama Stack as part of the MCP tool configuration
 4. When Llama Stack invokes the MCP tool, it includes these headers in the HTTP request
 5. The MCP server's `@trace_mcp_tool()` decorator extracts the parent context
@@ -184,11 +193,11 @@ export OTEL_LOG_LEVEL=debug
 When tracing is working correctly, you should see log messages like:
 
 ```
-DEBUG - Injected tracing headers for MCP server snow-server: ['AUTHORITATIVE_USER_ID', 'traceparent', 'tracestate']
-DEBUG - Extracting tracing context from headers: ['host', 'user-agent', 'traceparent', 'tracestate', ...]
-DEBUG - Found traceparent header: 00-abc123...
-DEBUG - Successfully extracted parent span context: trace_id=abc123...
-DEBUG - Created span with trace_id=abc123, span_id=def456
+DEBUG - Injected tracing headers for MCP server server_name=snow-server header_keys=['AUTHORITATIVE_USER_ID', 'traceparent', 'tracestate']
+DEBUG - Extracting tracing context from headers header_count=10
+DEBUG - Found traceparent header traceparent=00-abc123...
+DEBUG - Successfully extracted parent span context trace_id=abc123...
+DEBUG - Starting span span_name=mcp.tool.open_laptop_refresh_ticket
 ```
 
 ## Key Implementation Details

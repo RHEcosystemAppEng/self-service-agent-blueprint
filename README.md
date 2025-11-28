@@ -1560,7 +1560,6 @@ Step-by-step guides for integrations, deployment, and advanced features:
 - [Performance & Scaling](guides/PERFORMANCE_SCALING_GUIDE.md) - Scaling guidance and best practices
 - [Authentication](guides/AUTHENTICATION_GUIDE.md) - Authentication patterns and configuration
 - [Integration Development](guides/INTEGRATION_GUIDE.md) - Building custom integrations
-- [Tool Integration](guides/TOOL_INTEGRATION_GUIDE.md) - Adding integration with external tools for handling requests
 
 ### Technical Documentation
 

@@ -26,20 +26,20 @@ Common components are an exception to this and re-use of components in architect
 - The recommended project structure is similar to modern Python packaging best practices, with a clear separation between your source code and project configuration:
 
 ```
-your-module/ 
+your-module/
 └───src/
 │   └───your_package/
 │       │   __init__.py
 │       │   ... (main code)
-└───tests/
+└───tests/ (optional)
 │   └───... (test code)
 │   pyproject.toml
-│   README.md
+│   README.md (optional)
 │   uv.lock
-│   Containerfile  
 ```
 
 - Each module (for instance backend, frontend, core, util, …) will be contained in a different directory of the root source code project directory.
+- **Note on Containerfiles**: This project uses centralized Containerfile templates at the repository root (`Containerfile.services-template`, `Containerfile.mcp-template`) rather than individual Containerfiles per module. The Makefile build system uses these templates with build arguments to create images for each module.
 - Some references:
   - [Python project structures](https://packaging.python.org/en/latest/tutorials/packaging-projects/)
   - [UV project structures](https://docs.astral.sh/uv/guides/projects/)
