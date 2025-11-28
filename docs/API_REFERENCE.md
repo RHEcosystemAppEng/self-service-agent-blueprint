@@ -72,10 +72,17 @@ Handle web-based requests with authentication.
 **Response**:
 ```json
 {
-  "status": "success",
   "request_id": "string",
   "session_id": "string",
-  "message": "string"
+  "status": "completed",
+  "response": {
+    "content": "string",
+    "agent_id": "string",
+    "metadata": {},
+    "processing_time_ms": 0,
+    "requires_followup": false,
+    "followup_actions": []
+  }
 }
 ```
 
@@ -112,10 +119,17 @@ Handle CLI tool requests with authentication.
 **Response**:
 ```json
 {
-  "status": "success",
   "request_id": "string",
   "session_id": "string",
-  "message": "string"
+  "status": "completed",
+  "response": {
+    "content": "string",
+    "agent_id": "string",
+    "metadata": {},
+    "processing_time_ms": 0,
+    "requires_followup": false,
+    "followup_actions": []
+  }
 }
 ```
 
@@ -162,14 +176,16 @@ Handle system-to-system tool requests.
 **Response**:
 ```json
 {
-  "status": "success",
   "request_id": "string",
   "session_id": "string",
-  "message": "string",
-  "agent_response": {
+  "status": "completed",
+  "response": {
+    "content": "string",
     "agent_id": "string",
-    "estimated_completion": "string",
-    "next_steps": ["string"]
+    "metadata": {},
+    "processing_time_ms": 0,
+    "requires_followup": false,
+    "followup_actions": []
   }
 }
 ```
@@ -209,10 +225,17 @@ Handle generic requests without authentication.
 **Response**:
 ```json
 {
-  "status": "success",
   "request_id": "string",
   "session_id": "string",
-  "message": "string"
+  "status": "completed",
+  "response": {
+    "content": "string",
+    "agent_id": "string",
+    "metadata": {},
+    "processing_time_ms": 0,
+    "requires_followup": false,
+    "followup_actions": []
+  }
 }
 ```
 
@@ -252,14 +275,16 @@ curl -X POST https://your-request-manager/api/v1/requests/generic \
 **Response**:
 ```json
 {
-  "status": "success",
   "request_id": "string",
   "session_id": "string",
+  "status": "completed",
   "response": {
     "content": "string",
     "agent_id": "string",
-    "conversation_thread_id": "string",
-    "metadata": {}
+    "metadata": {},
+    "processing_time_ms": 0,
+    "requires_followup": false,
+    "followup_actions": []
   }
 }
 ```
@@ -311,16 +336,7 @@ Health check endpoint for Request Manager.
   "status": "healthy",
   "service": "request-manager",
   "version": "0.1.0",
-  "timestamp": "2024-01-01T00:00:00Z",
-  "database": {
-    "status": "healthy",
-    "connection_pool": {
-      "active": 2,
-      "idle": 3,
-      "max": 10
-    }
-  },
-  "uptime": 3600
+  "timestamp": "2024-01-01T00:00:00Z"
 }
 ```
 
@@ -642,21 +658,21 @@ Get user's delivery history.
 
 **Response**:
 ```json
-{
-  "user_id": "string",
-  "deliveries": [
-    {
-      "delivery_id": "string",
-      "integration_type": "EMAIL",
-      "status": "success",
-      "created_at": "2024-01-01T00:00:00Z",
-      "error_message": null
-    }
-  ],
-  "total_count": 100,
-  "limit": 50,
-  "offset": 0
-}
+[
+  {
+    "id": 1,
+    "request_id": "string",
+    "session_id": "string",
+    "user_id": "string",
+    "integration_type": "EMAIL",
+    "subject": "string",
+    "content": "string",
+    "status": "DELIVERED",
+    "error_message": null,
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  }
+]
 ```
 
 ### GET /health
@@ -671,17 +687,7 @@ Health check endpoint for Integration Dispatcher.
   "status": "healthy",
   "service": "integration-dispatcher",
   "version": "0.1.0",
-  "timestamp": "2024-01-01T00:00:00Z",
-  "database": {
-    "status": "healthy",
-    "connection_pool": {
-      "active": 2,
-      "idle": 3,
-      "max": 10
-    }
-  },
-  "integrations_available": ["SLACK", "EMAIL", "TEST"],
-  "uptime": 3600
+  "timestamp": "2024-01-01T00:00:00Z"
 }
 ```
 
@@ -719,9 +725,9 @@ enum SessionStatus {
 
 ```typescript
 enum DeliveryStatus {
-  SUCCESS = "SUCCESS",
-  FAILED = "FAILED",
   PENDING = "PENDING",
+  DELIVERED = "DELIVERED",
+  FAILED = "FAILED",
   RETRYING = "RETRYING",
   EXPIRED = "EXPIRED"
 }
@@ -761,75 +767,76 @@ interface DeliveryRequest {
 
 ## Error Responses
 
+All error responses follow the `ErrorResponse` schema with `error`, `error_code`, and optional `request_id` fields.
+
 ### 400 Bad Request
 ```json
 {
-  "status": "error",
   "error": "Validation failed",
-  "details": {
-    "field": "user_id",
-    "message": "user_id is required and cannot be empty"
-  }
+  "error_code": "HTTP_400",
+  "request_id": "optional-request-id"
 }
 ```
 
 ### 401 Unauthorized
 ```json
 {
-  "status": "error",
   "error": "Authentication required",
-  "details": "Invalid or missing authentication token"
+  "error_code": "HTTP_401"
 }
 ```
 
 ### 403 Forbidden
 ```json
 {
-  "status": "error",
-  "error": "Access denied",
-  "details": "User ID mismatch or insufficient permissions"
+  "error": "User ID mismatch",
+  "error_code": "HTTP_403"
 }
 ```
 
 ### 404 Not Found
 ```json
 {
-  "status": "error",
   "error": "Resource not found",
-  "details": "User or integration configuration not found"
+  "error_code": "HTTP_404"
 }
 ```
 
 ### 500 Internal Server Error
 ```json
 {
-  "status": "error",
   "error": "Internal server error",
-  "details": "An unexpected error occurred"
+  "error_code": "INTERNAL_ERROR"
 }
 ```
 
 ## Health Checks
 
-### Request Manager Health Check
+Both Request Manager and Integration Dispatcher provide two health check endpoints:
 
-The Request Manager health check includes:
-- Database connectivity
-- Connection pool status
-- Service uptime
-- Basic service metrics
+### GET /health
 
-### Integration Dispatcher Health Check
+Lightweight health check without database dependency. Returns basic service status:
+- `status`: Service health status
+- `service`: Service name
+- `version`: Service version
+- `timestamp`: Current timestamp
 
-The Integration Dispatcher health check includes:
-- Database connectivity
-- Integration availability (based on configuration)
-- Service uptime
-- Integration handler status
+### GET /health/detailed
+
+Detailed health check with database connectivity verification. Returns:
+- `status`: Service health status
+- `timestamp`: Current timestamp
+- `version`: Service version
+- `database_connected`: Database connectivity status
+- `services`: Additional service-specific status information
+
+**Note:** The simple `/health` endpoint is recommended for container liveness probes as it doesn't depend on database connectivity.
 
 ### Integration Availability
 
-The system automatically determines which integrations are available based on:
+The Integration Dispatcher's `/health/detailed` endpoint includes integration availability information. The system automatically determines which integrations are available based on:
+
 - **SLACK**: Bot token and signing secret configuration
 - **EMAIL**: SMTP server configuration
 - **TEST**: Test integration configuration

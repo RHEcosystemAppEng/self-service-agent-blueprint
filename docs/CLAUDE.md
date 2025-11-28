@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a self-service agent blueprint implementing a complete AI agent management system with LlamaStack integration, eventing-based communication (Knative eventing or Mock eventing), and multi-channel support (Slack, API, CLI). The project consists of:
 
-- **agent-service/**: AI agent processing service with knowledge base management and LangGraph state machine
-- **request-manager/**: Request routing, session management, and unified communication processing
+- **agent-service/**: AI agent processing service with knowledge base management, session management, and LangGraph state machine
+- **request-manager/**: Request routing, normalization, and unified communication processing
 - **integration-dispatcher/**: Multi-channel delivery (Slack, Email, etc.)
 - **mcp-servers/**: MCP (Model Context Protocol) servers for external tool integration
 - **mock-eventing-service/**: Lightweight mock service for testing without Knative infrastructure
@@ -47,8 +47,8 @@ The project uses templated Containerfiles for consistency:
 
 ```bash
 # Build using templates with build args
-make build-request-mgr-image    # Uses Containerfile.template
-make build-mcp-emp-info-image   # Uses Containerfile.mcp-template
+make build-request-mgr-image    # Uses Containerfile.services-template
+make build-mcp-snow-image       # Uses Containerfile.mcp-template
 
 # Push to registry
 make push-all-images
@@ -82,10 +82,10 @@ make helm-uninstall NAMESPACE=your-namespace
 
 ### Core Components
 
-1. **Agent Service**: Processes AI requests via LlamaStack, handles streaming responses, and manages knowledge bases
-2. **Request Manager**: Routes requests, manages sessions, unified communication processing with strategy pattern
+1. **Agent Service**: Processes AI requests via LlamaStack, handles streaming responses, manages knowledge bases and session management
+2. **Request Manager**: Routes requests, unified communication processing with strategy pattern
 3. **Integration Dispatcher**: Delivers responses to multiple channels (Slack, Email, etc.)
-4. **MCP Servers**: External tool integration (employee-info, ServiceNow)
+4. **MCP Servers**: External tool integration (ServiceNow)
 5. **Mock Eventing Service**: Lightweight service that mimics Knative broker behavior for testing
 6. **Shared Database**: PostgreSQL with Alembic migrations for session/request persistence
 
@@ -118,7 +118,7 @@ The system uses an **Integration Defaults** approach with **User Overrides** to 
 ### Project Structure
 
 - **UV**: Python package management and virtual environments across all services
-- **Templated Containerfiles**: `Containerfile.template` and `Containerfile.mcp-template` for consistency
+- **Templated Containerfiles**: `Containerfile.services-template` and `Containerfile.mcp-template` for consistency
 - **Red Hat UBI**: Uses `registry.access.redhat.com/ubi9/python-312-minimal` base images
 - **Multi-stage builds**: Optimized Docker layer caching
 - **OpenShift**: Helm charts designed for OpenShift with Routes, NetworkPolicies
@@ -142,23 +142,6 @@ The system uses an **Integration Defaults** approach with **User Overrides** to 
 - Python 3.12+ required
 
 ## Local Development
-
-### Testing with LlamaStack
-
-For local testing:
-
-```bash
-# 1. Run Ollama server
-OLLAMA_HOST=0.0.0.0 ollama serve
-
-# 2. Start LlamaStack container
-cd local_testing/
-./run_llamastack.sh
-
-# 3. Test asset registration (knowledge bases)
-cd agent-service/
-python -m agent_service.scripts.register_assets
-```
 
 ### Development Workflow
 
@@ -188,11 +171,9 @@ make helm-install-test NAMESPACE=dev
 - **`docs/ARCHITECTURE_DIAGRAMS.md`**: System architecture and flow diagrams
 - **`guides/AUTHENTICATION_GUIDE.md`**: Enhanced security and authentication setup with production readiness warnings
 - **`guides/SLACK_SETUP.md`**: Slack app configuration guide
-- **`guides/TOOL_INTEGRATION_GUIDE.md`**: Tool integration patterns
 
 ### Component Documentation
 - **`agent-service/`**: Agent service with knowledge base management and LangGraph
-- **`mcp-servers/employee-info/README.md`**: Employee information service documentation
 - **`mcp-servers/snow/README.md`**: ServiceNow integration documentation
 
 ### Unified Architecture
@@ -256,5 +237,5 @@ The system uses eventing-based communication with the following core components:
 
 ## Related Documentation
 
-- [README.md](README.md) - Main project documentation
+- [README.md](../README.md) - Main project documentation
 - [GUIDELINES.md](GUIDELINES.md) - Code practices and project structure guidelines

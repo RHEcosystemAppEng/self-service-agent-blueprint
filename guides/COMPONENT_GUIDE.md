@@ -164,8 +164,6 @@ MCP servers allow agents to interact with external systems through standardized 
 - Uses `AUTHORITATIVE_USER_ID` header for authenticated requests
 - Mock data includes pre-defined employees with laptop information for evaluation testing
 
-**Documentation:** See [Tool Integration Guide](TOOL_INTEGRATION_GUIDE.md) and `mcp-servers/snow/README.md`
-
 ---
 
 ### Knowledge Bases

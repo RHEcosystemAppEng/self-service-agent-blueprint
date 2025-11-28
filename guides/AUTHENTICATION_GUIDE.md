@@ -272,18 +272,17 @@ async def send_generic_request_with_context():
 
 The authentication configuration works across all deployment modes:
 
-- **Development Mode** (`helm-install-dev`): Use for local development and testing authentication
-- **Testing Mode** (`helm-install-test`): Use for CI/CD testing with authentication
+- **Testing Mode** (`helm-install-test`): Use for local development, testing, and CI/CD with authentication
 - **Production Mode** (`helm-install-prod`): Use for production deployments with authentication
 
 ### Using Helm Install
 
 ```bash
-# Development deployment with JWT authentication
-make helm-install-dev EXTRA_HELM_ARGS="--set security.jwt.enabled=true --set security.jwt.issuers[0].issuer=https://auth.acme.com --set security.jwt.issuers[0].jwksUri=https://auth.acme.com/.well-known/jwks.json --set security.jwt.issuers[0].audience=selfservice-api"
+# Testing deployment with JWT authentication
+make helm-install-test EXTRA_HELM_ARGS="--set security.jwt.enabled=true --set security.jwt.issuers[0].issuer=https://auth.acme.com --set security.jwt.issuers[0].jwksUri=https://auth.acme.com/.well-known/jwks.json --set security.jwt.issuers[0].audience=selfservice-api"
 
-# Development deployment with API key authentication
-make helm-install-dev EXTRA_HELM_ARGS="--set security.apiKeys.webKeys.web-test-user=test@company.com"
+# Testing deployment with API key authentication
+make helm-install-test EXTRA_HELM_ARGS="--set security.apiKeys.webKeys.web-test-user=test@company.com"
 
 # Production deployment with JWT authentication
 make helm-install-prod EXTRA_HELM_ARGS="--set security.jwt.enabled=true --set security.jwt.issuers[0].issuer=https://auth.acme.com --set security.jwt.issuers[0].jwksUri=https://auth.acme.com/.well-known/jwks.json --set security.jwt.issuers[0].audience=selfservice-api"

@@ -141,6 +141,7 @@ state_schema:
 - **`dict`**: Structured object/JSON data
 - **`list`**: Array of dictionaries
 - **`boolean`**: True/false values
+- **`integer`**: Integer numeric values
 - **`null`**: Empty by default (can be used with any type)
 
 ## State Types
