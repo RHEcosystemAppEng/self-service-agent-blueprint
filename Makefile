@@ -56,7 +56,7 @@ SERVICENOW_INSTANCE_URL ?= http://self-service-agent-mock-servicenow:8080
 SERVICENOW_API_KEY ?= now_mock_api_key
 SERVICENOW_LAPTOP_REFRESH_ID ?= mock_laptop_refresh_id
 SERVICENOW_LAPTOP_AVOID_DUPLICATES ?= false
-SERVICENOW_LAPTOP_REQUEST_LIMITS ?= None
+SERVICENOW_LAPTOP_REQUEST_LIMITS ?=
 TEST_USERS ?=
 
 # Evaluation Configuration
