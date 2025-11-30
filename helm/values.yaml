@@ -13,6 +13,7 @@ image:
   integrationDispatcher: self-service-agent-integration-dispatcher
   mockEventing: self-service-agent-mock-eventing
   mockServiceNow: self-service-agent-mock-servicenow
+  promptGuard: self-service-agent-promptguard
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
@@ -118,6 +119,41 @@ safety:
   # Leave empty to disable shields
   url: ""
 
+# PromptGuard Service Configuration (Attack Detection Shield)
+# This service detects prompt injection and jailbreak attempts using a lightweight 86M parameter model
+promptGuard:
+  enabled: false  # Set to true to enable PromptGuard service
+  replicas: 1
+  logLevel: "INFO"
+  uvicornWorkers: 1  # Single worker sufficient for CPU-based model
+  modelId: "meta-llama/Llama-Prompt-Guard-2-86M"  # Model to use (REQUIRES HF_TOKEN)
+  # HuggingFace authentication (REQUIRED for Llama-Prompt-Guard-2-86M which is a gated model)
+  # Create secret: kubectl create secret generic hf-token --from-literal=token=hf_xxxxx -n <namespace>
+  # huggingfaceToken:
+  #   secretName: hf-token
+  #   secretKey: token  # Optional, defaults to "token"
+  resources:
+    limits:
+      cpu: "2"
+      memory: 2Gi  # 86M model is very lightweight
+    requests:
+      cpu: "1"
+      memory: 1Gi
+  # Health check configuration (CPU model loads faster than GPU models)
+  healthChecks:
+    livenessProbe:
+      initialDelaySeconds: 45  # Allow time for model download/loading
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+    readinessProbe:
+      initialDelaySeconds: 30  # Model loading time
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+
 # PostgreSQL configuration for llama-stack agent persistence
 pgvector:
   extraDatabases:
@@ -187,6 +223,21 @@ llama-stack:
             db: llama_responses
             user: ${env.POSTGRES_USER:=pgvector}
             password: ${env.POSTGRES_PASSWORD:=pgvector}
+
+  # Model configurations for llama-stack
+  # Add PromptGuard as a shield when enabled
+  # See docs/LLAMA_GUARD_VS_PROMPTGUARD.md for shield ordering recommendations
+  models:
+    llama-prompt-guard-2-86m:
+      id: "meta-llama/Llama-Prompt-Guard-2-86M"  # Using Llama-Prompt-Guard-2-86M (requires HF_TOKEN)
+      enabled: false  # Set to true when promptGuard.enabled is true
+      registerShield: true  # Register as a shield in llama-stack
+      # URL points to the PromptGuard service created by promptguard-deployment.yaml
+      # Note: Service name is self-service-agent-promptguard by default
+      # Using short service name (works within same namespace)
+      url: "http://self-service-agent-promptguard:8000/v1"
+      apiToken: "fake"  # Not used but required by llama-stack
+      maxTokens: 512  # PromptGuard supports 512 token context window
 
 mcp-servers:
   enabled: true
