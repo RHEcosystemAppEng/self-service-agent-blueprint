@@ -272,18 +272,18 @@ def get_employee_laptop_info(
             result = laptop_info
         else:
             result = f"Error: Failed to retrieve laptop info for {authoritative_user_id} from ServiceNow"
+
+        logger.info(
+            "Returning laptop info for employee",
+            tool="get_employee_laptop_info",
+            authoritative_user_id=authoritative_user_id,
+        )
+
+        return result
     except Exception as e:
         error_msg = f"Error getting laptop info from ServiceNow: {str(e)}"
         logger.error(error_msg)
         raise  # Re-raise to allow fallback handling
-
-    logger.info(
-        "Returning laptop info for employee",
-        tool="get_employee_laptop_info",
-        authoritative_user_id=authoritative_user_id,
-    )
-
-    return result
 
 
 def main() -> None:
