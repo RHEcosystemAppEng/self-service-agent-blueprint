@@ -205,7 +205,7 @@ def open_laptop_refresh_ticket(
     except Exception as e:
         error_msg = f"Error opening ServiceNow laptop refresh request: {str(e)}"
         logger.error(error_msg)
-        raise  # Re-raise to allow fallback handling
+        return error_msg
 
 
 @mcp.tool()
@@ -283,7 +283,7 @@ def get_employee_laptop_info(
     except Exception as e:
         error_msg = f"Error getting laptop info from ServiceNow: {str(e)}"
         logger.error(error_msg)
-        raise  # Re-raise to allow fallback handling
+        return error_msg
 
 
 def main() -> None:
