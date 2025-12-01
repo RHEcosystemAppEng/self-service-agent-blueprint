@@ -564,6 +564,34 @@ class ResponsesSessionManager(BaseSessionManager):
                 agent, current_agent_id, session, session_name
             )
 
+            # Check if the conversation is in a terminal state
+            # If it's a specialist agent session that's completed, reset and return to routing
+            try:
+                state = session.app.get_state(session.thread_config)
+                if hasattr(state, "values"):
+                    current_state = state.values.get("current_state")
+                    if (
+                        current_agent_id != self.ROUTING_AGENT_NAME
+                        and session.state_machine.is_terminal_state(current_state)
+                    ):
+                        logger.info(
+                            "Resumed specialist session is in terminal state - resetting to routing agent",
+                            request_manager_session_id=request_manager_session_id,
+                            current_agent_id=current_agent_id,
+                            current_state=current_state,
+                        )
+                        # Reset the conversation state
+                        await self._reset_conversation_state()
+                        # Return False so a new routing session gets created
+                        return False
+            except Exception as e:
+                logger.debug(
+                    "Could not check conversation state when resuming session",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
+                # Continue with resumption if we can't check the state
+
             logger.info(
                 "Session resumed successfully",
                 request_manager_session_id=request_manager_session_id,
@@ -1111,22 +1139,44 @@ class ResponsesSessionManager(BaseSessionManager):
             logger.debug(
                 "Updating database to clear session state",
                 user_id=self.user_id,
+                request_manager_session_id=self.request_manager_session_id,
             )
 
-            stmt = (
-                update(RequestSession)
-                .where(
-                    RequestSession.user_id == self.user_id,
-                    RequestSession.status == SessionStatus.ACTIVE.value,
+            # Use session_id if available to target the specific session
+            # Otherwise fall back to user_id (for backward compatibility)
+            if self.request_manager_session_id:
+                stmt = (
+                    update(RequestSession)
+                    .where(
+                        RequestSession.session_id == self.request_manager_session_id,
+                        RequestSession.user_id == self.user_id,
+                        RequestSession.status == SessionStatus.ACTIVE.value,
+                    )
+                    .values(
+                        current_agent_id=None,
+                        conversation_thread_id=None,
+                        # Keep status ACTIVE so the session can be resumed/reused
+                        # status=SessionStatus.INACTIVE.value,
+                        updated_at=datetime.now(timezone.utc),
+                    )
                 )
-                .values(
-                    current_agent_id=None,
-                    conversation_thread_id=None,
-                    # Keep status ACTIVE so the session can be resumed/reused
-                    # status=SessionStatus.INACTIVE.value,
-                    updated_at=datetime.now(timezone.utc),
+            else:
+                # Fallback: update all active sessions for user (legacy behavior)
+                # This is less precise but needed if session_id is not available
+                stmt = (
+                    update(RequestSession)
+                    .where(
+                        RequestSession.user_id == self.user_id,
+                        RequestSession.status == SessionStatus.ACTIVE.value,
+                    )
+                    .values(
+                        current_agent_id=None,
+                        conversation_thread_id=None,
+                        # Keep status ACTIVE so the session can be resumed/reused
+                        # status=SessionStatus.INACTIVE.value,
+                        updated_at=datetime.now(timezone.utc),
+                    )
                 )
-            )
             await self.db_session.execute(stmt)
             await self.db_session.commit()
 

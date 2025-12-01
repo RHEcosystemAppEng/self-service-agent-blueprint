@@ -14,11 +14,14 @@ from typing import Any, Dict, Optional
 import aioimaplib
 from shared_models import (
     CloudEventSender,
+    DatabaseUtils,
     configure_logging,
 )
 from shared_models.database import get_database_manager
-from shared_models.models import ProcessedEvent
+from shared_models.models import IntegrationType, ProcessedEvent
 from sqlalchemy import select, text
+
+from .user_mapping_utils import resolve_user_id_from_email
 
 logger = configure_logging("integration-dispatcher")
 
@@ -671,6 +674,32 @@ class EmailService:
                 date = email_message.get("Date")
                 in_reply_to = email_message.get("In-Reply-To")
                 references = email_message.get("References")
+                # Extract X-Session-ID header if present (from previous email response)
+                # Try case-insensitive lookup (email headers are case-insensitive)
+                session_id = (
+                    email_message.get("X-Session-ID")
+                    or email_message.get("x-session-id")
+                    or email_message.get("X-SESSION-ID")
+                )
+                # Also check all headers for debugging
+                all_headers = dict(email_message.items())
+                if not session_id:
+                    # Log available headers for debugging
+                    logger.debug(
+                        "X-Session-ID header not found in email",
+                        email_id=email_id,
+                        from_addr=from_addr,
+                        available_headers=list(all_headers.keys()),
+                        has_in_reply_to=bool(in_reply_to),
+                        has_references=bool(references),
+                    )
+                else:
+                    logger.info(
+                        "Found X-Session-ID header in email reply",
+                        email_id=email_id,
+                        from_addr=from_addr,
+                        session_id=session_id,
+                    )
 
                 if not from_addr:
                     logger.warning(
@@ -705,8 +734,6 @@ class EmailService:
 
                 # ✅ ATOMIC EVENT CLAIMING: Use check-and-set pattern to prevent duplicate processing
                 # This provides 100% guarantee - only one pod can claim and process an event
-                from shared_models import DatabaseUtils
-
                 event_claimed = await DatabaseUtils.try_claim_event_for_processing(
                     db,
                     email_message_id,
@@ -775,6 +802,7 @@ class EmailService:
                     message_id=message_id,
                     in_reply_to=in_reply_to,
                     references=references,
+                    session_id=session_id,
                 )
 
                 return success
@@ -807,29 +835,28 @@ class EmailService:
             return False
 
     async def _resolve_user_id(self, email_address: str, db: Any) -> str:
-        """Resolve email address to user_id and create mapping if needed."""
+        """Resolve email address to canonical user_id and create mapping if needed."""
         try:
-            from shared_models.models import IntegrationType
-
-            from .user_mapping_utils import resolve_user_id_from_email
-
-            # Use shared helper function to resolve user_id with consistent logic
+            # Use shared helper function to resolve canonical user_id with consistent logic
+            # For EMAIL integration, integration_user_id is the email_address itself
             return await resolve_user_id_from_email(
                 email_address=email_address,
                 integration_type=IntegrationType.EMAIL,
                 db=db,
-                default_user_id=email_address,
+                integration_specific_id=email_address,
                 created_by="email_service",
             )
 
         except Exception as e:
             logger.error(
-                "Error resolving user_id from email",
+                "Error resolving canonical user_id from email",
                 email_address=email_address,
                 error=str(e),
             )
-            # Fall back to email address
-            return email_address
+            # Re-raise the exception rather than falling back to email address
+            # The email address is not a valid UUID and will cause database errors
+            # If resolution fails, we should fail the request rather than proceed with invalid data
+            raise
 
     def _extract_body(self, email_message: Any) -> str:
         """Extract text body from email message."""
@@ -909,10 +936,12 @@ class EmailService:
         message_id: Optional[str],
         in_reply_to: Optional[str],
         references: Optional[str],
+        session_id: Optional[str] = None,
     ) -> bool:
         """Forward email to Request Manager via CloudEvent."""
         try:
             # Create event data - Request Manager will generate request_id and session_id
+            # If session_id is provided (from X-Session-ID header), include it so Request Manager can reuse the session
             metadata = {
                 "email_from": from_address,
                 "email_subject": subject,
@@ -934,6 +963,15 @@ class EmailService:
                 "email_references": references,
                 "metadata": metadata,
             }
+
+            # Include session_id if provided (from X-Session-ID header in email reply)
+            if session_id:
+                event_data["session_id"] = session_id
+                logger.debug(
+                    "Including session_id from X-Session-ID header",
+                    session_id=session_id,
+                    from_address=from_address,
+                )
 
             logger.debug(
                 "Sending email request via CloudEvent to Request Manager",

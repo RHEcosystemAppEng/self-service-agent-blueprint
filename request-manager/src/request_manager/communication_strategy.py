@@ -19,9 +19,28 @@ logger = configure_logging("request-manager")
 # Global registry for response futures (event-driven approach)
 _response_futures_registry: dict[str, Any] = {}
 
+
+def _should_filter_sessions_by_integration_type() -> bool:
+    """Check if sessions should be filtered by integration type.
+
+    Returns:
+        True if sessions should be separated by integration type (legacy behavior)
+        False if a single session should be maintained across all integration types (default)
+    """
+    return os.getenv("SESSION_PER_INTEGRATION_TYPE", "false").lower() == "true"
+
+
+def _get_session_timeout_hours() -> int:
+    """Get session timeout in hours from environment variable.
+
+    Returns:
+        Session timeout in hours (default: 336 hours = 2 weeks)
+    """
+    return int(os.getenv("SESSION_TIMEOUT_HOURS", "336"))
+
+
 # Global polling task (single per pod)
 _pod_polling_task: Optional[asyncio.Task[None]] = None
-_pod_name: Optional[str] = None
 
 
 def get_pod_name() -> Optional[str]:
@@ -56,12 +75,8 @@ def resolve_response_future(request_id: str, response_data: Dict[str, Any]) -> b
                 request_id=request_id,
             )
             return True
-        else:
-            logger.debug(
-                "Response future already resolved",
-                request_id=request_id,
-            )
-            return True
+        # Future already resolved, return True (no need to log - this is expected)
+        return True
     else:
         # No future found - database polling will handle it
         logger.debug(
@@ -91,22 +106,107 @@ async def create_or_get_session_shared(
     import uuid
 
     from agent_service.schemas import SessionResponse
+
+    # Resolve user_id to canonical user_id if it's an email address
+    from shared_models import resolve_canonical_user_id
     from shared_models.models import RequestSession, SessionStatus
     from sqlalchemy import select
 
-    # Try to find existing active session
-    stmt = (
-        select(RequestSession)
-        .where(
-            RequestSession.user_id == request.user_id,
-            RequestSession.integration_type == request.integration_type,
+    canonical_user_id = await resolve_canonical_user_id(
+        request.user_id,
+        integration_type=getattr(request, "integration_type", None),
+        db=db,
+    )
+
+    # Check if a session_id was provided in metadata (e.g., from X-Session-ID header in email reply, or thread metadata)
+    # This allows integrations to provide a session_id to continue an existing session
+    request_metadata = getattr(request, "metadata", {}) or {}
+    provided_session_id = request_metadata.get("session_id")
+
+    # If a session_id is provided, try to use it first
+    if provided_session_id:
+        logger.debug(
+            "Session ID provided in request metadata, attempting to use it",
+            provided_session_id=provided_session_id,
+            canonical_user_id=canonical_user_id,
+        )
+        # Verify the provided session_id exists and belongs to this user
+        stmt = select(RequestSession).where(
+            RequestSession.session_id == provided_session_id,
+            RequestSession.user_id == canonical_user_id,
             RequestSession.status == SessionStatus.ACTIVE.value,
         )
+        result = await db.execute(stmt)
+        provided_session = result.scalar_one_or_none()
+
+        if provided_session:
+            # Check if session is expired
+            now = datetime.now(timezone.utc)
+            if provided_session.expires_at is None or provided_session.expires_at > now:
+                # Valid session found - update activity timestamp and return it
+                provided_session.last_request_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+                await db.commit()
+                logger.info(
+                    "Reusing provided session from metadata",
+                    session_id=provided_session_id,
+                    canonical_user_id=canonical_user_id,
+                )
+                return SessionResponse.model_validate(provided_session)
+            else:
+                logger.warning(
+                    "Provided session_id is expired, will create new session",
+                    session_id=provided_session_id,
+                    canonical_user_id=canonical_user_id,
+                )
+        else:
+            logger.warning(
+                "Provided session_id not found or doesn't belong to user, will create new session",
+                provided_session_id=provided_session_id,
+                canonical_user_id=canonical_user_id,
+            )
+
+    # Check if we should filter by integration type
+    filter_by_integration_type = _should_filter_sessions_by_integration_type()
+
+    # Get current time for expiration checks
+    now = datetime.now(timezone.utc)
+
+    # Try to find existing active session (not expired)
+    where_conditions = [
+        RequestSession.user_id == canonical_user_id,
+        RequestSession.status == SessionStatus.ACTIVE.value,
+        # Filter out expired sessions
+        ((RequestSession.expires_at.is_(None)) | (RequestSession.expires_at > now)),
+    ]
+
+    # Optionally filter by integration type based on env var
+    if filter_by_integration_type:
+        where_conditions.append(
+            RequestSession.integration_type == request.integration_type
+        )
+
+    stmt = (
+        select(RequestSession)
+        .where(*where_conditions)
         .order_by(RequestSession.last_request_at.desc())
     )
 
     result = await db.execute(stmt)
     existing_sessions = result.scalars().all()
+
+    # Debug logging for session lookup
+    logger.debug(
+        "Session lookup results",
+        canonical_user_id=canonical_user_id,
+        original_user_id=request.user_id,
+        integration_type=(
+            request.integration_type.value
+            if hasattr(request.integration_type, "value")
+            else str(request.integration_type)
+        ),
+        filter_by_integration_type=filter_by_integration_type,
+        found_sessions_count=len(existing_sessions),
+    )
 
     if existing_sessions:
         # Use the most recent session (first in the ordered list)
@@ -116,27 +216,38 @@ async def create_or_get_session_shared(
         if len(existing_sessions) > 1:
             logger.warning(
                 "Multiple active sessions found for user, cleaning up old sessions",
-                user_id=request.user_id,
+                user_id=canonical_user_id,
+                original_user_id=request.user_id,
                 integration_type=request.integration_type,
                 session_count=len(existing_sessions),
                 selected_session_id=existing_session.session_id,
                 all_session_ids=[s.session_id for s in existing_sessions],
+                filter_by_integration_type=filter_by_integration_type,
             )
 
             # Use the cleanup utility function
+            from shared_models import get_enum_value
+
             from .database_utils import cleanup_old_sessions
+
+            # Pass integration_type only if filtering by it, otherwise None
+            # Convert enum to string value for consistency
+            cleanup_integration_type = (
+                get_enum_value(request.integration_type)
+                if filter_by_integration_type
+                else None
+            )
 
             deactivated_count = await cleanup_old_sessions(
                 db=db,
-                user_id=request.user_id,
-                integration_type=request.integration_type,
-                keep_recent_count=1,  # Keep only the most recent session
-                max_age_hours=24,  # Deactivate sessions older than 24 hours
+                user_id=canonical_user_id,
+                integration_type=cleanup_integration_type,
             )
 
             logger.info(
                 "Session cleanup completed",
-                user_id=request.user_id,
+                user_id=canonical_user_id,
+                original_user_id=request.user_id,
                 deactivated_count=deactivated_count,
             )
 
@@ -147,19 +258,36 @@ async def create_or_get_session_shared(
             "Reusing existing session",
             session_id=existing_session.session_id,
             current_agent_id=existing_session.current_agent_id,
-            user_id=request.user_id,
+            user_id=canonical_user_id,
+            original_user_id=request.user_id,
+            integration_type=(
+                existing_session.integration_type.value
+                if hasattr(existing_session.integration_type, "value")
+                else str(existing_session.integration_type)
+            ),
+            filter_by_integration_type=filter_by_integration_type,
         )
         return SessionResponse.model_validate(existing_session)
 
-    # Create new session
+    # Create new session with expiration
+    from datetime import timedelta
+
+    session_timeout_hours = _get_session_timeout_hours()
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=session_timeout_hours)
+
+    # Get integration_type from request, with fallback to None if not available
+    # This handles cases where BaseRequest might have integration_type=None
+    request_integration_type = getattr(request, "integration_type", None)
+
     session = RequestSession(
         session_id=str(uuid.uuid4()),
-        user_id=request.user_id,
-        integration_type=request.integration_type,
+        user_id=canonical_user_id,
+        integration_type=request_integration_type,
         channel_id=getattr(request, "channel_id", None),
         thread_id=getattr(request, "thread_id", None),
         integration_metadata=request.metadata,
         status=SessionStatus.ACTIVE.value,
+        expires_at=expires_at,
     )
 
     db.add(session)
@@ -169,7 +297,8 @@ async def create_or_get_session_shared(
     logger.info(
         "Created new session",
         session_id=session.session_id,
-        user_id=request.user_id,
+        user_id=canonical_user_id,
+        original_user_id=request.user_id,
     )
     return SessionResponse.model_validate(session)
 
@@ -307,13 +436,12 @@ async def _start_pod_polling_task(pod_name: str) -> None:
     This task polls the database for responses where pod_name matches this pod
     and request_id is in the _response_futures_registry.
     """
-    global _pod_polling_task, _pod_name
+    global _pod_polling_task
 
     if _pod_polling_task and not _pod_polling_task.done():
         logger.warning("Pod polling task already running")
         return
 
-    _pod_name = pod_name
     _pod_polling_task = asyncio.create_task(_pod_response_poller(pod_name))
     logger.info(
         "Started single per-pod polling task",
@@ -526,6 +654,34 @@ class UnifiedRequestProcessor:
         normalized_request = normalizer.normalize_request(
             request, session_id, current_agent_id
         )
+
+        # For llama-stack and agent-service, we need to use email instead of canonical UUID
+        # Look up user email from canonical user_id and replace in NormalizedRequest
+        try:
+            from shared_models.models import User
+            from shared_models.user_utils import is_uuid
+            from sqlalchemy import select
+
+            # Only look up email if user_id is a UUID (canonical user_id)
+            if is_uuid(normalized_request.user_id):
+                stmt = select(User).where(User.user_id == normalized_request.user_id)
+                result = await db.execute(stmt)
+                user = result.scalar_one_or_none()
+                if user and user.primary_email:
+                    user_email = str(user.primary_email)
+                    # Replace UUID with email for llama-stack/agent-service communication
+                    normalized_request.user_id = user_email
+                    logger.debug(
+                        "Replaced canonical user_id with email for agent-service",
+                        canonical_user_id=request.user_id,
+                        user_email=user_email,
+                    )
+        except Exception as e:
+            logger.warning(
+                "Failed to retrieve user email for normalization",
+                user_id=normalized_request.user_id,
+                error=str(e),
+            )
 
         # Create initial RequestLog entry for tracking
         await self._create_request_log_entry(

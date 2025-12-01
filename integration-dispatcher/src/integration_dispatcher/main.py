@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from shared_models import (
+    DatabaseUtils,
     EventTypes,
     HealthChecker,
     configure_logging,
@@ -20,6 +21,7 @@ from shared_models import (
     get_db_session_dependency,
     get_enum_value,
     parse_cloudevent_from_request,
+    resolve_canonical_user_id,
 )
 from shared_models.models import (
     DeliveryLog,
@@ -116,43 +118,16 @@ class IntegrationDispatcher:
             slack_channel = request.template_variables.get("slack_channel")
             if slack_channel:
                 context["slack_channel"] = slack_channel
-                logger.info(
-                    "Found Slack channel in template variables",
-                    user_id=user_id,
-                    slack_channel=slack_channel,
-                )
 
             # Look for Slack user ID in template variables
             slack_user_id = request.template_variables.get("slack_user_id")
-            logger.info(
-                "Checking template variables for slack_user_id",
-                user_id=user_id,
-                template_variables=request.template_variables,
-                slack_user_id=slack_user_id,
-            )
             if slack_user_id:
                 context["slack_user_id"] = slack_user_id
-                logger.info(
-                    "Found Slack user ID in template variables",
-                    user_id=user_id,
-                    slack_user_id=slack_user_id,
-                )
-            else:
-                logger.warning(
-                    "No slack_user_id found in template variables",
-                    user_id=user_id,
-                    template_variables=request.template_variables,
-                )
 
             # Look for email address in template variables (from integration context)
             email_from = request.template_variables.get("email_from")
             if email_from:
                 context["email_from"] = email_from
-                logger.info(
-                    "Found email address in template variables",
-                    user_id=user_id,
-                    email_from=email_from,
-                )
 
         # Get smart defaults for all enabled integrations (no database persistence)
         smart_defaults = await integration_defaults_service.get_smart_defaults(
@@ -522,8 +497,6 @@ async def _integration_health_logic(db: AsyncSession) -> Dict[str, Any]:
     if IntegrationType.EMAIL in dispatcher.handlers:
         email_handler = dispatcher.handlers[IntegrationType.EMAIL]
         # Type check to ensure it's EmailIntegrationHandler
-        from .integrations.email import EmailIntegrationHandler
-
         if isinstance(email_handler, EmailIntegrationHandler):
             email_capabilities = {
                 "sending": await email_handler.health_check_sending(),
@@ -666,8 +639,6 @@ async def handle_cloudevent(
 
         # ✅ ATOMIC EVENT CLAIMING: Use check-and-set pattern to prevent duplicate processing
         # This provides 100% guarantee - only one pod can claim and process an event
-        from shared_models import DatabaseUtils
-
         event_claimed = await DatabaseUtils.try_claim_event_for_processing(
             db,
             event_id,
@@ -727,6 +698,39 @@ async def handle_cloudevent(
         request_id = response_data.get("request_id")
         session_id = response_data.get("session_id")
 
+        # Validate required fields - session_id is required for all agent responses
+        if not request_id:
+            logger.error("Missing request_id in CloudEvent response data")
+            return await create_cloudevent_response(
+                status="error",
+                message="Missing required field: request_id",
+                details={"event_id": event_id},
+            )
+
+        if not session_id:
+            logger.error(
+                "Missing session_id in CloudEvent response data",
+                request_id=request_id,
+                response_data_keys=list(response_data.keys()),
+            )
+            return await create_cloudevent_response(
+                status="error",
+                message="Missing required field: session_id (all agent responses must be tied to a session)",
+                details={"event_id": event_id, "request_id": request_id},
+            )
+
+        if not response_data.get("content"):
+            logger.error(
+                "Missing content in CloudEvent response data",
+                request_id=request_id,
+                session_id=session_id,
+            )
+            return await create_cloudevent_response(
+                status="error",
+                message="Missing required field: content",
+                details={"event_id": event_id, "request_id": request_id},
+            )
+
         logger.info(
             "Parsing CloudEvent data",
             request_id=request_id,
@@ -735,11 +739,19 @@ async def handle_cloudevent(
             agent_id=response_data.get("agent_id"),
         )
 
-        # Create delivery request
+        # Resolve user_id to canonical user_id if it's an email address
+        original_user_id = response_data.get("user_id")
+        canonical_user_id = await resolve_canonical_user_id(
+            original_user_id,
+            integration_type=None,
+            db=db,
+        )
+
+        # Create delivery request - session_id is guaranteed to be present after validation above
         delivery_request = DeliveryRequest(
-            request_id=response_data.get("request_id"),
-            session_id=response_data.get("session_id"),
-            user_id=response_data.get("user_id"),
+            request_id=request_id,
+            session_id=session_id,
+            user_id=canonical_user_id,
             subject=response_data.get("subject"),
             content=response_data.get("content"),
             template_variables=response_data.get("template_variables", {}),
@@ -751,6 +763,7 @@ async def handle_cloudevent(
             request_id=delivery_request.request_id,
             session_id=delivery_request.session_id,
             user_id=delivery_request.user_id,
+            original_user_id=original_user_id,
             agent_id=delivery_request.agent_id,
             content_length=(
                 len(delivery_request.content) if delivery_request.content else 0
@@ -774,8 +787,6 @@ async def handle_cloudevent(
 
         # ✅ UPDATE EVENT PROCESSING STATUS (event was already claimed)
         if event_id:
-            from shared_models import DatabaseUtils
-
             await DatabaseUtils.update_processed_event(
                 db,
                 event_id,
@@ -821,8 +832,6 @@ async def handle_cloudevent(
 
         # ✅ UPDATE EVENT PROCESSING STATUS (event was already claimed)
         if event_id:
-            from shared_models import DatabaseUtils
-
             request_id = event_data.get("request_id")
             session_id = event_data.get("session_id")
 
@@ -853,20 +862,60 @@ async def handle_direct_delivery(
         delivery_data = json.loads(body)
         logger.debug("Delivery data received", delivery_data=delivery_data)
 
+        request_id = delivery_data.get("request_id")
+        session_id = delivery_data.get("session_id")
+
         logger.info(
             "Direct delivery request received",
-            request_id=delivery_data.get("request_id"),
-            session_id=delivery_data.get("session_id"),
+            request_id=request_id,
+            session_id=session_id,
             user_id=delivery_data.get("user_id"),
         )
 
-        # Create delivery request from the payload using shared model
-        from shared_models.models import DeliveryRequest
+        # Validate required fields - session_id is required for all deliveries
+        if not request_id:
+            logger.error("Missing request_id in direct delivery request")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing required field: request_id",
+            )
 
+        if not session_id:
+            logger.error(
+                "Missing session_id in direct delivery request",
+                request_id=request_id,
+                delivery_data_keys=list(delivery_data.keys()),
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing required field: session_id (all deliveries must be tied to a session)",
+            )
+
+        if not delivery_data.get("content"):
+            logger.error(
+                "Missing content in direct delivery request",
+                request_id=request_id,
+                session_id=session_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing required field: content",
+            )
+
+        # Resolve user_id to canonical user_id if it's an email address
+        original_user_id = delivery_data.get("user_id")
+        canonical_user_id = await resolve_canonical_user_id(
+            original_user_id,
+            integration_type=None,
+            db=db,
+        )
+
+        # Create delivery request from the payload using shared model
+        # session_id is guaranteed to be present after validation above
         delivery_request = DeliveryRequest(
-            request_id=delivery_data.get("request_id"),
-            session_id=delivery_data.get("session_id"),
-            user_id=delivery_data.get("user_id"),
+            request_id=request_id,
+            session_id=session_id,
+            user_id=canonical_user_id,
             agent_id=delivery_data.get("agent_id"),
             subject=delivery_data.get("subject"),
             content=delivery_data.get("content"),
@@ -878,6 +927,7 @@ async def handle_direct_delivery(
             "About to dispatch delivery request",
             request_id=delivery_request.request_id,
             user_id=delivery_request.user_id,
+            original_user_id=original_user_id,
             agent_id=delivery_request.agent_id,
         )
 
@@ -1282,7 +1332,16 @@ async def handle_slack_interactive(request: Request) -> Dict[str, Any]:
             payload_json = form_data
 
         data = json.loads(payload_json)
-        payload = SlackInteractionPayload(**data)
+
+        try:
+            payload = SlackInteractionPayload(**data)
+        except Exception as parse_error:
+            logger.error(
+                "Failed to parse Slack interaction payload",
+                error=str(parse_error),
+                error_type=type(parse_error).__name__,
+            )
+            raise
 
         # Handle interaction
         if payload.type == "block_actions":
@@ -1296,10 +1355,23 @@ async def handle_slack_interactive(request: Request) -> Dict[str, Any]:
         return {"text": "Unknown interaction"}
 
     except json.JSONDecodeError as e:
-        logger.error("Invalid JSON in Slack interaction", error=str(e))
+        logger.error(
+            "Invalid JSON in Slack interaction",
+            error=str(e),
+            error_type=type(e).__name__,
+            exc_info=True,
+        )
         raise HTTPException(status_code=400, detail="Invalid JSON")
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 403 from signature verification)
+        raise
     except Exception as e:
-        logger.error("Error handling Slack interaction", error=str(e))
+        logger.error(
+            "Error handling Slack interaction",
+            error=str(e),
+            error_type=type(e).__name__,
+            exc_info=True,
+        )
         raise HTTPException(status_code=500, detail="Internal server error")
 
 

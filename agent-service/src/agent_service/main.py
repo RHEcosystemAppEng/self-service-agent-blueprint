@@ -451,15 +451,42 @@ class AgentService:
 
                 # Create response with automatic timing calculation
                 if session_manager.current_agent_name is None:
-                    logger.error(
-                        "Cannot create agent response - no agent assigned",
+                    logger.warning(
+                        "No agent assigned after processing message - retrying with routing session",
                         request_id=request.request_id,
                         session_id=request.session_id,
                     )
-                    return self._create_error_response(
-                        request=request,
-                        content="Error: No agent assigned to handle this request",
-                    )
+                    # Retry processing the message - this should create a routing session
+                    # if one doesn't exist (handle_responses_message handles session creation)
+                    try:
+                        response_content = (
+                            await session_manager.handle_responses_message(
+                                text=request.content,
+                                request_manager_session_id=request.session_id,
+                            )
+                        )
+                        # Check again after retry
+                        if session_manager.current_agent_name is None:
+                            logger.error(
+                                "No agent assigned after retry - cannot process request",
+                                request_id=request.request_id,
+                                session_id=request.session_id,
+                            )
+                            return self._create_error_response(
+                                request=request,
+                                content="Error: No agent assigned to handle this request",
+                            )
+                    except Exception as e:
+                        logger.error(
+                            "Exception while retrying message processing",
+                            request_id=request.request_id,
+                            session_id=request.session_id,
+                            error=str(e),
+                        )
+                        return self._create_error_response(
+                            request=request,
+                            content="Error: No agent assigned to handle this request",
+                        )
 
                 return self._create_agent_response(
                     request=request,

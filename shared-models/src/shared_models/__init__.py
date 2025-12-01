@@ -54,6 +54,13 @@ from .logging import (
 # Export security utilities
 from .security import verify_slack_signature
 
+# Export user utilities
+from .user_utils import (
+    get_or_create_canonical_user,
+    is_uuid,
+    resolve_canonical_user_id,
+)
+
 # Export utilities
 from .utils import generate_fallback_user_id, get_enum_value
 
@@ -67,6 +74,9 @@ __all__ = [
     "create_cloudevent_response",
     "get_enum_value",
     "generate_fallback_user_id",
+    "get_or_create_canonical_user",
+    "is_uuid",
+    "resolve_canonical_user_id",
     "CloudEventHandler",
     "DatabaseConfig",
     "DatabaseHealthChecker",

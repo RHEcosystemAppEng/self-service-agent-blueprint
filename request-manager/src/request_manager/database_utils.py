@@ -150,23 +150,22 @@ async def record_processed_event(
 async def cleanup_old_sessions(
     db: AsyncSession,
     user_id: str,
-    integration_type: str,
-    keep_recent_count: int = 1,
-    max_age_hours: int = 24,
+    integration_type: Optional[str] = None,
 ) -> int:
-    """Clean up old sessions for a user.
+    """Clean up duplicate sessions for a user, keeping only the most recent one.
+
+    Session expiration is handled separately via the expires_at field and timeoutHours configuration.
+    This function only handles duplicate cleanup when multiple active sessions exist.
 
     Args:
         db: Database session
         user_id: User ID to clean up sessions for
-        integration_type: Integration type to filter by
-        keep_recent_count: Number of most recent sessions to keep active
-        max_age_hours: Maximum age in hours before sessions are considered old
+        integration_type: Integration type to filter by. If None, cleans up across all integration types.
 
     Returns:
         Number of sessions deactivated
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone
 
     from shared_models import configure_logging
     from shared_models.models import RequestSession, SessionStatus
@@ -176,42 +175,51 @@ async def cleanup_old_sessions(
 
     try:
         # Find all active sessions for the user
+        where_conditions = [
+            RequestSession.user_id == user_id,
+            RequestSession.status == SessionStatus.ACTIVE.value,
+        ]
+
+        # Optionally filter by integration type
+        if integration_type is not None:
+            where_conditions.append(RequestSession.integration_type == integration_type)
+
         stmt = (
             select(RequestSession)
-            .where(
-                RequestSession.user_id == user_id,
-                RequestSession.integration_type == integration_type,
-                RequestSession.status == SessionStatus.ACTIVE.value,
-            )
+            .where(*where_conditions)
             .order_by(RequestSession.last_request_at.desc())
         )
 
         result = await db.execute(stmt)
         all_sessions = result.scalars().all()
 
-        if len(all_sessions) <= keep_recent_count:
-            return 0  # No cleanup needed
+        if len(all_sessions) <= 1:
+            return 0  # No cleanup needed - only one or zero sessions
 
-        # Calculate cutoff time for old sessions
-        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
-
-        # Find sessions to deactivate (old sessions beyond the keep count)
+        # Find sessions to deactivate (keep only the most recent one)
         sessions_to_deactivate = []
         for i, session in enumerate(all_sessions):
-            if i >= keep_recent_count or session.last_request_at < cutoff_time:
+            if i >= 1:  # Keep the first (most recent) session, deactivate the rest
                 sessions_to_deactivate.append(session.session_id)
 
         if not sessions_to_deactivate:
             return 0
 
         # Deactivate old sessions
+        deactivate_where_conditions = [
+            RequestSession.session_id.in_(sessions_to_deactivate),
+            RequestSession.user_id == user_id,
+        ]
+
+        # Optionally filter by integration type in deactivate statement
+        if integration_type is not None:
+            deactivate_where_conditions.append(
+                RequestSession.integration_type == integration_type
+            )
+
         deactivate_stmt = (
             update(RequestSession)
-            .where(
-                RequestSession.session_id.in_(sessions_to_deactivate),
-                RequestSession.user_id == user_id,
-                RequestSession.integration_type == integration_type,
-            )
+            .where(*deactivate_where_conditions)
             .values(
                 status=SessionStatus.INACTIVE.value,
                 updated_at=datetime.now(timezone.utc),
@@ -222,13 +230,11 @@ async def cleanup_old_sessions(
         await db.commit()
 
         logger.info(
-            "Cleaned up old sessions",
+            "Cleaned up duplicate sessions",
             user_id=user_id,
-            integration_type=integration_type,
+            integration_type=integration_type if integration_type else "all",
             deactivated_count=len(sessions_to_deactivate),
             deactivated_session_ids=sessions_to_deactivate,
-            keep_recent_count=keep_recent_count,
-            max_age_hours=max_age_hours,
         )
 
         return len(sessions_to_deactivate)
@@ -237,7 +243,118 @@ async def cleanup_old_sessions(
         logger.error(
             "Failed to cleanup old sessions",
             user_id=user_id,
-            integration_type=integration_type,
+            integration_type=integration_type if integration_type else "all",
             error=str(e),
         )
+        return 0
+
+
+async def delete_inactive_sessions(
+    db: AsyncSession,
+    older_than_days: int = 30,
+) -> int:
+    """Delete inactive sessions older than specified days.
+
+    Args:
+        db: Database session
+        older_than_days: Delete inactive sessions older than this many days (default: 30)
+
+    Returns:
+        Number of sessions deleted
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from shared_models import configure_logging
+    from shared_models.models import RequestSession, SessionStatus
+    from sqlalchemy import delete
+
+    logger = configure_logging("request-manager")
+
+    try:
+        # Calculate cutoff time
+        cutoff_time = datetime.now(timezone.utc) - timedelta(days=older_than_days)
+
+        # Delete inactive sessions older than cutoff
+        stmt = delete(RequestSession).where(
+            RequestSession.status == SessionStatus.INACTIVE.value,
+            RequestSession.updated_at < cutoff_time,
+        )
+
+        result = await db.execute(stmt)
+        deleted_count = result.rowcount
+        await db.commit()
+
+        logger.info(
+            "Deleted inactive sessions",
+            deleted_count=deleted_count,
+            older_than_days=older_than_days,
+            cutoff_time=cutoff_time.isoformat(),
+        )
+
+        return deleted_count
+
+    except Exception as e:
+        logger.error(
+            "Failed to delete inactive sessions",
+            error=str(e),
+            older_than_days=older_than_days,
+        )
+        await db.rollback()
+        return 0
+
+
+async def expire_old_sessions(
+    db: AsyncSession,
+) -> int:
+    """Expire sessions that have passed their expiration time.
+
+    Args:
+        db: Database session
+
+    Returns:
+        Number of sessions expired
+    """
+    from datetime import datetime, timezone
+
+    from shared_models import configure_logging
+    from shared_models.models import RequestSession, SessionStatus
+    from sqlalchemy import update
+
+    logger = configure_logging("request-manager")
+
+    try:
+        now = datetime.now(timezone.utc)
+
+        # Expire active sessions that have passed their expiration time
+        stmt = (
+            update(RequestSession)
+            .where(
+                RequestSession.status == SessionStatus.ACTIVE.value,
+                RequestSession.expires_at.isnot(None),
+                RequestSession.expires_at <= now,
+            )
+            .values(
+                status=SessionStatus.INACTIVE.value,
+                updated_at=now,
+            )
+        )
+
+        result = await db.execute(stmt)
+        expired_count = result.rowcount
+        await db.commit()
+
+        if expired_count > 0:
+            logger.info(
+                "Expired old sessions",
+                expired_count=expired_count,
+            )
+
+        return expired_count
+
+    except Exception as e:
+        logger.error(
+            "Failed to expire old sessions",
+            error=str(e),
+        )
+        await db.rollback()
         return 0

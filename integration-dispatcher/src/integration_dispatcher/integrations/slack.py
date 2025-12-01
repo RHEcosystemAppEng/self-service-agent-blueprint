@@ -242,6 +242,15 @@ class SlackIntegrationHandler(BaseIntegrationHandler):
         """Build Slack message blocks."""
         blocks: list[Dict[str, Any]] = []
 
+        # Log session_id for debugging
+        logger.debug(
+            "Building Slack message blocks",
+            request_id=request.request_id,
+            session_id=request.session_id,
+            has_session_id=bool(request.session_id),
+            agent_id=request.agent_id,
+        )
+
         # Main content block
         blocks.append(
             {
@@ -254,31 +263,77 @@ class SlackIntegrationHandler(BaseIntegrationHandler):
         )
 
         # Agent info if enabled
+        context_elements: list[Dict[str, str]] = []
         if config.get("include_agent_info") and request.agent_id:
-            elements: list[Dict[str, str]] = [
+            context_elements.append(
                 {
                     "type": "mrkdwn",
                     "text": f"_Response from agent: {request.agent_id}_",
                 }
-            ]
+            )
+
+        # Add session_id in same style as agent info for debugging/visibility
+        # Always show if present, regardless of other conditions
+        message_session_id = request.session_id
+        if message_session_id and message_session_id.strip():
+            context_elements.append(
+                {
+                    "type": "mrkdwn",
+                    "text": f"_Session ID: {message_session_id}_",
+                }
+            )
+            logger.info(
+                "Added session_id to Slack message context",
+                session_id=message_session_id,
+                request_id=request.request_id,
+                session_id_type=type(message_session_id).__name__,
+                session_id_length=len(message_session_id),
+            )
+        else:
+            logger.warning(
+                "Session ID missing or empty in DeliveryRequest",
+                request_id=request.request_id,
+                has_session_id=bool(message_session_id),
+                session_id_value=message_session_id,
+                session_id_type=(
+                    type(message_session_id).__name__ if message_session_id else None
+                ),
+            )
+
+        # Add context block if we have any elements
+        if context_elements:
             blocks.append(
                 {
                     "type": "context",
-                    "elements": elements,
+                    "elements": context_elements,
                 }
             )
 
         # Only add buttons for final AI responses (not for acknowledgments/processing messages)
-        if request.agent_id and not self._is_system_message(content):
+        # Also require session_id to be present and non-empty - buttons won't work without it
+        if (
+            request.agent_id
+            and request.session_id
+            and request.session_id.strip()
+            and not self._is_system_message(content)
+        ):
             # Add divider
             blocks.append({"type": "divider"})
 
             # Action buttons
+            button_session_id = request.session_id
+            logger.info(
+                "Creating View Session button",
+                request_id=request.request_id,
+                session_id=button_session_id,
+                session_id_length=len(button_session_id) if button_session_id else 0,
+                session_id_in_message=button_session_id in str(context_elements),
+            )
             buttons = [
                 {
                     "type": "button",
                     "text": {"type": "plain_text", "text": "📋 View Session"},
-                    "value": request.session_id,
+                    "value": button_session_id,
                     "action_id": "view_session",
                     "style": "primary",
                 }
@@ -298,6 +353,17 @@ class SlackIntegrationHandler(BaseIntegrationHandler):
             )
 
             blocks.append({"type": "actions", "elements": buttons})
+        elif request.agent_id and (
+            not request.session_id or not request.session_id.strip()
+        ):
+            # Log warning if we have agent_id but no valid session_id (buttons won't work)
+            logger.warning(
+                "Cannot add session buttons: session_id is missing or empty",
+                request_id=request.request_id,
+                agent_id=request.agent_id,
+                has_session_id=bool(request.session_id),
+                session_id_length=len(request.session_id) if request.session_id else 0,
+            )
 
         return blocks
 
