@@ -13,7 +13,6 @@ from shared_models.models import (
     RequestSession,
     SessionStatus,
 )
-from shared_models.user_utils import is_uuid
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -670,38 +669,10 @@ class ResponsesSessionManager(BaseSessionManager):
 
         # Extract parameters from kwargs
         resume_thread_id = kwargs.get("resume_thread_id")
-        # Determine authoritative_user_id for employee lookup (ServiceNow requires email addresses)
-        # Priority: 1) explicitly provided, 2) user_email if available, 3) user_id if it's an email (not UUID)
-        authoritative_user_id = kwargs.get("authoritative_user_id")
-        if authoritative_user_id is None:
-            # Always prefer user_email if available (most explicit/authoritative source)
-            if self.user_email:
-                authoritative_user_id = self.user_email
-                logger.debug(
-                    "Using user_email as authoritative_user_id",
-                    user_email=self.user_email,
-                )
-            # Fallback to user_id only if it's not a UUID (i.e., it's already an email address)
-            elif self.user_id and not is_uuid(self.user_id):
-                authoritative_user_id = self.user_id
-                logger.debug(
-                    "Using user_id as authoritative_user_id (not a UUID)",
-                    user_id=self.user_id,
-                )
-            else:
-                # If user_id is a UUID and we have no email, authoritative_user_id will be None
-                # This will cause the MCP server to raise an error, which is the correct behavior
-                logger.warning(
-                    "No email available for authoritative_user_id - user_id is UUID or missing",
-                    user_id=self.user_id,
-                    user_email=self.user_email,
-                    is_uuid=is_uuid(self.user_id) if self.user_id else False,
-                )
-        else:
-            logger.debug(
-                "Using provided authoritative_user_id from kwargs",
-                authoritative_user_id=authoritative_user_id,
-            )
+        # Use user_id as authoritative_user_id for employee lookup, fallback to user_email if available
+        authoritative_user_id = kwargs.get(
+            "authoritative_user_id", self.user_id or self.user_email
+        )
 
         # Use provided thread_id for resumption or generate a new one
         if resume_thread_id:
