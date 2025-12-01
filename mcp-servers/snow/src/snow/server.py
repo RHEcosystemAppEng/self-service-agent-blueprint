@@ -242,24 +242,24 @@ def get_employee_laptop_info(
         >>> get_employee_laptop_info(ctx)
         # Returns laptop info for alice.johnson@company.com
     """
-    # Extract authoritative user ID from request headers - CENTRALIZED HANDLING
-    authoritative_user_id = headers.extract_authoritative_user_id(ctx)
-    api_token = headers.extract_servicenow_token(ctx)
+    try:
+        # Extract authoritative user ID from request headers - CENTRALIZED HANDLING
+        authoritative_user_id = headers.extract_authoritative_user_id(ctx)
+        api_token = headers.extract_servicenow_token(ctx)
 
-    if not authoritative_user_id:
-        raise ValueError(
-            "Authoritative user ID not found in request headers. Ensure AUTHORITATIVE_USER_ID header is set."
+        if not authoritative_user_id:
+            raise ValueError(
+                "Authoritative user ID not found in request headers. Ensure AUTHORITATIVE_USER_ID header is set."
+            )
+
+        # Get laptop info from ServiceNow instance
+        # (which could be real ServiceNow or mock server based on SERVICENOW_INSTANCE_URL)
+        logger.info(
+            "Getting laptop info from ServiceNow",
+            tool="get_employee_laptop_info",
+            authoritative_user_id=authoritative_user_id,
         )
 
-    # Get laptop info from ServiceNow instance
-    # (which could be real ServiceNow or mock server based on SERVICENOW_INSTANCE_URL)
-    logger.info(
-        "Getting laptop info from ServiceNow",
-        tool="get_employee_laptop_info",
-        authoritative_user_id=authoritative_user_id,
-    )
-
-    try:
         client = ServiceNowClient(
             api_token,
             getattr(mcp, "laptop_refresh_id"),
