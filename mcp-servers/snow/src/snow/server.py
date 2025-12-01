@@ -277,6 +277,7 @@ def get_employee_laptop_info(
             "Returning laptop info for employee",
             tool="get_employee_laptop_info",
             authoritative_user_id=authoritative_user_id,
+            result=result,  # TODO only for debugging
         )
 
         return result
