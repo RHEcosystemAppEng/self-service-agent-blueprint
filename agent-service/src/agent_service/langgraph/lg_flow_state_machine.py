@@ -109,7 +109,7 @@ class StateMachine:
         state: dict[str, Any],
         state_config: dict[str, Any],
         temperature: float,
-        authoritative_user_id: str,
+        authoritative_user_id: str | None,
         allowed_tools: list[str] | None = None,
         action_config: dict[str, Any] | None = None,
         token_context: str | None = None,
@@ -317,14 +317,13 @@ class StateMachine:
         temperature = state_config.get("temperature") or 0.7
         allowed_tools = state_config.get("allowed_tools")
 
-        # Use fallback if authoritative_user_id is not provided
-        user_id = self._get_user_id(authoritative_user_id)
-
+        # Pass authoritative_user_id directly (can be None) - don't convert to "system" for MCP tools
+        # _get_user_id is only for text formatting, not for MCP tool authentication
         response_kwargs = self._build_response_kwargs(
             state,
             state_config,
             temperature,
-            user_id,
+            authoritative_user_id,  # Pass None if no email available - MCP server will error correctly
             allowed_tools,
             token_context=token_context,
         )
@@ -739,12 +738,12 @@ class StateMachine:
         allowed_tools = state_config.get("allowed_tools")
 
         # Build kwargs for create_response_with_retry
-        user_id = self._get_user_id(authoritative_user_id)
+        # Pass authoritative_user_id directly (can be None) - don't convert to "system" for MCP tools
         response_kwargs = self._build_response_kwargs(
             state,
             state_config,
             temperature,
-            user_id,
+            authoritative_user_id,  # Pass None if no email available - MCP server will error correctly
             allowed_tools,
             token_context=token_context,
         )
@@ -786,12 +785,12 @@ class StateMachine:
                     action_allowed_tools = action.get("allowed_tools", allowed_tools)
 
                     # Build kwargs for create_response_with_retry (with action-level config)
-                    user_id = self._get_user_id(authoritative_user_id)
+                    # Pass authoritative_user_id directly (can be None) - don't convert to "system" for MCP tools
                     action_response_kwargs = self._build_response_kwargs(
                         state,
                         state_config,
                         action_temperature,
-                        user_id,
+                        authoritative_user_id,  # Pass None if no email available - MCP server will error correctly
                         action_allowed_tools,
                         action_config=action,
                         token_context=token_context,
@@ -869,12 +868,12 @@ class StateMachine:
         allowed_tools = state_config.get("allowed_tools")
 
         # Build kwargs for create_response_with_retry
-        user_id = self._get_user_id(authoritative_user_id)
+        # Pass authoritative_user_id directly (can be None) - don't convert to "system" for MCP tools
         response_kwargs = self._build_response_kwargs(
             state,
             state_config,
             temperature,
-            user_id,
+            authoritative_user_id,  # Pass None if no email available - MCP server will error correctly
             allowed_tools,
             token_context=token_context,
         )
@@ -894,12 +893,12 @@ class StateMachine:
         validation_messages = [{"role": "user", "content": success_validation_prompt}]
 
         # Build kwargs for validation response
-        user_id = self._get_user_id(authoritative_user_id)
+        # Pass authoritative_user_id directly (can be None) - don't convert to "system" for MCP tools
         validation_kwargs = self._build_response_kwargs(
             state,
             state_config,
             0.1,
-            user_id,
+            authoritative_user_id,  # Pass None if no email available - MCP server will error correctly
             allowed_tools,
             token_context=token_context,
         )

@@ -676,12 +676,23 @@ class UnifiedRequestProcessor:
                         canonical_user_id=request.user_id,
                         user_email=user_email,
                     )
+                else:
+                    # User has no email - leave UUID as-is
+                    # The session_manager will detect it's a UUID and won't use it as authoritative_user_id
+                    # This will cause the MCP server to raise an error when no email is available (correct behavior)
+                    logger.warning(
+                        "User has no email address - cannot perform email-based lookups",
+                        canonical_user_id=normalized_request.user_id,
+                    )
         except Exception as e:
             logger.warning(
                 "Failed to retrieve user email for normalization",
                 user_id=normalized_request.user_id,
                 error=str(e),
             )
+            # If lookup fails and user_id is a UUID, leave it as-is
+            # The session_manager will detect it's a UUID and won't use it as authoritative_user_id
+            # This will cause the MCP server to raise an error when no email is available (correct behavior)
 
         # Create initial RequestLog entry for tracking
         await self._create_request_log_entry(
