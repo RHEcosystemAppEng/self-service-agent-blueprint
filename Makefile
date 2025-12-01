@@ -124,8 +124,9 @@ helm_replica_count_args = \
 	$(if $(REPLICA_COUNT),--set requestManagement.integrationDispatcher.replicas=$(REPLICA_COUNT),) \
 	$(if $(REPLICA_COUNT),--set requestManagement.agentService.replicas=$(REPLICA_COUNT),)
 
+COMMA := ,
 helm_test_users_args = \
-	$(if $(TEST_USERS),--set-string mockServiceNow.testUsers="$(TEST_USERS)",)
+	$(if $(TEST_USERS),--set-string mockServiceNow.testUsers="$(subst $(COMMA),\$(COMMA),$(TEST_USERS))",)
 
 # Version target
 .PHONY: version
