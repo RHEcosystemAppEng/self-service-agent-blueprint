@@ -87,118 +87,6 @@ mcp = FastMCP(
 )
 
 
-def _create_servicenow_ticket(
-    authoritative_user_id: str, preferred_model: str, api_token: str | None = None
-) -> str:
-    """Create a ServiceNow ticket using the API.
-
-    Args:
-        authoritative_user_id: Authoritative user ID from request headers
-        preferred_model: ServiceNow laptop model code
-        api_token: Optional API token from request header
-
-    Returns:
-        ServiceNow ticket creation result message
-    """
-    try:
-        client = ServiceNowClient(
-            api_token,
-            getattr(mcp, "laptop_refresh_id"),
-            getattr(mcp, "laptop_request_limits"),
-            getattr(mcp, "laptop_avoid_duplicates"),
-        )
-
-        # Look up user sys_id by email as currently only email is supported
-        # authoritative user id
-        logger.info(
-            "Looking up sys_id for email",
-            tool="open_laptop_refresh_ticket",
-            email=authoritative_user_id,
-        )
-        user_result = client.get_user_by_email(authoritative_user_id)
-        if user_result.get("success") and user_result.get("user"):
-            user_sys_id = user_result["user"].get("sys_id")
-            if not user_sys_id:
-                raise ValueError(
-                    f"User found but sys_id is missing for email: {authoritative_user_id}"
-                )
-            logger.info(
-                "Found sys_id",
-                tool="open_laptop_refresh_ticket",
-                user_sys_id=user_sys_id,
-            )
-        else:
-            error_msg = user_result.get("message", "Unknown error")
-            raise ValueError(
-                f"Could not find user for email {authoritative_user_id}: {error_msg}"
-            )
-
-        params = OpenServiceNowLaptopRefreshRequestParams(
-            who_is_this_request_for=user_sys_id,
-            laptop_choices=preferred_model,
-        )
-
-        result = client.open_laptop_refresh_request(params)
-
-        # Extract the required fields from the result
-        if result.get("success") and result.get("data", {}).get("result"):
-            logger.info(
-                "ServiceNow API request completed",
-                tool="open_laptop_refresh_ticket",
-                authoritative_user_id=authoritative_user_id,
-                laptop=preferred_model,
-                success=result.get("success", False),
-            )
-
-            result_data = result["data"]["result"]
-            request_number = result_data.get("request_number", "N/A")
-            sys_id = result_data.get("sys_id", "N/A")
-
-            return f"{request_number} opened for employee {authoritative_user_id}. System ID: {sys_id}"
-        else:
-            # Return error message if the request failed
-            error_msg = result.get("message", "Unknown error occurred")
-            return f"Failed to open laptop refresh request for employee {authoritative_user_id}: {error_msg}"
-
-    except Exception as e:
-        error_msg = f"Error opening ServiceNow laptop refresh request: {str(e)}"
-        logger.error(error_msg)
-        raise  # Re-raise to allow fallback handling
-
-
-def _get_servicenow_laptop_info(
-    authoritative_user_id: str, api_token: str | None = None
-) -> str:
-    """Get laptop information from ServiceNow API.
-
-    Note: ServiceNow API currently only supports email-based lookups.
-    If an employee ID is provided, this will likely fail.
-
-    Args:
-        authoritative_user_id: Authoritative user ID from request headers (email or employee ID)
-        api_token: Optional API token from request header
-    Returns:
-        Formatted laptop information string including employee details and hardware specifications
-    """
-    try:
-        client = ServiceNowClient(
-            api_token,
-            getattr(mcp, "laptop_refresh_id"),
-            getattr(mcp, "laptop_request_limits"),
-            getattr(mcp, "laptop_avoid_duplicates"),
-        )
-
-        laptop_info = client.get_employee_laptop_info(authoritative_user_id)
-        if laptop_info:
-            return laptop_info
-        else:
-            return f"Error: Failed to retrieve laptop info for {authoritative_user_id} from ServiceNow"
-    except Exception as e:
-        error_msg = f"Error getting laptop info from ServiceNow: {str(e)}"
-        logger.error(error_msg)
-        raise  # Re-raise to allow fallback handling
-
-
 @mcp.custom_route("/health", methods=["GET"])  # type: ignore
 async def health(request: Any) -> JSONResponse:
     """Health check endpoint."""
@@ -253,9 +141,71 @@ def open_laptop_refresh_ticket(
         authoritative_user_id=authoritative_user_id,
         laptop_code=servicenow_laptop_code,
     )
-    return _create_servicenow_ticket(
-        authoritative_user_id, servicenow_laptop_code, api_token
-    )
+
+    try:
+        client = ServiceNowClient(
+            api_token,
+            getattr(mcp, "laptop_refresh_id"),
+            getattr(mcp, "laptop_request_limits"),
+            getattr(mcp, "laptop_avoid_duplicates"),
+        )
+
+        # Look up user sys_id by email as currently only email is supported
+        # authoritative user id
+        logger.info(
+            "Looking up sys_id for email",
+            tool="open_laptop_refresh_ticket",
+            email=authoritative_user_id,
+        )
+        user_result = client.get_user_by_email(authoritative_user_id)
+        if user_result.get("success") and user_result.get("user"):
+            user_sys_id = user_result["user"].get("sys_id")
+            if not user_sys_id:
+                raise ValueError(
+                    f"User found but sys_id is missing for email: {authoritative_user_id}"
+                )
+            logger.info(
+                "Found sys_id",
+                tool="open_laptop_refresh_ticket",
+                user_sys_id=user_sys_id,
+            )
+        else:
+            error_msg = user_result.get("message", "Unknown error")
+            raise ValueError(
+                f"Could not find user for email {authoritative_user_id}: {error_msg}"
+            )
+
+        params = OpenServiceNowLaptopRefreshRequestParams(
+            who_is_this_request_for=user_sys_id,
+            laptop_choices=servicenow_laptop_code,
+        )
+
+        result = client.open_laptop_refresh_request(params)
+
+        # Extract the required fields from the result
+        if result.get("success") and result.get("data", {}).get("result"):
+            logger.info(
+                "ServiceNow API request completed",
+                tool="open_laptop_refresh_ticket",
+                authoritative_user_id=authoritative_user_id,
+                laptop=servicenow_laptop_code,
+                success=result.get("success", False),
+            )
+
+            result_data = result["data"]["result"]
+            request_number = result_data.get("request_number", "N/A")
+            sys_id = result_data.get("sys_id", "N/A")
+
+            return f"{request_number} opened for employee {authoritative_user_id}. System ID: {sys_id}"
+        else:
+            # Return error message if the request failed
+            error_msg = result.get("message", "Unknown error occurred")
+            return f"Failed to open laptop refresh request for employee {authoritative_user_id}: {error_msg}"
+
+    except Exception as e:
+        error_msg = f"Error opening ServiceNow laptop refresh request: {str(e)}"
+        logger.error(error_msg)
+        raise  # Re-raise to allow fallback handling
 
 
 @mcp.tool()
@@ -309,7 +259,23 @@ def get_employee_laptop_info(
         authoritative_user_id=authoritative_user_id,
     )
 
-    result = _get_servicenow_laptop_info(authoritative_user_id, api_token)
+    try:
+        client = ServiceNowClient(
+            api_token,
+            getattr(mcp, "laptop_refresh_id"),
+            getattr(mcp, "laptop_request_limits"),
+            getattr(mcp, "laptop_avoid_duplicates"),
+        )
+
+        laptop_info = client.get_employee_laptop_info(authoritative_user_id)
+        if laptop_info:
+            result = laptop_info
+        else:
+            result = f"Error: Failed to retrieve laptop info for {authoritative_user_id} from ServiceNow"
+    except Exception as e:
+        error_msg = f"Error getting laptop info from ServiceNow: {str(e)}"
+        logger.error(error_msg)
+        raise  # Re-raise to allow fallback handling
 
     logger.info(
         "Returning laptop info for employee",
