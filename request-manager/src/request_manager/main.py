@@ -56,67 +56,8 @@ logger = configure_logging(SERVICE_NAME)
 auto_tracing_run(SERVICE_NAME, logger)
 
 
-async def _session_cleanup_task() -> None:
-    """Background task to periodically clean up expired and inactive sessions."""
-    import asyncio
-
-    from shared_models import get_database_manager
-
-    cleanup_interval_hours = int(os.getenv("SESSION_CLEANUP_INTERVAL_HOURS", "24"))
-    cleanup_interval_seconds = cleanup_interval_hours * 3600
-    inactive_session_retention_days = int(
-        os.getenv("INACTIVE_SESSION_RETENTION_DAYS", "30")
-    )
-
-    logger.info(
-        "Starting session cleanup task",
-        cleanup_interval_hours=cleanup_interval_hours,
-        inactive_session_retention_days=inactive_session_retention_days,
-    )
-
-    while True:
-        try:
-            await asyncio.sleep(cleanup_interval_seconds)
-
-            db_manager = get_database_manager()
-            async with db_manager.get_session() as db:
-                from .database_utils import (
-                    delete_inactive_sessions,
-                    expire_old_sessions,
-                )
-
-                # First, expire sessions that have passed their expiration time
-                expired_count = await expire_old_sessions(db)
-
-                # Then, delete inactive sessions older than retention period
-                deleted_count = await delete_inactive_sessions(
-                    db, older_than_days=inactive_session_retention_days
-                )
-
-                if expired_count > 0 or deleted_count > 0:
-                    logger.info(
-                        "Session cleanup completed",
-                        expired_count=expired_count,
-                        deleted_count=deleted_count,
-                    )
-
-        except asyncio.CancelledError:
-            logger.info("Session cleanup task cancelled")
-            break
-        except Exception as e:
-            logger.error(
-                "Error in session cleanup task",
-                error=str(e),
-                error_type=type(e).__name__,
-            )
-            # Continue running even on error
-            await asyncio.sleep(60)  # Wait 1 minute before retrying on error
-
-
 async def _request_manager_startup() -> None:
     """Custom startup logic for Request Manager."""
-    import asyncio
-
     # Initialize unified processor
     global unified_processor
     communication_strategy = get_communication_strategy()
@@ -143,10 +84,6 @@ async def _request_manager_startup() -> None:
         logger.warning(
             "Pod name not found in environment (HOSTNAME or POD_NAME) - single pod polling not started"
         )
-
-    # Start session cleanup background task
-    asyncio.create_task(_session_cleanup_task())
-    logger.info("Started session cleanup background task")
 
 
 # Create lifespan using shared utility with custom startup
@@ -656,32 +593,12 @@ async def _handle_request_created_event_from_data(
                 details={"event_id": event_id},
             )
 
-        # Extract session_id if provided (e.g., from X-Session-ID header in email reply, or thread metadata in Slack)
-        # This allows integrations to provide a session_id to continue an existing session
-        provided_session_id = request_data.get("session_id")
-        metadata = request_data.get("metadata", {})
-        if provided_session_id:
-            metadata["session_id"] = provided_session_id
-            logger.info(
-                "Found session_id in request data, will attempt to reuse session",
-                session_id=provided_session_id,
-                integration_type=integration_type_str,
-                user_id=user_id,
-            )
-        else:
-            logger.debug(
-                "No session_id provided in request data, will create or find session by user_id",
-                integration_type=integration_type_str,
-                user_id=user_id,
-                request_data_keys=list(request_data.keys()),
-            )
-
         # Extract common base fields
         base_fields = {
             "user_id": str(user_id),
             "content": str(content),
             "integration_type": integration_type,
-            "metadata": metadata,
+            "metadata": request_data.get("metadata", {}),
         }
 
         # Create request object based on integration type
@@ -811,15 +728,6 @@ async def _handle_agent_response_event_from_data(
             CloudEventHandler.extract_response_data(response_data)
         )
 
-        # Log session_id presence for debugging
-        logger.info(
-            "Extracted response data from CloudEvent",
-            request_id=request_id,
-            session_id=session_id,
-            has_session_id_in_response_data=bool(response_data.get("session_id")),
-            response_data_keys=list(response_data.keys()),
-        )
-
         # Use unified response handler
         response_handler = UnifiedResponseHandler(db)
         result = await response_handler.process_agent_response(
@@ -878,20 +786,6 @@ async def _handle_agent_response_event_from_data(
 
         # Only forward response to Integration Dispatcher if it was actually processed
         if result.get("status") == "processed":
-            # Ensure response_data has session_id before forwarding
-            if "session_id" not in response_data:
-                response_data["session_id"] = session_id
-                logger.warning(
-                    "Added missing session_id to response_data before forwarding",
-                    request_id=request_id,
-                    session_id=session_id,
-                )
-            logger.info(
-                "Forwarding response to Integration Dispatcher",
-                request_id=request_id,
-                session_id=response_data.get("session_id"),
-                has_session_id=bool(response_data.get("session_id")),
-            )
             await _forward_response_to_integration_dispatcher(
                 response_data, result.get("routed_agent") is not None
             )
@@ -1014,13 +908,8 @@ async def _forward_response_to_integration_dispatcher(
         if request_id:
             # Retrieve original request context from RequestLog
             # Get database session
-            from shared_models import resolve_canonical_user_id
             from shared_models.database import get_database_manager
-            from shared_models.models import (
-                IntegrationType,
-                RequestLog,
-                UserIntegrationMapping,
-            )
+            from shared_models.models import RequestLog
             from sqlalchemy import select
 
             db_manager = get_database_manager()
@@ -1047,35 +936,6 @@ async def _forward_response_to_integration_dispatcher(
                         email_from=email_from,
                     )
 
-                    # If no slack_user_id in context, try to look it up from user mappings
-                    if not slack_user_id:
-                        # Resolve user_id to canonical user_id if needed
-                        user_id_from_event = event_data.get("user_id")
-                        if user_id_from_event:
-                            canonical_user_id = await resolve_canonical_user_id(
-                                user_id_from_event,
-                                integration_type=None,
-                                db=db,
-                            )
-
-                            # Look up Slack mapping for this canonical user_id
-                            stmt = select(UserIntegrationMapping).where(
-                                UserIntegrationMapping.user_id == canonical_user_id,
-                                UserIntegrationMapping.integration_type
-                                == IntegrationType.SLACK,
-                            )
-                            result = await db.execute(stmt)
-                            slack_mapping = result.scalar_one_or_none()
-
-                            if slack_mapping:
-                                slack_user_id = slack_mapping.integration_user_id
-                                logger.info(
-                                    "Found Slack user_id from user mapping",
-                                    request_id=request_id,
-                                    canonical_user_id=canonical_user_id,
-                                    slack_user_id=slack_user_id,
-                                )
-
                     if slack_user_id:
                         template_variables["slack_user_id"] = slack_user_id
                         logger.info(
@@ -1085,7 +945,7 @@ async def _forward_response_to_integration_dispatcher(
                         )
                     else:
                         logger.warning(
-                            "No slack_user_id found in integration context or user mappings",
+                            "No slack_user_id found in integration context",
                             request_id=request_id,
                             integration_context=integration_context,
                         )

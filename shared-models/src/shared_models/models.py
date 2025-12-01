@@ -1,6 +1,5 @@
 """Consolidated database models for all services."""
 
-import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -20,7 +19,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import TIMESTAMP, UUID
+from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.orm import relationship
 
 from .base import Base, TimestampMixin
@@ -31,7 +30,6 @@ __all__ = [
     "IntegrationType",
     "SessionStatus",
     "DeliveryStatus",
-    "User",
     "RequestSession",
     "RequestLog",
     "UserIntegrationConfig",
@@ -82,31 +80,6 @@ class DeliveryStatus(str, Enum):
     EXPIRED = "EXPIRED"
 
 
-# User Models
-class User(Base, TimestampMixin):  # type: ignore[misc]
-    """Canonical user identity across all integrations."""
-
-    __tablename__ = "users"
-
-    user_id = Column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
-    primary_email = Column(
-        String(255), nullable=True, unique=True, index=True
-    )  # For display/search - unique to prevent duplicates
-
-    # Relationships
-    integration_mappings = relationship(
-        "UserIntegrationMapping", back_populates="user", cascade="all, delete-orphan"
-    )
-    sessions = relationship(
-        "RequestSession", back_populates="user", cascade="all, delete-orphan"
-    )
-    integration_configs = relationship(
-        "UserIntegrationConfig", back_populates="user", cascade="all, delete-orphan"
-    )
-
-
 # Request Manager Models
 class RequestSession(Base, TimestampMixin):  # type: ignore[misc]
     """User conversation sessions."""
@@ -115,12 +88,7 @@ class RequestSession(Base, TimestampMixin):  # type: ignore[misc]
 
     id = Column(Integer, primary_key=True)
     session_id = Column(String(36), unique=True, nullable=False, index=True)
-    user_id = Column(
-        UUID(as_uuid=False),
-        ForeignKey("users.user_id"),
-        nullable=False,
-        index=True,
-    )
+    user_id = Column(String(255), nullable=False, index=True)
     integration_type: Column[IntegrationType] = Column(
         SQLEnum(IntegrationType), nullable=False
     )
@@ -160,7 +128,6 @@ class RequestSession(Base, TimestampMixin):  # type: ignore[misc]
     max_total_tokens_per_call = Column(Integer, default=0, nullable=False)
 
     # Relationships
-    user = relationship("User", back_populates="sessions")
     request_logs = relationship(
         "RequestLog", back_populates="session", cascade="all, delete-orphan"
     )
@@ -214,12 +181,7 @@ class UserIntegrationConfig(Base, TimestampMixin):  # type: ignore[misc]
     __tablename__ = "user_integration_configs"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(
-        UUID(as_uuid=False),
-        ForeignKey("users.user_id"),
-        nullable=False,
-        index=True,
-    )
+    user_id = Column(String(255), nullable=False, index=True)
     integration_type: Column[IntegrationType] = Column(
         SQLEnum(IntegrationType), nullable=False
     )
@@ -237,7 +199,6 @@ class UserIntegrationConfig(Base, TimestampMixin):  # type: ignore[misc]
     created_by = Column(String(255))  # Who configured this integration
 
     # Relationships
-    user = relationship("User", back_populates="integration_configs")
     delivery_logs = relationship(
         "DeliveryLog", back_populates="integration_config", cascade="all, delete-orphan"
     )
@@ -281,12 +242,7 @@ class DeliveryLog(Base, TimestampMixin):  # type: ignore[misc]
     # Request/session context
     request_id = Column(String(36), nullable=False, index=True)
     session_id = Column(String(36), nullable=False, index=True)
-    user_id = Column(
-        UUID(as_uuid=False),
-        ForeignKey("users.user_id"),
-        nullable=False,
-        index=True,
-    )
+    user_id = Column(String(255), nullable=False, index=True)
 
     # Integration details
     integration_config_id = Column(
@@ -380,20 +336,12 @@ class IntegrationCredential(Base, TimestampMixin):  # type: ignore[misc]
 
 
 class UserIntegrationMapping(Base, TimestampMixin):  # type: ignore[misc]
-    """Mapping between canonical users and integration-specific user IDs."""
+    """Mapping between user emails and integration-specific user IDs."""
 
     __tablename__ = "user_integration_mappings"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(
-        UUID(as_uuid=False),
-        ForeignKey("users.user_id"),
-        nullable=False,
-        index=True,
-    )
-    user_email = Column(
-        String(255), nullable=False, index=True
-    )  # For search/backward compatibility
+    user_email = Column(String(255), nullable=False, index=True)
     integration_type: Column[IntegrationType] = Column(
         SQLEnum(IntegrationType), nullable=False
     )
@@ -407,26 +355,10 @@ class UserIntegrationMapping(Base, TimestampMixin):  # type: ignore[misc]
     # Metadata
     created_by = Column(String(255), default="system")
 
-    # Relationships
-    user = relationship("User", back_populates="integration_mappings")
-
-    # Ensure one mapping per user per integration type
-    # Also ensure one mapping per integration_user_id per integration type (prevents conflicts)
-    # Also allow lookup by integration_user_id + integration_type
+    # Ensure one mapping per email per integration type
     __table_args__ = (
         UniqueConstraint(
-            "user_id", "integration_type", name="uq_user_integration_mapping"
-        ),
-        UniqueConstraint(
-            "integration_user_id",
-            "integration_type",
-            name="uq_integration_user_id_type",
-        ),
-        Index("ix_user_integration_mapping_user_type", "user_id", "integration_type"),
-        Index(
-            "ix_user_integration_mapping_integration",
-            "integration_user_id",
-            "integration_type",
+            "user_email", "integration_type", name="uq_user_integration_mapping"
         ),
         Index(
             "ix_user_integration_mapping_email_type", "user_email", "integration_type"

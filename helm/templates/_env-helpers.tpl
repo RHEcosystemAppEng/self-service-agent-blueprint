@@ -126,15 +126,6 @@ Generate Request Manager specific environment variables
   value: "{{ include "self-service-agent.fullname" . }}-agent-service"
 - name: AGENT_SERVICE_PORT
   value: "80"
-{{/* Session Management Configuration */}}
-- name: SESSION_PER_INTEGRATION_TYPE
-  value: {{ if and (hasKey .Values.requestManagement "requestManager") (hasKey .Values.requestManagement.requestManager "sessions") (hasKey .Values.requestManagement.requestManager.sessions "perIntegrationType") }}{{ .Values.requestManagement.requestManager.sessions.perIntegrationType | quote }}{{ else }}"false"{{ end }}
-- name: SESSION_TIMEOUT_HOURS
-  value: {{ if and (hasKey .Values.requestManagement "requestManager") (hasKey .Values.requestManagement.requestManager "sessions") (hasKey .Values.requestManagement.requestManager.sessions "timeoutHours") }}{{ .Values.requestManagement.requestManager.sessions.timeoutHours | quote }}{{ else }}"336"{{ end }}
-- name: SESSION_CLEANUP_INTERVAL_HOURS
-  value: {{ if and (hasKey .Values.requestManagement "requestManager") (hasKey .Values.requestManagement.requestManager "sessions") (hasKey .Values.requestManagement.requestManager.sessions "cleanupIntervalHours") }}{{ .Values.requestManagement.requestManager.sessions.cleanupIntervalHours | quote }}{{ else }}"24"{{ end }}
-- name: INACTIVE_SESSION_RETENTION_DAYS
-  value: {{ if and (hasKey .Values.requestManagement "requestManager") (hasKey .Values.requestManagement.requestManager "sessions") (hasKey .Values.requestManagement.requestManager.sessions "inactiveRetentionDays") }}{{ .Values.requestManagement.requestManager.sessions.inactiveRetentionDays | quote }}{{ else }}"30"{{ end }}
 {{- end }}
 
 {{/*

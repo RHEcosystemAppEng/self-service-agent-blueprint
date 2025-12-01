@@ -28,7 +28,7 @@ testIntegrationEnabled: false
 # Database Configuration
 database:
   # Expected migration version that services should wait for
-  expectedMigrationVersion: "007"
+  expectedMigrationVersion: "006"
   
   # Database connection URL - leave empty to use default pgvector service
   # Format: postgresql://username:password@host:port/database
@@ -325,17 +325,6 @@ requestManagement:
     replicas: 1
     uvicornWorkers: 4
     resources: {}
-    # Session Management Configuration
-    sessions:
-      # Set to "true" to maintain separate sessions per integration type (legacy behavior)
-      # Set to "false" to maintain a single session across all integration types (default)
-      perIntegrationType: "false"
-      # Session timeout in hours - sessions expire after this time (default: 336 hours = 2 weeks)
-      timeoutHours: 336
-      # How often to run session cleanup task in hours (default: 24 hours)
-      cleanupIntervalHours: 24
-      # How many days to retain inactive sessions before deletion (default: 30 days)
-      inactiveRetentionDays: 30
     # External Access Configuration
     externalAccess:
       enabled: false  # Set to true to create external access via OpenShift Route
