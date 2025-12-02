@@ -114,35 +114,35 @@ def open_laptop_refresh_ticket(
     Returns:
         A formatted string containing the ticket details
     """
-    if not employee_name:
-        raise ValueError("Employee name cannot be empty")
-
-    if not business_justification:
-        raise ValueError("Business justification cannot be empty")
-
-    if not servicenow_laptop_code:
-        raise ValueError(
-            "ServiceNow laptop code cannot be empty. Must be a valid ServiceNow laptop choice code like 'apple_mac_book_air_m_3'."
-        )
-
-    authoritative_user_id = headers.extract_authoritative_user_id(ctx)
-    api_token = headers.extract_servicenow_token(ctx)
-
-    if not authoritative_user_id:
-        raise ValueError(
-            "Authoritative user ID not found in request headers. Ensure AUTHORITATIVE_USER_ID header is set."
-        )
-
-    # Create ServiceNow ticket using the configured ServiceNow instance
-    # (which could be real ServiceNow or mock server based on SERVICENOW_INSTANCE_URL)
-    logger.info(
-        "Creating ServiceNow ticket",
-        tool="open_laptop_refresh_ticket",
-        authoritative_user_id=authoritative_user_id,
-        laptop_code=servicenow_laptop_code,
-    )
-
     try:
+        if not employee_name:
+            raise ValueError("Employee name cannot be empty")
+
+        if not business_justification:
+            raise ValueError("Business justification cannot be empty")
+
+        if not servicenow_laptop_code:
+            raise ValueError(
+                "ServiceNow laptop code cannot be empty. Must be a valid ServiceNow laptop choice code like 'apple_mac_book_air_m_3'."
+            )
+
+        authoritative_user_id = headers.extract_authoritative_user_id(ctx)
+        api_token = headers.extract_servicenow_token(ctx)
+
+        if not authoritative_user_id:
+            raise ValueError(
+                "Authoritative user ID not found in request headers. Ensure AUTHORITATIVE_USER_ID header is set."
+            )
+
+        # Create ServiceNow ticket using the configured ServiceNow instance
+        # (which could be real ServiceNow or mock server based on SERVICENOW_INSTANCE_URL)
+        logger.info(
+            "Creating ServiceNow ticket",
+            tool="open_laptop_refresh_ticket",
+            authoritative_user_id=authoritative_user_id,
+            laptop_code=servicenow_laptop_code,
+        )
+
         client = ServiceNowClient(
             api_token,
             getattr(mcp, "laptop_refresh_id"),
