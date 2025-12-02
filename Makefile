@@ -19,6 +19,7 @@ INTEGRATION_DISPATCHER_IMG ?= $(REGISTRY)/self-service-agent-integration-dispatc
 MCP_SNOW_IMG ?= $(REGISTRY)/self-service-agent-snow-mcp:$(VERSION)
 MOCK_EVENTING_IMG ?= $(REGISTRY)/self-service-agent-mock-eventing:$(VERSION)
 MOCK_SERVICENOW_IMG ?= $(REGISTRY)/self-service-agent-mock-servicenow:$(VERSION)
+PROMPTGUARD_IMG ?= $(REGISTRY)/self-service-agent-promptguard:$(VERSION)
 
 MAKEFLAGS += --no-print-directory
 
@@ -59,6 +60,10 @@ SERVICENOW_LAPTOP_AVOID_DUPLICATES ?= false
 SERVICENOW_LAPTOP_REQUEST_LIMITS ?=
 TEST_USERS ?=
 
+# PromptGuard Configuration
+PROMPTGUARD_MODEL ?= llama-prompt-guard-2-86m
+PROMPTGUARD_MODEL_ID ?= meta-llama/Llama-Prompt-Guard-2-86M
+
 # Evaluation Configuration
 # Enable full laptop details validation by default unless explicitly disabled
 # Set VALIDATE_FULL_LAPTOP_DETAILS=false to disable validation
@@ -85,6 +90,16 @@ helm_llm_service_args = \
     $(if $(SAFETY_TOLERATION),--set-json global.models.$(SAFETY).tolerations='$(call TOLERATIONS_TEMPLATE,$(SAFETY_TOLERATION))',) \
     $(if $(and $(LLM_URL),$(if $(SAFETY),,yes)),--set llm-service.enabled=false,)
 
+helm_promptguard_args = \
+    $(if $(PROMPTGUARD_ENABLED),--set promptGuard.enabled=$(PROMPTGUARD_ENABLED) \
+        --set llama-stack.models.$(PROMPTGUARD_MODEL).enabled=$(PROMPTGUARD_ENABLED) \
+        --set llama-stack.models.$(PROMPTGUARD_MODEL).url="http://$(MAIN_CHART_NAME)-promptguard.$(NAMESPACE).svc.cluster.local:8000/v1" \
+        --set global.models.$(PROMPTGUARD_MODEL).enabled=$(PROMPTGUARD_ENABLED) \
+        --set global.models.$(PROMPTGUARD_MODEL).url="http://$(MAIN_CHART_NAME)-promptguard.$(NAMESPACE).svc.cluster.local:8000/v1",) \
+    $(if $(PROMPTGUARD_MODEL_ID),--set promptGuard.modelId='$(PROMPTGUARD_MODEL_ID)',) \
+	$(if $(HF_TOKEN),--set promptGuard.huggingfaceToken.secretName=hf-token,) \
+    $(if $(HF_TOKEN),--set promptGuard.huggingfaceToken.secretKey=token,)
+
 helm_llama_stack_args = \
     $(if $(LLM),--set global.models.$(LLM).enabled=true,) \
     $(if $(SAFETY),--set global.models.$(SAFETY).enabled=true,) \
@@ -99,7 +114,8 @@ helm_llama_stack_args = \
     $(if $(LLAMASTACK_CLIENT_PORT),--set llamastack.port=$(LLAMASTACK_CLIENT_PORT),) \
     $(if $(LLAMASTACK_API_KEY),--set llamastack.apiKey='$(LLAMASTACK_API_KEY)',) \
     $(if $(LLAMASTACK_OPENAI_BASE_PATH),--set llamastack.openaiBasePath='$(LLAMASTACK_OPENAI_BASE_PATH)',) \
-    $(if $(LLAMASTACK_TIMEOUT),--set llamastack.timeout=$(LLAMASTACK_TIMEOUT),)
+    $(if $(LLAMASTACK_TIMEOUT),--set llamastack.timeout=$(LLAMASTACK_TIMEOUT),) \
+    $(helm_promptguard_args)
 
 helm_request_management_args = \
     $(if $(REQUEST_MANAGEMENT),--set requestManagement.enabled=$(REQUEST_MANAGEMENT),) \
@@ -145,6 +161,7 @@ help:
 	@echo "  build-mcp-snow-image                 - Build the snow MCP server container image (checks lockfiles first)"
 	@echo "  build-mock-eventing-image            - Build the mock eventing service container image (checks lockfiles first)"
 	@echo "  build-mock-servicenow-image          - Build the mock ServiceNow server container image (checks lockfiles first)"
+	@echo "  build-promptguard-image              - Build the PromptGuard service container image (checks lockfiles first)"
 	@echo "  build-request-mgr-image              - Build the request manager container image (checks lockfiles first)"
 	@echo ""
 	@echo "Helm Commands:"
@@ -190,6 +207,7 @@ help:
 	@echo "  push-integration-dispatcher-image   - Push the integration dispatcher container image to registry"
 	@echo "  push-mcp-snow-image                 - Push the snow MCP server container image to registry"
 	@echo "  push-mock-eventing-image            - Push the mock eventing service container image to registry"
+	@echo "  push-promptguard-image              - Push the PromptGuard service container image to registry"
 	@echo "  push-request-mgr-image              - Push the request manager container image to registry"
 	@echo ""
 	@echo "Test Commands:"
@@ -249,6 +267,7 @@ help:
 	@echo "    {SAFETY,LLM}_URL                  - Model URL"
 	@echo "    {SAFETY,LLM}_API_TOKEN            - Model API token for remote models"
 	@echo "    {SAFETY,LLM}_TOLERATION           - Model pod toleration"
+	@echo "    PROMPTGUARD_MODEL                 - PromptGuard model name (default: llama-prompt-guard-2-86m)"
 	@echo ""
 	@echo "  Integration Configuration:"
 	@echo "    ENABLE_SLACK                      - Set to 'true' to enable Slack integration and prompt for tokens"
@@ -374,7 +393,7 @@ endef
 
 # Build container images
 .PHONY: build-all-images
-build-all-images: build-request-mgr-image build-agent-service-image build-integration-dispatcher-image build-mcp-snow-image build-mock-eventing-image build-mock-servicenow-image
+build-all-images: build-request-mgr-image build-agent-service-image build-integration-dispatcher-image build-mcp-snow-image build-mock-eventing-image build-mock-servicenow-image build-promptguard-image
 	@echo "All container images built successfully!"
 
 
@@ -390,6 +409,10 @@ build-agent-service-image: check-lockfile-agent-service check-lockfile-shared-mo
 .PHONY: build-integration-dispatcher-image
 build-integration-dispatcher-image: check-lockfile-integration-dispatcher check-lockfile-shared-models check-lockfile-shared-clients
 	$(call build_template_image,$(INTEGRATION_DISPATCHER_IMG),integration dispatcher image,integration-dispatcher,integration_dispatcher.main,.)
+
+.PHONY: build-promptguard-image
+build-promptguard-image: check-lockfile-promptguard check-lockfile-shared-models
+	$(call build_template_image,$(PROMPTGUARD_IMG),PromptGuard service image,promptguard-service,promptguard_service.server,.)
 
 .PHONY: build-mcp-snow-image
 build-mcp-snow-image: check-lockfile-mcp-snow
@@ -417,7 +440,7 @@ build-mock-servicenow-image: check-lockfile-mock-servicenow check-lockfile-mock-
 
 # Push container images
 .PHONY: push-all-images
-push-all-images: push-request-mgr-image push-agent-service-image push-integration-dispatcher-image push-mcp-snow-image push-mock-eventing-image push-mock-servicenow-image
+push-all-images: push-request-mgr-image push-agent-service-image push-integration-dispatcher-image push-mcp-snow-image push-mock-eventing-image push-mock-servicenow-image push-promptguard-image
 	@echo "All container images pushed successfully!"
 
 
@@ -446,6 +469,10 @@ push-mock-eventing-image:
 .PHONY: push-mock-servicenow-image
 push-mock-servicenow-image:
 	$(call push_image,$(MOCK_SERVICENOW_IMG) $(PUSH_EXTRA_AGRS),mock ServiceNow server image)
+
+.PHONY: push-promptguard-image
+push-promptguard-image:
+	$(call push_image,$(PROMPTGUARD_IMG) $(PUSH_EXTRA_AGRS),PromptGuard service image)
 
 # Code quality
 .PHONY: lint
@@ -544,7 +571,7 @@ format:
 
 # Install dependencies
 .PHONY: install-all
-install-all: install-shared-models install-shared-clients install-tracing-config install install-request-manager install-agent-service install-integration-dispatcher install-mcp-snow install-mock-eventing install-mock-employee-data install-mock-servicenow install-evaluations install-servicenow-bootstrap
+install-all: install-shared-models install-shared-clients install-tracing-config install install-request-manager install-agent-service install-integration-dispatcher install-mcp-snow install-mock-eventing install-mock-employee-data install-mock-servicenow install-promptguard install-evaluations install-servicenow-bootstrap
 	@echo "All dependencies installed successfully!"
 
 .PHONY: install-shared-models
@@ -573,7 +600,7 @@ reinstall:
 	@echo "All dependencies reinstalled with latest code!"
 
 .PHONY: reinstall-all
-reinstall-all: reinstall-shared-models reinstall-shared-clients reinstall reinstall-request-manager reinstall-agent-service reinstall-integration-dispatcher reinstall-mcp-snow reinstall-mock-employee-data reinstall-mock-servicenow reinstall-servicenow-bootstrap
+reinstall-all: reinstall-shared-models reinstall-shared-clients reinstall reinstall-request-manager reinstall-agent-service reinstall-integration-dispatcher reinstall-mcp-snow reinstall-mock-employee-data reinstall-mock-servicenow reinstall-promptguard reinstall-servicenow-bootstrap
 	@echo "All project dependencies reinstalled successfully!"
 
 
@@ -636,6 +663,11 @@ reinstall-mock-servicenow:
 		echo "Current SERVICENOW_INSTANCE_URL: $(SERVICENOW_INSTANCE_URL)"; \
 	fi
 
+.PHONY: reinstall-promptguard
+reinstall-promptguard:
+	@echo "Force reinstalling PromptGuard service dependencies..."
+	cd promptguard-service && uv sync --reinstall
+	@echo "PromptGuard service dependencies force reinstalled successfully!"
 
 .PHONY: install-request-manager
 install-request-manager:
@@ -683,6 +715,12 @@ install-mock-servicenow:
 		echo "Skipping mock ServiceNow installation - SERVICENOW_INSTANCE_URL does not contain 'self-service-agent-mock-servicenow'"; \
 		echo "Current SERVICENOW_INSTANCE_URL: $(SERVICENOW_INSTANCE_URL)"; \
 	fi
+
+.PHONY: install-promptguard
+install-promptguard:
+	@echo "Installing PromptGuard service dependencies..."
+	cd promptguard-service && uv sync
+	@echo "PromptGuard service dependencies installed successfully!"
 
 .PHONY: install-tracing-config
 install-tracing-config:
@@ -789,13 +827,15 @@ update-lockfiles:
 	@echo
 	$(call update_lockfile,mock-employee-data)
 	@echo
+	$(call update_lockfile,promptguard-service)
+	@echo
 	$(call update_lockfile,scripts/servicenow-bootstrap)
 	@echo
 	@echo
 	@echo "🎉 All lockfiles updated successfully!"
 
 # Individual service lockfile targets
-.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-snow check-lockfile-mock-eventing check-lockfile-mock-employee-data check-lockfile-mock-servicenow check-lockfile-servicenow-bootstrap
+.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-snow check-lockfile-mock-eventing check-lockfile-mock-employee-data check-lockfile-mock-servicenow check-lockfile-promptguard check-lockfile-servicenow-bootstrap
 check-lockfile-root:
 	@echo "📦 Checking root project..."
 	@if uv lock --check; then \
@@ -831,11 +871,14 @@ check-lockfile-mock-employee-data:
 check-lockfile-mock-servicenow:
 	$(call check_lockfile,mock-service-now)
 
+check-lockfile-promptguard:
+	$(call check_lockfile,promptguard-service)
+
 check-lockfile-servicenow-bootstrap:
 	$(call check_lockfile,scripts/servicenow-bootstrap)
 
 
-.PHONY: update-lockfile-shared-models update-lockfile-shared-clients update-lockfile-agent-service update-lockfile-request-manager update-lockfile-integration-dispatcher update-lockfile-mcp-snow update-lockfile-mock-eventing update-lockfile-mock-employee-data update-lockfile-mock-servicenow update-lockfile-servicenow-bootstrap
+.PHONY: update-lockfile-shared-models update-lockfile-shared-clients update-lockfile-agent-service update-lockfile-request-manager update-lockfile-integration-dispatcher update-lockfile-mcp-snow update-lockfile-mock-eventing update-lockfile-mock-employee-data update-lockfile-mock-servicenow update-lockfile-promptguard update-lockfile-servicenow-bootstrap
 update-lockfile-shared-models:
 	$(call update_lockfile,shared-models)
 
@@ -862,6 +905,9 @@ update-lockfile-mock-employee-data:
 
 update-lockfile-mock-servicenow:
 	$(call update_lockfile,mock-service-now)
+
+update-lockfile-promptguard:
+	$(call update_lockfile,promptguard-service)
 
 update-lockfile-servicenow-bootstrap:
 	$(call update_lockfile,scripts/servicenow-bootstrap)
@@ -957,6 +1003,20 @@ namespace:
 	@kubectl create namespace $(NAMESPACE) &> /dev/null && kubectl label namespace $(NAMESPACE) modelmesh-enabled=false ||:
 	@kubectl config set-context --current --namespace=$(NAMESPACE) &> /dev/null ||:
 
+# Create HuggingFace token secret if HF_TOKEN is provided
+.PHONY: hf-token-secret
+hf-token-secret:
+ifdef HF_TOKEN
+	@echo "Creating HuggingFace token secret..."
+	@kubectl create secret generic hf-token \
+		--from-literal=token=$(HF_TOKEN) \
+		-n $(NAMESPACE) \
+		--dry-run=client -o yaml | kubectl apply -f -
+	@echo "✅ HuggingFace token secret created/updated"
+else
+	@echo "ℹ️  No HF_TOKEN provided, skipping secret creation"
+endif
+
 .PHONY: helm-depend
 helm-depend:
 	@echo "Updating Helm dependencies"
@@ -1033,6 +1093,7 @@ define helm_install_common
 		fi; \
 	done
 	$(if $(filter true,$(3)),@echo "Waiting for mock eventing deployment..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-mock-eventing -n $(NAMESPACE) --timeout 5m,)
+	$(if $(filter true,$(PROMPTGUARD_ENABLED)),@echo "Waiting for PromptGuard deployment..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-promptguard -n $(NAMESPACE) --timeout 10m,)
 	@echo "$(MAIN_CHART_NAME) $(1) installed successfully"
 endef
 
@@ -1041,7 +1102,7 @@ endef
 PROMPT_OVERRIDES := $(foreach var,$(filter LG_PROMPT_%,$(.VARIABLES)),--set requestManagement.agentService.promptOverrides.lg-prompt-$(shell echo $(var:LG_PROMPT_%=%) | tr '[:upper:]' '[:lower:]' | tr '_' '-')=$($(var)))
 
 .PHONY: helm-install-test
-helm-install-test: namespace helm-depend
+helm-install-test: namespace helm-depend hf-token-secret
 	$(call helm_install_common,"with mock eventing service - testing/CI",\
 		-f helm/values-test.yaml \
 		--set requestManagement.knative.mockEventing.enabled=true \
@@ -1052,7 +1113,7 @@ helm-install-test: namespace helm-depend
 
 # Install with full Knative eventing (production mode)
 .PHONY: helm-install-prod
-helm-install-prod: namespace helm-depend
+helm-install-prod: namespace helm-depend hf-token-secret
 	@echo "Installing with retry logic for triggers..."
 	@for i in 1 2 3; do \
 		echo "Attempt $$i of 3..."; \

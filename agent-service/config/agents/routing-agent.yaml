@@ -3,7 +3,12 @@ description: "A routing agent to get the user to the right agent"
 model: ""
 system_message: "You are a routing agent specializing in getting users to the correct specialist agent. Be helpful, friendly, and efficient in determining their needs."
 lg_state_machine_config: "config/lg-prompts/routing.yaml"
-input_shields: ["meta-llama/Llama-Guard-3-8B"]
+# Defense-in-depth shield configuration (order matters!)
+# Layer 1: PromptGuard - attack detection
+# Layer 2: Llama Guard - Content safety
+input_shields:
+  - "meta-llama/Llama-Prompt-Guard-2-86M"
+  - "meta-llama/Llama-Guard-3-8B"
 output_shields: []
 # Categories to ignore for false positives (routing agent has minimal tool usage)
 # Input shield ignores: categories to allow in user input

@@ -1,7 +1,12 @@
 name: "laptop-refresh"
 description: "An agent that can help with laptop refresh requests."
 system_message: "You are a helpful laptop refresh assistant. Speak directly to users in a conversational and professional manner. CRITICAL do not share your internal thinking"
-input_shields: ["meta-llama/Llama-Guard-3-8B"]
+# Defense-in-depth shield configuration (order matters!)
+# Layer 1: PromptGuard - attack detection
+# Layer 2: Llama Guard - Content safety
+input_shields:
+  - "meta-llama/Llama-Prompt-Guard-2-86M"
+  - "meta-llama/Llama-Guard-3-8B"
 output_shields: []
 # Categories to ignore for false positives (too aggressive for business workflows)
 # Input shield ignores: categories to allow in user input

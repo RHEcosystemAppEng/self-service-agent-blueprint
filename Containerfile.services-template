@@ -75,8 +75,16 @@ ENV PYTHONUNBUFFERED=1
 # Set the module name as an environment variable so it can be used in CMD
 ENV MODULE_NAME=${MODULE_NAME}
 
-# Drop privileges
+# Create HuggingFace cache directory with proper permissions (for services that need it)
+USER root
+RUN mkdir -p /app/.cache/huggingface/transformers && \
+    chmod -R 775 /app/.cache && \
+    chown -R 1001:0 /app/.cache
 USER 1001
+
+# HuggingFace environment variables (safe for all services, only used if needed)
+ENV HF_HOME="/app/.cache/huggingface"
+ENV TRANSFORMERS_CACHE="/app/.cache/huggingface/transformers"
 
 # Expose port
 EXPOSE 8080
