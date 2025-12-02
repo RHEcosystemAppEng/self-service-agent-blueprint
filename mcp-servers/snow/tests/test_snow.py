@@ -3,7 +3,6 @@
 from typing import Any, Dict, List
 from unittest.mock import MagicMock, Mock, patch
 
-import pytest
 from snow.server import get_employee_laptop_info, open_laptop_refresh_ticket
 from snow.servicenow.client import ServiceNowClient
 from snow.servicenow.models import OpenServiceNowLaptopRefreshRequestParams
@@ -130,37 +129,46 @@ def test_open_laptop_refresh_ticket_required_model(
 def test_open_laptop_refresh_ticket_empty_employee_name() -> None:
     """Test error handling for empty employee name."""
     ctx = MockContext({"AUTHORITATIVE_USER_ID": "alice.johnson@company.com"})
-    with pytest.raises(ValueError, match="Employee name cannot be empty"):
-        open_laptop_refresh_ticket(
-            employee_name="",
-            business_justification="Need new laptop",
-            servicenow_laptop_code="apple_mac_book_air_m_3",
-            ctx=ctx,
-        )
+    result = open_laptop_refresh_ticket(
+        employee_name="",
+        business_justification="Need new laptop",
+        servicenow_laptop_code="apple_mac_book_air_m_3",
+        ctx=ctx,
+    )
+    assert (
+        "Error opening ServiceNow laptop refresh request: Employee name cannot be empty"
+        in result
+    )
 
 
 def test_open_laptop_refresh_ticket_empty_justification() -> None:
     """Test error handling for empty business justification."""
     ctx = MockContext({"AUTHORITATIVE_USER_ID": "alice.johnson@company.com"})
-    with pytest.raises(ValueError, match="Business justification cannot be empty"):
-        open_laptop_refresh_ticket(
-            employee_name="John Doe",
-            business_justification="",
-            servicenow_laptop_code="apple_mac_book_air_m_3",
-            ctx=ctx,
-        )
+    result = open_laptop_refresh_ticket(
+        employee_name="John Doe",
+        business_justification="",
+        servicenow_laptop_code="apple_mac_book_air_m_3",
+        ctx=ctx,
+    )
+    assert (
+        "Error opening ServiceNow laptop refresh request: Business justification cannot be empty"
+        in result
+    )
 
 
 def test_open_laptop_refresh_ticket_empty_servicenow_code() -> None:
     """Test error handling for empty ServiceNow laptop code."""
     ctx = MockContext({"AUTHORITATIVE_USER_ID": "alice.johnson@company.com"})
-    with pytest.raises(ValueError, match="ServiceNow laptop code cannot be empty"):
-        open_laptop_refresh_ticket(
-            employee_name="John Doe",
-            business_justification="Need new laptop",
-            servicenow_laptop_code="",
-            ctx=ctx,
-        )
+    result = open_laptop_refresh_ticket(
+        employee_name="John Doe",
+        business_justification="Need new laptop",
+        servicenow_laptop_code="",
+        ctx=ctx,
+    )
+    assert (
+        "Error opening ServiceNow laptop refresh request: ServiceNow laptop code cannot be empty"
+        in result
+    )
 
 
 @patch("snow.server.mcp")
