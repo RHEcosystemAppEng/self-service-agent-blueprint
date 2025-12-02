@@ -116,6 +116,7 @@ jobs:
           SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
           SERVICENOW_API_KEY: ${{ secrets.SERVICENOW_API_KEY }}
           SERVICENOW_LAPTOP_REFRESH_ID: ${{ secrets.SERVICENOW_LAPTOP_REFRESH_ID }}
+          OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector-collector.observability-hub.svc.cluster.local:4318"
 
       - name: Install evaluations dependencies
         shell: bash
