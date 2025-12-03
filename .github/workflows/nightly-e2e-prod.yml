@@ -106,7 +106,7 @@ jobs:
       - name: Install the quickstart
         shell: bash
         run: |
-          make helm-install-prod NAMESPACE=self-service-agent-ci-project-1
+          make helm-install-prod NAMESPACE=self-service-agent-ci-project-1 OTEL_EXPORTER_OTLP_ENDPOINT="http://otel-collector-collector.observability-hub.svc.cluster.local:4318"
         env:
           VERSION: ${{ steps.version.outputs.version }}
           LLM_URL: ${{ vars.LLM_URL_EVAL_70B }}
@@ -116,7 +116,6 @@ jobs:
           SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
           SERVICENOW_API_KEY: ${{ secrets.SERVICENOW_API_KEY }}
           SERVICENOW_LAPTOP_REFRESH_ID: ${{ secrets.SERVICENOW_LAPTOP_REFRESH_ID }}
-          OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector-collector.observability-hub.svc.cluster.local:4318"
 
       - name: Install evaluations dependencies
         shell: bash
@@ -133,9 +132,10 @@ jobs:
 
       - name: Inspect Cluster - Self-Service Agent
         if: failure()
-        uses: ./.github/actions/inspect
+        uses: ./.github/actions/inspect-ns
         with:
           artifactPrefix: self-service-agent
+          namespace: self-service-agent-ci-project-1
 
       - name: Create evaluations tarball
         if: always()
