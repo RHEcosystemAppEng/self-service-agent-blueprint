@@ -97,8 +97,7 @@ helm_promptguard_args = \
         --set global.models.$(PROMPTGUARD_MODEL).enabled=$(PROMPTGUARD_ENABLED) \
         --set global.models.$(PROMPTGUARD_MODEL).url="http://$(MAIN_CHART_NAME)-promptguard.$(NAMESPACE).svc.cluster.local:8000/v1",) \
     $(if $(PROMPTGUARD_MODEL_ID),--set promptGuard.modelId='$(PROMPTGUARD_MODEL_ID)',) \
-	$(if $(HF_TOKEN),--set promptGuard.huggingfaceToken.secretName=hf-token,) \
-    $(if $(HF_TOKEN),--set promptGuard.huggingfaceToken.secretKey=token,)
+	$(if $(HF_TOKEN),--set promptGuard.huggingfaceToken='$(HF_TOKEN)',)
 
 helm_llama_stack_args = \
     $(if $(LLM),--set global.models.$(LLM).enabled=true,) \
@@ -1003,20 +1002,6 @@ namespace:
 	@kubectl create namespace $(NAMESPACE) &> /dev/null && kubectl label namespace $(NAMESPACE) modelmesh-enabled=false ||:
 	@kubectl config set-context --current --namespace=$(NAMESPACE) &> /dev/null ||:
 
-# Create HuggingFace token secret if HF_TOKEN is provided
-.PHONY: hf-token-secret
-hf-token-secret:
-ifdef HF_TOKEN
-	@echo "Creating HuggingFace token secret..."
-	@kubectl create secret generic hf-token \
-		--from-literal=token=$(HF_TOKEN) \
-		-n $(NAMESPACE) \
-		--dry-run=client -o yaml | kubectl apply -f -
-	@echo "✅ HuggingFace token secret created/updated"
-else
-	@echo "ℹ️  No HF_TOKEN provided, skipping secret creation"
-endif
-
 .PHONY: helm-depend
 helm-depend:
 	@echo "Updating Helm dependencies"
@@ -1102,7 +1087,7 @@ endef
 PROMPT_OVERRIDES := $(foreach var,$(filter LG_PROMPT_%,$(.VARIABLES)),--set requestManagement.agentService.promptOverrides.lg-prompt-$(shell echo $(var:LG_PROMPT_%=%) | tr '[:upper:]' '[:lower:]' | tr '_' '-')=$($(var)))
 
 .PHONY: helm-install-test
-helm-install-test: namespace helm-depend hf-token-secret
+helm-install-test: namespace helm-depend
 	$(call helm_install_common,"with mock eventing service - testing/CI",\
 		-f helm/values-test.yaml \
 		--set requestManagement.knative.mockEventing.enabled=true \
@@ -1113,7 +1098,7 @@ helm-install-test: namespace helm-depend hf-token-secret
 
 # Install with full Knative eventing (production mode)
 .PHONY: helm-install-prod
-helm-install-prod: namespace helm-depend hf-token-secret
+helm-install-prod: namespace helm-depend
 	@echo "Installing with retry logic for triggers..."
 	@for i in 1 2 3; do \
 		echo "Attempt $$i of 3..."; \

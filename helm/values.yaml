@@ -126,7 +126,8 @@ promptGuard:
   logLevel: "INFO"
   uvicornWorkers: 1  # Single worker sufficient for CPU-based model
   # This is the default value. It will be overridden if PROMPTGUARD_MODEL_ID is passed via the Makefile/Helm command.
-  modelId: "meta-llama/Llama-Prompt-Guard-2-86M" 
+  modelId: "meta-llama/Llama-Prompt-Guard-2-86M"
+  huggingfaceToken: "" 
   resources:
     limits:
       cpu: "2"

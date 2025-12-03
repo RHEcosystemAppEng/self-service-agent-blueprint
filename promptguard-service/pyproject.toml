@@ -16,6 +16,7 @@ dependencies = [
     "torch>=2.0.0",
     "transformers>=4.30.0",
     "self-service-agent-shared-models",
+    "tracing-config",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -26,6 +27,13 @@ allow-direct-references = true
 
 [tool.uv.sources]
 self-service-agent-shared-models = { path = "../shared-models" }
+tracing-config = { path = "../tracing-config" }
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [dependency-groups]
 dev = [

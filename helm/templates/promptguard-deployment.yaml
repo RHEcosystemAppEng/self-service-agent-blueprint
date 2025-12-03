@@ -1,4 +1,18 @@
 {{- if .Values.promptGuard.enabled }}
+{{- if .Values.promptGuard.huggingfaceToken }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-promptguard-hf-token
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: promptguard
+type: Opaque
+stringData:
+  token: {{ .Values.promptGuard.huggingfaceToken | quote }}
+{{- end }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -51,8 +65,8 @@ spec:
         - name: HF_TOKEN
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.promptGuard.huggingfaceToken.secretName }}
-              key: {{ .Values.promptGuard.huggingfaceToken.secretKey | default "token" }}
+              name: {{ include "self-service-agent.fullname" . }}-promptguard-hf-token
+              key: token
         {{- end }}
         {{- if .Values.promptGuard.resources }}
         resources:
