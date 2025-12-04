@@ -59,6 +59,9 @@ async def store_user_mapping(
                 canonical_user_id = await get_or_create_canonical_user(user_email, db)
 
             # Use upsert pattern - update if exists, insert if not
+            # Note: The database has a partial unique constraint on (integration_user_id, integration_type)
+            # that excludes __NOT_FOUND__ sentinel values, allowing multiple users to have __NOT_FOUND__
+            # entries while still preventing duplicate real integration user IDs.
             stmt = insert(UserIntegrationMapping).values(
                 user_id=canonical_user_id,
                 user_email=user_email,

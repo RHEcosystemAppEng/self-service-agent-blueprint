@@ -412,6 +412,11 @@ class UserIntegrationMapping(Base, TimestampMixin):  # type: ignore[misc]
 
     # Ensure one mapping per user per integration type
     # Also ensure one mapping per integration_user_id per integration type (prevents conflicts)
+    # NOTE: uq_integration_user_id_type is implemented as a PARTIAL unique INDEX at the database level
+    # (not a constraint) that excludes __NOT_FOUND__ sentinel values, allowing multiple users to have
+    # __NOT_FOUND__ entries while still preventing duplicate real integration user IDs.
+    # See migration 002_partial_unique_constraint_for_sentinel_values.py
+    # The UniqueConstraint declaration below is for SQLAlchemy documentation; the actual DB uses a unique index.
     # Also allow lookup by integration_user_id + integration_type
     __table_args__ = (
         UniqueConstraint(

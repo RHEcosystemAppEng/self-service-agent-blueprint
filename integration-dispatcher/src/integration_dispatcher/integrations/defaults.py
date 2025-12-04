@@ -195,14 +195,6 @@ class IntegrationDefaultsService:
                 if mapping:
                     slack_user_id = str(mapping.integration_user_id)
 
-                    # Check for negative cache sentinel value
-                    if slack_user_id == "__NOT_FOUND__":
-                        logger.info(
-                            "Found negative cache entry for Slack user (user does not exist)",
-                            user_email=user_email,
-                        )
-                        return None  # Skip API call for users that don't exist
-
                     logger.info(
                         "Found Slack user mapping in database",
                         user_email=user_email,
@@ -211,13 +203,20 @@ class IntegrationDefaultsService:
                         last_validated_at=mapping.last_validated_at,
                     )
 
-                    # Use shared TTL validation logic
+                    # Use shared TTL validation logic (handles both regular mappings and negative cache)
                     is_valid = await self._validate_mapping_with_ttl(
                         mapping, "email lookup"
                     )
 
                     if is_valid:
                         await db.commit()
+                        # If it's a negative cache entry, return None (user doesn't exist)
+                        if slack_user_id == "__NOT_FOUND__":
+                            logger.info(
+                                "Negative cache entry still valid (user does not exist)",
+                                user_email=user_email,
+                            )
+                            return None
                         stored_user_id = slack_user_id
                     else:
                         # Negative cache expired or mapping invalid - delete it and re-check via API
@@ -681,7 +680,15 @@ class IntegrationDefaultsService:
                     slack_mapping = result.scalar_one_or_none()
 
                     if slack_mapping:
-                        slack_user_id = slack_mapping.integration_user_id
+                        # Check for negative cache sentinel value
+                        if slack_mapping.integration_user_id == "__NOT_FOUND__":
+                            logger.info(
+                                "Found negative cache entry for Slack user (user does not exist)",
+                                user_id=user_id,
+                            )
+                            slack_user_id = None  # Treat as no mapping found
+                        else:
+                            slack_user_id = slack_mapping.integration_user_id
 
                     # If no mapping found, try to look up by email from context or User table
                     if not slack_user_id:
@@ -905,17 +912,42 @@ class IntegrationDefaultsService:
                         )
                     else:
                         # No context (e.g., CLI/web request), use stored mapping with validation
-                        final_slack_user_id = await self._get_validated_slack_user_id(
-                            user_id
-                        )
-                        if final_slack_user_id:
-                            self._update_slack_config(
-                                config, slack_user_id=final_slack_user_id
+                        # First, try to get email from context or User table
+                        user_email = None
+                        if context:
+                            user_email = context.get("email_from")
+
+                        # If no email in context, look it up from User table
+                        if not user_email:
+                            from shared_models.models import User
+
+                            stmt = select(User).where(User.user_id == user_id)
+                            result = await db.execute(stmt)
+                            user = result.scalar_one_or_none()
+                            if user and user.primary_email:
+                                user_email = user.primary_email
+
+                        # If we have an email, try to look up Slack user_id via API
+                        if user_email:
+                            final_slack_user_id = (
+                                await self._get_validated_slack_user_id(user_email)
                             )
+                            if final_slack_user_id:
+                                self._update_slack_config(
+                                    config, slack_user_id=final_slack_user_id
+                                )
+                            else:
+                                # No mapping exists - disable Slack integration for this request
+                                logger.warning(
+                                    "No valid Slack user mapping found, disabling Slack integration",
+                                    user_id=user_id,
+                                    user_email=user_email,
+                                )
+                                config["enabled"] = False
                         else:
-                            # No mapping exists - disable Slack integration for this request
+                            # No email available - disable Slack integration for this request
                             logger.warning(
-                                "No valid Slack user mapping found, disabling Slack integration",
+                                "No email address available for Slack lookup, disabling Slack integration",
                                 user_id=user_id,
                             )
                             config["enabled"] = False
