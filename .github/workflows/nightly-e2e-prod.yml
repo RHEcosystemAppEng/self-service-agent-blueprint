@@ -130,13 +130,6 @@ jobs:
           LLM_URL: ${{ vars.LLM_URL_EVAL_70B }}
           LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL_70B }}
 
-      - name: Inspect Cluster - Self-Service Agent
-        if: failure()
-        uses: ./.github/actions/inspect-ns
-        with:
-          artifactPrefix: self-service-agent
-          namespace: self-service-agent-ci-project-1
-
       - name: Create evaluations tarball
         if: always()
         shell: bash
@@ -162,7 +155,7 @@ jobs:
           if-no-files-found: warn
 
       - name: stop the quickstart
-        if: always()
+        if: success()
         shell: bash
         run: |
           make helm-uninstall NAMESPACE=self-service-agent-ci-project-1
