@@ -483,11 +483,8 @@ For initial testing and evaluation purposes, the quickstart includes a simple co
 Use the CLI chat script to start an interactive conversation with the agent:
 
 ```bash
-# Get the request manager pod
-export REQUEST_MANAGER_POD=$(oc get pod -n $NAMESPACE -l app=self-service-agent-request-manager -o jsonpath='{.items[0].metadata.name}')
-
 # Start interactive chat session
-oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
+oc exec -it deploy/self-service-agent-request-manager -n $NAMESPACE -- \
   python test/chat-responses-request-mgr.py \
   --user-id alice.johnson@company.com
 ```
@@ -534,12 +531,12 @@ Test with different employee IDs to see varied scenarios:
 
 ```bash
 # Test with different user (LATAM region)
-oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
+oc exec -it deploy/self-service-agent-request-manager -n $NAMESPACE -- \
   python test/chat-responses-request-mgr.py \
   --user-id maria.garcia@company.com
 
 # Test with user who may not be eligible
-oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
+oc exec -it deploy/self-service-agent-request-manager -n $NAMESPACE -- \
   python test/chat-responses-request-mgr.py \
   --user-id john.doe@company.com
 
@@ -675,11 +672,8 @@ make helm-install-test NAMESPACE=$NAMESPACE
 Use the CLI chat client to initiate a laptop refresh request with your real ServiceNow account:
 
 ```bash
-# Get the request manager pod
-export REQUEST_MANAGER_POD=$(oc get pod -n $NAMESPACE -l app=self-service-agent-request-manager -o jsonpath='{.items[0].metadata.name}')
-
 # Start chat session with your email
-oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
+oc exec -it deploy/self-service-agent-request-manager -n $NAMESPACE -- \
   python test/chat-responses-request-mgr.py \
   --user-id alice.johnson@company.com
 ```
@@ -1143,11 +1137,8 @@ echo "Jaeger UI: https://$JAEGER_UI_URL"
 1. Generate traces by interacting with the agent (via CLI, Slack, or API) as described earlier in the
    quickstart. To use the CLI you can use:
 ```bash
-# Get the request manager pod
-export REQUEST_MANAGER_POD=$(oc get pod -n $NAMESPACE -l app=self-service-agent-request-manager -o jsonpath='{.items[0].metadata.name}')
-   
 # Start chat session with your email
-oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
+oc exec -it deploy/self-service-agent-request-manager -n $NAMESPACE -- \
   python test/chat-responses-request-mgr.py \
   --user-id alice.johnson@company.com
 ```
@@ -1285,11 +1276,8 @@ make helm-install-test NAMESPACE=$NAMESPACE
 Use the CLI chat script to start an interactive conversation with the agent:
 
 ```bash
-# Get the request manager pod
-export REQUEST_MANAGER_POD=$(oc get pod -n $NAMESPACE -l app=self-service-agent-request-manager -o jsonpath='{.items[0].metadata.name}')
-
 # Start interactive chat session
-oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
+oc exec -it deploy/self-service-agent-request-manager -n $NAMESPACE -- \
   python test/chat-responses-request-mgr.py \
   --user-id alice.johnson@company.com
 ```
@@ -1410,9 +1398,7 @@ oc logs deployment/llamastack -n $NAMESPACE | grep -i "prompt-guard"
 #### Test Protection
 
 ```bash
-export REQUEST_MANAGER_POD=$(oc get pod -n $NAMESPACE -l app=self-service-agent-request-manager -o jsonpath='{.items[0].metadata.name}')
-
-oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
+oc exec -it deploy/self-service-agent-request-manager -n $NAMESPACE -- \
   python test/chat-responses-request-mgr.py \
   --user-id alice.johnson@company.com
 
@@ -1523,10 +1509,8 @@ Defaulted container "llama-stack" out of: llama-stack, wait-for-models (init)
 You can now run a conversation and see the effect of the Safety shield:
 
 ```bash
-export REQUEST_MANAGER_POD=$(oc get pod -n $NAMESPACE -l app=self-service-agent-request-manager -o jsonpath='{.items[0].metadata.name}')
-
 # Start interactive chat session
-oc exec -it $REQUEST_MANAGER_POD -n $NAMESPACE -- \
+oc exec -it deploy/self-service-agent-request-manager -n $NAMESPACE -- \
   python test/chat-responses-request-mgr.py \
   --user-id alice.johnson@company.com
 ```
