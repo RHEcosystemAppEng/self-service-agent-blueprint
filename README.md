@@ -1371,7 +1371,9 @@ make helm-install-test NAMESPACE=$NAMESPACE
 
 ### 3.10 Setting up PromptGuard (Optional)
 
-PromptGuard provides protection against prompt injection attacks by detecting malicious attempts to manipulate the AI agent. It uses the lightweight Llama Prompt Guard 2 model (86M parameters) which runs efficiently on CPU.
+Depending on your model, prompting approach and trust in your end users you may need additional protection against [prompt injection](https://www.ibm.com/think/topics/prompt-injection) attacks. PromptGuard provides protection against prompt injection attacks by detecting malicious attempts to manipulate the AI agent. It uses the lightweight Llama Prompt Guard 2 model (86M parameters) which runs efficiently on CPU. 
+
+We have found that when using llama 70b the protection provided by PromptGuard is needed when using the "big" prompt as outlined in [section 3.9 Trying out Smaller Prompts](#39-trying-out-smaller-prompts).
 
 #### Deploy PromptGuard
 
