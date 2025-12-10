@@ -366,14 +366,14 @@ This section walks you through deploying and testing the laptop refresh agent on
 
 ### 3.1 Clone the Repository
 
-First, clone the repository and navigate to the project directory:
+First, get the repository URL by clicking the green **Code** button at the top of this page, then clone and navigate to the project directory:
 
 ```bash
 # Clone the repository
-git clone https://github.com/RHEcosystemAppEng/self-service-agent-blueprint.git
+git clone <repository-url>
 
-# Navigate to the project directory
-cd self-service-agent-blueprint
+# Navigate to the project directory (directory name matches repository name)
+cd <repository-directory>
 ```
 
 **Expected outcome:**
@@ -882,7 +882,7 @@ Execute the predefined conversation flows against your deployed agent:
 python run_conversations.py
 ```
 
-This runs the pre-defined conversations in [evaluations/conversations_config/conversations/](https://github.com/RHEcosystemAppEng/self-service-agent-blueprint/tree/main/evaluations/conversations_config/conversations).
+This runs the pre-defined conversations in [evaluations/conversations_config/conversations/](evaluations/conversations_config/conversations/).
 
 **Expected outcome:**
 - ✓ Conversations executed against deployed agent
@@ -958,7 +958,7 @@ Quality Assurance Metrics:
 - **Confirmation Before Ticket Creation**: Agent requests approval before creating ticket? (Threshold: 1.0)
 - **Return to Router After Task Completion**: Proper routing when user says no? (Threshold: > 1.0)
 
-Each of these metrics is defined in [evaluations/get_deepeval_metrics.py](https://github.com/RHEcosystemAppEng/self-service-agent-blueprint/blob/main/evaluations/get_deepeval_metrics.py). Metrics tell a judge LLM how to evaluate the conversation. As an example:
+Each of these metrics is defined in [evaluations/get_deepeval_metrics.py](evaluations/get_deepeval_metrics.py). Metrics tell a judge LLM how to evaluate the conversation. As an example:
 
 ```python
         ConversationalGEval(

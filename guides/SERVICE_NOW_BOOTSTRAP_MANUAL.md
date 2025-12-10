@@ -83,7 +83,7 @@ This step creates the service catalog that your AI agent will interact with to f
        - Lenovo ThinkPad P1 Gen 6
      - Click "Insert question"
      
-Each time you add a laptop option, if you don't provide a value, one will be generated from the name. The values must match the `ServiceNow Code` value specified in the knowledge base. The default values generated will match what was used in the knowledge based in [agent-service/config/knowledge_bases/](https://github.com/RHEcosystemAppEng/self-service-agent-blueprint/tree/main/agent-service/config/knowledge_bases/laptop-refresh)
+Each time you add a laptop option, if you don't provide a value, one will be generated from the name. The values must match the `ServiceNow Code` value specified in the knowledge base. The default values generated will match what was used in the knowledge based in [agent-service/config/knowledge_bases/](../agent-service/config/knowledge_bases/laptop-refresh)
 
    ### Settings
    - **Submit button label:** Choose "Request"

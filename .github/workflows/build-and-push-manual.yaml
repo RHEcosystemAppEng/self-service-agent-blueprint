@@ -35,7 +35,7 @@ jobs:
       - name: Determine repository and branch to checkout
         id: checkout_info
         run: |
-          REPO="${{ github.event.inputs.github_username }}/self-service-agent-blueprint"
+          REPO="${{ github.event.inputs.github_username }}/${{ github.event.repository.name }}"
           CHECKOUT_REF="${{ github.event.inputs.target_branch }}"
           echo "repository=${REPO}" >> $GITHUB_OUTPUT
           echo "checkout_ref=${CHECKOUT_REF}" >> $GITHUB_OUTPUT

@@ -56,12 +56,6 @@ run-conversations = "run_conversations:main"
 generate-conversations = "generator:main"
 deep-eval = "deep_eval:main"
 
-[project.urls]
-Homepage = "https://github.com/mhdawson/self-service-agent-blueprint"
-Repository = "https://github.com/mhdawson/self-service-agent-blueprint"
-Issues = "https://github.com/mhdawson/self-service-agent-blueprint/issues"
-Documentation = "https://github.com/mhdawson/self-service-agent-blueprint/tree/main/evaluations"
-
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
 

@@ -73,9 +73,12 @@ Ensure you have the required tools installed:
 ### Local Setup
 
 1. **Clone the repository:**
+
+   Get the repository URL by clicking the green **Code** button at the top of the repository page, then:
+
    ```bash
-   git clone https://github.com/RHEcosystemAppEng/self-service-agent-blueprint.git
-   cd self-service-agent-blueprint
+   git clone <repository-url>
+   cd <repository-directory>  # The directory name matches the repository name
    ```
 
 2. **Install dependencies:**
