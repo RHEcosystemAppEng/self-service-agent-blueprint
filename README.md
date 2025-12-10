@@ -1414,7 +1414,6 @@ For detailed configuration options and API documentation, see the [PromptGuard S
 
 Safety shields provide content moderation for AI agent interactions, validating user input and agent responses against safety policies using Llama Guard 3 or compatible models.
 
-Depending on your model, prompting approach and trust in your end users they may also be critical for avoiding [prompt injection](https://www.ibm.com/think/topics/prompt-injection) attacks. A common model used with llama stack to prevent these types of attack is [PromptGuard](https://arxiv.org/abs/2509.08910). The quickstart supports both Llama Guard and PromptGuard. We have found that when using llama 70b the protection provided by PromptGuard is needed when using the "big" prompt as outlined in [section 3.9 Trying out Smaller Prompts](#39-trying-out-smaller-prompts). See [section 3.10 Setting up PromptGuard](#310-setting-up-promptguard-optional) for configuration instructions.
 
 #### When to Enable Safety Shields
 
