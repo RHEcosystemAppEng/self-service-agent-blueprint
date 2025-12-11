@@ -1,0 +1,407 @@
+name: Create Dev to Main promotion PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_title:
+        description: 'PR title (leave empty for auto-generated)'
+        required: false
+        default: ''
+        type: string
+      pr_description:
+        description: 'Additional PR description (optional)'
+        required: false
+        default: ''
+        type: string
+      last_commit:
+        description: 'Last commit to include (SHA or ref, leave empty for all commits in dev)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: write  # Changed from 'read' to allow creating temporary branches
+  pull-requests: write
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history to compare branches
+
+      - name: Show branch and commit info
+        run: |
+          echo "::group::Repository Information"
+          echo "Repository: ${{ github.repository }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "::endgroup::"
+
+      - name: Check for commits in dev not in main
+        id: check_commits
+        run: |
+          # Fetch latest from both branches
+          git fetch origin main
+          git fetch origin dev
+
+          # Determine the target commit (last_commit input or origin/dev HEAD)
+          if [ -n "${{ github.event.inputs.last_commit }}" ]; then
+            TARGET_COMMIT="${{ github.event.inputs.last_commit }}"
+
+            # Validate that the commit exists
+            if ! git rev-parse --verify "$TARGET_COMMIT^{commit}" >/dev/null 2>&1; then
+              echo "::error::Invalid commit: $TARGET_COMMIT"
+              echo "The specified commit does not exist in the repository"
+              exit 1
+            fi
+
+            # Validate that the commit is reachable from dev branch
+            if ! git merge-base --is-ancestor "$TARGET_COMMIT" origin/dev; then
+              echo "::error::Commit $TARGET_COMMIT is not in the dev branch history"
+              echo "The commit must be reachable from the dev branch"
+              exit 1
+            fi
+
+            # Get the full SHA for display
+            TARGET_COMMIT_SHA=$(git rev-parse "$TARGET_COMMIT")
+            echo "Using specified commit: $TARGET_COMMIT_SHA"
+            echo "is_partial=true" >> $GITHUB_OUTPUT
+            echo "target_commit=$TARGET_COMMIT_SHA" >> $GITHUB_OUTPUT
+            echo "target_commit_short=$(git rev-parse --short "$TARGET_COMMIT_SHA")" >> $GITHUB_OUTPUT
+          else
+            TARGET_COMMIT="origin/dev"
+            echo "Using all commits from dev branch"
+            echo "is_partial=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Count commits in dev (up to target) that are not in main
+          COMMIT_COUNT=$(git rev-list origin/main.."$TARGET_COMMIT" --count)
+
+          if [ "$COMMIT_COUNT" -eq 0 ]; then
+            echo "No new commits to merge"
+            echo "has_commits=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Found $COMMIT_COUNT commits not in main"
+          echo "has_commits=true" >> $GITHUB_OUTPUT
+          echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
+
+          # Check if main has commits not in dev (branches diverged)
+          # Always check against origin/dev HEAD, not the target commit
+          MAIN_ONLY_COUNT=$(git rev-list origin/dev..origin/main --count)
+
+          if [ "$MAIN_ONLY_COUNT" -gt 0 ]; then
+            echo "⚠️  WARNING: main has $MAIN_ONLY_COUNT commits not in dev"
+            echo "Branches have diverged - dev needs to be synced with main first"
+            echo "branches_diverged=true" >> $GITHUB_OUTPUT
+            echo "main_only_count=$MAIN_ONLY_COUNT" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Dev is ahead of main (fast-forward merge possible)"
+            echo "branches_diverged=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Get commit summary for PR body
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          git log origin/main.."$TARGET_COMMIT" --pretty=format:"- %s (%h) by %an" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Fail if branches have diverged
+        if: steps.check_commits.outputs.has_commits == 'true' && steps.check_commits.outputs.branches_diverged == 'true'
+        run: |
+          echo "::error::Cannot create PR - branches have diverged!"
+          echo ""
+          echo "❌ Main has ${{ steps.check_commits.outputs.main_only_count }} commits that are not in dev."
+          echo ""
+          echo "Dev must be synced with main before creating a promotion PR."
+          echo ""
+          echo "To fix this, sync dev with main:"
+          echo ""
+          echo "  git checkout dev"
+          echo "  git fetch origin"
+          echo "  git merge origin/main"
+          echo "  # Or to rebase: git rebase origin/main"
+          echo "  git push"
+          echo ""
+          echo "Then run this workflow again."
+          exit 1
+
+      - name: Check version consistency and increment
+        if: steps.check_commits.outputs.has_commits == 'true' && steps.check_commits.outputs.branches_diverged == 'false'
+        id: version_check
+        run: |
+          # Determine the target ref for dev (either specific commit or HEAD)
+          if [ -n "${{ github.event.inputs.last_commit }}" ]; then
+            DEV_REF="${{ steps.check_commits.outputs.target_commit }}"
+          else
+            DEV_REF="origin/dev"
+          fi
+
+          # Extract VERSION from Makefile in dev
+          DEV_MAKEFILE_VERSION=$(git show "$DEV_REF:Makefile" | grep '^VERSION' | head -1 | sed 's/VERSION.*= *//')
+
+          # Extract appVersion from helm/Chart.yaml in dev
+          DEV_HELM_VERSION=$(git show "$DEV_REF:helm/Chart.yaml" | grep '^appVersion:' | sed 's/appVersion: *//')
+
+          # Extract VERSION from Makefile in main
+          MAIN_MAKEFILE_VERSION=$(git show origin/main:Makefile | grep '^VERSION' | head -1 | sed 's/VERSION.*= *//')
+
+          # Extract appVersion from helm/Chart.yaml in main
+          MAIN_HELM_VERSION=$(git show origin/main:helm/Chart.yaml | grep '^appVersion:' | sed 's/appVersion: *//')
+
+          echo "Dev branch versions:"
+          echo "  Makefile VERSION: $DEV_MAKEFILE_VERSION"
+          echo "  Helm appVersion:  $DEV_HELM_VERSION"
+          echo ""
+          echo "Main branch versions:"
+          echo "  Makefile VERSION: $MAIN_MAKEFILE_VERSION"
+          echo "  Helm appVersion:  $MAIN_HELM_VERSION"
+          echo ""
+
+          # Check 1: Dev versions must match each other
+          if [ "$DEV_MAKEFILE_VERSION" != "$DEV_HELM_VERSION" ]; then
+            echo "::error::Version mismatch in dev branch!"
+            echo ""
+            echo "❌ Makefile VERSION ($DEV_MAKEFILE_VERSION) does not match Helm appVersion ($DEV_HELM_VERSION)"
+            echo ""
+            echo "All version values must match before promoting to main."
+            echo ""
+            echo "To fix:"
+            echo "  1. Update Makefile VERSION to match helm/Chart.yaml appVersion, OR"
+            echo "  2. Update helm/Chart.yaml appVersion to match Makefile VERSION"
+            echo "  3. Update helm/values.yaml image.tag to match (if set)"
+            echo "  4. Update helm/values.yaml MCP server image.tag to match (if set)"
+            echo "  5. Commit and push the change to dev"
+            exit 1
+          fi
+
+          # Check 1a: Extract and validate image.tag values from helm/values.yaml
+          DEV_IMAGE_TAG=$(git show "$DEV_REF:helm/values.yaml" | grep -A 15 '^image:' | grep '  tag:' | head -1 | sed 's/.*tag: *"\?\([^"]*\)"\?.*/\1/')
+          DEV_MCP_TAG=$(git show "$DEV_REF:helm/values.yaml" | grep -B 5 'self-service-agent-snow-mcp' | grep 'tag:' | sed 's/.*tag: *"\?\([^"]*\)"\?.*/\1/')
+
+          echo "Dev branch helm/values.yaml tags:"
+          echo "  image.tag:     $DEV_IMAGE_TAG"
+          echo "  MCP server tag: $DEV_MCP_TAG"
+          echo ""
+
+          # Check if image.tag is set and matches Makefile VERSION
+          if [ -n "$DEV_IMAGE_TAG" ] && [ "$DEV_IMAGE_TAG" != "$DEV_MAKEFILE_VERSION" ]; then
+            echo "::error::Image tag mismatch in dev branch!"
+            echo ""
+            echo "❌ helm/values.yaml image.tag ($DEV_IMAGE_TAG) does not match Makefile VERSION ($DEV_MAKEFILE_VERSION)"
+            echo ""
+            echo "To fix:"
+            echo "  1. Update helm/values.yaml image.tag to match Makefile VERSION ($DEV_MAKEFILE_VERSION)"
+            echo "  2. Commit and push the change to dev"
+            exit 1
+          fi
+
+          # Check if MCP server tag is set and matches Makefile VERSION
+          if [ -n "$DEV_MCP_TAG" ] && [ "$DEV_MCP_TAG" != "$DEV_MAKEFILE_VERSION" ]; then
+            echo "::error::MCP server image tag mismatch in dev branch!"
+            echo ""
+            echo "❌ helm/values.yaml MCP server tag ($DEV_MCP_TAG) does not match Makefile VERSION ($DEV_MAKEFILE_VERSION)"
+            echo ""
+            echo "To fix:"
+            echo "  1. Update helm/values.yaml mcp-servers.mcp-servers.self-service-agent-snow.image.tag to match Makefile VERSION ($DEV_MAKEFILE_VERSION)"
+            echo "  2. Commit and push the change to dev"
+            exit 1
+          fi
+
+          # Function to compare semantic versions
+          compare_versions() {
+            local ver1=$1
+            local ver2=$2
+
+            # Remove 'v' prefix if present
+            ver1=${ver1#v}
+            ver2=${ver2#v}
+
+            # Split versions into components
+            IFS='.' read -r -a ver1_parts <<< "$ver1"
+            IFS='.' read -r -a ver2_parts <<< "$ver2"
+
+            # Compare major version
+            if [ "${ver1_parts[0]}" -gt "${ver2_parts[0]}" ]; then
+              return 0  # ver1 > ver2
+            elif [ "${ver1_parts[0]}" -lt "${ver2_parts[0]}" ]; then
+              return 1  # ver1 < ver2
+            fi
+
+            # Compare minor version
+            if [ "${ver1_parts[1]}" -gt "${ver2_parts[1]}" ]; then
+              return 0
+            elif [ "${ver1_parts[1]}" -lt "${ver2_parts[1]}" ]; then
+              return 1
+            fi
+
+            # Compare patch version
+            if [ "${ver1_parts[2]}" -gt "${ver2_parts[2]}" ]; then
+              return 0
+            elif [ "${ver1_parts[2]}" -lt "${ver2_parts[2]}" ]; then
+              return 1
+            fi
+
+            return 2  # versions are equal
+          }
+
+          # Check 2: Dev version must be greater than main version
+          if compare_versions "$DEV_MAKEFILE_VERSION" "$MAIN_MAKEFILE_VERSION"; then
+            echo "✅ Version check passed:"
+            echo "   Dev version ($DEV_MAKEFILE_VERSION) > Main version ($MAIN_MAKEFILE_VERSION)"
+          else
+            if [ $? -eq 2 ]; then
+              echo "::error::Version must be incremented!"
+              echo ""
+              echo "❌ Dev version ($DEV_MAKEFILE_VERSION) is the same as Main version ($MAIN_MAKEFILE_VERSION)"
+            else
+              echo "::error::Version cannot be decreased!"
+              echo ""
+              echo "❌ Dev version ($DEV_MAKEFILE_VERSION) is less than Main version ($MAIN_MAKEFILE_VERSION)"
+            fi
+            echo ""
+            echo "Dev version must be greater than main version for promotion."
+            echo ""
+            echo "To fix, increment the version in dev branch:"
+            echo "  1. Update VERSION in Makefile"
+            echo "  2. Update appVersion in helm/Chart.yaml"
+            echo "  3. Update image.tag in helm/values.yaml (if set)"
+            echo "  4. Update MCP server image.tag in helm/values.yaml (if set)"
+            echo "  5. Ensure all version values match"
+            echo "  6. Commit and push to dev"
+            exit 1
+          fi
+
+          # Output versions for use in PR body
+          echo "dev_version=$DEV_MAKEFILE_VERSION" >> $GITHUB_OUTPUT
+          echo "main_version=$MAIN_MAKEFILE_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if PR already exists
+        if: steps.check_commits.outputs.has_commits == 'true'
+        id: check_pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Check if there's already an open PR from dev to main
+          PR_NUMBER=$(gh pr list --base main --head dev --state open --json number --jq '.[0].number')
+
+          if [ -n "$PR_NUMBER" ]; then
+            echo "PR already exists: #$PR_NUMBER"
+            echo "pr_exists=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          else
+            echo "No existing PR found"
+            echo "pr_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate PR title and body
+        if: steps.check_commits.outputs.has_commits == 'true' && steps.check_pr.outputs.pr_exists == 'false'
+        id: pr_content
+        run: |
+          # Generate PR title
+          if [ -n "${{ github.event.inputs.pr_title }}" ]; then
+            PR_TITLE="${{ github.event.inputs.pr_title }}"
+          else
+            if [ "${{ steps.check_commits.outputs.is_partial }}" = "true" ]; then
+              PR_TITLE="Promote dev to main (${{ steps.check_commits.outputs.commit_count }} commits up to ${{ steps.check_commits.outputs.target_commit_short }})"
+            else
+              PR_TITLE="Promote dev to main (${{ steps.check_commits.outputs.commit_count }} commits)"
+            fi
+          fi
+          echo "title=$PR_TITLE" >> $GITHUB_OUTPUT
+
+          # Generate PR body
+          {
+            echo "body<<EOF"
+            echo "## Summary"
+            echo ""
+            if [ "${{ steps.check_commits.outputs.is_partial }}" = "true" ]; then
+              echo "This PR promotes a **subset of changes** from \`dev\` branch to \`main\` branch."
+              echo ""
+              echo "**Commits included:** ${{ steps.check_commits.outputs.commit_count }}"
+              echo "**Last commit:** \`${{ steps.check_commits.outputs.target_commit }}\`"
+              echo "**Version:** ${{ steps.version_check.outputs.main_version }} → ${{ steps.version_check.outputs.dev_version }}"
+              echo ""
+              echo "> ⚠️ **Partial Promotion:** This PR does not include all commits from dev."
+              echo "> Additional commits in dev will need to be promoted separately."
+              echo ""
+              echo "📌 **Note:** This PR uses a temporary branch that can be deleted after merging."
+            else
+              echo "This PR promotes changes from \`dev\` branch to \`main\` branch."
+              echo ""
+              echo "**Commits included:** ${{ steps.check_commits.outputs.commit_count }}"
+              echo "**Version:** ${{ steps.version_check.outputs.main_version }} → ${{ steps.version_check.outputs.dev_version }}"
+            fi
+            echo ""
+            if [ -n "${{ github.event.inputs.pr_description }}" ]; then
+              echo "## Additional Notes"
+              echo ""
+              echo "${{ github.event.inputs.pr_description }}"
+              echo ""
+            fi
+            echo "## Commits"
+            echo ""
+            echo "${{ steps.check_commits.outputs.commits }}"
+            echo ""
+            echo "---"
+            echo ""
+            echo "**Triggered by:** @${{ github.actor }}"
+            echo "**Workflow:** [${{ github.workflow }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Create temporary branch for partial promotion
+        if: steps.check_commits.outputs.has_commits == 'true' && steps.check_pr.outputs.pr_exists == 'false' && steps.check_commits.outputs.is_partial == 'true'
+        run: |
+          # Create a temporary branch at the target commit
+          BRANCH_NAME="promote-to-main-${{ steps.check_commits.outputs.target_commit_short }}-$(date +%s)"
+          echo "Creating temporary branch: $BRANCH_NAME"
+
+          git checkout -b "$BRANCH_NAME" "${{ steps.check_commits.outputs.target_commit }}"
+          git push origin "$BRANCH_NAME"
+
+          echo "pr_head_branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "is_temp_branch=true" >> $GITHUB_OUTPUT
+        id: temp_branch
+
+      - name: Create Pull Request
+        if: steps.check_commits.outputs.has_commits == 'true' && steps.check_pr.outputs.pr_exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Determine the head branch
+          if [ "${{ steps.check_commits.outputs.is_partial }}" = "true" ]; then
+            HEAD_BRANCH="${{ steps.temp_branch.outputs.pr_head_branch }}"
+          else
+            HEAD_BRANCH="dev"
+          fi
+
+          gh pr create \
+            --base main \
+            --head "$HEAD_BRANCH" \
+            --title "${{ steps.pr_content.outputs.title }}" \
+            --body "${{ steps.pr_content.outputs.body }}"
+
+          echo "✅ Pull Request created successfully"
+
+          if [ "${{ steps.check_commits.outputs.is_partial }}" = "true" ]; then
+            echo ""
+            echo "📌 Temporary branch created: $HEAD_BRANCH"
+            echo "   This branch can be deleted after the PR is merged or closed"
+          fi
+
+      - name: PR already exists
+        if: steps.check_commits.outputs.has_commits == 'true' && steps.check_pr.outputs.pr_exists == 'true'
+        run: |
+          echo "ℹ️  A PR from dev to main already exists: #${{ steps.check_pr.outputs.pr_number }}"
+          echo "View it at: ${{ github.server_url }}/${{ github.repository }}/pull/${{ steps.check_pr.outputs.pr_number }}"
+
+      - name: No commits to promote
+        if: steps.check_commits.outputs.has_commits == 'false'
+        run: |
+          echo "ℹ️  No new commits in dev branch. Nothing to promote to main."
