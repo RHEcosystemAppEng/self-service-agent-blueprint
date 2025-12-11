@@ -107,17 +107,11 @@ The script will:
    3. Click "Review and submit" -> Click "Submit"
 2. **REST API Access**: Click "All" -> Search for "REST API Access Policies" -> 
    1. **Configue MCP Agent - SC**:
-      1. **Set REST API:** Click "MCP Agent - SC" -> Click "REST API" dropdown -> Select "Service Catalog API"
-      2. **Set Authentication Profiles** Double Click "Insert new row.." -> Search for "API Key" -> Click Green Checkmark
-      3. Click "Update"
+      1. **Set REST API:** Click "MCP Agent - SC" -> Click "REST API" dropdown -> Select "Service Catalog API" -> Click "Update"
    2. **Configue "MCP Agent - Table"** 
-      1. **Set REST API:**  Click "REST API" dropdown -> Select "Table API"
-      2. **Set Authentication Profiles**  repeat same steps as in 2.i.a-b
-      3. Click "Update"
+      1. **Set REST API:**  Click "REST API" dropdown -> Select "Table API" -> Click "Update"
    3. **Configue "MCP Agent - UI"**
-       1. **Set REST API:**  Click "REST API" dropdown -> Select "UI GlideRecord API"
-       2. **Set Authentication Profiles**  repeat same steps as in 2.i.a-b
-       3. Click "Update"
+       1. **Set REST API:**  Click "REST API" dropdown -> Select "UI GlideRecord API" -> Click "Update"
         
 
 ### 6. Setup Validation
