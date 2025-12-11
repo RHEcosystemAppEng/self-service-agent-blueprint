@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'main'
+      - 'dev'
 
 # Cancel any previous runs of this workflow
 concurrency:
@@ -36,7 +37,8 @@ jobs:
             VERSIONS="${VERSIONS} latest"
             echo "Adding 'latest' tag for main branch"
           else
-            echo "Skipping 'latest' tag for non-main branch: ${{ github.ref_name }}"
+            VERSIONS="${VERSIONS} dev"
+            echo "Adding 'dev' tag for dev branch"
           fi
 
           echo "versions=${VERSIONS}" >> $GITHUB_OUTPUT
