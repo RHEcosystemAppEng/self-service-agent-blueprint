@@ -145,7 +145,9 @@ class ServiceNowAPIAutomation:
                 print(f"Response: {e.response.text}")
             raise
 
-    def create_api_access_policy(self, policy_name: str, api_name: str, auth_profiles: Dict[str, str]) -> str:
+    def create_api_access_policy(
+        self, policy_name: str, api_name: str, auth_profiles: Dict[str, str]
+    ) -> str:
         """Create API access policy."""
         print(f"🛡️  Creating API access policy: {policy_name}")
 
@@ -203,7 +205,9 @@ class ServiceNowAPIAutomation:
                 print(f"Response: {e.response.text}")
             raise
 
-    def create_auth_profile_mapping(self, policy_sys_id: str, auth_profiles: Dict[str, str]) -> None:
+    def create_auth_profile_mapping(
+        self, policy_sys_id: str, auth_profiles: Dict[str, str]
+    ) -> None:
         """Create authentication profile mappings for the API access policy."""
         print("🔗 Creating authentication profile mappings...")
 
@@ -211,25 +215,33 @@ class ServiceNowAPIAutomation:
 
         # Always create basic_auth first if it exists
         if "basic_auth" in auth_profiles:
-            self._create_single_auth_mapping(mapping_url, policy_sys_id, "basic_auth", auth_profiles["basic_auth"])
+            self._create_single_auth_mapping(
+                mapping_url, policy_sys_id, "basic_auth", auth_profiles["basic_auth"]
+            )
 
         # Then create all other auth profiles
         for auth_type, profile_sys_id in auth_profiles.items():
             if auth_type != "basic_auth":  # Skip basic_auth as we already processed it
-                self._create_single_auth_mapping(mapping_url, policy_sys_id, auth_type, profile_sys_id)
+                self._create_single_auth_mapping(
+                    mapping_url, policy_sys_id, auth_type, profile_sys_id
+                )
 
-    def _create_single_auth_mapping(self, mapping_url: str, policy_sys_id: str, auth_type: str, profile_sys_id: str) -> None:
+    def _create_single_auth_mapping(
+        self, mapping_url: str, policy_sys_id: str, auth_type: str, profile_sys_id: str
+    ) -> None:
         """Helper method to create a single auth profile mapping."""
         try:
             payload = {
                 "api_access_policy": policy_sys_id,
-                "inbound_auth_profile": profile_sys_id
+                "inbound_auth_profile": profile_sys_id,
             }
 
             response = self.session.post(mapping_url, json=payload)
             response.raise_for_status()
 
-            print(f"✅ {auth_type.replace('_', ' ').title()} authentication profile mapping created successfully!")
+            print(
+                f"✅ {auth_type.replace('_', ' ').title()} authentication profile mapping created successfully!"
+            )
 
         except requests.RequestException as e:
             print(f"❌ Error creating {auth_type} auth profile mapping: {e}")
