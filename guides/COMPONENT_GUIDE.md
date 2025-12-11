@@ -274,4 +274,4 @@ To adapt these components for your own use case:
 
 3. **Follow Established Patterns**: The laptop refresh implementation demonstrates all patterns—use it as a reference when building your own use case
 
-For detailed customization guidance, see [Section 7: Customizing for Your Use Case](../README.md#7-customizing-for-your-use-case) in the main README.
+For detailed customization guidance, see [Customizing for your use case](../README.md#customizing-for-your-use-case) in the main README.

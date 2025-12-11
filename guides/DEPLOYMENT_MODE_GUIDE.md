@@ -117,5 +117,5 @@ The same application code, container images, and business logic work in both mod
 For detailed flow diagrams and technical architecture details, see [Architecture Diagrams](../docs/ARCHITECTURE_DIAGRAMS.md).
 
 For deployment instructions, see:
-- [Section 3: Hands-On Quickstart](../README.md#3-hands-on-quickstart) in the main README
+- [Deploy](../README.md#deploy) in the main README
 - [Performance & Scaling Guide](PERFORMANCE_SCALING_GUIDE.md) for scaling considerations
