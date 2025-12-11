@@ -145,7 +145,7 @@ class ServiceNowAPIAutomation:
                 print(f"Response: {e.response.text}")
             raise
 
-    def create_api_access_policy(self, policy_name: str, api_name: str) -> str:
+    def create_api_access_policy(self, policy_name: str, api_name: str, auth_profiles: Dict[str, str]) -> str:
         """Create API access policy."""
         print(f"🛡️  Creating API access policy: {policy_name}")
 
@@ -191,6 +191,10 @@ class ServiceNowAPIAutomation:
             policy_sys_id = str(result["result"]["sys_id"])
 
             print(f"✅ API access policy '{policy_name}' created successfully!")
+
+            # Create authentication profile mappings
+            self.create_auth_profile_mapping(policy_sys_id, auth_profiles)
+
             return policy_sys_id
 
         except requests.RequestException as e:
@@ -198,6 +202,30 @@ class ServiceNowAPIAutomation:
             if hasattr(e, "response") and e.response is not None:
                 print(f"Response: {e.response.text}")
             raise
+
+    def create_auth_profile_mapping(self, policy_sys_id: str, auth_profiles: Dict[str, str]) -> None:
+        """Create authentication profile mappings for the API access policy."""
+        print("🔗 Creating authentication profile mappings...")
+
+        mapping_url = f"{self.instance_url}/api/now/table/sys_auth_profile_mapping"
+
+        for auth_type, profile_sys_id in auth_profiles.items():
+            try:
+                payload = {
+                    "api_access_policy": policy_sys_id,
+                    "inbound_auth_profile": profile_sys_id
+                }
+
+                response = self.session.post(mapping_url, json=payload)
+                response.raise_for_status()
+
+                print(f"✅ {auth_type.replace('_', ' ').title()} authentication profile mapping created successfully!")
+
+            except requests.RequestException as e:
+                print(f"❌ Error creating {auth_type} auth profile mapping: {e}")
+                if hasattr(e, "response") and e.response is not None:
+                    print(f"Response: {e.response.text}")
+                raise
 
     def setup_api_configuration(self) -> Dict[str, Any]:
         """Complete API configuration setup."""
@@ -220,19 +248,19 @@ class ServiceNowAPIAutomation:
 
         # Service Catalog API
         sc_policy_sys_id = self.create_api_access_policy(
-            "MCP Agent - SC", "Service Catalog API"
+            "MCP Agent - SC", "Service Catalog API", results["auth_profiles"]
         )
         results["sc_policy"] = sc_policy_sys_id
 
         # Table API
         table_policy_sys_id = self.create_api_access_policy(
-            "MCP Agent - Tables", "Table API"
+            "MCP Agent - Tables", "Table API", results["auth_profiles"]
         )
         results["table_policy"] = table_policy_sys_id
 
         # UI GlideRecord API
         ui_policy_sys_id = self.create_api_access_policy(
-            "MCP Agent - UI", "UI GlideRecord API"
+            "MCP Agent - UI", "UI GlideRecord API", results["auth_profiles"]
         )
         results["ui_policy"] = ui_policy_sys_id
 
