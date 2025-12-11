@@ -209,23 +209,33 @@ class ServiceNowAPIAutomation:
 
         mapping_url = f"{self.instance_url}/api/now/table/sys_auth_profile_mapping"
 
+        # Always create basic_auth first if it exists
+        if "basic_auth" in auth_profiles:
+            self._create_single_auth_mapping(mapping_url, policy_sys_id, "basic_auth", auth_profiles["basic_auth"])
+
+        # Then create all other auth profiles
         for auth_type, profile_sys_id in auth_profiles.items():
-            try:
-                payload = {
-                    "api_access_policy": policy_sys_id,
-                    "inbound_auth_profile": profile_sys_id
-                }
+            if auth_type != "basic_auth":  # Skip basic_auth as we already processed it
+                self._create_single_auth_mapping(mapping_url, policy_sys_id, auth_type, profile_sys_id)
 
-                response = self.session.post(mapping_url, json=payload)
-                response.raise_for_status()
+    def _create_single_auth_mapping(self, mapping_url: str, policy_sys_id: str, auth_type: str, profile_sys_id: str) -> None:
+        """Helper method to create a single auth profile mapping."""
+        try:
+            payload = {
+                "api_access_policy": policy_sys_id,
+                "inbound_auth_profile": profile_sys_id
+            }
 
-                print(f"✅ {auth_type.replace('_', ' ').title()} authentication profile mapping created successfully!")
+            response = self.session.post(mapping_url, json=payload)
+            response.raise_for_status()
 
-            except requests.RequestException as e:
-                print(f"❌ Error creating {auth_type} auth profile mapping: {e}")
-                if hasattr(e, "response") and e.response is not None:
-                    print(f"Response: {e.response.text}")
-                raise
+            print(f"✅ {auth_type.replace('_', ' ').title()} authentication profile mapping created successfully!")
+
+        except requests.RequestException as e:
+            print(f"❌ Error creating {auth_type} auth profile mapping: {e}")
+            if hasattr(e, "response") and e.response is not None:
+                print(f"Response: {e.response.text}")
+            raise
 
     def setup_api_configuration(self) -> Dict[str, Any]:
         """Complete API configuration setup."""
