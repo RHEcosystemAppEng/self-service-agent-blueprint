@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "requests>=2.25.0",
     "mock-employee-data",
+    "playwright>=1.40.0",
 ]
 
 

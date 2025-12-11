@@ -60,6 +60,10 @@ SERVICENOW_LAPTOP_AVOID_DUPLICATES ?= false
 SERVICENOW_LAPTOP_REQUEST_LIMITS ?=
 TEST_USERS ?=
 
+# ServiceNow Developer Portal Credentials (for waking up PDI)
+SERVICENOW_DEV_PORTAL_USERNAME ?=
+SERVICENOW_DEV_PORTAL_PASSWORD ?=
+
 # PromptGuard Configuration
 PROMPTGUARD_MODEL ?= llama-prompt-guard-2-86m
 PROMPTGUARD_MODEL_ID ?= meta-llama/Llama-Prompt-Guard-2-86M
@@ -213,6 +217,10 @@ help:
 	@echo "  test-all                            - Run tests for all projects"
 	@echo "  test                                - Run tests for self-service agent"
 	@echo ""
+	@echo "ServiceNow PDI Commands:"
+	@echo "  servicenow-wake-install             - Install Playwright for ServiceNow PDI wake-up"
+	@echo "  servicenow-wake                     - Wake up hibernating ServiceNow PDI"
+	@echo ""
 	@echo "Lockfile Management:"
 	@echo "  check-lockfiles                     - Check if all uv.lock files are up-to-date"
 	@echo "  update-lockfiles                    - Update all uv.lock files to match pyproject.toml"
@@ -281,6 +289,8 @@ help:
 	@echo "    SERVICENOW_LAPTOP_REFRESH_ID      - ServiceNow catalog item ID for laptop refresh requests (default: mock_laptop_refresh_id)"
 	@echo "    SERVICENOW_LAPTOP_AVOID_DUPLICATES - Whether to prevent creating duplicate laptop requests for the same model (default: false)"
 	@echo "    SERVICENOW_LAPTOP_REQUEST_LIMITS  - Maximum number of open laptop requests allowed per user (default: None)"
+	@echo "    SERVICENOW_DEV_PORTAL_USERNAME    - ServiceNow Developer Portal username for PDI wake-up (required for servicenow-wake)"
+	@echo "    SERVICENOW_DEV_PORTAL_PASSWORD    - ServiceNow Developer Portal password for PDI wake-up (required for servicenow-wake)"
 	@echo "    TEST_USERS                        - Comma-separated list of email addresses to add to mock employee data for testing"
 	@echo ""
 	@echo "  Request Management Layer:"
@@ -1374,3 +1384,17 @@ jaeger-undeploy:
 	@kubectl delete networkpolicy jaeger-allow-ingress -n $(NAMESPACE) || echo "Network policy not found"
 	@kubectl delete deployment jaeger -n $(NAMESPACE) || echo "Deployment not found"
 	@echo "✅ Jaeger removed successfully!"
+
+# ServiceNow PDI wake-up
+.PHONY: servicenow-wake-install
+servicenow-wake-install: install-servicenow-bootstrap
+	@echo "Installing Playwright browsers..."
+	@cd scripts/servicenow-bootstrap && uv run playwright install chromium
+
+.PHONY: servicenow-wake
+servicenow-wake: servicenow-wake-install
+	@if [ -z "$(SERVICENOW_DEV_PORTAL_USERNAME)" ] || [ -z "$(SERVICENOW_DEV_PORTAL_PASSWORD)" ]; then \
+		echo "❌ Error: SERVICENOW_DEV_PORTAL_USERNAME and SERVICENOW_DEV_PORTAL_PASSWORD are required"; \
+		exit 1; \
+	fi
+	@cd scripts/servicenow-bootstrap && uv run python -m servicenow_bootstrap.wake_up_pdi
