@@ -6,7 +6,7 @@ on:
       github_username:
         description: 'GitHub username/organization'
         required: false
-        default: 'RHEcosystemAppEng'
+        default: 'rh-ai-quickstart'
         type: string
       target_branch:
         description: 'Target branch for building'
