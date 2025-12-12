@@ -24,7 +24,7 @@ The scripts automate most of the manual steps described in the [ServiceNow PDI B
    - Follow [Step 1](SERVICE_NOW_BOOTSTRAP_MANUAL.md#step-1---signup--pdi-new-instance) of the ServiceNow PDI Bootstrap - Manual Setup
      - After the instance is ready click "Manage my instance" and note your: Instance URL, Admin Password
 
-       <img src="images/manage-instance.png" alt="ServiceNow Manage Instance" width="850">
+       <img src="../docs/images/manage-instance.png" alt="ServiceNow Manage Instance" width="850">
 
 ## 🚀 Quick Start
 
@@ -77,7 +77,7 @@ The script will:
 
 1. After setup is complete you should see the following message:
 
-   ![Setup Success Message](images/setup-success.png)
+   ![Setup Success Message](../docs/images/setup-success.png)
 
 2. Save the `SERVICENOW_LAPTOP_REFRESH_ID` & set it as an environment variable for the setup validation.
 
@@ -85,17 +85,17 @@ The script will:
 
    i. Click "Start Building"
 
-      <img src="images/start-building.png" alt="Start Building Button" width="350">
+      <img src="../docs/images/start-building.png" alt="Start Building Button" width="350">
 
    ii. Click "All" -> Search for "REST API Key"
 
-      <img src="images/rest-api-key.png" alt="rest-api-key.png" width="350">
+      <img src="../docs/images/rest-api-key.png" alt="rest-api-key.png" width="350">
 
    iii. Click "MCP Agent API Key"
 
    iv. Click on the right side of the "Token" field click the 🔒icon ("Toggle Password Visibility")
 
-      ![API Key Token Field](images/api-key.png)
+      ![API Key Token Field](../docs/images/api-key.png)
 
    v. Copy and set this as an environment variable named `SERVICENOW_API_KEY`
 
