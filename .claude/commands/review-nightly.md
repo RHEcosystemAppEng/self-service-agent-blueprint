@@ -6,6 +6,8 @@ Run the nightly test failure analysis and generate a comprehensive report.
 
 use the script .claude/scripts/check_nightly_failures.sh to get the results for the last nightly runs.
 
+The script accepts an optional date parameter in YYYY-MM-DD format. If a date is provided, the analysis will use the last nightly runs as of that date instead of the most recent runs. If the user provides a date with this command, pass it to the script as the first argument.
+
 For any runs that failed, generate a summary that indicates for each action run:
 1) was there failures or not
 2) If there were failures, the specific runs that failed

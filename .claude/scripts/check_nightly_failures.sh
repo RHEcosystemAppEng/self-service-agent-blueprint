@@ -3,8 +3,16 @@
 set -e
 
 # Configuration
-REPO="RHEcosystemAppEng/self-service-agent-blueprint"
+REPO="rh-ai-quickstart/it-self-service-agent"
 DOWNLOAD_DIR="./nightly_test_results"
+
+# Parse optional date argument
+AS_OF_DATE=""
+if [ -n "$1" ]; then
+    AS_OF_DATE="$1"
+    echo "Filtering runs as of date: $AS_OF_DATE"
+    echo ""
+fi
 
 # Check if GITHUB_TOKEN is set
 if [ -z "$GITHUB_TOKEN" ]; then
@@ -128,14 +136,33 @@ DOWNLOADED_RESULTS=()
 while IFS='|' read -r workflow_id workflow_name; do
     echo "Checking: $workflow_name (ID: $workflow_id)"
 
-    # Get the most recent run for this workflow
-    latest_run=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+    # Get recent runs for this workflow
+    # Fetch more runs if we need to filter by date
+    per_page=1
+    if [ -n "$AS_OF_DATE" ]; then
+        per_page=50  # Fetch more runs to find the last one before the date
+    fi
+
+    all_runs=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" \
         -H "Accept: application/vnd.github.v3+json" \
-        "https://api.github.com/repos/${REPO}/actions/workflows/${workflow_id}/runs?per_page=1" \
-        | jq -r '.workflow_runs[0] // empty')
+        "https://api.github.com/repos/${REPO}/actions/workflows/${workflow_id}/runs?per_page=${per_page}")
+
+    # Filter runs by date if AS_OF_DATE is provided
+    if [ -n "$AS_OF_DATE" ]; then
+        # Convert AS_OF_DATE to ISO 8601 format for comparison (add end of day)
+        as_of_datetime="${AS_OF_DATE}T23:59:59Z"
+        latest_run=$(echo "$all_runs" | jq -r --arg date "$as_of_datetime" \
+            '.workflow_runs[] | select(.created_at <= $date) | . // empty' | jq -s '.[0] // empty')
+    else
+        latest_run=$(echo "$all_runs" | jq -r '.workflow_runs[0] // empty')
+    fi
 
     if [ -z "$latest_run" ]; then
-        echo "  ⚠️  No runs found for this workflow"
+        if [ -n "$AS_OF_DATE" ]; then
+            echo "  ⚠️  No runs found for this workflow on or before $AS_OF_DATE"
+        else
+            echo "  ⚠️  No runs found for this workflow"
+        fi
         echo ""
         continue
     fi
