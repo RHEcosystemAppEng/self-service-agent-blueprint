@@ -1,15 +1,33 @@
-name: Pull Request - Nightly 20 conversation test
+name: (main) (Scout Prompt) Post-promotion 20 conversation test
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 3 * * *'  # Run daily at 3 AM UTC
-  
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+# Shared concurrency group across all nightly-e2e workflows
+concurrency:
+  group: 'nightly-e2e-tests'
+  cancel-in-progress: false
+
 jobs:
   e2e-tests:
     name: Run e2e tests
+    # Only run if manually triggered or if PR was actually merged
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
+      - name: Validate LLM_API_TOKEN_INFERENCE_SCOUT secret
+        shell: bash
+        env:
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_INFERENCE_SCOUT }}
+        run: |
+          if [ -z "${LLM_API_TOKEN}" ]; then
+            echo "LLM_API_TOKEN_INFERENCE_SCOUT secret is missing or empty. Set it in repository or organization secrets."
+            exit 1
+          fi
       - name: Validate LLM_API_TOKEN_EVAL_70B secret
         shell: bash
         env:
@@ -22,12 +40,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Prepare Runner
-        uses: ./.github/actions/prepare-runner
-        with:
-          swap-storage: 'false'
+          ref: main
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v6
@@ -44,11 +57,12 @@ jobs:
       - name: Initialize cluster and deploy application
         uses: ./.github/actions/kind
         with:
-          llm: ${{ vars.LLM_INFERENCE }}
-          llm_id: ${{ vars.LLM_ID_INFERENCE }}
-          llm_url: ${{ vars.LLM_URL_INFERENCE }}
+          llm: ${{ vars.LLM_INFERENCE_SCOUT }}
+          llm_id: ${{ vars.LLM_ID_INFERENCE_SCOUT }}
+          llm_url: ${{ vars.LLM_URL_INFERENCE_SCOUT }}
         env:
-          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_INFERENCE }}
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_INFERENCE_SCOUT }}
+          LG_PROMPT_LAPTOP_REFRESH: /app/agent-service/config/lg-prompts/lg-prompt-small-scout.yaml
 
       - name: Set `test` as default namespace on Kind
         shell: bash
