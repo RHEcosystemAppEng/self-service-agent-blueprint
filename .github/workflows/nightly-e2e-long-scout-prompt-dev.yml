@@ -1,9 +1,14 @@
-name: (Scout Prompt) Nightly 20 conversation test
+name: (dev) (Scout Prompt) Nightly 20 conversation test
 
 on:
   workflow_dispatch:
   schedule:
     - cron: '0 5 * * *'  # Run daily at 5 AM UTC
+
+# Shared concurrency group across all nightly-e2e workflows
+concurrency:
+  group: 'nightly-e2e-tests'
+  cancel-in-progress: false
 
 jobs:
   e2e-tests:
@@ -31,7 +36,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: dev
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v6

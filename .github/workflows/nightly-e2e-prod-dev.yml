@@ -1,0 +1,163 @@
+name: (dev) Prod deploy - Nightly 20 conversation test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'  # Run daily at 6 AM UTC
+
+# Shared concurrency group across all nightly-e2e workflows
+concurrency:
+  group: 'nightly-e2e-tests'
+  cancel-in-progress: false
+
+jobs:
+  e2e-tests:
+    name: Run e2e tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate LLM_API_TOKEN_EVAL_70B secret
+        shell: bash
+        env:
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL_70B }}
+        run: |
+          if [ -z "${LLM_API_TOKEN}" ]; then
+            echo "LLM_API_TOKEN_EVAL_70B secret is missing or empty. Set it in repository or organization secrets."
+            exit 1
+          fi
+
+      - name: Validate PROD_TOKEN and PROD_SERVER secrets
+        shell: bash
+        env:
+          PROD_TOKEN: ${{ secrets.PROD_TOKEN }}
+          PROD_SERVER: ${{ secrets.PROD_SERVER }}
+        run: |
+          if [ -z "${PROD_TOKEN}" ]; then
+            echo "PROD_TOKEN secret is missing or empty. Set it in repository or organization secrets."
+            exit 1
+          fi
+          if [ -z "${PROD_SERVER}" ]; then
+            echo "PROD_SERVER secret is missing or empty. Set it in repository or organization secrets."
+            exit 1
+          fi
+
+      - name: Validate ServiceNow secrets
+        shell: bash
+        env:
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SERVICENOW_API_KEY: ${{ secrets.SERVICENOW_API_KEY }}
+          SERVICENOW_LAPTOP_REFRESH_ID: ${{ secrets.SERVICENOW_LAPTOP_REFRESH_ID }}
+        run: |
+          if [ -z "${SERVICENOW_INSTANCE_URL}" ]; then
+            echo "SERVICENOW_INSTANCE_URL secret is missing or empty. Set it in repository or organization secrets."
+            exit 1
+          fi
+          if [ -z "${SERVICENOW_API_KEY}" ]; then
+            echo "SERVICENOW_API_KEY secret is missing or empty. Set it in repository or organization secrets."
+            exit 1
+          fi
+          if [ -z "${SERVICENOW_LAPTOP_REFRESH_ID}" ]; then
+            echo "SERVICENOW_LAPTOP_REFRESH_ID secret is missing or empty. Set it in repository or organization secrets."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          ref: dev
+
+      - name: Prepare Runner
+        uses: ./.github/actions/prepare-runner
+        with:
+          swap-storage: 'false'
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.6.17"
+          python-version: "3.12"
+
+      - name: Install Local Dependencies
+        shell: bash
+        run: |
+          make oc
+          echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
+
+      - name: log into the cluster
+        shell: bash
+        run: |
+          oc login --token=$PROD_TOKEN --server=$PROD_SERVER
+        env:
+          PROD_TOKEN: ${{ secrets.PROD_TOKEN }}
+          PROD_SERVER: ${{ secrets.PROD_SERVER }}
+
+      - name: Make sure there are no pods running in the namespace
+        continue-on-error: true
+        shell: bash
+        run: |
+          make helm-uninstall NAMESPACE=self-service-agent-ci-project-1
+
+      - name: Extract version from Makefile
+        id: version
+        run: |
+          BASE_VERSION=$(make version)
+          VERSION_WITH_COMMIT="${BASE_VERSION}-${{ github.sha }}"
+          echo "version=${VERSION_WITH_COMMIT}" >> $GITHUB_OUTPUT
+          echo "Base version: ${BASE_VERSION}"
+          echo "Version with commit: ${VERSION_WITH_COMMIT}"
+
+      - name: Install the quickstart
+        shell: bash
+        run: |
+          make helm-install-prod NAMESPACE=self-service-agent-ci-project-1 OTEL_EXPORTER_OTLP_ENDPOINT="http://otel-collector-collector.observability-hub.svc.cluster.local:4318"
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          LLM_URL: ${{ vars.LLM_URL_EVAL_70B }}
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL_70B }}
+          LLM_ID: ${{ vars.LLM_ID_INFERENCE }}
+          LLM: ${{ vars.LLM_ID_INFERENCE }}
+          SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
+          SERVICENOW_API_KEY: ${{ secrets.SERVICENOW_API_KEY }}
+          SERVICENOW_LAPTOP_REFRESH_ID: ${{ secrets.SERVICENOW_LAPTOP_REFRESH_ID }}
+
+      - name: Install evaluations dependencies
+        shell: bash
+        run: |
+          make sync-evaluations
+
+      - name: Run responses evaluations (Request Manager)
+        shell: bash
+        run: |
+          make test-long-resp-integration-request-mgr
+        env:
+          LLM_URL: ${{ vars.LLM_URL_EVAL_70B }}
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL_70B }}
+
+      - name: Create evaluations tarball
+        if: always()
+        shell: bash
+        run: |
+          if [ -d "evaluations/results" ]; then
+            tar -czf evaluations-results-${{ github.run_id }}.tar.gz -C evaluations results/
+            echo "Tarball created successfully from evaluations/results/"
+            ls -lh evaluations-results-${{ github.run_id }}.tar.gz
+          else
+            echo "evaluations/results directory not found, creating empty marker"
+            mkdir -p evaluations/results
+            echo "No evaluation results were generated" > evaluations/results/README.txt
+            tar -czf evaluations-results-${{ github.run_id }}.tar.gz -C evaluations results/
+          fi
+
+      - name: Upload evaluations artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluations-results-${{ github.run_id }}
+          path: evaluations-results-${{ github.run_id }}.tar.gz
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: stop the quickstart
+        if: success()
+        shell: bash
+        run: |
+          make helm-uninstall NAMESPACE=self-service-agent-ci-project-1

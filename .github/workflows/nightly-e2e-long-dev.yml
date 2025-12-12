@@ -1,24 +1,20 @@
-name: (Small Prompt) Nightly 20 conversation test
+name: (dev) Pull Request - Nightly 20 conversation test
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 4 * * *'  # Run daily at 4 AM UTC
+    - cron: '0 3 * * *'  # Run daily at 3 AM UTC
+
+# Shared concurrency group across all nightly-e2e workflows
+concurrency:
+  group: 'nightly-e2e-tests'
+  cancel-in-progress: false
 
 jobs:
   e2e-tests:
     name: Run e2e tests
     runs-on: ubuntu-latest
     steps:
-      - name: Validate LLM_API_TOKEN_INFERENCE secret
-        shell: bash
-        env:
-          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_INFERENCE }}
-        run: |
-          if [ -z "${LLM_API_TOKEN}" ]; then
-            echo "LLM_API_TOKEN_INFERENCE secret is missing or empty. Set it in repository or organization secrets."
-            exit 1
-          fi
       - name: Validate LLM_API_TOKEN_EVAL_70B secret
         shell: bash
         env:
@@ -31,7 +27,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: dev
 
       - name: Prepare Runner
         uses: ./.github/actions/prepare-runner
@@ -58,7 +54,6 @@ jobs:
           llm_url: ${{ vars.LLM_URL_INFERENCE }}
         env:
           LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_INFERENCE }}
-          LG_PROMPT_LAPTOP_REFRESH: /app/agent-service/config/lg-prompts/lg-prompt-small.yaml
 
       - name: Set `test` as default namespace on Kind
         shell: bash
