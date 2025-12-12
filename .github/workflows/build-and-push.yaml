@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'main'
+      - 'dev'
 
 # Cancel any previous runs of this workflow
 concurrency:
@@ -21,12 +22,41 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if merge commit or squash merge
+        id: check_merge
+        run: |
+          # Check if it's a merge commit (has 2+ parents)
+          PARENT_COUNT=$(git log -1 --format=%P HEAD | wc -w)
+          if [ "$PARENT_COUNT" -gt 1 ]; then
+            echo "is_merge=true" >> $GITHUB_OUTPUT
+            echo "Detected: Merge commit (has $PARENT_COUNT parents)"
+          else
+            # Check if it's a squash merge (commit message starts with "Merge pull request")
+            COMMIT_MSG=$(git log -1 --pretty=%B HEAD)
+            if echo "$COMMIT_MSG" | grep -qE "^Merge pull request"; then
+              echo "is_merge=true" >> $GITHUB_OUTPUT
+              echo "Detected: Squash merge (commit message pattern matches)"
+            else
+              echo "is_merge=false" >> $GITHUB_OUTPUT
+              echo "Skipping: This is not a merge commit or squash merge"
+            fi
+          fi
 
       - name: Extract version from Makefile
+        if: steps.check_merge.outputs.is_merge == 'true'
         id: version
         run: |
-          BASE_VERSION=$(make version)
-          VERSION_WITH_COMMIT="${BASE_VERSION}-${{ github.sha }}"
+          RAW_VERSION=$(make version)
+          # Append -dev for dev branch (only in BASE_VERSION, not VERSION_WITH_COMMIT)
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            BASE_VERSION="${RAW_VERSION}"
+          else
+            BASE_VERSION="${RAW_VERSION}-dev"
+          fi
+          VERSION_WITH_COMMIT="${RAW_VERSION}-${{ github.sha }}"
           echo "base_version=${BASE_VERSION}" >> $GITHUB_OUTPUT
           echo "version_with_commit=${VERSION_WITH_COMMIT}" >> $GITHUB_OUTPUT
 
@@ -36,7 +66,8 @@ jobs:
             VERSIONS="${VERSIONS} latest"
             echo "Adding 'latest' tag for main branch"
           else
-            echo "Skipping 'latest' tag for non-main branch: ${{ github.ref_name }}"
+            VERSIONS="${VERSIONS} dev"
+            echo "Adding 'dev' tag for dev branch"
           fi
 
           echo "versions=${VERSIONS}" >> $GITHUB_OUTPUT
@@ -45,9 +76,11 @@ jobs:
           echo "All versions: ${VERSIONS}"
 
       - name: Set up Docker Buildx
+        if: steps.check_merge.outputs.is_merge == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Quay.io
+        if: steps.check_merge.outputs.is_merge == 'true'
         uses: docker/login-action@v3
         with:
           registry: quay.io
@@ -55,12 +88,14 @@ jobs:
           password: ${{ secrets.QUAY_PASSWORD }}
 
       - name: Setup uv
+        if: steps.check_merge.outputs.is_merge == 'true'
         uses: astral-sh/setup-uv@v6
         with:
           version: "0.6.17"
           python-version: "3.12"
 
       - name: Build all Images
+        if: steps.check_merge.outputs.is_merge == 'true'
         run: |
           IFS=' ' read -ra VERSIONS <<< "${{ steps.version.outputs.versions }}"
           for version in "${VERSIONS[@]}"; do
@@ -69,6 +104,7 @@ jobs:
           done
 
       - name: Push all Images
+        if: steps.check_merge.outputs.is_merge == 'true'
         run: |
           IFS=' ' read -ra VERSIONS <<< "${{ steps.version.outputs.versions }}"
           for version in "${VERSIONS[@]}"; do
