@@ -26,6 +26,30 @@ The scripts automate most of the manual steps described in the [ServiceNow PDI B
 
        <img src="../docs/images/manage-instance.png" alt="ServiceNow Manage Instance" width="850">
 
+2. **Hibernating Instances**: ServiceNow PDI instances automatically hibernate after periods of inactivity.
+
+### 🔄 Waking Up a Hibernating Instance
+
+If your instance is hibernating, use the automated wake-up script before proceeding with setup:
+
+```bash
+# Set your ServiceNow Developer Portal credentials (not instance credentials)
+export SERVICENOW_DEV_PORTAL_USERNAME="your-developer-portal-email@example.com"
+export SERVICENOW_DEV_PORTAL_PASSWORD="your-developer-portal-password"
+
+# Wake up the instance
+make servicenow-wake
+```
+
+**What this does:**
+- Automates logging into the ServiceNow Developer Portal
+- Triggers your instance wake-up process
+- Saves you from manually clicking through login flows
+
+**Important notes:**
+- This uses your **Developer Portal credentials** (the account you use to log into https://developer.servicenow.com), NOT your instance admin credentials
+- The script only triggers the wake-up process - after triggering, the instance typically takes 3-4 minutes (sometimes more) to fully boot
+
 ## 🚀 Quick Start
 
 ### 1. Setup Configuration
