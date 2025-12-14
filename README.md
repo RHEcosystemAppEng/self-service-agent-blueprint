@@ -648,6 +648,8 @@ is being set up and configured. These guides include the required steps:
 - [ServiceNow PDI Bootstrap - Automated Setup](guides/SERVICE_NOW_BOOTSTRAP_AUTOMATED.md) - for a guide to automated ServiceNow Bootstrap (recommended)
 - [ServiceNow PDI Bootstrap - Manual Setup](guides/SERVICE_NOW_BOOTSTRAP_MANUAL.md) - for a guide to manual ServiceNow Bootstrap
 
+**Note:** ServiceNow PDI instances hibernate after inactivity. See the wake-up instructions in the [Automated Setup guide](guides/SERVICE_NOW_BOOTSTRAP_AUTOMATED.md#-waking-up-a-hibernating-instance).
+
 #### Step 2: configure ServiceNow credentials
 
 In step one you will have noted these values:
