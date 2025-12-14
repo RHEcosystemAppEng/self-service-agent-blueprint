@@ -68,6 +68,27 @@ class ServiceNowCatalogAutomation:
             print(f"Error getting category sys_id for '{category_name}': {e}")
             return None
 
+    def get_user_criteria_sys_id(self, criteria_name: str) -> Optional[str]:
+        """Get the sys_id for a user criteria by name."""
+        url = f"{self.instance_url}/api/now/table/user_criteria"
+        params = {
+            "sysparm_query": f"sys_name={criteria_name}",
+            "sysparm_fields": "sys_id",
+        }
+
+        try:
+            response = self.session.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("result"):
+                return str(data["result"][0]["sys_id"])
+            return None
+
+        except requests.RequestException as e:
+            print(f"Error getting user criteria sys_id for '{criteria_name}': {e}")
+            return None
+
     def create_catalog_item(self) -> str:
         """Create the PC Refresh catalog item."""
         print("📦 Creating PC Refresh catalog item...")
@@ -176,6 +197,57 @@ class ServiceNowCatalogAutomation:
 
         except requests.RequestException as e:
             print(f"⚠️  Error adding item to category: {e}")
+
+    def create_user_criteria_assignment(self, item_sys_id: str) -> None:
+        """Create user criteria assignment for catalog item."""
+        print("👥 Creating user criteria assignment...")
+
+        try:
+            # Get the User Criteria ID for "All ACME Corporation employees"
+            criteria_name = "All ACME Corporation employees"
+            user_criteria_sys_id = self.get_user_criteria_sys_id(criteria_name)
+
+            if not user_criteria_sys_id:
+                print(
+                    f"⚠️  User criteria '{criteria_name}' not found, skipping assignment"
+                )
+                return
+
+            # Check if assignment already exists
+            check_url = (
+                f"{self.instance_url}/api/now/table/sc_cat_item_user_criteria_mtom"
+            )
+            check_params = {
+                "sysparm_query": f"sc_cat_item={item_sys_id}^user_criteria={user_criteria_sys_id}"
+            }
+
+            response = self.session.get(check_url, params=check_params)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("result"):
+                print("✅ User criteria assignment already exists")
+                return
+
+            # Create user criteria assignment
+            assignment_data = {
+                "sc_cat_item": item_sys_id,
+                "user_criteria": user_criteria_sys_id,
+            }
+
+            create_url = (
+                f"{self.instance_url}/api/now/table/sc_cat_item_user_criteria_mtom"
+            )
+            response = self.session.post(create_url, json=assignment_data)
+            response.raise_for_status()
+
+            print(f"✅ User criteria assignment created for '{criteria_name}'")
+
+        except requests.RequestException as e:
+            print(f"❌ Error creating user criteria assignment: {e}")
+            if hasattr(e, "response") and e.response is not None:
+                print(f"Response: {e.response.text}")
+            raise
 
     def create_variable(self, item_sys_id: str, variable_data: Dict[str, Any]) -> str:
         """Create a catalog variable for the item."""
@@ -315,6 +387,9 @@ class ServiceNowCatalogAutomation:
 
         # Create catalog item
         item_sys_id = self.create_catalog_item()
+
+        # Create user criteria assignment
+        self.create_user_criteria_assignment(item_sys_id)
 
         # Create variables
         print("📋 Creating catalog variables...")
