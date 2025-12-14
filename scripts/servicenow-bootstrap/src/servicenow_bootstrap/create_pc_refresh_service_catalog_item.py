@@ -237,7 +237,9 @@ class ServiceNowCatalogAutomation:
             data = response.json()
 
             if data.get("result"):
-                print(f"✅ User criteria assignment for '{criteria_name}' already exists")
+                print(
+                    f"✅ User criteria assignment for '{criteria_name}' already exists"
+                )
                 return
 
             # Create user criteria assignment
@@ -255,7 +257,9 @@ class ServiceNowCatalogAutomation:
             )
 
         except requests.RequestException as e:
-            print(f"❌ Error creating user criteria assignment for '{criteria_name}': {e}")
+            print(
+                f"❌ Error creating user criteria assignment for '{criteria_name}': {e}"
+            )
             if hasattr(e, "response") and e.response is not None:
                 print(f"Response: {e.response.text}")
             raise
