@@ -402,13 +402,6 @@ class ServiceNowCatalogAutomation:
             item_sys_id, self.catalog_config["laptop_choices"]
         )
 
-        print("✅ Catalog setup completed!")
-        print("\n📝 Manual steps still required:")
-        print(
-            "1. Set proper access controls (Available for: Any User, Not available for: Guest User)"
-        )
-        print("2. Submit the catalog item")
-
         return {
             "catalog_item_sys_id": item_sys_id,
             "requested_for_variable": requested_for_var,
