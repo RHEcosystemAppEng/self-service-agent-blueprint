@@ -91,8 +91,8 @@ Each time you add a laptop option, if you don't provide a value, one will be gen
    - Check "Hide quantity selector"
 
    ### Access
-   - **Available for:** Browse → Select "Any User" → Click "Save selection"
-   - **Not available for:** Browse → Select "Guest User" → Click "Save selection"
+   - **Available for:** Browse → Select "All ACME Corporation employees" → Click "Save selection"
+     - Note: "All ACME Corporation employees" is ServiceNow's generic Employee user criteria
 
    ### Fulfillment
    - **Process engine:** Select "Flow Designer flow"
