@@ -1066,6 +1066,8 @@ Agentic systems involve complex interactions between multiple components—routi
 
 The system includes OpenTelemetry support for distributed tracing across all components, enabling you to track requests end-to-end through Request Manager, Agent Service, Integration Dispatcher, MCP Servers, and Llama Stack. By integrating with OpenShift's observability stack, you gain unified monitoring across all platform components alongside your existing infrastructure metrics.
 
+![Tracing Schema](guides/images/tracing-schema.png)
+
 #### Setting up observability infrastructure
 
 Before enabling distributed tracing, you need to set up an OpenTelemetry collector to receive, process, and visualize traces.
