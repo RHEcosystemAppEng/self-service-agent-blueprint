@@ -176,7 +176,7 @@ make test-mcp-snow             # Run tests for ServiceNow MCP
 
 **Default Registry:**
 
-By default, container images are built for `quay.io/ecosystem-appeng`. You can override this by setting the `REGISTRY` environment variable (see examples below).
+By default, container images are built for `quay.io/rh-ai-quickstart`. You can override this by setting the `REGISTRY` environment variable (see examples below).
 
 #### Building Container Images
 

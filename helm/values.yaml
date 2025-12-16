@@ -7,7 +7,7 @@ logLevel: "INFO"
 
 # This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
 image:
-  registry: quay.io/ecosystem-appeng
+  registry: quay.io/rh-ai-quickstart
   requestManager: self-service-agent-request-manager
   agentService: self-service-agent-service
   integrationDispatcher: self-service-agent-integration-dispatcher
@@ -241,7 +241,7 @@ mcp-servers:
       replicas: 1
       deploymentMode: deployment  # Use standard Deployment (no Toolhive)
       image:
-        repository: quay.io/ecosystem-appeng/self-service-agent-snow-mcp
+        repository: quay.io/rh-ai-quickstart/self-service-agent-snow-mcp
         tag: "0.0.2"
       port: 8000
       targetPort: 8000

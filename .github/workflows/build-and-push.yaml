@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
- REGISTRY: quay.io/ecosystem-appeng
+ REGISTRY: quay.io/rh-ai-quickstart
 
 jobs:
   build-and-push:

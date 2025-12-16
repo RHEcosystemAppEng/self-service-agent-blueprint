@@ -10,7 +10,7 @@ VERSION ?= 0.0.2
 # If not set, uses defaults from helm/values.yaml
 REPLICA_COUNT ?=
 CONTAINER_TOOL ?= podman
-REGISTRY ?= quay.io/ecosystem-appeng
+REGISTRY ?= quay.io/rh-ai-quickstart
 PYTHON_VERSION ?= 3.12
 ARCH ?= linux/amd64
 REQUEST_MGR_IMG ?= $(REGISTRY)/self-service-agent-request-manager:$(VERSION)
@@ -243,7 +243,7 @@ help:
 	@echo ""
 	@echo "  Core Configuration:"
 	@echo "    CONTAINER_TOOL                    - Container build tool (default: podman)"
-	@echo "    REGISTRY                          - Container registry (default: quay.io/ecosystem-appeng)"
+	@echo "    REGISTRY                          - Container registry (default: quay.io/rh-ai-quickstart)"
 	@echo "    VERSION                           - Image version tag (default: 0.0.2)"
 	@echo "    NAMESPACE                         - Target namespace (required, no default)"
 	@echo "    REPLICA_COUNT                     - Number of replicas for scalable services (optional)"
