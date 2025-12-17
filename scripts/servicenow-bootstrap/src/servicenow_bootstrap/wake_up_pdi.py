@@ -15,6 +15,15 @@ from playwright.sync_api import Page, sync_playwright
 
 from .utils import get_env_var
 
+# UI element selectors for ServiceNow Developer Portal login flow
+SELECTORS = {
+    "logo": "#logo",
+    "username": "#username",
+    "password": "#password",
+    "next_button": "#identify-submit",
+    "signin_button": "#challenge-authenticator-submit",
+}
+
 
 def set_cookies(page: Page) -> None:
     """
@@ -97,32 +106,32 @@ def wake_up_instance(
 
             # Wait for logo to confirm page loaded
             logging.info("Searching for the logo element")
-            page.wait_for_selector("#logo", state="visible")
+            page.wait_for_selector(SELECTORS["logo"], state="visible")
             logging.info("Found logo element")
 
             # Fill username
             logging.info("Filling out the username field")
-            page.fill("#username", username)
+            page.fill(SELECTORS["username"], username)
             logging.info(f"Filled username field with {username}")
 
             # Click Next button
             logging.info("Clicking the next button")
-            page.click("#identify-submit")
+            page.click(SELECTORS["next_button"])
             logging.info("Clicked Next button")
 
             # Wait for password field
             logging.info("Searching for the password field")
-            page.wait_for_selector("#password", state="visible")
+            page.wait_for_selector(SELECTORS["password"], state="visible")
             logging.info("Found password field")
 
             # Fill password
             logging.info("Filling out the password field")
-            page.fill("#password", password)
+            page.fill(SELECTORS["password"], password)
             logging.info("Filled password field with ******")
 
             # Click Sign In button
             logging.info("Clicking the Sign In button")
-            page.click("#challenge-authenticator-submit")
+            page.click(SELECTORS["signin_button"])
             logging.info("Clicked Sign In button")
 
             # Wait for navigation to complete after login
@@ -139,6 +148,10 @@ def wake_up_instance(
 
             # Set cookies to bypass modal
             set_cookies(page)
+
+            # Wait for the page to fully load and process the wu=true parameter
+            logging.info("Waiting for wake-up trigger to process...")
+            page.wait_for_timeout(5000)  # Wait 5 seconds for JavaScript to execute
 
             logging.info(
                 "Instance wakeup initiated successfully, "
