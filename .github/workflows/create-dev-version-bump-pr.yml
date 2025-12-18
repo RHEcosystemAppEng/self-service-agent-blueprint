@@ -137,33 +137,27 @@ jobs:
           CURRENT_VERSION="${{ steps.version.outputs.current_version }}"
           BRANCH_NAME="${{ steps.commit.outputs.branch_name }}"
 
-          # Create PR body
-          PR_BODY=$(cat <<'EOF'
+          gh pr create \
+            --base dev \
+            --head "$BRANCH_NAME" \
+            --title "chore: increment dev version to $NEW_VERSION" \
+            --body "$(cat <<EOF
 ## Summary
 
-This PR increments the dev version from `$CURRENT_VERSION` to `$NEW_VERSION`.
+This PR increments the dev version from \`$CURRENT_VERSION\` to \`$NEW_VERSION\`.
 
 ## Files Updated
 
-- **Makefile**: `BASE_VERSION`
-- **helm/Chart.yaml**: `appVersion`
-- **helm/values.yaml**: `image.tag` (2 locations)
+- **Makefile**: \`BASE_VERSION\`
+- **helm/Chart.yaml**: \`appVersion\`
+- **helm/values.yaml**: \`image.tag\` (2 locations)
 
 ---
 
 **Triggered by:** @${{ github.actor }}
 **Workflow:** [${{ github.workflow }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
 EOF
-)
-
-          # Replace variables in PR body
-          PR_BODY=$(echo "$PR_BODY" | sed "s/\$CURRENT_VERSION/$CURRENT_VERSION/g; s/\$NEW_VERSION/$NEW_VERSION/g")
-
-          gh pr create \
-            --base dev \
-            --head "$BRANCH_NAME" \
-            --title "chore: increment dev version to $NEW_VERSION" \
-            --body "$PR_BODY"
+)"
 
           echo "✅ Pull Request created successfully"
 
