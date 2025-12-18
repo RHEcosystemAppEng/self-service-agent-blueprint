@@ -286,11 +286,19 @@ jobs:
           echo "dev_version=$DEV_MAKEFILE_VERSION" >> $GITHUB_OUTPUT
           echo "main_version=$MAIN_MAKEFILE_VERSION" >> $GITHUB_OUTPUT
 
+      - name: Generate GitHub App Token
+        if: steps.check_commits.outputs.has_commits == 'true'
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.PR_CREATION_APP_IT_SELF_SERVICE_ID }}
+          private-key: ${{ secrets.PR_CREATION_APP_IT_SELF_SERVICE_PRIVATE_KEY }}
+
       - name: Check if PR already exists
         if: steps.check_commits.outputs.has_commits == 'true'
         id: check_pr
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
         run: |
           # Check if there's already an open PR from dev to main
           PR_NUMBER=$(gh pr list --base main --head dev --state open --json number --jq '.[0].number')
@@ -377,7 +385,7 @@ jobs:
       - name: Create Pull Request
         if: steps.check_commits.outputs.has_commits == 'true' && steps.check_pr.outputs.pr_exists == 'false'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
         run: |
           # Determine the head branch
           if [ "${{ steps.check_commits.outputs.is_partial }}" = "true" ]; then
