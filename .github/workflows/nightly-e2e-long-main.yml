@@ -2,21 +2,16 @@ name: (main) Pull Request - Post-promotion 20 conversation test
 
 on:
   workflow_dispatch:
-  pull_request:
-    types: [closed]
-    branches:
-      - main
-
-# Shared concurrency group across all nightly-e2e workflows
-concurrency:
-  group: 'nightly-e2e-tests'
-  cancel-in-progress: false
+  workflow_run:
+    workflows: ["(main) Prod deploy - Post-promotion test"]
+    types:
+      - completed
 
 jobs:
   e2e-tests:
     name: Run e2e tests
-    # Only run if manually triggered or if PR was actually merged
-    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
+    # Only run if: manually triggered, OR if previous workflow was NOT manually dispatched (run regardless of success/failure)
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event != 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Validate LLM_API_TOKEN_EVAL_70B secret

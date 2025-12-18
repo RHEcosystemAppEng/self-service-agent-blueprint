@@ -32,11 +32,13 @@ jobs:
             exit 1
           fi
           
-          # Check if PR is from the dev branch
-          if [ "${PR_SOURCE_BRANCH}" != "dev" ]; then
-            echo "::error::PR must come from the 'dev' branch. Current source branch: ${PR_SOURCE_BRANCH}"
+          # Check if PR is from the dev branch or a dev-* temporary branch
+          if [ "${PR_SOURCE_BRANCH}" = "dev" ]; then
+            echo "✅ PR validation passed: PR is from 'dev' branch in the same repository"
+          elif [[ "${PR_SOURCE_BRANCH}" =~ ^dev-[a-f0-9]+$ ]]; then
+            echo "✅ PR validation passed: PR is from temporary promotion branch '${PR_SOURCE_BRANCH}' in the same repository"
+          else
+            echo "::error::PR must come from the 'dev' branch or a 'dev-<commit>' temporary branch. Current source branch: ${PR_SOURCE_BRANCH}"
             exit 1
           fi
-          
-          echo "✅ PR validation passed: PR is from 'dev' branch in the same repository"
 

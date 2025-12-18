@@ -66,17 +66,18 @@ jobs:
               exit 1
             fi
 
-            # Get the full SHA for display
-            TARGET_COMMIT_SHA=$(git rev-parse "$TARGET_COMMIT")
-            echo "Using specified commit: $TARGET_COMMIT_SHA"
+            echo "Using specified commit: $TARGET_COMMIT"
             echo "is_partial=true" >> $GITHUB_OUTPUT
-            echo "target_commit=$TARGET_COMMIT_SHA" >> $GITHUB_OUTPUT
-            echo "target_commit_short=$(git rev-parse --short "$TARGET_COMMIT_SHA")" >> $GITHUB_OUTPUT
           else
             TARGET_COMMIT="origin/dev"
             echo "Using all commits from dev branch"
             echo "is_partial=false" >> $GITHUB_OUTPUT
           fi
+
+          # Get the full SHA for the target commit (common for both paths)
+          TARGET_COMMIT_SHA=$(git rev-parse "$TARGET_COMMIT")
+          echo "target_commit=$TARGET_COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "target_commit_short=$(git rev-parse --short "$TARGET_COMMIT_SHA")" >> $GITHUB_OUTPUT
 
           # Count commits in dev (up to target) that are not in main
           COMMIT_COUNT=$(git rev-list origin/main.."$TARGET_COMMIT" --count)
@@ -135,12 +136,8 @@ jobs:
         if: steps.check_commits.outputs.has_commits == 'true' && steps.check_commits.outputs.branches_diverged == 'false'
         id: version_check
         run: |
-          # Determine the target ref for dev (either specific commit or HEAD)
-          if [ -n "${{ github.event.inputs.last_commit }}" ]; then
-            DEV_REF="${{ steps.check_commits.outputs.target_commit }}"
-          else
-            DEV_REF="origin/dev"
-          fi
+          # Use the target commit that was already determined
+          DEV_REF="${{ steps.check_commits.outputs.target_commit }}"
 
           # Extract BASE_VERSION from Makefile in dev
           DEV_MAKEFILE_VERSION=$(git show "$DEV_REF:Makefile" | grep '^BASE_VERSION' | head -1 | sed 's/BASE_VERSION.*= *//')
@@ -320,11 +317,7 @@ jobs:
           if [ -n "${{ github.event.inputs.pr_title }}" ]; then
             PR_TITLE="${{ github.event.inputs.pr_title }}"
           else
-            if [ "${{ steps.check_commits.outputs.is_partial }}" = "true" ]; then
-              PR_TITLE="Promote dev to main (${{ steps.check_commits.outputs.commit_count }} commits up to ${{ steps.check_commits.outputs.target_commit_short }})"
-            else
-              PR_TITLE="Promote dev to main (${{ steps.check_commits.outputs.commit_count }} commits)"
-            fi
+            PR_TITLE="Promote dev to main (${{ steps.check_commits.outputs.commit_count }} commits up to ${{ steps.check_commits.outputs.target_commit_short }})"
           fi
           echo "title=$PR_TITLE" >> $GITHUB_OUTPUT
 
@@ -335,21 +328,20 @@ jobs:
             echo ""
             if [ "${{ steps.check_commits.outputs.is_partial }}" = "true" ]; then
               echo "This PR promotes a **subset of changes** from \`dev\` branch to \`main\` branch."
-              echo ""
-              echo "**Commits included:** ${{ steps.check_commits.outputs.commit_count }}"
-              echo "**Last commit:** \`${{ steps.check_commits.outputs.target_commit }}\`"
-              echo "**Version:** ${{ steps.version_check.outputs.main_version }} → ${{ steps.version_check.outputs.dev_version }}"
+            else
+              echo "This PR promotes changes from \`dev\` branch to \`main\` branch."
+            fi
+            echo ""
+            echo "**Commits included:** ${{ steps.check_commits.outputs.commit_count }}"
+            echo "**Last commit:** \`${{ steps.check_commits.outputs.target_commit }}\`"
+            echo "**Version:** ${{ steps.version_check.outputs.main_version }} → ${{ steps.version_check.outputs.dev_version }}"
+            if [ "${{ steps.check_commits.outputs.is_partial }}" = "true" ]; then
               echo ""
               echo "> ⚠️ **Partial Promotion:** This PR does not include all commits from dev."
               echo "> Additional commits in dev will need to be promoted separately."
-              echo ""
-              echo "📌 **Note:** This PR uses a temporary branch that can be deleted after merging."
-            else
-              echo "This PR promotes changes from \`dev\` branch to \`main\` branch."
-              echo ""
-              echo "**Commits included:** ${{ steps.check_commits.outputs.commit_count }}"
-              echo "**Version:** ${{ steps.version_check.outputs.main_version }} → ${{ steps.version_check.outputs.dev_version }}"
             fi
+            echo ""
+            echo "📌 **Note:** This PR uses a temporary branch that can be deleted after merging."
             echo ""
             if [ -n "${{ github.event.inputs.pr_description }}" ]; then
               echo "## Additional Notes"
@@ -368,18 +360,19 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
-      - name: Create temporary branch for partial promotion
-        if: steps.check_commits.outputs.has_commits == 'true' && steps.check_pr.outputs.pr_exists == 'false' && steps.check_commits.outputs.is_partial == 'true'
+      - name: Create temporary branch for promotion
+        if: steps.check_commits.outputs.has_commits == 'true' && steps.check_pr.outputs.pr_exists == 'false'
         run: |
           # Create a temporary branch at the target commit
-          BRANCH_NAME="promote-to-main-${{ steps.check_commits.outputs.target_commit_short }}-$(date +%s)"
-          echo "Creating temporary branch: $BRANCH_NAME"
+          TARGET_REF="${{ steps.check_commits.outputs.target_commit }}"
+          BRANCH_NAME="dev-${{ steps.check_commits.outputs.target_commit_short }}"
 
-          git checkout -b "$BRANCH_NAME" "${{ steps.check_commits.outputs.target_commit }}"
+          echo "Creating temporary branch: $BRANCH_NAME at $TARGET_REF"
+
+          git checkout -b "$BRANCH_NAME" "$TARGET_REF"
           git push origin "$BRANCH_NAME"
 
           echo "pr_head_branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
-          echo "is_temp_branch=true" >> $GITHUB_OUTPUT
         id: temp_branch
 
       - name: Create Pull Request
@@ -387,12 +380,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.generate_token.outputs.token }}
         run: |
-          # Determine the head branch
-          if [ "${{ steps.check_commits.outputs.is_partial }}" = "true" ]; then
-            HEAD_BRANCH="${{ steps.temp_branch.outputs.pr_head_branch }}"
-          else
-            HEAD_BRANCH="dev"
-          fi
+          HEAD_BRANCH="${{ steps.temp_branch.outputs.pr_head_branch }}"
 
           gh pr create \
             --base main \
@@ -401,12 +389,9 @@ jobs:
             --body "${{ steps.pr_content.outputs.body }}"
 
           echo "✅ Pull Request created successfully"
-
-          if [ "${{ steps.check_commits.outputs.is_partial }}" = "true" ]; then
-            echo ""
-            echo "📌 Temporary branch created: $HEAD_BRANCH"
-            echo "   This branch can be deleted after the PR is merged or closed"
-          fi
+          echo ""
+          echo "📌 Temporary branch created: $HEAD_BRANCH"
+          echo "   This branch can be deleted after the PR is merged or closed"
 
       - name: PR already exists
         if: steps.check_commits.outputs.has_commits == 'true' && steps.check_pr.outputs.pr_exists == 'true'

@@ -1,0 +1,179 @@
+name: Create Dev Version Bump PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New version (leave empty to auto-increment patch version)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-version-bump-pr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Determine new version
+        id: version
+        run: |
+          # Get current version from Makefile
+          CURRENT_VERSION=$(grep '^BASE_VERSION' Makefile | head -1 | sed 's/BASE_VERSION.*:= *//')
+          echo "Current version: $CURRENT_VERSION"
+
+          # Use provided version or auto-increment patch version
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            NEW_VERSION="${{ github.event.inputs.version }}"
+            echo "Using provided version: $NEW_VERSION"
+          else
+            # Split version into major.minor.patch
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+            # Increment patch version
+            PATCH=$((PATCH + 1))
+            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            echo "Auto-incremented to: $NEW_VERSION"
+          fi
+
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update version in files
+        run: |
+          CURRENT_VERSION="${{ steps.version.outputs.current_version }}"
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+
+          echo "Updating version from $CURRENT_VERSION to $NEW_VERSION"
+
+          # Update Makefile
+          sed -i "s/BASE_VERSION := $CURRENT_VERSION/BASE_VERSION := $NEW_VERSION/" Makefile
+
+          # Update helm/Chart.yaml
+          sed -i "s/appVersion: $CURRENT_VERSION/appVersion: $NEW_VERSION/" helm/Chart.yaml
+
+          # Update helm/values.yaml (both image.tag locations)
+          sed -i "s/tag: \"$CURRENT_VERSION\"/tag: \"$NEW_VERSION\"/" helm/values.yaml
+
+          echo "Version updates complete"
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes detected"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changes detected"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            git diff
+          fi
+
+      - name: Generate GitHub App Token
+        if: steps.check_changes.outputs.has_changes == 'true'
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.PR_CREATION_APP_IT_SELF_SERVICE_ID }}
+          private-key: ${{ secrets.PR_CREATION_APP_IT_SELF_SERVICE_PRIVATE_KEY }}
+
+      - name: Create branch and commit
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+          BRANCH_NAME="chore/bump-dev-version-to-${NEW_VERSION}"
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create and checkout new branch
+          git checkout -b "$BRANCH_NAME"
+
+          # Stage and commit changes
+          git add Makefile helm/Chart.yaml helm/values.yaml
+          git commit -m "chore: increment dev version to $NEW_VERSION"
+
+          # Push branch
+          git push origin "$BRANCH_NAME"
+
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+        id: commit
+
+      - name: Check if PR already exists
+        if: steps.check_changes.outputs.has_changes == 'true'
+        id: check_pr
+        env:
+          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
+        run: |
+          BRANCH_NAME="${{ steps.commit.outputs.branch_name }}"
+
+          # Check if there's already an open PR from this branch to dev
+          PR_NUMBER=$(gh pr list --base dev --head "$BRANCH_NAME" --state open --json number --jq '.[0].number')
+
+          if [ -n "$PR_NUMBER" ]; then
+            echo "PR already exists: #$PR_NUMBER"
+            echo "pr_exists=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          else
+            echo "No existing PR found"
+            echo "pr_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        if: steps.check_changes.outputs.has_changes == 'true' && steps.check_pr.outputs.pr_exists == 'false'
+        env:
+          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
+        run: |
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+          CURRENT_VERSION="${{ steps.version.outputs.current_version }}"
+          BRANCH_NAME="${{ steps.commit.outputs.branch_name }}"
+
+          # Create PR body
+          PR_BODY=$(cat <<'EOF'
+## Summary
+
+This PR increments the dev version from `$CURRENT_VERSION` to `$NEW_VERSION`.
+
+## Files Updated
+
+- **Makefile**: `BASE_VERSION`
+- **helm/Chart.yaml**: `appVersion`
+- **helm/values.yaml**: `image.tag` (2 locations)
+
+---
+
+**Triggered by:** @${{ github.actor }}
+**Workflow:** [${{ github.workflow }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+EOF
+)
+
+          # Replace variables in PR body
+          PR_BODY=$(echo "$PR_BODY" | sed "s/\$CURRENT_VERSION/$CURRENT_VERSION/g; s/\$NEW_VERSION/$NEW_VERSION/g")
+
+          gh pr create \
+            --base dev \
+            --head "$BRANCH_NAME" \
+            --title "chore: increment dev version to $NEW_VERSION" \
+            --body "$PR_BODY"
+
+          echo "✅ Pull Request created successfully"
+
+      - name: PR already exists
+        if: steps.check_changes.outputs.has_changes == 'true' && steps.check_pr.outputs.pr_exists == 'true'
+        run: |
+          echo "ℹ️  A PR for this version bump already exists: #${{ steps.check_pr.outputs.pr_number }}"
+          echo "View it at: ${{ github.server_url }}/${{ github.repository }}/pull/${{ steps.check_pr.outputs.pr_number }}"
+
+      - name: No changes needed
+        if: steps.check_changes.outputs.has_changes == 'false'
+        run: |
+          echo "ℹ️  No version changes detected. Version is already up to date."

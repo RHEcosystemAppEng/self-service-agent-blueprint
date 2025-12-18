@@ -5,9 +5,9 @@ on:
   schedule:
     - cron: '0 6 * * *'  # Run daily at 6 AM UTC
 
-# Shared concurrency group across all nightly-e2e workflows
+# Shared concurrency group with main prod deploy to prevent simultaneous namespace usage
 concurrency:
-  group: 'nightly-e2e-tests'
+  group: 'prod-deploy-shared-namespace'
   cancel-in-progress: false
 
 jobs:

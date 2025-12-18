@@ -5,11 +5,6 @@ on:
   schedule:
     - cron: '0 3 * * *'  # Run daily at 3 AM UTC
 
-# Shared concurrency group across all nightly-e2e workflows
-concurrency:
-  group: 'nightly-e2e-tests'
-  cancel-in-progress: false
-
 jobs:
   e2e-tests:
     name: Run e2e tests
