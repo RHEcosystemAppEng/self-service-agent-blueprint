@@ -28,8 +28,9 @@ jobs:
         run: |
           BASE_VERSION=$(make version)
           BRANCH_NAME="${{ github.ref_name }}"
-          # Append branch name suffix for non-main branches
-          if [[ "${BRANCH_NAME}" != "main" ]]; then
+          # Append branch name suffix only for branches that are not main or dev
+          # Main and dev branches are handled by the Makefile version detection
+          if [[ "${BRANCH_NAME}" != "main" ]] && [[ "${BRANCH_NAME}" != "dev" ]]; then
             BASE_VERSION="${BASE_VERSION}-${BRANCH_NAME}"
           fi
           VERSION_WITH_COMMIT="${BASE_VERSION}-${{ github.sha }}"

@@ -5,7 +5,62 @@ $(error NAMESPACE is not set)
 endif
 endif
 
-VERSION ?= 0.0.2
+# Auto-detect version based on git branch if VERSION is not explicitly set
+# - main branch: uses base version (0.0.2) for stable builds
+# - dev branch: uses '0.0.2-dev' tag (matches CI builds)
+# - branches forked from dev: uses '0.0.2-dev' tag (dev builds)
+# - all other branches: uses base version (0.0.2) for stable builds (default)
+# Set VERSION explicitly to override this behavior (e.g., VERSION=latest)
+BASE_VERSION := 0.0.3
+DEV_VERSION := $(BASE_VERSION)-dev
+GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+# Check if branch was forked from dev by comparing how close merge-bases are to branch tip
+# If merge-base with dev is closer (fewer commits away) than merge-base with main, likely forked from dev
+IS_FORKED_FROM_DEV := $(shell \
+  BRANCH="$(GIT_BRANCH)"; \
+  if [ -n "$$BRANCH" ] && [ "$$BRANCH" != "main" ] && [ "$$BRANCH" != "dev" ]; then \
+    if git rev-parse --verify main >/dev/null 2>&1 && git rev-parse --verify dev >/dev/null 2>&1; then \
+      MERGE_BASE_MAIN=$$(git merge-base $$BRANCH main 2>/dev/null); \
+      MERGE_BASE_DEV=$$(git merge-base $$BRANCH dev 2>/dev/null); \
+      if [ -n "$$MERGE_BASE_MAIN" ] && [ -n "$$MERGE_BASE_DEV" ]; then \
+        DISTANCE_FROM_MAIN=$$(git rev-list --count $$MERGE_BASE_MAIN..$$BRANCH 2>/dev/null || echo "999"); \
+        DISTANCE_FROM_DEV=$$(git rev-list --count $$MERGE_BASE_DEV..$$BRANCH 2>/dev/null || echo "999"); \
+        if [ "$$DISTANCE_FROM_DEV" -lt "$$DISTANCE_FROM_MAIN" ]; then \
+          echo "true"; \
+        else \
+          echo "false"; \
+        fi; \
+      elif [ -n "$$MERGE_BASE_DEV" ]; then \
+        echo "true"; \
+      elif [ -n "$$MERGE_BASE_MAIN" ]; then \
+        echo "false"; \
+      else \
+        echo "false"; \
+      fi; \
+    else \
+      echo "false"; \
+    fi; \
+  else \
+    echo "false"; \
+  fi \
+)
+# Only auto-detect if VERSION was not explicitly set by user (via env var or make arg)
+ifeq ($(origin VERSION),undefined)
+  ifeq ($(GIT_BRANCH),main)
+    VERSION := $(BASE_VERSION)
+  else ifeq ($(GIT_BRANCH),dev)
+    VERSION := $(DEV_VERSION)
+  else ifeq ($(IS_FORKED_FROM_DEV),true)
+    # Branch was forked from dev, use dev version
+    VERSION := $(DEV_VERSION)
+  else
+    # Default: use stable version (includes branches forked from main, branches with no connection to either, etc.)
+    VERSION := $(BASE_VERSION)
+  endif
+else
+  # VERSION was explicitly set by user, use it as-is
+endif
+
 # Replica count - can be set with REPLICA_COUNT=X to override all replica counts
 # If not set, uses defaults from helm/values.yaml
 REPLICA_COUNT ?=
@@ -252,7 +307,12 @@ help:
 	@echo "  Core Configuration:"
 	@echo "    CONTAINER_TOOL                    - Container build tool (default: podman)"
 	@echo "    REGISTRY                          - Container registry (default: quay.io/rh-ai-quickstart)"
-	@echo "    VERSION                           - Image version tag (default: 0.0.2)"
+	@echo "    VERSION                           - Image version tag (auto-detected from git branch if not set)"
+	@echo "                                        - main branch: uses base version '0.0.2' (stable builds)"
+	@echo "                                        - dev branch: uses '0.0.2-dev' tag (latest dev builds)"
+	@echo "                                        - branches forked from dev: uses '0.0.2-dev' tag (dev builds)"
+	@echo "                                        - all other branches: uses base version '0.0.2' (stable builds, default)"
+	@echo "                                        - Set explicitly to override (e.g., VERSION=latest for main)"
 	@echo "    NAMESPACE                         - Target namespace (required, no default)"
 	@echo "    REPLICA_COUNT                     - Number of replicas for scalable services (optional)"
 	@echo "                                        If set, overrides defaults from helm/values.yaml"
@@ -1043,6 +1103,11 @@ define helm_install_common
 	@kubectl delete job -l app.kubernetes.io/component=init -n $(NAMESPACE) --ignore-not-found || true
 	@kubectl delete job -l app.kubernetes.io/name=self-service-agent -n $(NAMESPACE) --ignore-not-found || true
 	@echo "Installing $(MAIN_CHART_NAME) helm chart $(1)"
+	@if [ -n "$(GIT_BRANCH)" ] && [ "$(origin VERSION)" = "undefined" ]; then \
+		echo "Using image version: $(VERSION) (auto-detected from branch: $(GIT_BRANCH))"; \
+	else \
+		echo "Using image version: $(VERSION)"; \
+	fi
 	@helm upgrade --install $(MAIN_CHART_NAME) helm -n $(NAMESPACE) \
 		--set image.requestManager=self-service-agent-request-manager \
 		--set image.agentService=self-service-agent-service \

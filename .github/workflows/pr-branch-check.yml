@@ -1,0 +1,42 @@
+name: Require dev branch for main PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+# Cancel any previous runs of this workflow for the same PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate-pr-branch:
+    name: Validate PR comes from dev branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR source branch and repository
+        run: |
+          PR_SOURCE_BRANCH="${{ github.event.pull_request.head.ref }}"
+          PR_SOURCE_REPO="${{ github.event.pull_request.head.repo.full_name }}"
+          TARGET_REPO="${{ github.repository }}"
+          
+          echo "PR Source Branch: ${PR_SOURCE_BRANCH}"
+          echo "PR Source Repository: ${PR_SOURCE_REPO}"
+          echo "Target Repository: ${TARGET_REPO}"
+          
+          # Check if PR is from the same repository
+          if [ "${PR_SOURCE_REPO}" != "${TARGET_REPO}" ]; then
+            echo "::error::PR must come from the same repository. Source: ${PR_SOURCE_REPO}, Target: ${TARGET_REPO}"
+            exit 1
+          fi
+          
+          # Check if PR is from the dev branch
+          if [ "${PR_SOURCE_BRANCH}" != "dev" ]; then
+            echo "::error::PR must come from the 'dev' branch. Current source branch: ${PR_SOURCE_BRANCH}"
+            exit 1
+          fi
+          
+          echo "✅ PR validation passed: PR is from 'dev' branch in the same repository"
+

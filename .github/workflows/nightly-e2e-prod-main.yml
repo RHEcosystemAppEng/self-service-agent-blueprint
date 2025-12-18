@@ -1,18 +1,22 @@
-name: Prod deploy - Nightly 20 conversation test
+name: (main) Prod deploy - Post-promotion test
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 6 * * *'  # Run daily at 6 AM UTC
+  pull_request:
+    types: [closed]
+    branches:
+      - main
 
-# Cancel any previous runs of this workflow
+# Shared concurrency group across all nightly-e2e workflows
 concurrency:
-  group: ${{ github.workflow }}-${{ github.sha }}
-  cancel-in-progress: true
+  group: 'nightly-e2e-tests'
+  cancel-in-progress: false
 
 jobs:
   e2e-tests:
     name: Run e2e tests
+    # Only run if manually triggered or if PR was actually merged
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - name: Validate LLM_API_TOKEN_EVAL_70B secret
@@ -62,6 +66,8 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          ref: main
 
       - name: Prepare Runner
         uses: ./.github/actions/prepare-runner
@@ -80,7 +86,7 @@ jobs:
           make oc
           echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
 
-      - name: log into the cluster 
+      - name: log into the cluster
         shell: bash
         run: |
           oc login --token=$PROD_TOKEN --server=$PROD_SERVER

@@ -142,24 +142,29 @@ jobs:
             DEV_REF="origin/dev"
           fi
 
-          # Extract VERSION from Makefile in dev
-          DEV_MAKEFILE_VERSION=$(git show "$DEV_REF:Makefile" | grep '^VERSION' | head -1 | sed 's/VERSION.*= *//')
+          # Extract BASE_VERSION from Makefile in dev
+          DEV_MAKEFILE_VERSION=$(git show "$DEV_REF:Makefile" | grep '^BASE_VERSION' | head -1 | sed 's/BASE_VERSION.*= *//')
 
           # Extract appVersion from helm/Chart.yaml in dev
           DEV_HELM_VERSION=$(git show "$DEV_REF:helm/Chart.yaml" | grep '^appVersion:' | sed 's/appVersion: *//')
 
-          # Extract VERSION from Makefile in main
-          MAIN_MAKEFILE_VERSION=$(git show origin/main:Makefile | grep '^VERSION' | head -1 | sed 's/VERSION.*= *//')
+          # Extract BASE_VERSION from Makefile in main (fallback to VERSION if not found)
+          MAIN_MAKEFILE_VERSION=$(git show origin/main:Makefile | grep '^BASE_VERSION' | head -1 | sed 's/BASE_VERSION.*= *//')
+          MAIN_VERSION_VAR="BASE_VERSION"
+          if [ -z "$MAIN_MAKEFILE_VERSION" ]; then
+            MAIN_MAKEFILE_VERSION=$(git show origin/main:Makefile | grep '^VERSION' | head -1 | sed 's/VERSION.*= *//')
+            MAIN_VERSION_VAR="VERSION"
+          fi
 
           # Extract appVersion from helm/Chart.yaml in main
           MAIN_HELM_VERSION=$(git show origin/main:helm/Chart.yaml | grep '^appVersion:' | sed 's/appVersion: *//')
 
           echo "Dev branch versions:"
-          echo "  Makefile VERSION: $DEV_MAKEFILE_VERSION"
+          echo "  Makefile BASE_VERSION: $DEV_MAKEFILE_VERSION"
           echo "  Helm appVersion:  $DEV_HELM_VERSION"
           echo ""
           echo "Main branch versions:"
-          echo "  Makefile VERSION: $MAIN_MAKEFILE_VERSION"
+          echo "  Makefile $MAIN_VERSION_VAR: $MAIN_MAKEFILE_VERSION"
           echo "  Helm appVersion:  $MAIN_HELM_VERSION"
           echo ""
 
@@ -167,13 +172,13 @@ jobs:
           if [ "$DEV_MAKEFILE_VERSION" != "$DEV_HELM_VERSION" ]; then
             echo "::error::Version mismatch in dev branch!"
             echo ""
-            echo "❌ Makefile VERSION ($DEV_MAKEFILE_VERSION) does not match Helm appVersion ($DEV_HELM_VERSION)"
+            echo "❌ Makefile BASE_VERSION ($DEV_MAKEFILE_VERSION) does not match Helm appVersion ($DEV_HELM_VERSION)"
             echo ""
             echo "All version values must match before promoting to main."
             echo ""
             echo "To fix:"
-            echo "  1. Update Makefile VERSION to match helm/Chart.yaml appVersion, OR"
-            echo "  2. Update helm/Chart.yaml appVersion to match Makefile VERSION"
+            echo "  1. Update Makefile BASE_VERSION to match helm/Chart.yaml appVersion, OR"
+            echo "  2. Update helm/Chart.yaml appVersion to match Makefile BASE_VERSION"
             echo "  3. Update helm/values.yaml image.tag to match (if set)"
             echo "  4. Update helm/values.yaml MCP server image.tag to match (if set)"
             echo "  5. Commit and push the change to dev"
@@ -189,26 +194,26 @@ jobs:
           echo "  MCP server tag: $DEV_MCP_TAG"
           echo ""
 
-          # Check if image.tag is set and matches Makefile VERSION
+          # Check if image.tag is set and matches Makefile BASE_VERSION
           if [ -n "$DEV_IMAGE_TAG" ] && [ "$DEV_IMAGE_TAG" != "$DEV_MAKEFILE_VERSION" ]; then
             echo "::error::Image tag mismatch in dev branch!"
             echo ""
-            echo "❌ helm/values.yaml image.tag ($DEV_IMAGE_TAG) does not match Makefile VERSION ($DEV_MAKEFILE_VERSION)"
+            echo "❌ helm/values.yaml image.tag ($DEV_IMAGE_TAG) does not match Makefile BASE_VERSION ($DEV_MAKEFILE_VERSION)"
             echo ""
             echo "To fix:"
-            echo "  1. Update helm/values.yaml image.tag to match Makefile VERSION ($DEV_MAKEFILE_VERSION)"
+            echo "  1. Update helm/values.yaml image.tag to match Makefile BASE_VERSION ($DEV_MAKEFILE_VERSION)"
             echo "  2. Commit and push the change to dev"
             exit 1
           fi
 
-          # Check if MCP server tag is set and matches Makefile VERSION
+          # Check if MCP server tag is set and matches Makefile BASE_VERSION
           if [ -n "$DEV_MCP_TAG" ] && [ "$DEV_MCP_TAG" != "$DEV_MAKEFILE_VERSION" ]; then
             echo "::error::MCP server image tag mismatch in dev branch!"
             echo ""
-            echo "❌ helm/values.yaml MCP server tag ($DEV_MCP_TAG) does not match Makefile VERSION ($DEV_MAKEFILE_VERSION)"
+            echo "❌ helm/values.yaml MCP server tag ($DEV_MCP_TAG) does not match Makefile BASE_VERSION ($DEV_MAKEFILE_VERSION)"
             echo ""
             echo "To fix:"
-            echo "  1. Update helm/values.yaml mcp-servers.mcp-servers.self-service-agent-snow.image.tag to match Makefile VERSION ($DEV_MAKEFILE_VERSION)"
+            echo "  1. Update helm/values.yaml mcp-servers.mcp-servers.self-service-agent-snow.image.tag to match Makefile BASE_VERSION ($DEV_MAKEFILE_VERSION)"
             echo "  2. Commit and push the change to dev"
             exit 1
           fi
@@ -268,7 +273,7 @@ jobs:
             echo "Dev version must be greater than main version for promotion."
             echo ""
             echo "To fix, increment the version in dev branch:"
-            echo "  1. Update VERSION in Makefile"
+            echo "  1. Update BASE_VERSION in Makefile"
             echo "  2. Update appVersion in helm/Chart.yaml"
             echo "  3. Update image.tag in helm/values.yaml (if set)"
             echo "  4. Update MCP server image.tag in helm/values.yaml (if set)"
@@ -281,11 +286,19 @@ jobs:
           echo "dev_version=$DEV_MAKEFILE_VERSION" >> $GITHUB_OUTPUT
           echo "main_version=$MAIN_MAKEFILE_VERSION" >> $GITHUB_OUTPUT
 
+      - name: Generate GitHub App Token
+        if: steps.check_commits.outputs.has_commits == 'true'
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.PR_CREATION_APP_IT_SELF_SERVICE_ID }}
+          private-key: ${{ secrets.PR_CREATION_APP_IT_SELF_SERVICE_PRIVATE_KEY }}
+
       - name: Check if PR already exists
         if: steps.check_commits.outputs.has_commits == 'true'
         id: check_pr
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
         run: |
           # Check if there's already an open PR from dev to main
           PR_NUMBER=$(gh pr list --base main --head dev --state open --json number --jq '.[0].number')
@@ -372,7 +385,7 @@ jobs:
       - name: Create Pull Request
         if: steps.check_commits.outputs.has_commits == 'true' && steps.check_pr.outputs.pr_exists == 'false'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
         run: |
           # Determine the head branch
           if [ "${{ steps.check_commits.outputs.is_partial }}" = "true" ]; then
