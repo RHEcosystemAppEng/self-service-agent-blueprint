@@ -96,11 +96,24 @@ jobs:
         run: |
           make helm-uninstall NAMESPACE=self-service-agent-ci-project-1
 
+      - name: Extract version from Makefile
+        id: version
+        run: |
+          BASE_VERSION=$(make version)
+          # Get actual commit SHA from checked out dev branch
+          COMMIT_SHA=$(git rev-parse HEAD)
+          VERSION_WITH_COMMIT="${BASE_VERSION}-${COMMIT_SHA}"
+          echo "version=${VERSION_WITH_COMMIT}" >> $GITHUB_OUTPUT
+          echo "Base version: ${BASE_VERSION}"
+          echo "Commit SHA: ${COMMIT_SHA}"
+          echo "Version with commit: ${VERSION_WITH_COMMIT}"
+
       - name: Install the quickstart
         shell: bash
         run: |
           make helm-install-prod NAMESPACE=self-service-agent-ci-project-1 OTEL_EXPORTER_OTLP_ENDPOINT="http://otel-collector-collector.observability-hub.svc.cluster.local:4318"
         env:
+          VERSION: ${{ steps.version.outputs.version }}
           LLM_URL: ${{ vars.LLM_URL_EVAL_70B }}
           LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL_70B }}
           LLM_ID: ${{ vars.LLM_ID_INFERENCE }}
