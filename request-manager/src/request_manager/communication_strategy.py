@@ -720,7 +720,7 @@ class UnifiedRequestProcessor:
         self,
         request: Any,
         db: AsyncSession,
-        timeout: int = 120,
+        timeout: int = int(os.getenv("AGENT_TIMEOUT", "120")),
         set_pod_name: bool = True,
     ) -> Dict[str, Any]:
         """Process a request synchronously and wait for response via eventing.

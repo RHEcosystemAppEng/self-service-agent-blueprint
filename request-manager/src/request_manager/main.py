@@ -599,7 +599,7 @@ async def _process_request_adaptive(
         BaseRequest, SlackRequest, WebRequest, CLIRequest, EmailRequest, ToolRequest
     ],
     db: AsyncSession,
-    timeout: int = 120,
+    timeout: int = int(os.getenv("AGENT_TIMEOUT", "120")),
     is_cloudevent_request: bool = False,
 ) -> Dict[str, Any]:
     """Process a request synchronously and return the actual AI response.

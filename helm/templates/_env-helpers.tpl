@@ -126,6 +126,8 @@ Generate Request Manager specific environment variables
   value: "{{ include "self-service-agent.fullname" . }}-agent-service"
 - name: AGENT_SERVICE_PORT
   value: "80"
+- name: AGENT_TIMEOUT
+  value: {{ if hasKey .Values "agent" }}{{ .Values.agent.timeout | default "120" | quote }}{{ else }}"120"{{ end }}
 {{/* Session Management Configuration */}}
 - name: SESSION_PER_INTEGRATION_TYPE
   value: {{ if and (hasKey .Values.requestManagement "requestManager") (hasKey .Values.requestManagement.requestManager "sessions") (hasKey .Values.requestManagement.requestManager.sessions "perIntegrationType") }}{{ .Values.requestManagement.requestManager.sessions.perIntegrationType | quote }}{{ else }}"false"{{ end }}

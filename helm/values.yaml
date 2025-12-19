@@ -458,7 +458,7 @@ requestManagement:
     # Default agent ID for routing (can be overridden)
     defaultAgentId: "routing-agent"
     # Agent response timeout in seconds
-    timeout: 120
+    timeout: 180
     # Always refresh agent mapping from LlamaStack on each request
     # Set to false for better performance, true for maximum reliability
     alwaysRefreshMapping: true
