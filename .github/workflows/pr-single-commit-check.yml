@@ -1,0 +1,31 @@
+name: Require single commit for dev PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - dev
+
+# Cancel any previous runs of this workflow for the same PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate-single-commit:
+    name: Validate PR has only 1 commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check commit count
+        run: |
+          COMMIT_COUNT=${{ github.event.pull_request.commits }}
+
+          echo "Number of commits in PR: ${COMMIT_COUNT}"
+
+          if [ "${COMMIT_COUNT}" -ne 1 ]; then
+            echo "::error::PR must contain exactly 1 commit. Current commit count: ${COMMIT_COUNT}"
+            echo "Please squash your commits into a single commit."
+            exit 1
+          fi
+
+          echo "✅ Validation passed: PR contains exactly 1 commit"
