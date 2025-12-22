@@ -1,0 +1,120 @@
+{{- $models := include "llama-stack.mergeModels" . | fromJson }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "llama-stack.fullname" . }}
+  labels:
+    {{- include "llama-stack.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "llama-stack.selectorLabels" . | nindent 6 }}
+  {{- with .Values.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  progressDeadlineSeconds: {{ .Values.progressDeadlineSeconds }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "llama-stack.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "llama-stack.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: wait-for-models
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              for url_data in {{ range $key, $model := $models }}{{- if $model.enabled }}{{ $model.url }}/models#{{ $model.apiToken }} {{ end }}{{ end }}; do
+                url_components=(${url_data//#/ })
+                url=${url_components[0]}
+                auth=${url_components[1]}
+                echo "Waiting for $url..."
+                curl_options=("-ksf" "$url")
+                if [[ -n "$auth" ]]; then
+                  curl_options+=("-H" "Authorization: Bearer $auth")
+                fi
+                until curl "${curl_options[@]}"; do
+                  echo "Still waiting for $url ..."
+                  sleep 10
+                done
+                echo "$url is ready."
+              done
+              echo "All services are up."
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
+            {{- if .Values.otelExporter }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.otelExporter }}
+            {{- end }}
+          envFrom:
+          - secretRef:
+              name: {{ .Chart.Name }}-env
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            {{- toYaml .Values.volumeMounts | nindent 12 }}
+            {{- if .Values.gcpServiceAccountFile }}
+            - name: {{ .Values.gcpServiceAccount.name }}
+              mountPath: {{ .Values.gcpServiceAccount.mountPath }}
+              subPath: gcp-service-account.json
+            {{- end }}
+      volumes:
+        {{- toYaml .Values.volumes | nindent 8 }}
+        {{- if .Values.gcpServiceAccountFile }}
+        - name: {{ .Values.gcpServiceAccount.name }}
+          secret:
+            secretName: {{ .Values.gcpServiceAccount.name }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
