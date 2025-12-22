@@ -155,8 +155,7 @@ helm_promptguard_args = \
         --set llama-stack.models.$(PROMPTGUARD_MODEL).url="http://$(MAIN_CHART_NAME)-promptguard.$(NAMESPACE).svc.cluster.local:8000/v1" \
         --set global.models.$(PROMPTGUARD_MODEL).enabled=$(PROMPTGUARD_ENABLED) \
         --set global.models.$(PROMPTGUARD_MODEL).url="http://$(MAIN_CHART_NAME)-promptguard.$(NAMESPACE).svc.cluster.local:8000/v1",) \
-    $(if $(PROMPTGUARD_MODEL_ID),--set promptGuard.modelId='$(PROMPTGUARD_MODEL_ID)',) \
-	$(if $(HF_TOKEN),--set promptGuard.huggingfaceToken='$(HF_TOKEN)',)
+    $(if $(PROMPTGUARD_MODEL_ID),--set promptGuard.modelId='$(PROMPTGUARD_MODEL_ID)',)
 
 helm_llama_stack_args = \
     $(if $(LLM),--set global.models.$(LLM).enabled=true,) \
@@ -1105,6 +1104,11 @@ define helm_install_common
 		--from-literal=slack-signing-secret="$${SLACK_SIGNING_SECRET:-}" \
 		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
 
+	@echo "Creating HuggingFace credentials secret..."
+	@kubectl create secret generic $(MAIN_CHART_NAME)-huggingface-credentials \
+		--from-literal=HF_TOKEN="$${HF_TOKEN:-}" \
+		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+
 	@echo "Cleaning up any existing jobs..."
 	@kubectl delete job -l app.kubernetes.io/component=init -n $(NAMESPACE) --ignore-not-found || true
 	@kubectl delete job -l app.kubernetes.io/name=self-service-agent -n $(NAMESPACE) --ignore-not-found || true
@@ -1324,6 +1328,8 @@ helm-uninstall:
 	@kubectl delete secret $(MAIN_CHART_NAME)-servicenow-credentials -n $(NAMESPACE) --ignore-not-found || true
 	@echo "Removing Slack credentials secret from $(NAMESPACE)"
 	@kubectl delete secret $(MAIN_CHART_NAME)-slack-credentials -n $(NAMESPACE) --ignore-not-found || true
+	@echo "Removing HuggingFace credentials secret from $(NAMESPACE)"
+	@kubectl delete secret $(MAIN_CHART_NAME)-huggingface-credentials -n $(NAMESPACE) --ignore-not-found || true
 	@echo "Removing pgvector and init job PVCs from $(NAMESPACE)"
 	@kubectl get pvc -n $(NAMESPACE) -o custom-columns=NAME:.metadata.name | grep -E '^(pg.*-data|self-service-agent-init-status)' | xargs -I {} kubectl delete pvc -n $(NAMESPACE) {} ||:
 	@echo "Deleting remaining pods in namespace $(NAMESPACE)"
