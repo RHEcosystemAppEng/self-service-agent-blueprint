@@ -224,13 +224,13 @@ Generate Integration Dispatcher specific environment variables
 - name: SLACK_BOT_TOKEN
   valueFrom:
     secretKeyRef:
-      name: {{ include "self-service-agent.fullname" . }}-integration-secrets
+      name: {{ include "self-service-agent.fullname" . }}-slack-credentials
       key: slack-bot-token
       optional: true
 - name: SLACK_SIGNING_SECRET
   valueFrom:
     secretKeyRef:
-      name: {{ include "self-service-agent.fullname" . }}-integration-secrets
+      name: {{ include "self-service-agent.fullname" . }}-slack-credentials
       key: slack-signing-secret
       optional: true
 {{/* SMTP Configuration */}}
