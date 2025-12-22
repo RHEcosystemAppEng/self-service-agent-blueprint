@@ -3,7 +3,7 @@ name: (main) (Small Prompt) Post-promotion 20 conversation test
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["(main) (Scout Prompt) Post-promotion 20 conversation test"]
+    workflows: ["(main) Pull Request - Post-promotion 20 conversation test"]
     types:
       - completed
 
