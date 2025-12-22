@@ -6,6 +6,8 @@ on:
     workflows: ["(main) Pull Request - Post-promotion 20 conversation test"]
     types:
       - completed
+    branches:
+      - main
 
 jobs:
   e2e-tests:

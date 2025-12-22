@@ -6,6 +6,8 @@ on:
     workflows: ["Build and push images"]
     types:
       - completed
+    branches:
+      - main
 
 # Shared concurrency group with dev prod deploy to prevent simultaneous namespace usage
 concurrency:
