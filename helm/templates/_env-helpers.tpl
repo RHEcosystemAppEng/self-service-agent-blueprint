@@ -88,14 +88,14 @@ Generate Request Manager specific environment variables
 - name: SNOW_API_KEY
   valueFrom:
     secretKeyRef:
-      name: api-keys
-      key: snow-integration
+      name: {{ include "self-service-agent.fullname" . }}-snow-integration-credentials
+      key: snow-api-key
       optional: true
 - name: HR_API_KEY
   valueFrom:
     secretKeyRef:
-      name: api-keys
-      key: hr-system
+      name: {{ include "self-service-agent.fullname" . }}-hr-credentials
+      key: hr-api-key
       optional: true
 - name: MONITORING_API_KEY
   valueFrom:
