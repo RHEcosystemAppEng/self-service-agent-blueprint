@@ -40,7 +40,7 @@ parse_failed_conversations() {
     fi
 
     # Find all failed conversations
-    local failed_convos=$(grep -E "❌.*generated_flow_worker.*\.json:.*metrics passed" "$log_file" 2>/dev/null || true)
+    local failed_convos=$(grep -E "❌.*\.json:.*metrics passed" "$log_file" 2>/dev/null || true)
 
     if [ -z "$failed_convos" ]; then
         echo "    ℹ️  No specific conversation failures found in log"
@@ -57,7 +57,7 @@ parse_failed_conversations() {
         count=$((count + 1))
 
         # Extract conversation file name and metrics
-        local conv_file=$(echo "$line" | grep -o 'generated_flow_worker[0-9_]*\.json' || echo "Unknown")
+        local conv_file=$(echo "$line" | grep -oP '[a-zA-Z0-9_-]+\.json' || echo "Unknown")
         local metrics=$(echo "$line" | grep -o '[0-9]*/[0-9]* metrics passed' || echo "Unknown")
 
         echo "    $count. $conv_file ($metrics)"
