@@ -1,18 +1,4 @@
 {{- if .Values.promptGuard.enabled }}
-{{- if .Values.promptGuard.huggingfaceToken }}
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: {{ include "self-service-agent.fullname" . }}-promptguard-hf-token
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "self-service-agent.labels" . | nindent 4 }}
-    app.kubernetes.io/component: promptguard
-type: Opaque
-stringData:
-  token: {{ .Values.promptGuard.huggingfaceToken | quote }}
-{{- end }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -61,13 +47,12 @@ spec:
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
           value: {{ .Values.otelExporter }}
         {{- end }}
-        {{- if .Values.promptGuard.huggingfaceToken }}
         - name: HF_TOKEN
           valueFrom:
             secretKeyRef:
-              name: {{ include "self-service-agent.fullname" . }}-promptguard-hf-token
-              key: token
-        {{- end }}
+              name: {{ include "self-service-agent.fullname" . }}-huggingface-credentials
+              key: HF_TOKEN
+              optional: true
         {{- if .Values.promptGuard.resources }}
         resources:
           {{- toYaml .Values.promptGuard.resources | nindent 10 }}

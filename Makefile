@@ -155,8 +155,7 @@ helm_promptguard_args = \
         --set llama-stack.models.$(PROMPTGUARD_MODEL).url="http://$(MAIN_CHART_NAME)-promptguard.$(NAMESPACE).svc.cluster.local:8000/v1" \
         --set global.models.$(PROMPTGUARD_MODEL).enabled=$(PROMPTGUARD_ENABLED) \
         --set global.models.$(PROMPTGUARD_MODEL).url="http://$(MAIN_CHART_NAME)-promptguard.$(NAMESPACE).svc.cluster.local:8000/v1",) \
-    $(if $(PROMPTGUARD_MODEL_ID),--set promptGuard.modelId='$(PROMPTGUARD_MODEL_ID)',) \
-	$(if $(HF_TOKEN),--set promptGuard.huggingfaceToken='$(HF_TOKEN)',)
+    $(if $(PROMPTGUARD_MODEL_ID),--set promptGuard.modelId='$(PROMPTGUARD_MODEL_ID)',)
 
 helm_llama_stack_args = \
     $(if $(LLM),--set global.models.$(LLM).enabled=true,) \
@@ -178,10 +177,7 @@ helm_llama_stack_args = \
 helm_request_management_args = \
     $(if $(REQUEST_MANAGEMENT),--set requestManagement.enabled=$(REQUEST_MANAGEMENT),) \
     $(if $(KNATIVE_EVENTING),--set requestManagement.knative.eventing.enabled=$(KNATIVE_EVENTING),) \
-    $(if $(MOCK_EVENTING),--set requestManagement.knative.mockEventing.enabled=$(MOCK_EVENTING),) \
-    $(if $(SLACK_SIGNING_SECRET),--set-string security.slack.signingSecret='$(SLACK_SIGNING_SECRET)',) \
-    $(if $(SNOW_API_KEY),--set-string security.apiKeys.snowIntegration='$(SNOW_API_KEY)',) \
-    $(if $(HR_API_KEY),--set-string security.apiKeys.hrSystem='$(HR_API_KEY)',)
+    $(if $(MOCK_EVENTING),--set requestManagement.knative.mockEventing.enabled=$(MOCK_EVENTING),)
 
 helm_generic_args = \
 	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set otelExporter=$(OTEL_EXPORTER_OTLP_ENDPOINT),) \
@@ -1099,6 +1095,28 @@ define helm_install_common
 		--from-literal=servicenow-api-key="$${SERVICENOW_API_KEY:-}" \
 		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
 
+	@echo "Creating Slack credentials secret..."
+	@echo "  Slack enabled: $(SLACK_ENABLED)"
+	@kubectl create secret generic $(MAIN_CHART_NAME)-slack-credentials \
+		--from-literal=slack-bot-token="$${SLACK_BOT_TOKEN:-}" \
+		--from-literal=slack-signing-secret="$${SLACK_SIGNING_SECRET:-}" \
+		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+
+	@echo "Creating HuggingFace credentials secret..."
+	@kubectl create secret generic $(MAIN_CHART_NAME)-huggingface-credentials \
+		--from-literal=HF_TOKEN="$${HF_TOKEN:-}" \
+		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+
+	@echo "Creating HR system credentials secret..."
+	@kubectl create secret generic $(MAIN_CHART_NAME)-hr-credentials \
+		--from-literal=hr-api-key="$${HR_API_KEY:-}" \
+		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+
+	@echo "Creating ServiceNow integration credentials secret..."
+	@kubectl create secret generic $(MAIN_CHART_NAME)-snow-integration-credentials \
+		--from-literal=snow-api-key="$${SNOW_API_KEY:-}" \
+		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+
 	@echo "Cleaning up any existing jobs..."
 	@kubectl delete job -l app.kubernetes.io/component=init -n $(NAMESPACE) --ignore-not-found || true
 	@kubectl delete job -l app.kubernetes.io/name=self-service-agent -n $(NAMESPACE) --ignore-not-found || true
@@ -1117,7 +1135,6 @@ define helm_install_common
 		$(LLM_SERVICE_ARGS) \
 		$(LLAMA_STACK_ARGS) \
 		--set requestManagement.integrations.slack.enabled=$(SLACK_ENABLED) \
-		$(if $(filter true,$(SLACK_ENABLED)),--set security.slack.signingSecret=$(SLACK_SIGNING_SECRET) --set security.slack.botToken=$(SLACK_BOT_TOKEN),) \
 		--set image.registry=$(REGISTRY) \
 		--set mcp-servers.mcp-servers.self-service-agent-snow.image.repository=$(REGISTRY)/self-service-agent-snow-mcp \
 		--set mcp-servers.mcp-servers.self-service-agent-snow.image.tag=$(VERSION) \
@@ -1317,6 +1334,14 @@ helm-uninstall:
 	@$(MAKE) helm-cleanup-jobs
 	@echo "Removing ServiceNow credentials secret from $(NAMESPACE)"
 	@kubectl delete secret $(MAIN_CHART_NAME)-servicenow-credentials -n $(NAMESPACE) --ignore-not-found || true
+	@echo "Removing Slack credentials secret from $(NAMESPACE)"
+	@kubectl delete secret $(MAIN_CHART_NAME)-slack-credentials -n $(NAMESPACE) --ignore-not-found || true
+	@echo "Removing HuggingFace credentials secret from $(NAMESPACE)"
+	@kubectl delete secret $(MAIN_CHART_NAME)-huggingface-credentials -n $(NAMESPACE) --ignore-not-found || true
+	@echo "Removing HR credentials secret from $(NAMESPACE)"
+	@kubectl delete secret $(MAIN_CHART_NAME)-hr-credentials -n $(NAMESPACE) --ignore-not-found || true
+	@echo "Removing ServiceNow integration credentials secret from $(NAMESPACE)"
+	@kubectl delete secret $(MAIN_CHART_NAME)-snow-integration-credentials -n $(NAMESPACE) --ignore-not-found || true
 	@echo "Removing pgvector and init job PVCs from $(NAMESPACE)"
 	@kubectl get pvc -n $(NAMESPACE) -o custom-columns=NAME:.metadata.name | grep -E '^(pg.*-data|self-service-agent-init-status)' | xargs -I {} kubectl delete pvc -n $(NAMESPACE) {} ||:
 	@echo "Deleting remaining pods in namespace $(NAMESPACE)"
