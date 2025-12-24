@@ -116,11 +116,11 @@ data:
         config:
           sqlite_db_path: ${env.SQLITE_DB_PATH:=~/.llama/distributions/starter/trace_store.db}
           {{- if .Values.otelExporter }}
-          sinks: ${env.TELEMETRY_SINKS:=console,sqlite,otel_trace}
+          sinks: ${env.TELEMETRY_SINKS:=sqlite,otel_trace}
           service_name: {{ include "llama-stack.fullname" . }}
           otel_exporter_otlp_endpoint: ${env.OTEL_EXPORTER_OTLP_ENDPOINT:=}
           {{- else }}
-          sinks: ${env.TELEMETRY_SINKS:=console,sqlite}
+          sinks: ${env.TELEMETRY_SINKS:=sqlite}
           {{- end }}
       tool_runtime:
       - provider_id: brave-search

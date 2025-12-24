@@ -78,6 +78,11 @@ spec:
             {{- if .Values.otelExporter }}
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: {{ .Values.otelExporter }}
+            - name: TELEMETRY_SINKS
+              value: sqlite,otel_trace
+            {{- else }}
+            - name: TELEMETRY_SINKS
+              value: sqlite
             {{- end }}
           envFrom:
           - secretRef:
