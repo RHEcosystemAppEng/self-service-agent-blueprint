@@ -20,6 +20,10 @@ spec:
         {{- include "self-service-agent.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: mock-servicenow
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: mock-servicenow
         image: "{{ .Values.image.registry }}/{{ .Values.image.mockServiceNow }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -51,6 +55,14 @@ spec:
         resources:
           {{- toYaml .Values.mockServiceNow.resources | nindent 10 }}
         {{- end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
         {{- if .Values.mockServiceNow.healthChecks }}
         livenessProbe:
           httpGet:

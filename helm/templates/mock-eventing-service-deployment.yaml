@@ -20,6 +20,10 @@ spec:
         {{- include "self-service-agent.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: mock-eventing
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: mock-eventing-service
         image: "{{ .Values.image.registry }}/{{ .Values.image.mockEventing }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -51,6 +55,14 @@ spec:
         resources:
           {{- toYaml .Values.requestManagement.knative.mockEventing.resources | nindent 10 }}
         {{- end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
         {{- if .Values.requestManagement.knative.mockEventing.healthChecks }}
         livenessProbe:
           httpGet:

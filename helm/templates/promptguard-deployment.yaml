@@ -34,6 +34,10 @@ spec:
         {{- include "self-service-agent.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: promptguard
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: promptguard
         image: "{{ .Values.image.registry }}/{{ .Values.image.promptGuard }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -72,6 +76,14 @@ spec:
         resources:
           {{- toYaml .Values.promptGuard.resources | nindent 10 }}
         {{- end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
         {{- if .Values.promptGuard.healthChecks }}
         livenessProbe:
           httpGet:
