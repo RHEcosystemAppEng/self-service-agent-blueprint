@@ -25,6 +25,10 @@ spec:
       {{- end }}
       serviceAccountName: {{ include "self-service-agent.serviceAccountName" . }}
       restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: init-and-complete
           image: "{{ .Values.image.registry }}/{{ .Values.image.agentService }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -52,6 +56,14 @@ spec:
               value: {{ .Values.llamastack.timeout | quote }}
             {{- end }}
             {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
           command:
             - /bin/bash
             - -c
