@@ -18,6 +18,10 @@ spec:
         app: {{ include "self-service-agent.fullname" . }}-db-migration
     spec:
       restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: db-migration
         image: "{{ .Values.image.registry }}/{{ .Values.image.agentService }}:{{ .Values.image.tag }}"
