@@ -514,7 +514,6 @@ class ServiceNowClient:
             # Format output to match mock data format exactly
             laptop_info = f"""
     Employee Name: {user_data.get("name", "N/A")}
-    Employee ID: {user_data.get("sys_id", "N/A")}
     Employee Location: {location_value}
     Laptop Model: {model_value}
     Laptop Serial Number: {computer_data.get("serial_number", "N/A")}
