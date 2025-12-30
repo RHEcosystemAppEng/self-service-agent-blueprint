@@ -275,6 +275,8 @@ help:
 	@echo "ServiceNow PDI Commands:"
 	@echo "  servicenow-wake-install             - Install Playwright for ServiceNow PDI wake-up"
 	@echo "  servicenow-wake                     - Wake up hibernating ServiceNow PDI"
+	@echo "  servicenow-bootstrap                - Run ServiceNow bootstrap setup with config file"
+	@echo "  servicenow-bootstrap-validation     - Run ServiceNow bootstrap validation checks"
 	@echo ""
 	@echo "Lockfile Management:"
 	@echo "  check-lockfiles                     - Check if all uv.lock files are up-to-date"
@@ -1463,3 +1465,15 @@ servicenow-wake: servicenow-wake-install
 		exit 1; \
 	fi
 	@cd scripts/servicenow-bootstrap && uv run python -m servicenow_bootstrap.wake_up_pdi
+
+.PHONY: servicenow-bootstrap
+servicenow-bootstrap:
+	@echo "Running ServiceNow bootstrap setup with config..."
+	@cd scripts/servicenow-bootstrap && uv run -m servicenow_bootstrap.setup --config config.json
+	@echo "ServiceNow bootstrap setup completed successfully!"
+
+.PHONY: servicenow-bootstrap-validation
+servicenow-bootstrap-validation:
+	@echo "Running ServiceNow bootstrap validation..."
+	@cd scripts/servicenow-bootstrap && uv run python -m servicenow_bootstrap.setup_validations
+	@echo "ServiceNow bootstrap validation completed successfully!"
