@@ -273,10 +273,14 @@ help:
 	@echo "  test                                - Run tests for self-service agent"
 	@echo ""
 	@echo "ServiceNow PDI Commands:"
-	@echo "  servicenow-wake-install             - Install Playwright for ServiceNow PDI wake-up"
-	@echo "  servicenow-wake                     - Wake up hibernating ServiceNow PDI"
-	@echo "  servicenow-bootstrap                - Run ServiceNow bootstrap setup with config file"
-	@echo "  servicenow-bootstrap-validation     - Run ServiceNow bootstrap validation checks"
+	@echo "  servicenow-wake-install                      - Install Playwright for ServiceNow PDI wake-up"
+	@echo "  servicenow-wake                              - Wake up hibernating ServiceNow PDI"
+	@echo "  servicenow-bootstrap                         - Run ServiceNow bootstrap setup with config file"
+	@echo "  servicenow-bootstrap-validation              - Run ServiceNow bootstrap validation checks"
+	@echo "  servicenow-bootstrap-create-user             - Create MCP agent user only"
+	@echo "  servicenow-bootstrap-create-api-key          - Create MCP agent API key only"
+	@echo "  servicenow-bootstrap-create-catalog-item     - Create PC refresh service catalog item only"
+	@echo "  servicenow-bootstrap-create-evaluation-users - Create evaluation users only"
 	@echo ""
 	@echo "Lockfile Management:"
 	@echo "  check-lockfiles                     - Check if all uv.lock files are up-to-date"
@@ -1469,7 +1473,7 @@ servicenow-wake: servicenow-wake-install
 .PHONY: servicenow-bootstrap
 servicenow-bootstrap:
 	@echo "Running ServiceNow bootstrap setup with config..."
-	@cd scripts/servicenow-bootstrap && uv run -m servicenow_bootstrap.setup --config config.json
+	@cd scripts/servicenow-bootstrap && uv run -m servicenow_bootstrap.setup --config config.json $(ARGS)
 	@echo "ServiceNow bootstrap setup completed successfully!"
 
 .PHONY: servicenow-bootstrap-validation
@@ -1477,3 +1481,27 @@ servicenow-bootstrap-validation:
 	@echo "Running ServiceNow bootstrap validation..."
 	@cd scripts/servicenow-bootstrap && uv run python -m servicenow_bootstrap.setup_validations
 	@echo "ServiceNow bootstrap validation completed successfully!"
+
+.PHONY: servicenow-bootstrap-create-user
+servicenow-bootstrap-create-user:
+	@echo "Creating MCP agent user..."
+	@cd scripts/servicenow-bootstrap && uv run python -m servicenow_bootstrap.create_mcp_agent_user --config config.json
+	@echo "MCP agent user creation completed successfully!"
+
+.PHONY: servicenow-bootstrap-create-api-key
+servicenow-bootstrap-create-api-key:
+	@echo "Creating MCP agent API key..."
+	@cd scripts/servicenow-bootstrap && uv run python -m servicenow_bootstrap.create_mcp_agent_api_key --config config.json
+	@echo "MCP agent API key creation completed successfully!"
+
+.PHONY: servicenow-bootstrap-create-catalog-item
+servicenow-bootstrap-create-catalog-item:
+	@echo "Creating PC refresh service catalog item..."
+	@cd scripts/servicenow-bootstrap && uv run python -m servicenow_bootstrap.create_pc_refresh_service_catalog_item --config config.json
+	@echo "PC refresh service catalog item creation completed successfully!"
+
+.PHONY: servicenow-bootstrap-create-evaluation-users
+servicenow-bootstrap-create-evaluation-users:
+	@echo "Creating evaluation users..."
+	@cd scripts/servicenow-bootstrap && uv run python -m servicenow_bootstrap.create_evaluation_users
+	@echo "Evaluation users creation completed successfully!"

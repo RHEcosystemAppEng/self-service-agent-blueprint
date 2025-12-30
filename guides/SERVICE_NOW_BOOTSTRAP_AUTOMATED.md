@@ -76,11 +76,10 @@ The [config.json](../scripts/servicenow-bootstrap/config.json) file contains sta
 
 ### 2. Install Dependencies
 
-Install the project and its dependencies using uv:
+Install the project and its dependencies:
 
 ```bash
-cd scripts/servicenow-bootstrap
-uv sync
+make install-servicenow-bootstrap
 ```
 
 ### 3. Run Complete Setup
@@ -88,8 +87,7 @@ uv sync
 Execute the main orchestration script:
 
 ```bash
-source .venv/bin/activate # make sure python uv binaries are active 
-uv run -m servicenow_bootstrap.setup --config config.json
+make servicenow-bootstrap
 ```
 
 The script will:
@@ -145,8 +143,7 @@ export SERVICENOW_LAPTOP_REFRESH_ID="your_catalog_item_id"              # From s
 export SERVICENOW_INSTANCE_URL="https://your-instance.service-now.com"  # Same variable as used for the setup
 
 # Run the comprehensive setup validation
-source .venv/bin/activate # make sure python uv binaries are active
-uv run python -m servicenow_bootstrap.setup_validations
+make servicenow-bootstrap-validation
 ```
 
 This will test:
@@ -165,33 +162,33 @@ The setup process automatically creates evaluation users and test data that matc
 2. **Check Computer Assets**: Go to "All" → Search for "Computers" → Verify laptop assets were created
 3. **Review Setup Summary**: The setup output shows detailed statistics of what was created
 
-If you need to skip evaluation users creation, use the `--skip-evaluation-users` flag.
+If you need to skip evaluation users creation, use `make servicenow-bootstrap ARGS="--skip-evaluation-users"`.
 
 ## 📜 Individual Scripts
 
-You can also run individual automation modules using Python's module syntax. Note that all these steps are included when you run `uv run -m servicenow_bootstrap.setup --config config.json`, but can be run separately if needed:
+You can also run individual automation modules separately. Note that all these steps are included when you run `make servicenow-bootstrap`, but can be run individually if needed:
 
 ### Create MCP Agent User
 ```bash
-uv run python -m servicenow_bootstrap.create_mcp_agent_user --config config.json
+make servicenow-bootstrap-create-user
 ```
 Creates the MCP Agent user, generates password, and assigns roles.
 
 ### Create MCP Agent API Key
 ```bash
-uv run python -m servicenow_bootstrap.create_mcp_agent_api_key --config config.json
+make servicenow-bootstrap-create-api-key
 ```
 Sets up API keys, authentication profiles, and access policies.
 
 ### Create PC Refresh Service Catalog Item
 ```bash
-uv run python -m servicenow_bootstrap.create_pc_refresh_service_catalog_item --config config.json
+make servicenow-bootstrap-create-catalog-item
 ```
 Creates the PC Refresh catalog item with variables and choices.
 
 ### Create Evaluation Users
 ```bash
-uv run python -m servicenow_bootstrap.create_evaluation_users
+make servicenow-bootstrap-create-evaluation-users
 ```
 Creates test users and laptop computers based on mock employee data. Requires the same environment variables as the main setup:
 - `SERVICENOW_INSTANCE_URL`: Your ServiceNow instance URL
@@ -200,7 +197,7 @@ Creates test users and laptop computers based on mock employee data. Requires th
 
 ### Setup Validations
 ```bash
-uv run python -m servicenow_bootstrap.setup_validations
+make servicenow-bootstrap-validation
 ```
 Validates the ServiceNow setup by testing API Key credentials against various endpoints to verify connectivity and permissions. Requires environment variables:
 - `SERVICENOW_API_KEY`: The API key for authentication
@@ -213,19 +210,22 @@ Validates the ServiceNow setup by testing API Key credentials against various en
 
 ```bash
 # Skip user creation (if already done)
-uv run -m servicenow_bootstrap.setup --config config.json --skip-user
+make servicenow-bootstrap ARGS="--skip-user"
 
 # Skip API setup
-uv run -m servicenow_bootstrap.setup --config config.json --skip-api
+make servicenow-bootstrap ARGS="--skip-api"
 
 # Skip catalog creation
-uv run -m servicenow_bootstrap.setup --config config.json --skip-catalog
+make servicenow-bootstrap ARGS="--skip-catalog"
 
 # Skip evaluation users creation
-uv run -m servicenow_bootstrap.setup --config config.json --skip-evaluation-users
+make servicenow-bootstrap ARGS="--skip-evaluation-users"
 
 # Run without confirmation prompts
-uv run -m servicenow_bootstrap.setup --config config.json --no-confirm
+make servicenow-bootstrap ARGS="--no-confirm"
+
+# Combine multiple flags
+make servicenow-bootstrap ARGS="--skip-user --no-confirm"
 ```
 
 ### Re-running Scripts
