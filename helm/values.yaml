@@ -150,32 +150,16 @@ promptGuard:
       failureThreshold: 3
       successThreshold: 1
 
-# PostgreSQL configuration for llama-stack agent persistence
+# PostgreSQL configuration
 pgvector:
-  extraDatabases:
-    - name: llama_agents
-      vectordb: false
-    - name: llama_responses
-      vectordb: false
+  enabled: true
 
-# Llama Stack agents configuration with PostgreSQL persistence
+# Llama Stack agents configuration
 llama-stack:
   replicaCount: 1
   initContainers:
     enabled: true
   resources: {}
-
-  # Override volumes to use emptyDir instead of PVC for multi-replica support
-  # Since all persistence is handled by PostgreSQL, we don't need a shared PVC
-  volumes:
-    - configMap:
-        defaultMode: 420
-        name: run-config
-      name: run-config-volume
-    - emptyDir: {}
-      name: dot-llama
-    - emptyDir: {}
-      name: cache
 
   # Configure metadata store to use PostgreSQL for multi-replica support
   metadataStore:
@@ -204,21 +188,13 @@ llama-stack:
       - provider_id: meta-ref-postgres
         provider_type: inline::meta-reference
         config:
-          persistence_store:
-            type: postgres
-            namespace: null
-            host: ${env.POSTGRES_HOST:=pgvector}
-            port: ${env.POSTGRES_PORT:=5432}
-            db: llama_agents
-            user: ${env.POSTGRES_USER:=pgvector}
-            password: ${env.POSTGRES_PASSWORD:=pgvector}
-          responses_store:
-            type: postgres
-            host: ${env.POSTGRES_HOST:=pgvector}
-            port: ${env.POSTGRES_PORT:=5432}
-            db: llama_responses
-            user: ${env.POSTGRES_USER:=pgvector}
-            password: ${env.POSTGRES_PASSWORD:=pgvector}
+          persistence:
+            agent_state:
+              backend: kv_default
+              namespace: llama_agents
+            responses:
+              backend: sql_default
+              table_name: agent_responses
 
   # Model configurations for llama-stack
   # Add PromptGuard as a shield when enabled
