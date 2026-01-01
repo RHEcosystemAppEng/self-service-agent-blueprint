@@ -1626,7 +1626,9 @@ that you will either need to manage access to traces and logs to account for pot
 or extend it to redact information based on your organizations policies.
 2. **Credential management**: Credentials are set in the quickstart in order to make it easy for people to get started and easily deploy the quickstart.
 When deploying to production you will need to manage credentials in accordance with your organizations requirements including potentially managing
-them through vaults and planning for credential rotation. These more advanced techniques are not covered in the quickstart.
+them through vaults and planning for credential rotation. For enhanced security, you should consider managing project-managed secrets (Slack, HuggingFace,
+ServiceNow, HR) by creating Kubernetes secrets beforehand instead of passing them via Helm `--set` flags, which avoids exposure in shell history and
+Helm release history. These more advanced techniques are not covered in the quickstart.
 3. **Database, Kafka configuration**: Production configuration and security hardening for components like the database and Kafka, are not covered
 as they will often be existing components within an organization which have already been configured and hardened to meet the organizations requirements
 for scaling and security.
