@@ -1,6 +1,6 @@
 # Automate IT processes with Self-Service Agents - Laptop Refresh
 
-Framework and components to deploy agent-based IT processes. Implements laptop refresh process with reusable tools, knowledge bases, and evaluations.
+Transform IT service delivery using AI to lower support effort, improve compliance, and increase throughput.
 
 ## Table of contents
 
@@ -286,11 +286,16 @@ Now that you understand the architecture and capabilities of the self-service ag
 
 ## Requirements
 
+**NOTE:** The quickstart requires access to an instance of [meta-llama/Meta-Llama-3-70B](https://huggingface.co/meta-llama/Meta-Llama-3-70B).
+If you don't already have one available, additional steps and resources will be required to host that instance.
+
 ### Minimum hardware requirements
 
 * CPU: 6-8 cores
 * Memory: 16-20Gi
 * Storage: 150-200Gi
+* **Optional** GPU - Required only if you want to run optional safety shields with local instance of
+  [meta-llama/Llama-Guard-3-8B](https://huggingface.co/meta-llama/Llama-Guard-3-8B)
 
 ### Minimum software requirements
 
@@ -357,7 +362,8 @@ spec:
 * Namespace admin permissions in the target OpenShift project
 * Access to quay.io to be able pull down container images
 * LLM API endpoint with credentials (Llama 3 70B model)
-* LLM API safety model endpoint with credentials, OPTIONAL if you want to enable safety shields (meta-llama/Llama-Guard-3-8B)
+* **Optional** meta-llama/Llama-Guard-3-8B safety model endpoint with credentials if you want to enable safety shields without using local instance
+* **Optional** Hugging Face credentials with access to meta-llama/Llama-Guard-3-8B if you want to enable safety shields with local instance of meta-llama/Llama-Guard-3-8B
 * Slack workspace admin access (we provide instructions on how to set up a test instance), OPTIONAL if you want to explore integration with Slack
 * ServiceNow instance admin access (we provide instructions on how to set up a test instance), OPTIONAL if you want to explore integration with ServiceNow
 ---
