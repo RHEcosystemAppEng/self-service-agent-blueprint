@@ -294,7 +294,7 @@ If you don't already have one available, additional steps and resources will be 
 * CPU: 6-8 cores
 * Memory: 16-20Gi
 * Storage: 150-200Gi
-* **Optional** GPU - Required only if you want to run optional safety shields with local instance of
+* **Optional** GPU - Required only if you want to run safety shields with local instance of
   [meta-llama/Llama-Guard-3-8B](https://huggingface.co/meta-llama/Llama-Guard-3-8B)
 
 ### Minimum software requirements
