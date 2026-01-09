@@ -17,7 +17,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "0.0.6"
+  tag: "0.0.7"
 
 # Test Integration Configuration
 testIntegrationEnabled: false
@@ -242,7 +242,7 @@ mcp-servers:
       deploymentMode: deployment  # Use standard Deployment (no Toolhive)
       image:
         repository: quay.io/rh-ai-quickstart/self-service-agent-snow-mcp
-        tag: "0.0.6"
+        tag: "0.0.7"
       port: 8000
       targetPort: 8000
       transport: streamable-http
