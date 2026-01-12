@@ -30,6 +30,7 @@ dependencies = [
     "deepeval>=3.3.9",
     # LLM integration
     "openai>=1.99.0",
+    "instructor>=1.7.0",
 ]
 
 [project.optional-dependencies]
@@ -107,7 +108,7 @@ profile = "black"
 multi_line_output = 3
 line_length = 88
 known_first_party = ["helpers"]
-known_third_party = ["deepeval", "openai"]
+known_third_party = ["deepeval", "instructor", "openai"]
 
 [tool.flake8]
 max-line-length = 88
