@@ -288,6 +288,8 @@ Now that you understand the architecture and capabilities of the self-service ag
 
 **NOTE:** The quickstart requires access to an instance of [meta-llama/Meta-Llama-3-70B](https://huggingface.co/meta-llama/Meta-Llama-3-70B).
 If you don't already have one available, additional steps and resources will be required to host that instance.
+[The LLM Service Helm Chart](https://github.com/rh-ai-quickstart/ai-architecture-charts/tree/main/llm-service)
+can be used to deploy the required meta-llama/Meta-Llama-3-70B model. It lists the specific requirements and deployment steps.
 
 ### Minimum hardware requirements
 
