@@ -2,7 +2,7 @@
 
 import logging
 import os
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Type, Union
 
 import instructor
 import openai
@@ -47,13 +47,15 @@ class CustomLLM(DeepEvalBaseLLM):
         """
         return self.client
 
-    def generate(self, prompt: str, schema: Optional[BaseModel] = None) -> Union[str, BaseModel]:
+    def generate(  # type: ignore[override]
+        self, prompt: str, schema: Optional[Type[BaseModel]] = None
+    ) -> Union[str, BaseModel]:
         """
         Generate a response to the given prompt using the custom LLM.
 
         Args:
             prompt: The input prompt to generate a response for
-            schema: Optional Pydantic BaseModel for structured output
+            schema: Optional Pydantic BaseModel class for structured output
 
         Returns:
             Pydantic model instance if schema provided, otherwise string response.
@@ -66,12 +68,14 @@ class CustomLLM(DeepEvalBaseLLM):
         try:
             # If schema is provided, use instructor for structured output
             if schema is not None:
-                logger.debug(f"Generating with schema using instructor: {schema.__name__}")
+                logger.debug(
+                    f"Generating with schema using instructor: {schema.__name__}"
+                )
 
                 # Use instructor with OpenAI client for reliable JSON
                 instructor_client = instructor.from_openai(client)
 
-                resp = instructor_client.chat.completions.create(
+                resp: BaseModel = instructor_client.chat.completions.create(
                     model=self.model_name,
                     messages=[
                         {
@@ -101,13 +105,16 @@ class CustomLLM(DeepEvalBaseLLM):
 
                 # Try to enable JSON mode if the prompt appears to be asking for JSON
                 if any(
-                    keyword in prompt.lower() for keyword in ["json", "schema", "format"]
+                    keyword in prompt.lower()
+                    for keyword in ["json", "schema", "format"]
                 ):
                     try:
                         api_kwargs["response_format"] = {"type": "json_object"}
                         logger.debug("Enabled JSON mode for structured output")
                     except Exception as e:
-                        logger.debug(f"JSON mode not supported, continuing without it: {e}")
+                        logger.debug(
+                            f"JSON mode not supported, continuing without it: {e}"
+                        )
 
                 response = client.chat.completions.create(**api_kwargs)
 
@@ -123,13 +130,15 @@ class CustomLLM(DeepEvalBaseLLM):
             logger.error(f"Error generating response: {e}")
             raise
 
-    async def a_generate(self, prompt: str, schema: Optional[BaseModel] = None) -> Union[str, BaseModel]:
+    async def a_generate(  # type: ignore[override]
+        self, prompt: str, schema: Optional[Type[BaseModel]] = None
+    ) -> Union[str, BaseModel]:
         """
         Asynchronously generate a response to the given prompt using the custom LLM.
 
         Args:
             prompt: The input prompt to generate a response for
-            schema: Optional Pydantic BaseModel for structured output
+            schema: Optional Pydantic BaseModel class for structured output
 
         Returns:
             Pydantic model instance if schema provided, otherwise string response.
@@ -144,12 +153,14 @@ class CustomLLM(DeepEvalBaseLLM):
 
             # If schema is provided, use instructor for structured output
             if schema is not None:
-                logger.debug(f"Async generating with schema using instructor: {schema.__name__}")
+                logger.debug(
+                    f"Async generating with schema using instructor: {schema.__name__}"
+                )
 
                 # Use instructor with async OpenAI client
                 instructor_client = instructor.from_openai(async_client)
 
-                resp = await instructor_client.chat.completions.create(
+                resp: BaseModel = await instructor_client.chat.completions.create(
                     model=self.model_name,
                     messages=[
                         {
@@ -179,13 +190,16 @@ class CustomLLM(DeepEvalBaseLLM):
 
                 # Try to enable JSON mode if the prompt appears to be asking for JSON
                 if any(
-                    keyword in prompt.lower() for keyword in ["json", "schema", "format"]
+                    keyword in prompt.lower()
+                    for keyword in ["json", "schema", "format"]
                 ):
                     try:
                         api_kwargs["response_format"] = {"type": "json_object"}
                         logger.debug("Enabled JSON mode for structured output")
                     except Exception as e:
-                        logger.debug(f"JSON mode not supported, continuing without it: {e}")
+                        logger.debug(
+                            f"JSON mode not supported, continuing without it: {e}"
+                        )
 
                 response = await async_client.chat.completions.create(**api_kwargs)
 
