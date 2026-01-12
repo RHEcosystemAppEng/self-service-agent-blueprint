@@ -19,7 +19,7 @@ MAX_WAKE_POLL_ATTEMPTS=20  # maximum polling attempts to check if instance is aw
 log() {
     local color=$1
     local message=$2
-    echo -e "${color}[$(date +'%Y-%m-%d %H:%M:%S')] ${message}${NC}"
+    echo -e "${color}[$(date +'%Y-%m-%d %H:%M:%S')] ${message}${NC}" >&2
 }
 
 log_info() {
@@ -63,18 +63,18 @@ check_hibernation_status() {
     if [[ "$http_code" == "200" ]]; then
         if echo "$body" | grep -q "Instance Hibernating page"; then
             log_warning "Instance is hibernating"
-            return 0  # Hibernating
+            echo "hibernating"
         else
             log_success "Instance is awake and responding"
-            return 1  # Awake
+            echo "awake"
         fi
     elif [[ "$http_code" == "502" ]]; then
         log_warning "Instance is waking up, not ready yet"
-        return 3  # Waking up
+        echo "waking_up"
     else
         log_error "API call failed with HTTP $http_code"
         log_error "Response: $body"
-        return 2  # Error
+        echo "error"
     fi
 }
 
@@ -104,21 +104,20 @@ wait_for_instance_awake() {
     while [[ $attempt -le $MAX_WAKE_POLL_ATTEMPTS ]]; do
         log_info "Checking status... (attempt: ${attempt}/${MAX_WAKE_POLL_ATTEMPTS})"
 
-        check_hibernation_status "$base_url" "$api_key"
-        local status=$?
+        local status=$(check_hibernation_status "$base_url" "$api_key")
 
         case $status in
-            0)  # Still hibernating
+            "hibernating")
                 log_info "Instance still hibernating, attempt $attempt..."
                 ;;
-            1)  # Awake
+            "awake")
                 log_success "Instance is now fully awake!"
                 return 0
                 ;;
-            2)  # Error
+            "error")
                 log_warning "API check failed, attempt $attempt..."
                 ;;
-            3)  # Instance is waking up
+            "waking_up")
                 log_info "The instance is waking up, attempt $attempt..."
                 ;;
         esac
@@ -165,11 +164,10 @@ main() {
     log_info "ServiceNow Instance URL: $base_url"
 
     # Initial hibernation check
-    check_hibernation_status "$base_url" "$api_key"
-    local initial_status=$?
+    local initial_status=$(check_hibernation_status "$base_url" "$api_key")
 
     case $initial_status in
-        0)  # Instance is hibernating
+        "hibernating")
             log_warning "Instance is hibernating - attempting to wake it up"
 
             if wake_up_instance; then
@@ -186,12 +184,26 @@ main() {
                 exit 1
             fi
             ;;
-        1)  # Instance is awake
+        "awake")
             log_success "Instance is already awake - no action needed"
             exit 0
             ;;
-        2)  # API error
+        "waking_up")
+            log_info "Instance is already waking up - waiting for it to be fully awake"
+            if wait_for_instance_awake "$base_url" "$api_key"; then
+                log_success "Instance is now fully awake!"
+                exit 0
+            else
+                log_error "Instance failed to wake up within the polling attempts"
+                exit 1
+            fi
+            ;;
+        "error")
             log_error "Failed to check hibernation status"
+            exit 1
+            ;;
+        *)
+            log_error "Unexpected hibernation status: $initial_status"
             exit 1
             ;;
     esac
