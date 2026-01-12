@@ -2,10 +2,12 @@
 
 import logging
 import os
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
+import instructor
 import openai
 from deepeval.models import DeepEvalBaseLLM
+from pydantic import BaseModel
 
 from .token_counter import count_tokens_from_response
 
@@ -45,101 +47,155 @@ class CustomLLM(DeepEvalBaseLLM):
         """
         return self.client
 
-    def generate(self, prompt: str) -> str:
+    def generate(self, prompt: str, schema: Optional[BaseModel] = None) -> Union[str, BaseModel]:
         """
         Generate a response to the given prompt using the custom LLM.
 
         Args:
             prompt: The input prompt to generate a response for
+            schema: Optional Pydantic BaseModel for structured output
 
         Returns:
-            Generated response text
+            Pydantic model instance if schema provided, otherwise string response.
 
         Raises:
             Exception: If the API call fails or returns an error
         """
         client = self.load_model()
+
         try:
-            # Build kwargs for the API call
-            api_kwargs: Dict[str, Any] = {
-                "model": self.model_name,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.1,
-                "max_tokens": 2048,  # Ensure we don't truncate JSON responses
-            }
+            # If schema is provided, use instructor for structured output
+            if schema is not None:
+                logger.debug(f"Generating with schema using instructor: {schema.__name__}")
 
-            # Try to enable JSON mode if the prompt appears to be asking for JSON
-            # This helps larger models produce valid JSON more consistently
-            if any(
-                keyword in prompt.lower() for keyword in ["json", "schema", "format"]
-            ):
-                try:
-                    api_kwargs["response_format"] = {"type": "json_object"}
-                    logger.debug("Enabled JSON mode for structured output")
-                except Exception as e:
-                    logger.debug(f"JSON mode not supported, continuing without it: {e}")
+                # Use instructor with OpenAI client for reliable JSON
+                instructor_client = instructor.from_openai(client)
 
-            response = client.chat.completions.create(**api_kwargs)
+                resp = instructor_client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt,
+                        }
+                    ],
+                    response_model=schema,
+                    temperature=0.0,  # Deterministic for structured output
+                    max_tokens=3072,
+                )
 
-            # Count tokens from the response
-            count_tokens_from_response(
-                response, self.model_name, "custom_llm_evaluation"
-            )
+                # Return just the Pydantic model object (non-native model behavior)
+                return resp
 
-            content = response.choices[0].message.content
-            return str(content) if content is not None else ""
+            # Without schema, use regular OpenAI API with JSON mode
+            else:
+                logger.debug("Generating without schema using regular API")
+
+                # Build kwargs for the API call
+                api_kwargs: Dict[str, Any] = {
+                    "model": self.model_name,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.1,
+                    "max_tokens": 2048,
+                }
+
+                # Try to enable JSON mode if the prompt appears to be asking for JSON
+                if any(
+                    keyword in prompt.lower() for keyword in ["json", "schema", "format"]
+                ):
+                    try:
+                        api_kwargs["response_format"] = {"type": "json_object"}
+                        logger.debug("Enabled JSON mode for structured output")
+                    except Exception as e:
+                        logger.debug(f"JSON mode not supported, continuing without it: {e}")
+
+                response = client.chat.completions.create(**api_kwargs)
+
+                # Count tokens from the response
+                count_tokens_from_response(
+                    response, self.model_name, "custom_llm_evaluation"
+                )
+
+                content = response.choices[0].message.content
+                return str(content) if content is not None else ""
+
         except Exception as e:
             logger.error(f"Error generating response: {e}")
             raise
 
-    async def a_generate(self, prompt: str) -> str:
+    async def a_generate(self, prompt: str, schema: Optional[BaseModel] = None) -> Union[str, BaseModel]:
         """
         Asynchronously generate a response to the given prompt using the custom LLM.
 
         Args:
             prompt: The input prompt to generate a response for
+            schema: Optional Pydantic BaseModel for structured output
 
         Returns:
-            Generated response text
+            Pydantic model instance if schema provided, otherwise string response.
 
         Raises:
             Exception: If the API call fails or returns an error
         """
         try:
-            import openai
-
             async_client = openai.AsyncOpenAI(
                 api_key=self.api_key, base_url=self.base_url
             )
 
-            # Build kwargs for the API call
-            api_kwargs: Dict[str, Any] = {
-                "model": self.model_name,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.1,  # Slightly higher temperature for better JSON formatting
-                "max_tokens": 2048,  # Ensure we don't truncate JSON responses
-            }
+            # If schema is provided, use instructor for structured output
+            if schema is not None:
+                logger.debug(f"Async generating with schema using instructor: {schema.__name__}")
 
-            # Try to enable JSON mode if the prompt appears to be asking for JSON
-            # This helps larger models produce valid JSON more consistently
-            if any(
-                keyword in prompt.lower() for keyword in ["json", "schema", "format"]
-            ):
-                try:
-                    api_kwargs["response_format"] = {"type": "json_object"}
-                    logger.debug("Enabled JSON mode for structured output")
-                except Exception as e:
-                    logger.debug(f"JSON mode not supported, continuing without it: {e}")
+                # Use instructor with async OpenAI client
+                instructor_client = instructor.from_openai(async_client)
 
-            response = await async_client.chat.completions.create(**api_kwargs)
+                resp = await instructor_client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt,
+                        }
+                    ],
+                    response_model=schema,
+                    temperature=0.0,  # Deterministic for structured output
+                    max_tokens=3072,
+                )
 
-            # Count tokens from the response
-            count_tokens_from_response(
-                response, self.model_name, "custom_llm_evaluation_async"
-            )
+                # Return just the Pydantic model object (non-native model behavior)
+                return resp
 
-            content = response.choices[0].message.content
-            return str(content) if content is not None else ""
+            # Without schema, use regular OpenAI API
+            else:
+                logger.debug("Async generating without schema using regular API")
+
+                # Build kwargs for the API call
+                api_kwargs: Dict[str, Any] = {
+                    "model": self.model_name,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.1,
+                    "max_tokens": 2048,
+                }
+
+                # Try to enable JSON mode if the prompt appears to be asking for JSON
+                if any(
+                    keyword in prompt.lower() for keyword in ["json", "schema", "format"]
+                ):
+                    try:
+                        api_kwargs["response_format"] = {"type": "json_object"}
+                        logger.debug("Enabled JSON mode for structured output")
+                    except Exception as e:
+                        logger.debug(f"JSON mode not supported, continuing without it: {e}")
+
+                response = await async_client.chat.completions.create(**api_kwargs)
+
+                # Count tokens from the response
+                count_tokens_from_response(
+                    response, self.model_name, "custom_llm_evaluation_async"
+                )
+
+                content = response.choices[0].message.content
+                return str(content) if content is not None else ""
 
         except Exception as e:
             logger.error(f"Error generating async response: {e}")
