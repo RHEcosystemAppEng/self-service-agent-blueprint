@@ -17,11 +17,9 @@ logger = logging.getLogger(__name__)
 
 class StructuredLLM(DeepEvalBaseLLM):
     """
-    LLM class that uses instructor library for structured output enforcement.
+    Custom LLM class using instructor for Pydantic schema validation with retries.
 
-    This class is specifically designed for models that struggle with regular JSON mode
-    and need structured output enforcement via Pydantic schemas. It uses the instructor
-    library to ensure valid JSON output with automatic retries and schema validation.
+    For models with unreliable JSON formatting (e.g., Google Gemini) where native JSON mode is insufficient.
     """
 
     def __init__(
@@ -91,17 +89,16 @@ class StructuredLLM(DeepEvalBaseLLM):
                     ],
                     response_model=schema,
                     temperature=0.1,  # Low temperature for evaluation consistency
-                    max_tokens=2048,
+                    max_tokens=4096,  # Increased for verbose responses
+                    max_retries=3,  # Add retries for malformed responses
                 )
 
-                # Return just the Pydantic model object (non-native model behavior)
                 return resp
 
             # Without schema, use regular OpenAI API with JSON mode
             else:
                 logger.debug("Generating without schema using regular API")
 
-                # Build kwargs for the API call
                 api_kwargs: Dict[str, Any] = {
                     "model": self.model_name,
                     "messages": [{"role": "user", "content": prompt}],
@@ -124,7 +121,6 @@ class StructuredLLM(DeepEvalBaseLLM):
 
                 response = client.chat.completions.create(**api_kwargs)
 
-                # Count tokens from the response
                 count_tokens_from_response(
                     response, self.model_name, "structured_llm_evaluation"
                 )
@@ -176,17 +172,16 @@ class StructuredLLM(DeepEvalBaseLLM):
                     ],
                     response_model=schema,
                     temperature=0.1,  # Low temperature for evaluation consistency
-                    max_tokens=2048,
+                    max_tokens=4096,  # Increased for verbose responses
+                    max_retries=3,  # Add retries for malformed responses
                 )
 
-                # Return just the Pydantic model object (non-native model behavior)
                 return resp
 
             # Without schema, use regular OpenAI API
             else:
                 logger.debug("Async generating without schema using regular API")
 
-                # Build kwargs for the API call
                 api_kwargs: Dict[str, Any] = {
                     "model": self.model_name,
                     "messages": [{"role": "user", "content": prompt}],
@@ -209,7 +204,6 @@ class StructuredLLM(DeepEvalBaseLLM):
 
                 response = await async_client.chat.completions.create(**api_kwargs)
 
-                # Count tokens from the response
                 count_tokens_from_response(
                     response, self.model_name, "structured_llm_evaluation_async"
                 )

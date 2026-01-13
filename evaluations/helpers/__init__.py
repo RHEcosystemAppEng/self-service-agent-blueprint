@@ -10,9 +10,9 @@ This package contains:
 
 # Make key classes and functions available at package level
 from .custom_llm import CustomLLM, get_api_configuration
-from .structured_llm import StructuredLLM
 from .openshift_chat_client import OpenShiftChatClient
 from .run_conversation_flow import ConversationFlowTester
+from .structured_llm import StructuredLLM
 
 __all__ = [
     "CustomLLM",
