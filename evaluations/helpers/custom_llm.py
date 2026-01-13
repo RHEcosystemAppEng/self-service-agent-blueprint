@@ -84,8 +84,8 @@ class CustomLLM(DeepEvalBaseLLM):
                         }
                     ],
                     response_model=schema,
-                    temperature=0.0,  # Deterministic for structured output
-                    max_tokens=3072,
+                    temperature=0.1,  # Deterministic for structured output
+                    max_tokens=2048,
                 )
 
                 # Return just the Pydantic model object (non-native model behavior)
@@ -169,8 +169,8 @@ class CustomLLM(DeepEvalBaseLLM):
                         }
                     ],
                     response_model=schema,
-                    temperature=0.0,  # Deterministic for structured output
-                    max_tokens=3072,
+                    temperature=0.1,  # Deterministic for structured output
+                    max_tokens=2048,
                 )
 
                 # Return just the Pydantic model object (non-native model behavior)
