@@ -301,6 +301,7 @@ help:
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  format                              - Run isort import sorting and Black formatting on entire codebase"
+	@echo "  generate-lg-diagrams                - Generate LangGraph visualization diagrams from YAML configs (outputs to docs/images/)"
 	@echo "  lint                                - Run optimized linting (global isort/flake8 + per-directory mypy + logging patterns)"
 	@echo "  lint-global-tools                   - Run isort and flake8 globally on all projects"
 	@echo "  lint-mypy-per-directory             - Run mypy on all projects with project-specific configs"
@@ -643,6 +644,12 @@ format:
 	@echo "Running Black formatting on entire codebase..."
 	uv run black .
 	@echo "Formatting completed successfully!"
+
+.PHONY: generate-lg-diagrams
+generate-lg-diagrams:
+	@echo "Generating LangGraph visualizations..."
+	cd agent-service && uv run python ../scripts/create_langraph_graphs.py
+	@echo "LangGraph diagrams generated successfully in docs/images/"
 
 # Install dependencies
 .PHONY: install-all
