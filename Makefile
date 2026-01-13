@@ -1097,6 +1097,7 @@ define helm_install_common
 	@$(eval GENERIC_ARGS := $(helm_generic_args))
 	@$(eval REPLICA_COUNT_ARGS := $(helm_replica_count_args))
 	@$(eval TEST_USERS_ARGS := $(helm_test_users_args))
+	@$(eval LANGFUSE_ARGS := $(if $(filter true,$(ENABLE_LANGFUSE)),--set langfuse.enabled=true,))
 
 	@echo "Creating ServiceNow credentials secret..."
 	@echo "  Instance URL: $$SERVICENOW_INSTANCE_URL"
@@ -1137,6 +1138,7 @@ define helm_install_common
 		$(GENERIC_ARGS) \
 		$(REPLICA_COUNT_ARGS) \
 		$(TEST_USERS_ARGS) \
+		$(LANGFUSE_ARGS) \
 		$(if $(filter-out "",$(2)),$(2),) \
 		$(EXTRA_HELM_ARGS)
 	@echo "Waiting for deployments to be ready..."
@@ -1160,6 +1162,7 @@ define helm_install_common
 	done
 	$(if $(filter true,$(3)),@echo "Waiting for mock eventing deployment..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-mock-eventing -n $(NAMESPACE) --timeout 5m,)
 	$(if $(filter true,$(PROMPTGUARD_ENABLED)),@echo "Waiting for PromptGuard deployment..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-promptguard -n $(NAMESPACE) --timeout 10m,)
+	$(if $(filter true,$(ENABLE_LANGFUSE)),@echo "Waiting for Redis StatefulSet..." && kubectl rollout status statefulset/$(MAIN_CHART_NAME)-redis -n $(NAMESPACE) --timeout 10m && echo "Waiting for MinIO StatefulSet..." && kubectl rollout status statefulset/$(MAIN_CHART_NAME)-minio -n $(NAMESPACE) --timeout 10m && echo "Waiting for ClickHouse StatefulSet..." && kubectl rollout status statefulset/$(MAIN_CHART_NAME)-clickhouse -n $(NAMESPACE) --timeout 10m && echo "Waiting for LangFuse Web deployment..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-langfuse -n $(NAMESPACE) --timeout 10m && echo "Waiting for LangFuse Worker deployment (runs ClickHouse migrations)..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-langfuse-worker -n $(NAMESPACE) --timeout 10m && echo "LangFuse URL: https://$$(kubectl get route $(MAIN_CHART_NAME)-langfuse -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null || echo 'Route not found')",)
 	@echo "$(MAIN_CHART_NAME) $(1) installed successfully"
 endef
 
@@ -1323,8 +1326,8 @@ helm-uninstall:
 	@$(MAKE) helm-cleanup-jobs
 	@echo "Removing ServiceNow credentials secret from $(NAMESPACE)"
 	@kubectl delete secret $(MAIN_CHART_NAME)-servicenow-credentials -n $(NAMESPACE) --ignore-not-found || true
-	@echo "Removing pgvector and init job PVCs from $(NAMESPACE)"
-	@kubectl get pvc -n $(NAMESPACE) -o custom-columns=NAME:.metadata.name | grep -E '^(pg.*-data|self-service-agent-init-status)' | xargs -I {} kubectl delete pvc -n $(NAMESPACE) {} ||:
+	@echo "Removing pgvector, init job, and LangFuse PVCs from $(NAMESPACE)"
+	@kubectl get pvc -n $(NAMESPACE) -o custom-columns=NAME:.metadata.name 2>/dev/null | grep -E '^(pg.*-data|self-service-agent-init-status|data-self-service-agent-(clickhouse|redis|minio)-.*)' | xargs -I {} kubectl delete pvc -n $(NAMESPACE) {} --ignore-not-found ||:
 	@echo "Deleting remaining pods in namespace $(NAMESPACE)"
 	@kubectl delete pods -n $(NAMESPACE) --all || true
 	@echo "Checking for any remaining resources in namespace $(NAMESPACE)..."

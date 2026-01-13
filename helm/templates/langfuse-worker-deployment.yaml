@@ -1,0 +1,231 @@
+{{- if .Values.langfuse.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-langfuse-worker
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse-worker
+spec:
+  replicas: {{ .Values.langfuse.worker.replicas | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "self-service-agent.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: langfuse-worker
+  template:
+    metadata:
+      labels:
+        {{- include "self-service-agent.labels" . | nindent 8 }}
+        app.kubernetes.io/component: langfuse-worker
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "self-service-agent.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+      # Wait for ClickHouse to be ready before starting worker
+      - name: wait-for-clickhouse
+        image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Install curl
+          microdnf install -y curl
+
+          until curl -sf http://{{ include "self-service-agent.fullname" . }}-clickhouse:8123/ping >/dev/null 2>&1; do
+            echo "Waiting for ClickHouse to be ready..."
+            sleep 2
+          done
+          echo "ClickHouse is ready"
+      containers:
+      - name: langfuse-worker
+        image: {{ .Values.langfuse.worker.image.repository | default "langfuse/langfuse-worker" }}:{{ .Values.langfuse.worker.image.tag | default .Values.langfuse.image.tag }}
+        imagePullPolicy: {{ .Values.langfuse.image.pullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        # Worker processes Redis queue and runs ClickHouse migrations on startup
+        env:
+        # PostgreSQL Configuration
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: host
+        - name: POSTGRES_PORT
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: port
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: password
+        - name: LANGFUSE_DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-config
+              key: LANGFUSE_DB_NAME
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(LANGFUSE_DB_NAME)"
+
+        # ClickHouse Configuration
+        - name: CLICKHOUSE_USER
+          value: {{ .Values.langfuse.clickhouse.user | quote }}
+        - name: CLICKHOUSE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-clickhouse-secret
+              key: password
+        - name: CLICKHOUSE_HOST
+          value: {{ include "self-service-agent.fullname" . }}-clickhouse
+        - name: CLICKHOUSE_PORT
+          value: "8123"
+        - name: CLICKHOUSE_DATABASE
+          value: {{ .Values.langfuse.clickhouse.database | quote }}
+        - name: CLICKHOUSE_DB
+          value: {{ .Values.langfuse.clickhouse.database | quote }}
+        - name: CLICKHOUSE_URL
+          value: "http://$(CLICKHOUSE_USER):$(CLICKHOUSE_PASSWORD)@$(CLICKHOUSE_HOST):$(CLICKHOUSE_PORT)/$(CLICKHOUSE_DATABASE)"
+        - name: CLICKHOUSE_MIGRATION_URL
+          value: clickhouse://$(CLICKHOUSE_USER):$(CLICKHOUSE_PASSWORD)@{{ include "self-service-agent.fullname" . }}-clickhouse:9000/$(CLICKHOUSE_DATABASE)
+        - name: CLICKHOUSE_CLUSTER_ENABLED
+          value: "false"
+
+        # IMPORTANT: Do NOT set LANGFUSE_AUTO_CLICKHOUSE_MIGRATION_DISABLED to "true"
+        # This allows ClickHouse migrations to run automatically on worker startup
+
+        # Redis Configuration
+        - name: LANGFUSE_REDIS_ENABLED
+          value: "true"
+        - name: REDIS_HOST
+          value: {{ include "self-service-agent.fullname" . }}-redis
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_AUTH
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-redis-secret
+              key: password
+        - name: REDIS_CONNECTION_STRING
+          value: "redis://:$(REDIS_AUTH)@$(REDIS_HOST):$(REDIS_PORT)"
+
+        # S3/MinIO Configuration (Event Upload)
+        - name: LANGFUSE_S3_EVENT_UPLOAD_ENABLED
+          value: "true"
+        - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
+          value: "langfuse-events"
+        - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
+          value: "us-east-1"
+        - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
+          value: http://{{ include "self-service-agent.fullname" . }}-minio:9000
+        - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-minio-secret
+              key: access-key
+        - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-minio-secret
+              key: secret-key
+        - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
+          value: "true"
+
+        # S3/MinIO Configuration (Batch Export)
+        - name: LANGFUSE_S3_BATCH_EXPORT_ENABLED
+          value: "true"
+        - name: LANGFUSE_S3_BATCH_EXPORT_BUCKET
+          value: "langfuse-exports"
+        - name: LANGFUSE_S3_BATCH_EXPORT_REGION
+          value: "us-east-1"
+        - name: LANGFUSE_S3_BATCH_EXPORT_ENDPOINT
+          value: http://{{ include "self-service-agent.fullname" . }}-minio:9000
+        - name: LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-minio-secret
+              key: access-key
+        - name: LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-minio-secret
+              key: secret-key
+        - name: LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE
+          value: "true"
+
+        # S3/MinIO Configuration (Media Upload)
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_ENABLED
+          value: "true"
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_BUCKET
+          value: "langfuse-media"
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_REGION
+          value: "us-east-1"
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT
+          value: http://{{ include "self-service-agent.fullname" . }}-minio:9000
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-minio-secret
+              key: access-key
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-minio-secret
+              key: secret-key
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE
+          value: "true"
+
+        # Security & Secrets
+        - name: NEXTAUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-secret
+              key: nextauth-secret
+        - name: SALT
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-secret
+              key: salt
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-secret
+              key: encryption-key
+
+        # Telemetry
+        - name: TELEMETRY_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-config
+              key: TELEMETRY_ENABLED
+
+        resources:
+          {{- toYaml .Values.langfuse.worker.resources | default .Values.langfuse.resources | nindent 10 }}
+{{- end }}

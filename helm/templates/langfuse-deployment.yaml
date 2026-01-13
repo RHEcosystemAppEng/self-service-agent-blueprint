@@ -1,0 +1,500 @@
+{{- if .Values.langfuse.enabled }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-langfuse-secret
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse
+type: Opaque
+stringData:
+  {{- if .Values.langfuse.config.nextAuthSecret }}
+  nextauth-secret: {{ .Values.langfuse.config.nextAuthSecret | quote }}
+  {{- else }}
+  nextauth-secret: {{ randAlphaNum 32 | b64enc | quote }}
+  {{- end }}
+  {{- if .Values.langfuse.config.salt }}
+  salt: {{ .Values.langfuse.config.salt | quote }}
+  {{- else }}
+  salt: {{ randAlphaNum 32 | b64enc | quote }}
+  {{- end }}
+  {{- if .Values.langfuse.config.encryptionKey }}
+  encryption-key: {{ .Values.langfuse.config.encryptionKey | quote }}
+  {{- else }}
+  encryption-key: {{ randAlphaNum 64 | quote }}
+  {{- end }}
+  {{- if .Values.langfuse.config.adminApiKey }}
+  admin-api-key: {{ .Values.langfuse.config.adminApiKey | quote }}
+  {{- else }}
+  admin-api-key: {{ randAlphaNum 32 | quote }}
+  {{- end }}
+  {{- if .Values.langfuse.config.initOrgId }}
+  init-user-password: {{ .Values.langfuse.config.initUserPassword | quote }}
+  {{- end }}
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-langfuse-api-keys
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse
+type: Opaque
+{{- $existingSecret := lookup "v1" "Secret" .Release.Namespace (printf "%s-langfuse-api-keys" (include "self-service-agent.fullname" .)) }}
+{{- if $existingSecret }}
+data:
+  # Reuse existing keys from previous installation to avoid mismatch with LangFuse database
+  public-key: {{ index $existingSecret.data "public-key" }}
+  secret-key: {{ index $existingSecret.data "secret-key" }}
+{{- else }}
+stringData:
+  # These keys will be auto-created in LangFuse via headless initialization on first install
+  public-key: {{ .Values.langfuse.config.initApiPublicKey | default (printf "pk-lf-%s" (randAlphaNum 32)) | quote }}
+  secret-key: {{ .Values.langfuse.config.initApiSecretKey | default (printf "sk-lf-%s" (randAlphaNum 64)) | quote }}
+{{- end }}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-langfuse-config
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse
+data:
+  NEXTAUTH_URL: {{ .Values.langfuse.config.nextAuthUrl | default (printf "http://%s-langfuse:%d" (include "self-service-agent.fullname" .) (.Values.langfuse.service.port | int)) | quote }}
+  NEXT_PUBLIC_API_URL: {{ .Values.langfuse.config.publicApiUrl | default (printf "http://%s-langfuse:%d" (include "self-service-agent.fullname" .) (.Values.langfuse.service.port | int)) | quote }}
+  TELEMETRY_ENABLED: {{ .Values.langfuse.config.telemetryEnabled | quote }}
+  LANGFUSE_INIT_PROJECT_NAME: {{ .Values.langfuse.config.initProjectName | quote }}
+  LANGFUSE_DB_NAME: {{ .Values.langfuse.database.name | quote }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-langfuse
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse
+spec:
+  replicas: {{ .Values.langfuse.replicas }}
+  selector:
+    matchLabels:
+      {{- include "self-service-agent.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: langfuse
+  template:
+    metadata:
+      labels:
+        {{- include "self-service-agent.labels" . | nindent 8 }}
+        app.kubernetes.io/component: langfuse
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "self-service-agent.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+      - name: init-db
+        image: quay.io/fedora/postgresql-16:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        env:
+        - name: PGHOST
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: host
+        - name: PGPORT
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: port
+        - name: PGUSER
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: user
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: user
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: password
+        - name: PGDATABASE
+          value: "postgres"
+        - name: LANGFUSE_DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-config
+              key: LANGFUSE_DB_NAME
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Wait for PostgreSQL to be ready
+          until psql -c '\q' 2>/dev/null; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+          # Create langfuse database if it doesn't exist
+          echo "Initializing LangFuse PostgreSQL database..."
+          psql -v ON_ERROR_STOP=1 --username="$POSTGRES_USER" --dbname=postgres <<-EOSQL
+              SELECT 'CREATE DATABASE {{ .Values.langfuse.database.name }}'
+              WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '{{ .Values.langfuse.database.name }}')\gexec
+          EOSQL
+          echo "LangFuse PostgreSQL database initialized"
+      - name: init-minio
+        image: quay.io/minio/mc:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        env:
+        - name: MINIO_ENDPOINT
+          value: {{ include "self-service-agent.fullname" . }}-minio:9000
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-minio-secret
+              key: access-key
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-minio-secret
+              key: secret-key
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Set MC_HOST_ environment variable for MinIO client (no config file needed)
+          export MC_HOST_myminio="http://${MINIO_ACCESS_KEY}:${MINIO_SECRET_KEY}@${MINIO_ENDPOINT}"
+          # Set config directory to /tmp (writable in OpenShift)
+          export MC_CONFIG_DIR=/tmp/.mc
+
+          # Wait for MinIO to be ready
+          until mc ls myminio/ >/dev/null 2>&1; do
+            echo "Waiting for MinIO to be ready..."
+            sleep 2
+          done
+          echo "MinIO is ready"
+
+          # Create buckets if they don't exist
+          echo "Creating LangFuse S3 buckets..."
+          mc mb --ignore-existing myminio/langfuse-events
+          mc mb --ignore-existing myminio/langfuse-exports
+          mc mb --ignore-existing myminio/langfuse-media
+
+          # Set public policy for bucket access (MinIO requirement for LangFuse)
+          mc anonymous set download myminio/langfuse-events
+          mc anonymous set download myminio/langfuse-exports
+          mc anonymous set download myminio/langfuse-media
+
+          echo "MinIO buckets initialized successfully"
+      # Wait for ClickHouse to be ready before starting web container
+      # This is critical because schema migrations run from the WEB container on startup
+      - name: wait-for-clickhouse
+        image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Install curl
+          microdnf install -y curl
+
+          until curl -sf http://{{ include "self-service-agent.fullname" . }}-clickhouse:8123/ping >/dev/null 2>&1; do
+            echo "Waiting for ClickHouse to be ready..."
+            sleep 2
+          done
+          echo "ClickHouse is ready"
+      containers:
+      - name: langfuse
+        image: "{{ .Values.langfuse.image.repository }}:{{ .Values.langfuse.image.tag }}"
+        imagePullPolicy: {{ .Values.langfuse.image.pullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        env:
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: host
+        - name: POSTGRES_PORT
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: port
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: password
+        - name: LANGFUSE_DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-config
+              key: LANGFUSE_DB_NAME
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(LANGFUSE_DB_NAME)"
+        - name: CLICKHOUSE_USER
+          value: {{ .Values.langfuse.clickhouse.user | quote }}
+        - name: CLICKHOUSE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-clickhouse-secret
+              key: password
+        - name: CLICKHOUSE_HOST
+          value: {{ include "self-service-agent.fullname" . }}-clickhouse
+        - name: CLICKHOUSE_PORT
+          value: "8123"
+        - name: CLICKHOUSE_DATABASE
+          value: {{ .Values.langfuse.clickhouse.database | quote }}
+        - name: CLICKHOUSE_DB
+          value: {{ .Values.langfuse.clickhouse.database | quote }}
+        - name: CLICKHOUSE_URL
+          value: "http://$(CLICKHOUSE_USER):$(CLICKHOUSE_PASSWORD)@$(CLICKHOUSE_HOST):$(CLICKHOUSE_PORT)/$(CLICKHOUSE_DATABASE)"
+        - name: CLICKHOUSE_MIGRATION_URL
+          value: clickhouse://$(CLICKHOUSE_USER):$(CLICKHOUSE_PASSWORD)@{{ include "self-service-agent.fullname" . }}-clickhouse:9000/$(CLICKHOUSE_DATABASE)
+        - name: CLICKHOUSE_CLUSTER_ENABLED
+          value: "false"
+        - name: NEXTAUTH_URL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-config
+              key: NEXTAUTH_URL
+        - name: NEXTAUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-secret
+              key: nextauth-secret
+        - name: SALT
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-secret
+              key: salt
+        - name: TELEMETRY_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-config
+              key: TELEMETRY_ENABLED
+        - name: LANGFUSE_INIT_PROJECT_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-config
+              key: LANGFUSE_INIT_PROJECT_NAME
+{{- if .Values.langfuse.config.initOrgId }}
+        - name: LANGFUSE_INIT_ORG_ID
+          value: {{ .Values.langfuse.config.initOrgId | quote }}
+        - name: LANGFUSE_INIT_ORG_NAME
+          value: {{ .Values.langfuse.config.initOrgName | quote }}
+        - name: LANGFUSE_INIT_PROJECT_ID
+          value: {{ .Values.langfuse.config.initProjectId | quote }}
+        - name: LANGFUSE_INIT_USER_EMAIL
+          value: {{ .Values.langfuse.config.initUserEmail | quote }}
+        - name: LANGFUSE_INIT_USER_NAME
+          value: {{ .Values.langfuse.config.initUserName | quote }}
+        - name: LANGFUSE_INIT_USER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-secret
+              key: init-user-password
+        - name: LANGFUSE_INIT_PROJECT_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-api-keys
+              key: public-key
+        - name: LANGFUSE_INIT_PROJECT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-api-keys
+              key: secret-key
+{{- end }}
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-secret
+              key: encryption-key
+        - name: ADMIN_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-secret
+              key: admin-api-key
+        - name: NEXT_PUBLIC_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-config
+              key: NEXT_PUBLIC_API_URL
+        - name: LANGFUSE_S3_EVENT_UPLOAD_ENABLED
+          value: "true"
+        - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
+          value: "langfuse-events"
+        - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
+          value: "us-east-1"
+        - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
+          value: http://{{ include "self-service-agent.fullname" . }}-minio:9000
+        - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-minio-secret
+              key: access-key
+        - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-minio-secret
+              key: secret-key
+        - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
+          value: "true"
+        - name: LANGFUSE_S3_BATCH_EXPORT_ENABLED
+          value: "true"
+        - name: LANGFUSE_S3_BATCH_EXPORT_BUCKET
+          value: "langfuse-exports"
+        - name: LANGFUSE_S3_BATCH_EXPORT_REGION
+          value: "us-east-1"
+        - name: LANGFUSE_S3_BATCH_EXPORT_ENDPOINT
+          value: http://{{ include "self-service-agent.fullname" . }}-minio:9000
+        - name: LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-minio-secret
+              key: access-key
+        - name: LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-minio-secret
+              key: secret-key
+        - name: LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE
+          value: "true"
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_ENABLED
+          value: "true"
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_BUCKET
+          value: "langfuse-media"
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_REGION
+          value: "us-east-1"
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT
+          value: http://{{ include "self-service-agent.fullname" . }}-minio:9000
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-minio-secret
+              key: access-key
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-minio-secret
+              key: secret-key
+        - name: LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE
+          value: "true"
+        - name: LANGFUSE_REDIS_ENABLED
+          value: "true"
+        - name: REDIS_HOST
+          value: {{ include "self-service-agent.fullname" . }}-redis
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_AUTH
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-redis-secret
+              key: password
+        - name: REDIS_CONNECTION_STRING
+          value: "redis://:$(REDIS_AUTH)@$(REDIS_HOST):$(REDIS_PORT)"
+        ports:
+        - name: http
+          containerPort: {{ .Values.langfuse.service.port }}
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.langfuse.healthChecks.livenessProbe.path }}
+            port: http
+          initialDelaySeconds: {{ .Values.langfuse.healthChecks.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.langfuse.healthChecks.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.langfuse.healthChecks.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.langfuse.healthChecks.livenessProbe.failureThreshold }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.langfuse.healthChecks.readinessProbe.path }}
+            port: http
+          initialDelaySeconds: {{ .Values.langfuse.healthChecks.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.langfuse.healthChecks.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.langfuse.healthChecks.readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.langfuse.healthChecks.readinessProbe.failureThreshold }}
+        resources:
+          {{- toYaml .Values.langfuse.resources | nindent 10 }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-langfuse
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse
+spec:
+  type: {{ .Values.langfuse.service.type }}
+  ports:
+  - port: {{ .Values.langfuse.service.port }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "self-service-agent.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse
+
+{{- if .Values.langfuse.externalAccess.enabled }}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-langfuse
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: langfuse
+spec:
+  to:
+    kind: Service
+    name: {{ include "self-service-agent.fullname" . }}-langfuse
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+{{- end }}
+{{- end }}

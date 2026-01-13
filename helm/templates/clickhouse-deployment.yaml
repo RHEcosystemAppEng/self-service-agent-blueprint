@@ -1,0 +1,139 @@
+{{- if .Values.langfuse.enabled }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-clickhouse-secret
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: clickhouse
+type: Opaque
+stringData:
+  {{- if .Values.langfuse.clickhouse.password }}
+  password: {{ .Values.langfuse.clickhouse.password | quote }}
+  {{- else }}
+  password: {{ randAlphaNum 32 | quote }}
+  {{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-clickhouse
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: clickhouse
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8123
+    targetPort: http
+    protocol: TCP
+  - name: native
+    port: 9000
+    targetPort: native
+    protocol: TCP
+  selector:
+    {{- include "self-service-agent.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: clickhouse
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-clickhouse
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: clickhouse
+spec:
+  serviceName: {{ include "self-service-agent.fullname" . }}-clickhouse
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "self-service-agent.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: clickhouse
+  template:
+    metadata:
+      labels:
+        {{- include "self-service-agent.labels" . | nindent 8 }}
+        app.kubernetes.io/component: clickhouse
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: clickhouse
+        image: "clickhouse/clickhouse-server:{{ .Values.langfuse.clickhouse.version }}"
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        ports:
+        - name: http
+          containerPort: 8123
+          protocol: TCP
+        - name: native
+          containerPort: 9000
+          protocol: TCP
+        env:
+        - name: CLICKHOUSE_USER
+          value: {{ .Values.langfuse.clickhouse.user | quote }}
+        - name: CLICKHOUSE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-clickhouse-secret
+              key: password
+        - name: CLICKHOUSE_DB
+          value: {{ .Values.langfuse.clickhouse.database | quote }}
+        - name: CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT
+          value: "1"
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/clickhouse
+        - name: config
+          mountPath: /etc/clickhouse-server/config.d/
+        resources:
+          {{- toYaml .Values.langfuse.clickhouse.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: http
+          initialDelaySeconds: {{ .Values.langfuse.clickhouse.healthChecks.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.langfuse.clickhouse.healthChecks.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.langfuse.clickhouse.healthChecks.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.langfuse.clickhouse.healthChecks.livenessProbe.failureThreshold }}
+        readinessProbe:
+          httpGet:
+            path: /ping
+            port: http
+          initialDelaySeconds: {{ .Values.langfuse.clickhouse.healthChecks.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.langfuse.clickhouse.healthChecks.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.langfuse.clickhouse.healthChecks.readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.langfuse.clickhouse.healthChecks.readinessProbe.failureThreshold }}
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "self-service-agent.fullname" . }}-clickhouse-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      {{- if .Values.langfuse.clickhouse.storageClass }}
+      storageClassName: {{ .Values.langfuse.clickhouse.storageClass | quote }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.langfuse.clickhouse.storage }}
+{{- end }}

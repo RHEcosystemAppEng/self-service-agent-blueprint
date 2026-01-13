@@ -111,6 +111,10 @@ spec:
       port: 8080
     - protocol: TCP
       port: 80
+{{- if .Values.langfuse.enabled }}
+    - protocol: TCP
+      port: 3000
+{{- end }}
 {{- else if eq .Values.requestManagement.networkPolicies.platform "kind" }}
   # Allow access from kind ingress-nginx namespace
   - from:
@@ -122,6 +126,10 @@ spec:
       port: 8080
     - protocol: TCP
       port: 80
+{{- if .Values.langfuse.enabled }}
+    - protocol: TCP
+      port: 3000
+{{- end }}
   # Also allow from ingress-nginx with app label (for older kind versions)
   - from:
     - namespaceSelector:
@@ -132,6 +140,10 @@ spec:
       port: 8080
     - protocol: TCP
       port: 80
+{{- if .Values.langfuse.enabled }}
+    - protocol: TCP
+      port: 3000
+{{- end }}
 {{- end }}
 {{- end }}
 

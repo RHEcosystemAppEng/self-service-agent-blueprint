@@ -1,0 +1,136 @@
+{{- if .Values.langfuse.enabled }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-redis-secret
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+type: Opaque
+stringData:
+  password: {{ .Values.langfuse.redis.password | default "changeme" | quote }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-redis
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  type: ClusterIP
+  ports:
+  - name: redis
+    port: 6379
+    targetPort: redis
+    protocol: TCP
+  selector:
+    {{- include "self-service-agent.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-redis
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  serviceName: {{ include "self-service-agent.fullname" . }}-redis
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "self-service-agent.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: redis
+  template:
+    metadata:
+      labels:
+        {{- include "self-service-agent.labels" . | nindent 8 }}
+        app.kubernetes.io/component: redis
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: redis
+        image: "redis:{{ .Values.langfuse.redis.version }}"
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        command:
+        - redis-server
+        - --requirepass
+        - $(REDIS_PASSWORD)
+        - --appendonly
+        - "yes"
+        - --save
+        - "900 1"
+        - --save
+        - "300 10"
+        - --save
+        - "60 10000"
+        ports:
+        - name: redis
+          containerPort: 6379
+          protocol: TCP
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-redis-secret
+              key: password
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          {{- toYaml .Values.langfuse.redis.resources | nindent 10 }}
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - --no-auth-warning
+            - -a
+            - $(REDIS_PASSWORD)
+            - ping
+          initialDelaySeconds: {{ .Values.langfuse.redis.healthChecks.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.langfuse.redis.healthChecks.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.langfuse.redis.healthChecks.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.langfuse.redis.healthChecks.livenessProbe.failureThreshold }}
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - --no-auth-warning
+            - -a
+            - $(REDIS_PASSWORD)
+            - ping
+          initialDelaySeconds: {{ .Values.langfuse.redis.healthChecks.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.langfuse.redis.healthChecks.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.langfuse.redis.healthChecks.readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.langfuse.redis.healthChecks.readinessProbe.failureThreshold }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      {{- if .Values.langfuse.redis.storageClass }}
+      storageClassName: {{ .Values.langfuse.redis.storageClass | quote }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.langfuse.redis.storage }}
+{{- end }}

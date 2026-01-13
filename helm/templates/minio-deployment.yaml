@@ -1,0 +1,139 @@
+{{- if .Values.langfuse.enabled }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-minio-secret
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+type: Opaque
+stringData:
+  access-key: {{ .Values.langfuse.minio.accessKey | default "minioadmin" | quote }}
+  secret-key: {{ .Values.langfuse.minio.secretKey | default "changeme" | quote }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-minio
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9000
+    targetPort: api
+    protocol: TCP
+    name: api
+  - port: 9001
+    targetPort: console
+    protocol: TCP
+    name: console
+  selector:
+    {{- include "self-service-agent.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-minio
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  serviceName: {{ include "self-service-agent.fullname" . }}-minio
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "self-service-agent.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: minio
+  template:
+    metadata:
+      labels:
+        {{- include "self-service-agent.labels" . | nindent 8 }}
+        app.kubernetes.io/component: minio
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "self-service-agent.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: minio
+        image: "quay.io/minio/minio:{{ .Values.langfuse.minio.version }}"
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        args:
+        - server
+        - /data
+        - --console-address
+        - ":9001"
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-minio-secret
+              key: access-key
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "self-service-agent.fullname" . }}-minio-secret
+              key: secret-key
+        ports:
+        - name: api
+          containerPort: 9000
+          protocol: TCP
+        - name: console
+          containerPort: 9001
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /minio/health/live
+            port: api
+          initialDelaySeconds: {{ .Values.langfuse.minio.healthChecks.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.langfuse.minio.healthChecks.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.langfuse.minio.healthChecks.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.langfuse.minio.healthChecks.livenessProbe.failureThreshold }}
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: api
+          initialDelaySeconds: {{ .Values.langfuse.minio.healthChecks.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.langfuse.minio.healthChecks.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.langfuse.minio.healthChecks.readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.langfuse.minio.healthChecks.readinessProbe.failureThreshold }}
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          {{- toYaml .Values.langfuse.minio.resources | nindent 10 }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      labels:
+        {{- include "self-service-agent.labels" . | nindent 8 }}
+        app.kubernetes.io/component: minio
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      {{- if .Values.langfuse.minio.storageClass }}
+      storageClassName: {{ .Values.langfuse.minio.storageClass }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.langfuse.minio.storage }}
+{{- end }}

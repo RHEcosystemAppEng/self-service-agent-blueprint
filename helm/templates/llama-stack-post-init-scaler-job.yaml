@@ -28,7 +28,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: scale-deployment
-        image: bitnami/kubectl:latest
+        image: quay.io/bitnami/kubectl:latest
         imagePullPolicy: IfNotPresent
         env:
         - name: NAMESPACE

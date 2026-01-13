@@ -33,7 +33,7 @@ database:
   
   # Database connection URL - leave empty to use default pgvector service
   # Format: postgresql://username:password@host:port/database
-  url: ""  # Uses default: postgresql://postgres:changeme@self-service-agent-pgvector:5432/postgres
+  url: ""  # Uses default: postgresql://postgres:rag_password@self-service-agent-pgvector:5432/postgres
 
 # This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
 serviceAccount:
@@ -599,3 +599,197 @@ security:
     imapPollInterval: "60"  # Polling interval in seconds (default: 60 - 1 minute)
     imapLeaseDuration: "120"  # Leader election lease duration in seconds (default: 120 - should be 2x poll interval)
     imapLeaseRenewalInterval: ""  # Lease renewal interval in seconds (optional, defaults to lease_duration // 2)
+
+# LangFuse Observability Platform
+# Enable with: export ENABLE_LANGFUSE=true before running make helm-install-test or helm-install-prod
+langfuse:
+  enabled: false  # Set to true or use ENABLE_LANGFUSE=true environment variable
+
+  # LangFuse deployment configuration
+  replicas: 1
+  image:
+    repository: ghcr.io/langfuse/langfuse
+    tag: "3"
+    pullPolicy: Always
+
+  # Worker configuration (processes Redis queue and runs ClickHouse migrations)
+  worker:
+    replicas: 1
+    # Worker uses a separate image from the web container
+    image:
+      repository: "ghcr.io/langfuse/langfuse-worker"
+      # tag defaults to langfuse.image.tag if not specified
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+  # Database configuration (uses same PostgreSQL instance)
+  database:
+    name: langfuse
+    # Uses same credentials as main database
+
+  # ClickHouse configuration (required for v3)
+  clickhouse:
+    # ClickHouse version
+    version: "24.3"
+
+    # Database configuration
+    user: "langfuse"
+    database: "langfuse"
+    password: "langgraph_password"  # Default password (change for production)
+
+    # Storage configuration
+    storage: "10Gi"  # PersistentVolume size for trace data
+    storageClass: ""  # Use cluster default if empty
+
+    # Resource limits
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+
+    # Health check configuration
+    healthChecks:
+      livenessProbe:
+        initialDelaySeconds: 60
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 5
+      readinessProbe:
+        initialDelaySeconds: 20
+        periodSeconds: 5
+        timeoutSeconds: 3
+        failureThreshold: 6
+
+  # Redis configuration (required for v3)
+  redis:
+    # Redis version
+    version: "7.2"
+
+    # Database configuration
+    password: "langgraph_password"  # Default password (change for production)
+
+    # Storage configuration
+    storage: "2Gi"  # PersistentVolume size for Redis data
+    storageClass: ""  # Use cluster default if empty
+
+    # Resource limits
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+
+    # Health check configuration
+    healthChecks:
+      livenessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+      readinessProbe:
+        initialDelaySeconds: 10
+        periodSeconds: 5
+        timeoutSeconds: 3
+        failureThreshold: 3
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 3000
+
+  # External access via OpenShift Route
+  externalAccess:
+    enabled: true
+
+  # Resource limits
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+  # Health checks
+  healthChecks:
+    livenessProbe:
+      path: /api/public/health
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readinessProbe:
+      path: /api/public/health
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 3
+
+  # MinIO configuration (S3-compatible storage, required for v3)
+  minio:
+    # MinIO version
+    version: "RELEASE.2024-12-18T13-15-44Z"
+
+    # Access credentials
+    accessKey: "minioadmin"
+    secretKey: "langgraph_password"  # Default password (change for production)
+
+    # Storage configuration
+    storage: "10Gi"  # PersistentVolume size for object storage
+    storageClass: ""  # Use cluster default if empty
+
+    # Resource limits
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+    # Health check configuration
+    healthChecks:
+      livenessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+      readinessProbe:
+        initialDelaySeconds: 10
+        periodSeconds: 5
+        timeoutSeconds: 3
+        failureThreshold: 3
+
+  # LangFuse configuration
+  config:
+    telemetryEnabled: false
+    initProjectName: "self-service-agent"
+    # Public API URL - defaults to internal service URL
+    # For production with external access, set to your external route URL (https://langfuse-route.apps.cluster.com)
+    publicApiUrl: ""  # Defaults to internal service URL if not set (http://self-service-agent-langfuse:3000)
+    # NextAuth URL - defaults to internal service URL if not set
+    nextAuthUrl: ""  # Override if needed
+    # Secrets (auto-generated if not provided)
+    nextAuthSecret: ""  # Leave empty to auto-generate
+    salt: ""  # Leave empty to auto-generate
+    encryptionKey: ""  # Leave empty to auto-generate (256-bit hex, 64 chars)
+    adminApiKey: ""  # Leave empty to auto-generate. Used for Admin API to create API keys programmatically.
+
+    # Auto-initialization (creates organization, project, and admin user on first startup)
+    # Leave empty to disable auto-initialization
+    initOrgId: "self-service-agent-org"  # Organization ID
+    initOrgName: "Self Service Agent"  # Organization display name
+    initProjectId: "self-service-agent-project"  # Project ID
+    initUserEmail: "admin@example.com"  # Admin user email
+    initUserName: "Admin User"  # Admin user display name
+    initUserPassword: "langgraph_password"  # Admin user password (change for production!)

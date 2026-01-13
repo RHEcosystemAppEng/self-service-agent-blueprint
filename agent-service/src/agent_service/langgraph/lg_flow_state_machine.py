@@ -5,11 +5,13 @@ LangGraph-based state machine and agent session management.
 This module contains the StateMachine and AgentSession classes for managing
 conversational flows using LangGraph with persistent checkpoint storage.
 """
+import os
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Optional, TypedDict
 
 import yaml
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langfuse.langchain import CallbackHandler
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.types import Command
@@ -20,6 +22,33 @@ from .postgres_checkpoint import get_postgres_checkpointer, reset_postgres_check
 from .util import resolve_agent_service_path
 
 logger = configure_logging("agent-service")
+
+
+def get_langfuse_handler() -> Optional[Any]:
+    """Get LangFuse callback handler if enabled and configured."""
+
+    enabled = os.getenv("LANGFUSE_ENABLED", "false").lower() == "true"
+    if not enabled:
+        logger.info("LangFuse tracing disabled via LANGFUSE_ENABLED=false")
+        return None
+
+    public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
+    secret_key = os.getenv("LANGFUSE_SECRET_KEY")
+    host = os.getenv("LANGFUSE_HOST", "http://langfuse:3000")
+
+    if not public_key or not secret_key:
+        logger.warning("LangFuse keys not configured - tracing disabled")
+        return None
+
+    try:
+        # In langfuse 3.x, CallbackHandler reads credentials from environment variables
+        # LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, and LANGFUSE_HOST
+        handler = CallbackHandler()
+        logger.info("LangFuse tracing enabled", host=host)
+        return handler
+    except Exception as e:
+        logger.error("Failed to initialize LangFuse", error=str(e))
+        return None
 
 
 # Dynamic state definition created from YAML configuration
@@ -1046,8 +1075,43 @@ class ConversationSession:
         # Create the graph with checkpointer
         self.app = self._create_graph()
 
-        # Thread configuration for this session
-        self.thread_config = {"configurable": {"thread_id": self.thread_id}}
+        # Thread configuration for this session with optional LangFuse callbacks
+        self.thread_config: dict[str, Any] = {
+            "configurable": {"thread_id": self.thread_id}
+        }
+
+        # Add LangFuse handler to config if available
+        langfuse_handler = get_langfuse_handler()
+        if langfuse_handler:
+            self.thread_config["callbacks"] = [langfuse_handler]
+
+            # In LangFuse v3, session_id and other attributes are set via metadata
+            # Build tags with agent name for filtering
+            tags = ["langgraph"]
+            agent_name = self.agent.config.get("name")
+            if agent_name:
+                tags.append(agent_name)
+
+            # Build metadata with all recommended LangFuse attributes
+            metadata: dict[str, Any] = {
+                "langfuse_session_id": self.thread_id,
+                "langfuse_tags": tags,
+            }
+
+            # Add user_id if available (important for user-level analytics)
+            if self.authoritative_user_id:
+                metadata["langfuse_user_id"] = self.authoritative_user_id
+
+            # Add custom metadata for additional context
+            if agent_name:
+                metadata["agent_id"] = agent_name
+
+            self.thread_config["metadata"] = metadata
+            logger.debug(
+                "LangFuse tracing enabled for session", thread_id=self.thread_id
+            )
+        else:
+            logger.debug("LangFuse tracing disabled for this session")
 
         # Store current token context for this session
         self.current_token_context: Optional[str] = None

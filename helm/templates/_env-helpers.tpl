@@ -145,6 +145,26 @@ Generate Request Manager specific environment variables
 Generate Agent Service specific environment variables
 */}}
 {{- define "self-service-agent.agentServiceEnvVars" -}}
+{{/* LangFuse Observability Configuration */}}
+{{- if .Values.langfuse.enabled }}
+- name: LANGFUSE_ENABLED
+  value: "true"
+- name: LANGFUSE_PUBLIC_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "self-service-agent.fullname" . }}-langfuse-api-keys
+      key: public-key
+- name: LANGFUSE_SECRET_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "self-service-agent.fullname" . }}-langfuse-api-keys
+      key: secret-key
+- name: LANGFUSE_HOST
+  value: {{ printf "http://%s-langfuse:%d" (include "self-service-agent.fullname" .) (.Values.langfuse.service.port | int) | quote }}
+{{- else }}
+- name: LANGFUSE_ENABLED
+  value: "false"
+{{- end }}
 {{/* LLM Service Configuration */}}
 - name: LLAMA_STACK_URL
   value: {{ .Values.llama_stack_url | default "http://llamastack:8321" | quote }}
