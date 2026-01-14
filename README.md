@@ -1685,7 +1685,7 @@ Detailed technical documentation for developers:
 
 * **Title:** Automate IT processes with Self-Service Agents - Laptop Refresh
 * **Description:** Framework and components to deploy agent-based IT processes. Implements laptop refresh process with reusable tools, knowledge bases, and evaluations.
-* **Industry:** Information Technology and Services
+* **Industry:** Adopt and scale AI
 * **Product:** OpenShift AI
 * **Use case:** Agentic IT process automation
 * **Contributor org:** Red Hat
