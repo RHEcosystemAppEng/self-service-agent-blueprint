@@ -129,6 +129,11 @@ PROMPTGUARD_MODEL_ID ?= meta-llama/Llama-Prompt-Guard-2-86M
 VALIDATE_FULL_LAPTOP_DETAILS ?= true
 VALIDATE_LAPTOP_DETAILS_FLAG := $(if $(filter true,$(VALIDATE_FULL_LAPTOP_DETAILS)),--validate-full-laptop-details,--no-validate-full-laptop-details)
 
+# Enable structured output mode for evaluations (default: false)
+# Set USE_STRUCTURED_OUTPUT=true to enable Pydantic schema validation with retries
+USE_STRUCTURED_OUTPUT ?= false
+STRUCTURED_OUTPUT_FLAG := $(if $(filter true,$(USE_STRUCTURED_OUTPUT)),--use-structured-output,)
+
 # Export to shell so kubectl can access them
 export SERVICENOW_INSTANCE_URL
 export SERVICENOW_API_KEY
@@ -376,6 +381,9 @@ help:
 	@echo "    VALIDATE_FULL_LAPTOP_DETAILS    - Enable full laptop details validation (default: true)"
 	@echo "                                        Set to 'false' to disable: VALIDATE_FULL_LAPTOP_DETAILS=false"
 	@echo "                                        When enabled, integration tests validate all laptop specification fields"
+	@echo "    USE_STRUCTURED_OUTPUT           - Enable structured output mode for evaluations (default: false)"
+	@echo "                                        Set to 'true' to enable: USE_STRUCTURED_OUTPUT=true"
+	@echo "                                        Uses Pydantic schema validation with retries (recommended for Gemini)"
 
 # Build function: $(call build_image,IMAGE_NAME,DESCRIPTION,CONTAINERFILE_PATH,BUILD_CONTEXT)
 define build_image
@@ -1058,19 +1066,19 @@ sync-evaluations:
 .PHONY: test-short-resp-integration-request-mgr
 test-short-resp-integration-request-mgr:
 	@echo "Running short responses integration test with Request Manager..."
-	uv --directory evaluations run evaluate.py -n 1 --test-script chat-responses-request-mgr.py --reset-conversation $(VALIDATE_LAPTOP_DETAILS_FLAG)
+	uv --directory evaluations run evaluate.py -n 1 --test-script chat-responses-request-mgr.py --reset-conversation $(VALIDATE_LAPTOP_DETAILS_FLAG) $(STRUCTURED_OUTPUT_FLAG)
 	@echo "short responses integrations tests with Request Manager completed successfully!"
 
 .PHONY: test-long-resp-integration-request-mgr
 test-long-resp-integration-request-mgr:
 	@echo "Running long responses integration test with Request Manager..."
-	uv --directory evaluations run evaluate.py -n 20 --test-script chat-responses-request-mgr.py --reset-conversation --timeout=1800 $(VALIDATE_LAPTOP_DETAILS_FLAG)
+	uv --directory evaluations run evaluate.py -n 20 --test-script chat-responses-request-mgr.py --reset-conversation --timeout=1800 $(VALIDATE_LAPTOP_DETAILS_FLAG) $(STRUCTURED_OUTPUT_FLAG)
 	@echo "long responses integrations tests with Request Manager completed successfully!"
 
 .PHONY: test-long-concurrent-integration-request-mgr
 test-long-concurrent-integration-request-mgr:
 	@echo "Running long concurrent responses integration test with Request Manager..."
-	uv --directory evaluations run evaluate.py -n 10 --test-script chat-responses-request-mgr.py --reset-conversation --timeout=1800 --concurrency 4 --message-timeout 120 $(VALIDATE_LAPTOP_DETAILS_FLAG)
+	uv --directory evaluations run evaluate.py -n 10 --test-script chat-responses-request-mgr.py --reset-conversation --timeout=1800 --concurrency 4 --message-timeout 120 $(VALIDATE_LAPTOP_DETAILS_FLAG) $(STRUCTURED_OUTPUT_FLAG)
 	@echo "long concurrent responses integrations tests with Request Manager completed successfully!"
 
 # Create namespace and deploy

@@ -561,11 +561,20 @@ def _parse_arguments() -> argparse.Namespace:
         dest="validate_full_laptop_details",
         help="Disable validation of the 15 laptop specification fields.",
     )
+    parser.add_argument(
+        "--use-structured-output",
+        action="store_true",
+        default=False,
+        help="Enable structured output mode for evaluations using Pydantic schema validation with retries. "
+        "Recommended for models like Gemini that benefit from explicit schema validation.",
+    )
     return parser.parse_args()
 
 
 def run_check_known_bad_conversations(
-    timeout: int = 600, validate_full_laptop_details: bool = True
+    timeout: int = 600,
+    validate_full_laptop_details: bool = True,
+    use_structured_output: bool = False,
 ) -> int:
     """
     Check known bad conversations by running deepeval on them.
@@ -577,6 +586,7 @@ def run_check_known_bad_conversations(
     Args:
         timeout: Timeout in seconds for deepeval execution
         validate_full_laptop_details: Enable validation of all 15 laptop specification fields (default: True)
+        use_structured_output: Enable structured output with Pydantic schema validation (default: False)
 
     Returns:
         Exit code (0 if all known bad conversations failed as expected, 1 otherwise)
@@ -610,6 +620,8 @@ def run_check_known_bad_conversations(
         deep_eval_args.append("--validate-full-laptop-details")
     else:
         deep_eval_args.append("--no-validate-full-laptop-details")
+    if use_structured_output:
+        deep_eval_args.append("--use-structured-output")
     # For the check option, we want to run deep_eval and analyze the results
     # even if it returns a non-zero exit code (which indicates it found issues)
     run_script("deep_eval.py", args=deep_eval_args, timeout=timeout)
@@ -870,6 +882,7 @@ def run_evaluation_pipeline(
     concurrency: int = 1,
     message_timeout: int = 60,
     validate_full_laptop_details: bool = True,
+    use_structured_output: bool = False,
 ) -> int:
     """
     Run the complete evaluation pipeline.
@@ -889,6 +902,7 @@ def run_evaluation_pipeline(
         concurrency: Number of parallel workers for generator.py (default: 1)
         message_timeout: Timeout for individual message send/response operations (default: 60)
         validate_full_laptop_details: Enable validation of all 15 laptop specification fields (default: True)
+        use_structured_output: Enable structured output with Pydantic schema validation (default: False)
 
     Returns:
         Exit code (0 for success, 1 for any failures)
@@ -941,6 +955,8 @@ def run_evaluation_pipeline(
         generator_args.extend(["--concurrency", str(concurrency)])
     if reset_conversation:
         generator_args.append("--reset-conversation")
+    if use_structured_output:
+        generator_args.append("--use-structured-output")
     if not run_script("generator.py", args=generator_args, timeout=timeout):
         failed_steps.append("generator.py")
         logger.error("❌ Step 2 failed - continuing with remaining steps")
@@ -956,6 +972,8 @@ def run_evaluation_pipeline(
         deep_eval_args.append("--validate-full-laptop-details")
     else:
         deep_eval_args.append("--no-validate-full-laptop-details")
+    if use_structured_output:
+        deep_eval_args.append("--use-structured-output")
     if not run_script("deep_eval.py", args=deep_eval_args, timeout=timeout):
         failed_steps.append("deep_eval.py")
         logger.error("❌ Step 3 failed")
@@ -1021,6 +1039,7 @@ def main() -> int:
             return run_check_known_bad_conversations(
                 timeout=args.timeout,
                 validate_full_laptop_details=args.validate_full_laptop_details,
+                use_structured_output=args.use_structured_output,
             )
         else:
             return run_evaluation_pipeline(
@@ -1032,6 +1051,7 @@ def main() -> int:
                 concurrency=args.concurrency,
                 message_timeout=args.message_timeout,
                 validate_full_laptop_details=args.validate_full_laptop_details,
+                use_structured_output=args.use_structured_output,
             )
     except KeyboardInterrupt:
         logger.warning("⚠️  Pipeline interrupted by user")

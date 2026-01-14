@@ -172,6 +172,13 @@ def _parse_arguments() -> argparse.Namespace:
         help="Timeout in seconds for individual message send/response operations (default: 60). "
         "Increase for slower agents or high concurrency scenarios.",
     )
+    parser.add_argument(
+        "--use-structured-output",
+        action="store_true",
+        default=False,
+        help="Enable structured output mode using Pydantic schema validation with retries. "
+        "Recommended for models like Gemini that benefit from explicit schema validation.",
+    )
     return parser.parse_args()
 
 
@@ -195,6 +202,7 @@ def _run_worker(
     test_script: str,
     reset_conversation: bool,
     message_timeout: int = 60,
+    use_structured_output: bool = False,
 ) -> dict[str, Any]:
     """
     Worker function to generate conversations in parallel.
@@ -207,6 +215,7 @@ def _run_worker(
         test_script: Test script to use
         reset_conversation: Whether to reset conversation at start
         message_timeout: Timeout for individual message send/response operations
+        use_structured_output: Enable structured output with Pydantic schema validation
 
     Returns:
         Dictionary with saved_files, token_counts, and test_case_count
@@ -231,7 +240,10 @@ def _run_worker(
 
     # Initialize the custom LLM for this worker
     custom_llm = CustomLLM(
-        api_key=api_key, base_url=api_endpoint, model_name=model_name
+        api_key=api_key,
+        base_url=api_endpoint,
+        model_name=model_name,
+        use_structured_output=use_structured_output,
     )
 
     # Create a client variable for this worker
@@ -513,6 +525,7 @@ if __name__ == "__main__":
                 args.test_script,
                 args.reset_conversation,
                 args.message_timeout,
+                args.use_structured_output,
             )
             for i in range(args.concurrency)
         ]

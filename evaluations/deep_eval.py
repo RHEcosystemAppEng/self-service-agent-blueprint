@@ -80,6 +80,7 @@ def _evaluate_conversations(
     output_dir: str = "results/deep_eval_results",
     context_dir: Optional[str] = None,
     validate_full_laptop_details: bool = True,
+    use_structured_output: bool = False,
 ) -> int:
     """
     Main evaluation function that processes conversation files and generates assessment reports.
@@ -100,6 +101,8 @@ def _evaluate_conversations(
         results_dir: Path to directory containing conversation JSON files to evaluate
         output_dir: Path to directory where evaluation results will be saved
         context_dir: Optional path to directory with context files for conversations
+        validate_full_laptop_details: Enable validation of all 15 laptop specification fields
+        use_structured_output: Enable structured output with Pydantic schema validation and retries
 
     Returns:
         int: Exit code (0 for success, 1 for failure) indicating evaluation outcome
@@ -114,7 +117,10 @@ def _evaluate_conversations(
     # At this point, api_key_found is guaranteed to be non-None
     assert api_key_found is not None
     custom_model = CustomLLM(
-        api_key=api_key_found, base_url=current_endpoint or "", model_name=model_name
+        api_key=api_key_found,
+        base_url=current_endpoint or "",
+        model_name=model_name,
+        use_structured_output=use_structured_output,
     )
     if not custom_model:
         logger.error("Could not create model object. Cannot proceed with evaluation.")
@@ -453,6 +459,14 @@ def _parse_arguments() -> argparse.Namespace:
         help="Disable validation of the 15 laptop specification fields.",
     )
 
+    parser.add_argument(
+        "--use-structured-output",
+        action="store_true",
+        default=False,
+        help="Enable structured output with Pydantic schema validation and retries. "
+        "Recommended for models with unreliable JSON formatting (e.g., Google Gemini).",
+    )
+
     return parser.parse_args()
 
 
@@ -481,6 +495,13 @@ if __name__ == "__main__":
     final_api_endpoint = args.api_endpoint or os.getenv("LLM_URL")
     print(f"Custom endpoint: {final_api_endpoint}")
 
+    if args.use_structured_output:
+        print(
+            "Structured output: ENABLED (using Pydantic schema validation with retries)"
+        )
+    else:
+        print("Structured output: DISABLED (using standard JSON mode)")
+
     print("=" * 80)
     print("")
 
@@ -495,6 +516,7 @@ if __name__ == "__main__":
         output_dir=args.output_dir,
         context_dir=args.context_dir,
         validate_full_laptop_details=args.validate_full_laptop_details,
+        use_structured_output=args.use_structured_output,
     )
 
     # Print token usage summary using shared function
