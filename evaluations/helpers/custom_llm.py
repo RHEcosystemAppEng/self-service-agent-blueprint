@@ -3,7 +3,7 @@
 import json
 import logging
 import os
-from typing import Any, Dict, Optional, Tuple, Type, Union
+from typing import Any, Dict, Optional, Tuple, Type, Union, cast
 
 import instructor
 import openai
@@ -77,13 +77,15 @@ class CustomLLM(DeepEvalBaseLLM):
                 instructor_client = instructor.from_openai(client)
 
                 # Use create_with_completion to get both the model and the raw completion for token counting
-                resp, completion = instructor_client.chat.completions.create_with_completion(
-                    model=self.model_name,
-                    messages=[{"role": "user", "content": prompt}],
-                    response_model=schema,
-                    temperature=0.1,
-                    max_tokens=4096,
-                    max_retries=3,
+                resp, completion = (
+                    instructor_client.chat.completions.create_with_completion(
+                        model=self.model_name,
+                        messages=[{"role": "user", "content": prompt}],
+                        response_model=schema,
+                        temperature=0.1,
+                        max_tokens=4096,
+                        max_retries=3,
+                    )
                 )
 
                 # Count tokens from the raw completion
@@ -91,7 +93,7 @@ class CustomLLM(DeepEvalBaseLLM):
                     completion, self.model_name, "custom_llm_evaluation"
                 )
 
-                return resp
+                return cast(BaseModel, resp)
 
             # Regular mode (without instructor)
             api_kwargs: Dict[str, Any] = {
@@ -163,13 +165,15 @@ class CustomLLM(DeepEvalBaseLLM):
                 instructor_client = instructor.from_openai(async_client)
 
                 # Use create_with_completion to get both the model and the raw completion for token counting
-                resp, completion = await instructor_client.chat.completions.create_with_completion(
-                    model=self.model_name,
-                    messages=[{"role": "user", "content": prompt}],
-                    response_model=schema,
-                    temperature=0.1,
-                    max_tokens=4096,
-                    max_retries=3,
+                resp, completion = (
+                    await instructor_client.chat.completions.create_with_completion(
+                        model=self.model_name,
+                        messages=[{"role": "user", "content": prompt}],
+                        response_model=schema,
+                        temperature=0.1,
+                        max_tokens=4096,
+                        max_retries=3,
+                    )
                 )
 
                 # Count tokens from the raw completion
