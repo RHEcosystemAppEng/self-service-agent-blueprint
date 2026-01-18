@@ -186,9 +186,9 @@ def _create_conversation_golden(conversation_number: int) -> ConversationalGolde
     """Create a single ConversationalGolden object for simulation."""
 
     conversation_golden = ConversationalGolden(
-        scenario="An Employee wants to refresh their laptop. The agent shows them a list they can choose from, they select the appropriate laptop and a service now ticket number is returned.",
+        scenario="An Employee wants to refresh their laptop. The user initiates the conversation by asking to refresh their laptop. Then, if the agent provides a list of options, the user selects the appropriate laptop.",
         expected_outcome="They get a Service now ticket number for their refresh request",
-        user_description="user who tries to answer the asssitants last question",
+        user_description="An employee interacting with an IT self-service agent.",
     )
 
     return conversation_golden
@@ -423,7 +423,19 @@ def _convert_test_case_to_conversation_format(
     # Extract turns from the test case
     if hasattr(test_case, "turns") and test_case.turns:
         for turn in test_case.turns:
-            conversation_turns.append({"role": turn.role, "content": turn.content})
+            content = turn.content
+
+            # This handles cases where Structured Output mode saves the whole Pydantic object as a string
+            if isinstance(content, str) and content.strip().startswith("{") and "simulated_input" in content:
+                try:
+                    data = json.loads(content)
+                    if isinstance(data, dict) and "simulated_input" in data:
+                        content = str(data["simulated_input"])
+                except Exception:
+                    # If parsing fails, keep original content
+                    pass
+
+            conversation_turns.append({"role": turn.role, "content": content})
 
     return {
         "metadata": {
