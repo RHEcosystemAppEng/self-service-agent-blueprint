@@ -426,7 +426,11 @@ def _convert_test_case_to_conversation_format(
             content = turn.content
 
             # This handles cases where Structured Output mode saves the whole Pydantic object as a string
-            if isinstance(content, str) and content.strip().startswith("{") and "simulated_input" in content:
+            if (
+                isinstance(content, str)
+                and content.strip().startswith("{")
+                and "simulated_input" in content
+            ):
                 try:
                     data = json.loads(content)
                     if isinstance(data, dict) and "simulated_input" in data:
