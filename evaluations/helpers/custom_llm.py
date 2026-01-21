@@ -33,7 +33,7 @@ class CustomLLM(DeepEvalBaseLLM):
             api_key: API key for authentication
             base_url: Base URL for the LLM API endpoint
             model_name: Optional model name
-            use_structured_output: Enable structured output with Pydantic schema validation and retries
+            use_structured_output: Use instructor for schema processing with automatic retries
         """
         self.api_key = api_key
         self.base_url = base_url
@@ -59,10 +59,10 @@ class CustomLLM(DeepEvalBaseLLM):
 
         Args:
             prompt: The input prompt to generate a response for
-            schema: Optional Pydantic BaseModel class for structured output (only when use_structured_output=True)
+            schema: Optional Pydantic BaseModel class for structured output
 
         Returns:
-            Pydantic model instance if schema provided and use_structured_output=True, otherwise string response
+            Pydantic model instance if schema provided, otherwise string response
 
         Raises:
             Exception: If the API call fails or returns an error
@@ -144,10 +144,10 @@ class CustomLLM(DeepEvalBaseLLM):
 
         Args:
             prompt: The input prompt to generate a response for
-            schema: Optional Pydantic BaseModel class for structured output (only when use_structured_output=True)
+            schema: Optional Pydantic BaseModel class for structured output
 
         Returns:
-            Pydantic model instance if schema provided and use_structured_output=True, otherwise string response
+            Pydantic model instance if schema provided, otherwise string response
 
         Raises:
             Exception: If the API call fails or returns an error
