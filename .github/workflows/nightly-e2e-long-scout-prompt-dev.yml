@@ -2,6 +2,12 @@ name: (dev) (Scout Prompt) Nightly 20 conversation test
 
 on:
   workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref (branch, tag, or SHA) to checkout'
+        required: false
+        default: 'dev'
+        type: string
   schedule:
     - cron: '0 5 * * *'  # Run daily at 5 AM UTC
 
@@ -31,7 +37,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
-          ref: dev
+          ref: ${{ inputs.ref || 'dev' }}
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v6
