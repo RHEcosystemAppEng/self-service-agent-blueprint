@@ -891,7 +891,7 @@ Execute the predefined conversation flows against your deployed agent:
 
 ```bash
 # Run predefined conversations
-python run_conversations.py
+python run_conversations.py --reset-conversation
 ```
 
 This runs the pre-defined conversations in [evaluations/conversations_config/conversations/](evaluations/conversations_config/conversations/).
@@ -916,7 +916,7 @@ Create additional test scenarios using the conversation generator (generate.py):
 
 ```bash
 # Generate 5 synthetic conversations
-python generator.py 5 --max-turns 20
+python generator.py 5 --max-turns 20 --reset-conversation
 ```
 
 **Expected outcome:**
@@ -1022,7 +1022,7 @@ Run the full pipeline in one command (this will take a little while):
 
 ```bash
 # Complete pipeline: predefined + generated + evaluation
-python evaluate.py --num-conversations 5
+python evaluate.py --num-conversations 5 --reset-conversation
 ```
 
 **Expected outcome:**
