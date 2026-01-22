@@ -182,13 +182,24 @@ def _parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _create_conversation_golden(conversation_number: int) -> ConversationalGolden:
-    """Create a single ConversationalGolden object for simulation."""
+def _create_conversation_golden(
+    conversation_number: int, use_structured_output: bool = False
+) -> ConversationalGolden:
+    """Create a single ConversationalGolden object for simulation based on the use_structured_output flag."""
+
+    if use_structured_output:
+        # for models with structured output like Gemini
+        scenario = "An Employee wants to refresh their laptop. The user initiates the conversation by asking to refresh their laptop. Then, if the agent provides a list of options, the user selects the appropriate laptop."
+        user_description = "An employee interacting with an IT self-service agent."
+    else:
+        # for models without structured output like Llama
+        scenario = "An Employee wants to refresh their laptop. The agent shows them a list they can choose from, they select the appropriate laptop and a service now ticket number is returned."
+        user_description = "user who tries to answer the asssitants last question"
 
     conversation_golden = ConversationalGolden(
-        scenario="An Employee wants to refresh their laptop. The user initiates the conversation by asking to refresh their laptop. Then, if the agent provides a list of options, the user selects the appropriate laptop.",
+        scenario=scenario,
         expected_outcome="They get a Service now ticket number for their refresh request",
-        user_description="An employee interacting with an IT self-service agent.",
+        user_description=user_description,
     )
 
     return conversation_golden
@@ -343,7 +354,9 @@ def _run_worker(
             worker_client.get_agent_initialization()
 
             # Create conversation golden
-            conversation_golden = _create_conversation_golden(conversation_number)
+            conversation_golden = _create_conversation_golden(
+                conversation_number, use_structured_output=use_structured_output
+            )
 
             # Simulate conversation
             conversational_test_cases = simulator.simulate(
