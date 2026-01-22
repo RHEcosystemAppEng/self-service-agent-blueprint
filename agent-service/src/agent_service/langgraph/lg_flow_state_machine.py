@@ -357,7 +357,7 @@ class StateMachine:
             token_context=token_context,
         )
 
-        response = agent.create_response_with_retry(
+        response, _response_failed = agent.create_response_with_retry(
             messages_to_send,
             self._get_retry_count(),
             **response_kwargs,
@@ -368,6 +368,9 @@ class StateMachine:
 
         # Step 4: Add response to conversation
         state["messages"].append(AIMessage(content=response))
+
+        if _response_failed:
+            return state, state.get("current_state", "end")
 
         # Step 5: Analyze response and determine next state
         next_state = self._analyze_response_and_transition(
@@ -777,15 +780,14 @@ class StateMachine:
             token_context=token_context,
         )
 
-        intent_response = (
-            agent.create_response_with_retry(
-                intent_messages,
-                self._get_retry_count(),
-                **response_kwargs,
-            )
-            .strip()
-            .upper()
+        intent_response, _intent_response_failed = agent.create_response_with_retry(
+            intent_messages,
+            self._get_retry_count(),
+            **response_kwargs,
         )
+        if _intent_response_failed:
+            return state, state.get("current_state", "end")
+        intent_response = intent_response.strip().upper()
 
         # Process intent actions
         intent_actions = state_config.get("intent_actions", {})
@@ -825,12 +827,14 @@ class StateMachine:
                         token_context=token_context,
                     )
 
-                    response = agent.create_response_with_retry(
+                    response, _response_failed = agent.create_response_with_retry(
                         messages_to_send,
                         self._get_retry_count(),
                         **action_response_kwargs,
                     )
                     state["messages"].append(AIMessage(content=response))
+                    if _response_failed:
+                        return state, state.get("current_state", "end")
 
                 # Handle data storage
                 if "data_storage" in action:
@@ -907,11 +911,14 @@ class StateMachine:
             token_context=token_context,
         )
 
-        response = agent.create_response_with_retry(
+        response, _response_failed = agent.create_response_with_retry(
             messages_to_send,
             self._get_retry_count(),
             **response_kwargs,
         )
+        if _response_failed:
+            state["messages"].append(AIMessage(content=response))
+            return state, state.get("current_state", "end")
 
         # Use LLM to determine if validation passed
         success_validation_prompt = self._format_text(
@@ -932,15 +939,17 @@ class StateMachine:
             token_context=token_context,
         )
 
-        validation_response = (
+        validation_response, _validation_response_failed = (
             agent.create_response_with_retry(
                 validation_messages,
                 self._get_retry_count(),
                 **validation_kwargs,
             )
-            .strip()
-            .upper()
         )
+        if _validation_response_failed:
+            state["messages"].append(AIMessage(content=response))
+            return state, state.get("current_state", "end")
+        validation_response = validation_response.strip().upper()
 
         # Store data and transition
         data_storage = state_config.get("data_storage", {})
