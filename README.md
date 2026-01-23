@@ -291,6 +291,10 @@ If you don't already have one available, additional steps and resources will be 
 [The LLM Service Helm Chart](https://github.com/rh-ai-quickstart/ai-architecture-charts/tree/main/llm-service)
 can be used to deploy the required meta-llama/Meta-Llama-3-70B model. It lists the specific requirements and deployment steps.
 
+If you cannot deploy an instance of the meta-llama/Meta-Llama-3-70B model but are able to deploy an instance of
+[Llama-4-Scout-17B-16E](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E), an alternate stripped-down journey is
+available in [docs/alternate-journeys/scout-only.md](docs/alternate-journeys/scout-only.md).
+
 ### Minimum hardware requirements
 
 * CPU: 6-8 cores
