@@ -1186,19 +1186,25 @@ You can also leave it running if you want to come back to look at traces later o
 
 #### Example trace hierarchy
 
-A complete laptop refresh request shows spans across all services:
+A laptop refresh request shows spans across several services:
 
 ```
-http.request POST /api/v1/requests (request-manager)          [120ms]
-  └─ publish_event agent.request (request-manager)            [10ms]
-      └─ http.request POST /agent/chat (agent-service)        [95ms]
-          ├─ knowledge_base_query laptop-refresh-policy       [15ms]
-          ├─ http.request POST /inference/chat (llamastack)   [65ms]
-          │   └─ mcp.tool.get_employee_laptop_info            [8ms]
-          │       └─ http.request GET servicenow.com/api      [6ms]
-          └─ http.request POST /inference/chat (llamastack)   [12ms]
-              └─ mcp.tool.open_laptop_refresh_ticket          [8ms]
-                  └─ http.request POST servicenow.com/api     [6ms]
+request-manager: POST /api/v1/requests/generic [3.75s]
+ └─ mock-eventing-service: POST [3.66s]
+ └─ agent-service: POST /api/v1/events/cloudevents [3.64s]
+ ├─ mock-eventing-service: POST /{namespace}/{broker_name} [1.03ms]
+ │   └─ integration-dispatcher: POST /notifications [1ms]
+ ├─ agent-service: GET [3.68ms]
+ │   └─ llamastack: /v1/models [8.21ms]
+ ├─ agent-service: GET [2.53ms]
+ │   └─ llamastack: /v1/openai/v1/vector_stores [9.43ms]
+ ├─ agent-service: POST [3.55s]
+ ├─ llamastack: /v1/openai/v1/responses [3.54s]
+ │   ├─ llamastack: InferenceRouter.openai_chat_completion [88.26ms]
+ │   ├─ llamastack: InferenceRouter.stream_tokens_openai_chat [1.88s]
+ │   ├─ llamastack: InferenceRouter.openai_chat_completion [90.65ms]
+ │   └─ llamastack: InferenceRouter.stream_tokens_openai_chat [1.39s]
+ └─ snow-mcp-server: mcp.tool.open_laptop_refresh_ticket [11.93ms]
 ```
 
 **Viewing Traces with Jaeger:**
