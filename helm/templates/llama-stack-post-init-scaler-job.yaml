@@ -28,7 +28,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: scale-deployment
-        image: quay.io/openshift/origin-cli:latest
+        image: bitnami/kubectl:latest
         imagePullPolicy: IfNotPresent
         env:
         - name: NAMESPACE
