@@ -13,7 +13,6 @@ metadata:
     {{- include "self-service-agent.labels" . | nindent 4 }}
 spec:
   kafka:
-    version: 3.9.0
     listeners:
     - name: plain
       port: 9092
