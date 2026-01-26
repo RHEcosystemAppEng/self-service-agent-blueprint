@@ -1130,7 +1130,7 @@ define helm_install_common
 	else \
 		echo "Using image version: $(VERSION)"; \
 	fi
-	@helm upgrade --install $(MAIN_CHART_NAME) helm -n $(NAMESPACE) \
+	@helm upgrade --install $(MAIN_CHART_NAME) helm -n $(NAMESPACE) --timeout 15m \
 		--set image.requestManager=self-service-agent-request-manager \
 		--set image.agentService=self-service-agent-service \
 		--set image.integrationDispatcher=self-service-agent-integration-dispatcher \
