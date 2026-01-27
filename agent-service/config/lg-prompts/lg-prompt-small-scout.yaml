@@ -7,7 +7,7 @@ settings:
   terminator_env_var: "AGENT_MESSAGE_TERMINATOR"
   agent_name: "laptop-refresh"
   terminal_state: "end"
-  empty_response_retry_count: 3
+  empty_response_retry_count: 5
 
 # State structure definition - completely configurable
 state_schema:
@@ -244,6 +244,7 @@ states:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic intent classification
     uses_tools: "No"
+    failure_transition: "waiting_ineligible_user_input"
     intent_prompt: |
       Analyze the user's message and determine their intent. The user said: "{user_input}"
 
@@ -290,6 +291,7 @@ states:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic yes/no classification
     uses_tools: "No"
+    failure_transition: "waiting_proceed_confirmation"
     intent_prompt: |
       CRITICAL: First check if the user wants to return to the router. ANY mention of "router", "go back", "return", or "stop" should be classified as RETURN_TO_ROUTER, even if they use polite language like "please".
 
@@ -327,6 +329,7 @@ states:
     type: "llm_processor"
     temperature: 0.2  # Mix of factual info + conversational presentation
     uses_mcp_tools: "No"
+    failure_transition: "waiting_proceed_confirmation"
     conditional_prompts:
       - condition: "user_is_ineligible"
         check_field: "eligibility_status"
@@ -417,6 +420,7 @@ states:
     temperature: 0.1  # Very deterministic validation
     uses_tools: "No"
     suppress_response: true  # Don't show the VALID/INVALID output to the user
+    failure_transition: "waiting_proceed_confirmation"
     prompt: |
       Think step by step and use no tools
       Analyze this laptop options response: "{laptop_options.response}"
@@ -472,6 +476,7 @@ states:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic selection validation
     uses_tools: "No"
+    failure_transition: "waiting_laptop_selection"
     intent_prompt: |
       The user said: "{user_input}"
 
@@ -504,6 +509,7 @@ states:
     type: "llm_processor"
     temperature: 0.2  # Mix of factual lookup + conversational confirmation
     uses_tools: "No"
+    failure_transition: "waiting_laptop_selection"
     prompt: |
       The user selected: "{selected_laptop}"
 
@@ -530,6 +536,7 @@ states:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic yes/no classification
     uses_tools: "No"
+    failure_transition: "waiting_ticket_confirmation"
     intent_prompt: |
       The user was asked if they want to create a ServiceNow ticket for their laptop refresh request. They responded: "{user_input}"
 
@@ -565,6 +572,7 @@ states:
     temperature: 0.3
     uses_tools: "Yes"
     allowed_tools: [ "open_laptop_refresh_ticket" ]
+    failure_transition: "waiting_ticket_confirmation"
     prompt: |
       You have the employee information: {employee_info.response}
       Selected Laptop details: {selected_laptop_details}
@@ -630,6 +638,7 @@ states:
     type: "intent_classifier"
     temperature: 0.2  # Deterministic intent classification
     uses_tools: "No"
+    failure_transition: "waiting_post_ticket_input"
     intent_prompt: |
       The user was asked if there is anything else we can help with after creating a ticket. They responded: "{user_input}"
 
