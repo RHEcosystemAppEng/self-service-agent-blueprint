@@ -7,7 +7,7 @@ settings:
   terminator_env_var: "AGENT_MESSAGE_TERMINATOR"
   agent_name: "routing-agent"
   terminal_state: "end"
-  empty_response_retry_count: 3
+  empty_response_retry_count: 5
 
 # State structure definition
 state_schema:
@@ -23,6 +23,7 @@ states:
   greet_and_identify_need:
     type: "llm_processor"
     temperature: 0.3
+    failure_transition: "waiting_user_need"
     prompt: |
       You are a routing agent specializing in getting users to the correct specialist agent. Be helpful, friendly, and efficient in determining their needs.
 
@@ -46,6 +47,7 @@ states:
   classify_user_intent:
     type: "llm_processor"
     temperature: 0.1  # Very deterministic for classification
+    failure_transition: "waiting_user_need"
     prompt: |
       The user said: "{last_user_message}"
 
@@ -96,6 +98,7 @@ states:
   handle_other_request:
     type: "llm_processor"
     temperature: 0.3
+    failure_transition: "waiting_clarification"
     prompt: |
       The user said: "{last_user_message}"
 

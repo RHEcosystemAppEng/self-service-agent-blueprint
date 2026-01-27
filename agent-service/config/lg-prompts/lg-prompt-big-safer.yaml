@@ -8,7 +8,7 @@ settings:
   terminator_env_var: "AGENT_MESSAGE_TERMINATOR"
   agent_name: "laptop-refresh"
   terminal_state: "end"
-  empty_response_retry_count: 3
+  empty_response_retry_count: 5
 
 # State structure definition
 state_schema:
@@ -32,6 +32,7 @@ states:
     type: "intent_classifier"
     temperature: 0.0
     allowed_tools: [ "" ]
+    failure_transition: "waiting_for_interaction"
     intent_prompt: |
       You are a security validator. Classify the user message below as either SAFE or UNSAFE.
 
@@ -85,6 +86,7 @@ states:
     type: "llm_processor"
     temperature: 0.3
     use_conversation_history: true  # Use API conversation history instead of prompt
+    failure_transition: "waiting_for_interaction"
     prompt: |
       You are an IT Support Agent specializing in hardware replacement. Your task is to determine if an already authenticated user's employee's laptop is eligible for replacement based on the company policy and the specific context of their request.
 

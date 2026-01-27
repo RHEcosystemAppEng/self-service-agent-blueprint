@@ -165,3 +165,71 @@ def create_llamastack_client(
         base_url=base_url,
         timeout=timeout_val,
     )
+
+
+def create_async_llamastack_client(
+    timeout: Optional[float] = None,
+    llamastack_host: Optional[str] = None,
+    port: Optional[int] = None,
+) -> Any:
+    """
+    Create an async native LlamaStack client.
+
+    This async client is used for:
+    - Model listing (await models.list())
+    - Response generation (await responses.create())
+    - Content moderation (await moderations.create())
+
+    Uses httpx.AsyncClient under the hood for true async I/O, allowing
+    high concurrency without blocking the event loop or requiring thread pools.
+
+    Args:
+        timeout: Request timeout in seconds.
+            Default: LLAMASTACK_TIMEOUT env var or 120.0
+        llamastack_host: LlamaStack hostname (without protocol).
+            Default: LLAMASTACK_SERVICE_HOST env var (Kubernetes auto-injected) or "llamastack"
+        port: LlamaStack port number.
+            Default: LLAMASTACK_CLIENT_PORT env var (Helm override) or
+                     LLAMASTACK_SERVICE_PORT env var (Kubernetes auto-injected) or 8321
+
+    Returns:
+        Configured AsyncLlamaStackClient instance
+
+    Environment Variables (priority order):
+        LLAMASTACK_SERVICE_HOST: Kubernetes-injected hostname (auto-discovered from service)
+        LLAMASTACK_CLIENT_PORT: Helm-configurable port override (takes precedence)
+        LLAMASTACK_SERVICE_PORT: Kubernetes-injected port (auto-discovered from service)
+        LLAMASTACK_TIMEOUT: Request timeout in seconds (default: "120.0")
+
+    """
+    from llama_stack_client import AsyncLlamaStackClient
+
+    # Get configuration from parameters or environment variables
+    # Host: Use Kubernetes auto-injected LLAMASTACK_SERVICE_HOST
+    host = llamastack_host or os.environ.get("LLAMASTACK_SERVICE_HOST", "llamastack")
+
+    # Port: Check Helm override first, then Kubernetes auto-injected, then default
+    # Note: We avoid LLAMASTACK_PORT as Kubernetes sets it to "tcp://host:port" format
+    port_str = os.environ.get("LLAMASTACK_CLIENT_PORT") or os.environ.get(
+        "LLAMASTACK_SERVICE_PORT", "8321"
+    )
+    port_num = port or int(port_str)
+    timeout_val = timeout or float(os.environ.get("LLAMASTACK_TIMEOUT", "120.0"))
+
+    # Strip protocol if present in hostname
+    if host.startswith(("http://", "https://")):
+        host = host.split("://", 1)[1]
+
+    # Construct base URL
+    base_url = f"http://{host}:{port_num}"
+
+    logger.debug(
+        "Creating async LlamaStack client",
+        base_url=base_url,
+        timeout=timeout_val,
+    )
+
+    return AsyncLlamaStackClient(
+        base_url=base_url,
+        timeout=timeout_val,
+    )

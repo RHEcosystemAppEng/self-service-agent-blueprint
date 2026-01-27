@@ -1,8 +1,9 @@
+import asyncio
 import os
 from typing import Any, Dict, Optional
 
 import yaml
-from agent_service.utils import create_llamastack_client
+from agent_service.utils import create_async_llamastack_client
 from opentelemetry.propagate import inject
 from shared_models import configure_logging
 from tracing_config.auto_tracing import tracingIsActive
@@ -32,15 +33,16 @@ class Agent:
         # Initialize LlamaStack client once for this agent
         # This client provides both native APIs and OpenAI-compatible APIs
         timeout = self.global_config.get("timeout", 120.0)
-        self.llama_client = create_llamastack_client(timeout=timeout)
+        self.async_llama_client = create_async_llamastack_client(timeout=timeout)
 
-        self.model = self._get_model_for_agent()
+        # Defer model initialization to first use
+        self.model: str | None = None
+
         self.default_response_config = self._get_response_config()
         self.system_message = system_message or self._get_default_system_message()
 
-        # Build tools once during initialization (without authoritative_user_id)
-        mcp_server_configs = self.config.get("mcp_servers", [])
-        self.tools = self._get_mcp_tools_to_use(mcp_server_configs)
+        # Defer tools initialization to first use
+        self.tools: list[Any] | None = None
 
         # Load shield configuration for input/output moderation
         # Check if SAFETY environment variables are configured
@@ -72,8 +74,8 @@ class Agent:
         logger.info(
             "Initialized Agent",
             agent_name=agent_name,
-            model=self.model,
-            tool_count=len(self.tools),
+            model="deferred" if self.model is None else self.model,
+            tool_count="deferred" if self.tools is None else len(self.tools),
         )
         if self.input_shields:
             logger.info("Input shields configured", shields=self.input_shields)
@@ -89,7 +91,7 @@ class Agent:
                     categories=self.ignored_output_categories,
                 )
 
-    def _get_model_for_agent(self) -> str:
+    async def _get_model_for_agent(self) -> str:
         """Get the model to use for the agent from configuration."""
         if self.config and self.config.get("model"):
             model = self.config["model"]
@@ -97,7 +99,7 @@ class Agent:
             return str(model) if model is not None else ""
 
         try:
-            models = self.llama_client.models.list()
+            models = await self.async_llama_client.models.list()
             model_id = next(m.identifier for m in models if m.api_model_type == "llm")
             if model_id:
                 logger.info("Using first available LLM model", model_id=model_id)
@@ -137,11 +139,11 @@ class Agent:
 
         return ""
 
-    def _get_vector_store_id(self, kb_name: str) -> str:
+    async def _get_vector_store_id(self, kb_name: str) -> str:
         """Get the vector store ID for a specific knowledge base."""
         try:
             # Use LlamaStack's OpenAI-compatible vector store API
-            vector_stores = self.llama_client.vector_stores.list()
+            vector_stores = await self.async_llama_client.vector_stores.list()
             matching_stores = []
             for vs in vector_stores.data:
                 if vs.name and kb_name in vs.name:
@@ -171,7 +173,7 @@ class Agent:
             )
             return kb_name  # Return the kb_name as fallback
 
-    def _get_mcp_tools_to_use(
+    async def _get_mcp_tools_to_use(
         self,
         mcp_server_configs: list[dict[str, Any]] | None = None,
         authoritative_user_id: str | None = None,
@@ -194,7 +196,7 @@ class Agent:
         if knowledge_bases:
             vector_store_ids = []
             for kb_name in knowledge_bases:
-                vector_store_id = self._get_vector_store_id(kb_name)
+                vector_store_id = await self._get_vector_store_id(kb_name)
                 if vector_store_id:
                     vector_store_ids.append(vector_store_id)
 
@@ -277,7 +279,7 @@ class Agent:
 
         return tools_to_use
 
-    def _run_moderation_shields(
+    async def _run_moderation_shields(
         self,
         content: Any,
         shield_models: list[str],
@@ -351,7 +353,7 @@ class Agent:
                 )
 
                 # Call OpenAI-compatible moderation API
-                moderation_response = self.llama_client.moderations.create(
+                moderation_response = await self.async_llama_client.moderations.create(
                     input=moderation_input, model=shield_model
                 )
 
@@ -407,7 +409,7 @@ class Agent:
         # All shields passed
         return True, None
 
-    def create_response_with_retry(
+    async def create_response_with_retry(
         self,
         messages: list[Any],
         max_retries: int = 3,
@@ -426,8 +428,11 @@ class Agent:
         last_error = None
 
         for attempt in range(max_retries + 1):  # +1 for initial attempt plus retries
+            should_retry = False
+            retry_reason = None
+
             try:
-                response = self.create_response(
+                response = await self.create_response(
                     messages,
                     temperature=temperature,
                     additional_system_messages=additional_system_messages,
@@ -444,32 +449,15 @@ class Agent:
                     # Check if it's an error message that we should retry
                     if response.startswith("Error: Unable to get response"):
                         last_error = response
-                        response = ""  # Treat as empty to continue retry loop
+                        should_retry = True
+                        retry_reason = "error response"
                     else:
                         # Valid response, break out of retry loop
                         break
-
-                # Empty response or error detected
-                if attempt < max_retries:
-                    retry_delay = min(
-                        2**attempt, 8
-                    )  # Exponential backoff: 1s, 2s, 4s, 8s max
-                    logger.info(
-                        "Empty/error response, retrying",
-                        attempt=attempt + 1,
-                        max_attempts=max_retries + 1,
-                        retry_delay=retry_delay,
-                    )
-                    import time
-
-                    time.sleep(retry_delay)
                 else:
-                    logger.warning(
-                        "All retry attempts failed",
-                        max_attempts=max_retries + 1,
-                        last_error=last_error or "Empty response",
-                    )
-                    response = "I apologize, but I'm having difficulty generating a response right now. Please try again."
+                    # Empty response detected
+                    should_retry = True
+                    retry_reason = "empty response"
 
             except Exception as e:
                 last_error = str(e)
@@ -480,8 +468,30 @@ class Agent:
                     error=str(e),
                     error_type=type(e).__name__,
                 )
-                if attempt >= max_retries:
-                    response = "I apologize, but I'm experiencing technical difficulties. Please try again later."
+                should_retry = True
+                retry_reason = "exception"
+
+            # Consolidated retry logic
+            if should_retry:
+                if attempt < max_retries:
+                    retry_delay = min(
+                        2**attempt, 16
+                    )  # Exponential backoff: 1s, 2s, 4s, 8s, 16s max
+                    logger.info(
+                        "Retrying after failure",
+                        reason=retry_reason,
+                        attempt=attempt + 1,
+                        max_attempts=max_retries + 1,
+                        retry_delay=retry_delay,
+                    )
+                    await asyncio.sleep(retry_delay)
+                else:
+                    logger.warning(
+                        "All retry attempts failed",
+                        max_attempts=max_retries + 1,
+                        last_error=last_error or "Empty response",
+                    )
+                    response = default_response
                     break
 
         response_failed = response == default_response
@@ -590,7 +600,7 @@ class Agent:
             print(f"Response.text: {response.text}")
         print("=" * 80)
 
-    def create_response(
+    async def create_response(
         self,
         messages: list[Any],
         temperature: float | None = None,
@@ -618,7 +628,7 @@ class Agent:
             # INPUT SHIELD: Check user input before processing
             if self.input_shields and messages and len(messages) > 0:
                 # Check only the last message (most recent user input)
-                is_safe, error_message = self._run_moderation_shields(
+                is_safe, error_message = await self._run_moderation_shields(
                     messages, self.input_shields, "input"
                 )
                 if not is_safe:
@@ -648,6 +658,10 @@ class Agent:
             if temperature is not None:
                 response_config["temperature"] = temperature
 
+            # Lazy initialization of model on first use
+            if self.model is None:
+                self.model = await self._get_model_for_agent()
+
             # Rebuild tools if any tool filtering is requested
             if skip_all_tools:
                 # Skip all tools (no MCP servers, no knowledge base tools)
@@ -655,29 +669,32 @@ class Agent:
             elif skip_mcp_servers_only:
                 # Skip MCP servers but keep knowledge base tools
                 # Pass None/empty list for mcp_servers to exclude them
-                tools_to_use = self._get_mcp_tools_to_use(
+                tools_to_use = await self._get_mcp_tools_to_use(
                     None, authoritative_user_id, allowed_tools
                 )
             elif authoritative_user_id or allowed_tools:
                 # Include MCP servers and knowledge base tools
                 mcp_server_configs = self.config.get("mcp_servers", [])
-                tools_to_use = self._get_mcp_tools_to_use(
+                tools_to_use = await self._get_mcp_tools_to_use(
                     mcp_server_configs, authoritative_user_id, allowed_tools
                 )
             else:
+                # Lazy initialization of tools on first use
+                if self.tools is None:
+                    mcp_server_configs = self.config.get("mcp_servers", [])
+                    self.tools = await self._get_mcp_tools_to_use(mcp_server_configs)
                 tools_to_use = self.tools
 
-            # Use the existing LlamaStack client for response creation
             # Only pass tools if tools_to_use is not empty
             if tools_to_use:
-                response = self.llama_client.responses.create(
+                response = await self.async_llama_client.responses.create(
                     input=messages_with_system,
                     model=self.model,
                     **response_config,
                     tools=tools_to_use,
                 )
             else:
-                response = self.llama_client.responses.create(
+                response = await self.async_llama_client.responses.create(
                     input=messages_with_system,
                     model=self.model,
                     **response_config,
@@ -767,7 +784,7 @@ class Agent:
 
             # OUTPUT SHIELD: Check agent response before returning
             if self.output_shields and response_text:
-                is_safe, error_message = self._run_moderation_shields(
+                is_safe, error_message = await self._run_moderation_shields(
                     response_text, self.output_shields, "output"
                 )
                 if not is_safe:
