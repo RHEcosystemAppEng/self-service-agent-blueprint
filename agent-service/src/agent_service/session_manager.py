@@ -3,12 +3,13 @@
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from shared_models import BaseSessionManager, configure_logging
 from shared_models.models import RequestSession, SessionStatus
 from shared_models.user_utils import is_uuid
 from sqlalchemy import select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = configure_logging("agent-service")
@@ -176,7 +177,7 @@ class ResponsesSessionManager(BaseSessionManager):
             should_reset = False
             if self.conversation_session:
                 try:
-                    state = self.conversation_session.app.get_state(
+                    state = await self.conversation_session.app.aget_state(
                         self.conversation_session.thread_config
                     )
                     # Check for the _should_return_to_routing flag in state
@@ -234,7 +235,7 @@ class ResponsesSessionManager(BaseSessionManager):
                 logger.error("Conversation session not initialized")
                 return "Error: Conversation session not initialized"
 
-            response = self.conversation_session.send_message(
+            response = await self.conversation_session.send_message(
                 text,
                 token_context=token_context,
             )
@@ -317,7 +318,7 @@ class ResponsesSessionManager(BaseSessionManager):
                 routing_agent=self.ROUTING_AGENT_NAME,
             )
 
-            session = self._create_session_for_agent(
+            session = await self._create_session_for_agent(
                 routing_agent,
                 self.ROUTING_AGENT_NAME,
                 session_name=session_name,
@@ -440,7 +441,7 @@ class ResponsesSessionManager(BaseSessionManager):
             session_name = conversation_context.get(
                 "session_name", f"session-{self.user_id}"
             )
-            session = self._create_session_for_agent(
+            session = await self._create_session_for_agent(
                 agent,
                 current_agent_id,
                 session_name=session_name,
@@ -457,7 +458,7 @@ class ResponsesSessionManager(BaseSessionManager):
             # Check if the conversation is in a terminal state
             # If it's a specialist agent session that's completed, reset and return to routing
             try:
-                state = session.app.get_state(session.thread_config)
+                state = await session.app.aget_state(session.thread_config)
                 if hasattr(state, "values"):
                     current_state = state.values.get("current_state")
                     if (
@@ -547,7 +548,7 @@ class ResponsesSessionManager(BaseSessionManager):
             )
             return "Token stats not available (error retrieving counts)"
 
-    def _create_session_for_agent(
+    async def _create_session_for_agent(
         self,
         agent: Any,
         agent_name: str,
@@ -598,9 +599,9 @@ class ResponsesSessionManager(BaseSessionManager):
         else:
             session_thread_id = str(uuid.uuid4())
 
-        return ConversationSession(
+        return await ConversationSession.create(
             agent,
-            session_thread_id,
+            thread_id=session_thread_id,
             authoritative_user_id=authoritative_user_id,
         )
 
@@ -652,7 +653,7 @@ class ResponsesSessionManager(BaseSessionManager):
 
         if self.conversation_session:
             try:
-                current_state = self.conversation_session.app.get_state(
+                current_state = await self.conversation_session.app.aget_state(
                     self.conversation_session.thread_config
                 )
                 current_values = current_state.values
@@ -692,7 +693,7 @@ class ResponsesSessionManager(BaseSessionManager):
         # Check conversation state for routing decision from StateMachine
         if self.conversation_session:
             try:
-                current_state = self.conversation_session.app.get_state(
+                current_state = await self.conversation_session.app.aget_state(
                     self.conversation_session.thread_config
                 )
                 current_values = current_state.values
@@ -875,7 +876,7 @@ class ResponsesSessionManager(BaseSessionManager):
             )
 
             # Create session for the specialist agent
-            session = self._create_session_for_agent(
+            session = await self._create_session_for_agent(
                 agent,
                 agent_name,
                 session_name=session_name,
@@ -917,7 +918,7 @@ class ResponsesSessionManager(BaseSessionManager):
             )
 
             token_context = get_session_token_context(self.request_manager_session_id)
-            response = session.send_message(
+            response = await session.send_message(
                 text,
                 token_context=token_context,
             )
@@ -1110,7 +1111,7 @@ class ResponsesSessionManager(BaseSessionManager):
                 )
 
             # Execute and commit once for both branches
-            result = await self.db_session.execute(stmt)
+            result = cast(CursorResult[Any], await self.db_session.execute(stmt))
             await self.db_session.commit()
 
             # Log if no rows were updated

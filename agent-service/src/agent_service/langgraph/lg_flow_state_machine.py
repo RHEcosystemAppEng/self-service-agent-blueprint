@@ -116,6 +116,28 @@ class StateMachine:
 
     def _get_retry_count(self) -> int:
         """Get the configured retry count for empty responses."""
+        # Check for fault injection override first (for testing)
+        import os
+
+        fault_injection_retries = os.environ.get("FAULT_INJECTION_MAX_RETRIES")
+        if fault_injection_retries is not None and fault_injection_retries != "":
+            try:
+                retry_count = int(fault_injection_retries)
+                logger.info(
+                    "Using fault injection retry override",
+                    retry_count=retry_count,
+                    original_config=self.config.get("settings", {}).get(
+                        "empty_response_retry_count"
+                    ),
+                )
+                return retry_count
+            except ValueError:
+                logger.warning(
+                    "Invalid FAULT_INJECTION_MAX_RETRIES value, using config default",
+                    value=fault_injection_retries,
+                )
+
+        # Use configured value from YAML
         settings = self.config.get("settings", {})
         retry_count = settings.get("empty_response_retry_count")
         return int(retry_count) if isinstance(retry_count, (int, str)) else 3
@@ -285,7 +307,7 @@ class StateMachine:
             )
             return text
 
-    def process_llm_processor_state(
+    async def process_llm_processor_state(
         self,
         state: dict[str, Any],
         state_config: dict[str, Any],
@@ -357,7 +379,7 @@ class StateMachine:
             token_context=token_context,
         )
 
-        response = agent.create_response_with_retry(
+        response, _response_failed = await agent.create_response_with_retry(
             messages_to_send,
             self._get_retry_count(),
             **response_kwargs,
@@ -368,6 +390,10 @@ class StateMachine:
 
         # Step 4: Add response to conversation
         state["messages"].append(AIMessage(content=response))
+
+        if _response_failed:
+            failure_target = state_config.get("failure_transition", "end")
+            return state, failure_target
 
         # Step 5: Analyze response and determine next state
         next_state = self._analyze_response_and_transition(
@@ -725,7 +751,7 @@ class StateMachine:
 
         return state
 
-    def process_intent_classifier_state(
+    async def process_intent_classifier_state(
         self,
         state: dict[str, Any],
         state_config: dict[str, Any],
@@ -777,15 +803,19 @@ class StateMachine:
             token_context=token_context,
         )
 
-        intent_response = (
-            agent.create_response_with_retry(
+        intent_response, _intent_response_failed = (
+            await agent.create_response_with_retry(
                 intent_messages,
                 self._get_retry_count(),
                 **response_kwargs,
             )
-            .strip()
-            .upper()
         )
+        if _intent_response_failed:
+            # Add error message so user gets feedback about the failure
+            state["messages"].append(AIMessage(content=intent_response))
+            failure_target = state_config.get("failure_transition", "end")
+            return state, failure_target
+        intent_response = intent_response.strip().upper()
 
         # Process intent actions
         intent_actions = state_config.get("intent_actions", {})
@@ -825,12 +855,15 @@ class StateMachine:
                         token_context=token_context,
                     )
 
-                    response = agent.create_response_with_retry(
+                    response, _response_failed = await agent.create_response_with_retry(
                         messages_to_send,
                         self._get_retry_count(),
                         **action_response_kwargs,
                     )
                     state["messages"].append(AIMessage(content=response))
+                    if _response_failed:
+                        failure_target = state_config.get("failure_transition", "end")
+                        return state, failure_target
 
                 # Handle data storage
                 if "data_storage" in action:
@@ -853,7 +886,7 @@ class StateMachine:
         )
         return state, "end"
 
-    def process_llm_validator_state(
+    async def process_llm_validator_state(
         self,
         state: dict[str, Any],
         state_config: dict[str, Any],
@@ -907,11 +940,15 @@ class StateMachine:
             token_context=token_context,
         )
 
-        response = agent.create_response_with_retry(
+        response, _response_failed = await agent.create_response_with_retry(
             messages_to_send,
             self._get_retry_count(),
             **response_kwargs,
         )
+        if _response_failed:
+            state["messages"].append(AIMessage(content=response))
+            failure_target = state_config.get("failure_transition", "end")
+            return state, failure_target
 
         # Use LLM to determine if validation passed
         success_validation_prompt = self._format_text(
@@ -932,15 +969,18 @@ class StateMachine:
             token_context=token_context,
         )
 
-        validation_response = (
-            agent.create_response_with_retry(
+        validation_response, _validation_response_failed = (
+            await agent.create_response_with_retry(
                 validation_messages,
                 self._get_retry_count(),
                 **validation_kwargs,
             )
-            .strip()
-            .upper()
         )
+        if _validation_response_failed:
+            state["messages"].append(AIMessage(content=response))
+            failure_target = state_config.get("failure_transition", "end")
+            return state, failure_target
+        validation_response = validation_response.strip().upper()
 
         # Store data and transition
         data_storage = state_config.get("data_storage", {})
@@ -967,7 +1007,7 @@ class StateMachine:
         """
         return state, "end"
 
-    def process_state(
+    async def process_state(
         self,
         state: dict[str, Any],
         agent: Any,
@@ -988,15 +1028,15 @@ class StateMachine:
         state_type = state_config.get("type", "")
 
         if state_type == "llm_processor":
-            return self.process_llm_processor_state(
+            return await self.process_llm_processor_state(
                 state, state_config, agent, authoritative_user_id, token_context
             )
         elif state_type == "intent_classifier":
-            return self.process_intent_classifier_state(
+            return await self.process_intent_classifier_state(
                 state, state_config, agent, authoritative_user_id, token_context
             )
         elif state_type == "llm_validator":
-            return self.process_llm_validator_state(
+            return await self.process_llm_validator_state(
                 state, state_config, agent, authoritative_user_id, token_context
             )
         elif state_type == "terminal":
@@ -1017,6 +1057,7 @@ class ConversationSession:
         agent,
         thread_id: str | None = None,
         authoritative_user_id: str | None = None,
+        checkpointer: Any = None,
     ):
         """
         Initialize a new conversation session with persistent checkpoint storage.
@@ -1025,6 +1066,7 @@ class ConversationSession:
             agent: Agent instance to use for this session (config includes state machine path)
             thread_id: Thread identifier for conversation persistence (defaults to generated ID)
             authoritative_user_id: Optional authoritative user ID for the user
+            checkpointer: AsyncPostgresSaver instance (for internal use by create() factory)
         """
         import uuid
 
@@ -1066,8 +1108,8 @@ class ConversationSession:
         else:
             self.config_path = Path(lg_config_path)
 
-        # Initialize checkpoint storage with PostgresSaver
-        self.checkpointer = get_postgres_checkpointer()
+        # Initialize checkpoint storage with AsyncPostgresSaver
+        self.checkpointer = checkpointer
 
         # Initialize state machine
         self.state_machine = StateMachine(str(self.config_path))
@@ -1116,6 +1158,32 @@ class ConversationSession:
         # Store current token context for this session
         self.current_token_context: Optional[str] = None
 
+    @classmethod
+    async def create(  # type: ignore[no-untyped-def]
+        cls,
+        agent,
+        thread_id: str | None = None,
+        authoritative_user_id: str | None = None,
+    ):
+        """
+        Async factory method to create a ConversationSession with async initialization.
+
+        Args:
+            agent: Agent instance to use for this session (config includes state machine path)
+            thread_id: Thread identifier for conversation persistence (defaults to generated ID)
+            authoritative_user_id: Optional authoritative user ID for the user
+
+        Returns:
+            ConversationSession: Initialized conversation session
+        """
+        checkpointer = await get_postgres_checkpointer()
+        return cls(
+            agent,
+            thread_id=thread_id,
+            authoritative_user_id=authoritative_user_id,
+            checkpointer=checkpointer,
+        )
+
     def _create_graph(self) -> Any:  # LangGraph CompiledGraph type
         """Create the LangGraph workflow with one node per YAML state."""
         # Use the dynamic AgentState from the state machine
@@ -1134,7 +1202,9 @@ class ConversationSession:
 
             # Create node function with closure to capture state_name
             def make_node_func(name, stype):  # type: ignore[no-untyped-def]
-                def node_func(state: dict[str, Any]) -> Command[Any] | dict[str, Any]:
+                async def node_func(
+                    state: dict[str, Any],
+                ) -> Command[Any] | dict[str, Any]:
                     """Node function that returns Command for routing (or state for terminal nodes)."""
                     logger.info(
                         "Processing node",
@@ -1192,11 +1262,13 @@ class ConversationSession:
                         return state
                     else:
                         # Process the state and get next node
-                        updated_state, next_node = self.state_machine.process_state(
-                            state,
-                            self.agent,
-                            self.authoritative_user_id,
-                            self.current_token_context,
+                        updated_state, next_node = (
+                            await self.state_machine.process_state(
+                                state,
+                                self.agent,
+                                self.authoritative_user_id,
+                                self.current_token_context,
+                            )
                         )
                         # Return Command with routing information
                         return Command(goto=next_node, update=updated_state)
@@ -1206,7 +1278,7 @@ class ConversationSession:
             workflow.add_node(state_name, make_node_func(state_name, state_type))  # type: ignore[no-untyped-call]
 
         # Add a resume dispatcher node that routes to the correct starting point
-        def resume_dispatcher(state: dict[str, Any]) -> Command[Any]:
+        async def resume_dispatcher(state: dict[str, Any]) -> Command[Any]:
             """Dispatcher that resumes from last waiting node or starts from initial state"""
             last_waiting_node = state.get("_last_waiting_node")
 
@@ -1235,18 +1307,20 @@ class ConversationSession:
         # Compile with checkpointer only
         return workflow.compile(checkpointer=self.checkpointer, debug=False)
 
-    def get_initial_response(self) -> str | list[str | dict[str, Any]]:
+    async def get_initial_response(self) -> str | list[str | dict[str, Any]]:
         """Get the initial response from the agent by checking conversation history."""
         try:
             # Check if there's existing conversation state with retry logic
-            current_state = self._get_state_with_retry()
+            current_state = await self._get_state_with_retry()
 
             if current_state.values and current_state.values.get("messages"):
                 return ""
             else:
                 # New conversation - initialize and get first response
                 initial_state = self.state_machine.create_initial_state()
-                result = self.app.invoke(initial_state, config=self.thread_config)
+                result = await self.app.ainvoke(
+                    initial_state, config=self.thread_config
+                )
 
                 if result.get("messages"):
                     last_message = result["messages"][-1]
@@ -1262,14 +1336,14 @@ class ConversationSession:
             )
             return ""
 
-    def _get_state_with_retry(self) -> Any:
+    async def _get_state_with_retry(self) -> Any:
         """Get the current state from LangGraph with connection error handling and retry.
 
         Returns:
             The current state from LangGraph (has .values attribute)
         """
         try:
-            return self.app.get_state(self.thread_config)
+            return await self.app.aget_state(self.thread_config)
         except Exception as e:
             error_str = str(e).lower()
             # Check if this is a connection error
@@ -1279,17 +1353,17 @@ class ConversationSession:
                 or "the connection" in error_str
             ):
                 logger.warning(
-                    "PostgresSaver connection lost, resetting and retrying",
+                    "AsyncPostgresSaver connection lost, resetting and retrying",
                     error=str(e),
                     error_type=type(e).__name__,
                 )
                 reset_postgres_checkpointer()
                 # Recreate the graph with a fresh checkpointer
-                self.checkpointer = get_postgres_checkpointer()
+                self.checkpointer = await get_postgres_checkpointer()
                 self.app = self._create_graph()
                 # Retry once
                 try:
-                    return self.app.get_state(self.thread_config)
+                    return await self.app.aget_state(self.thread_config)
                 except Exception as e2:
                     logger.error(
                         "Failed to get state after connection reset",
@@ -1300,7 +1374,9 @@ class ConversationSession:
             else:
                 raise
 
-    def send_message(self, message: str, token_context: Optional[str] = None) -> str:
+    async def send_message(
+        self, message: str, token_context: Optional[str] = None
+    ) -> str:
         """
         Send a message to the agent and return the response.
         Uses checkpointed thread state for persistence across process restarts.
@@ -1322,7 +1398,7 @@ class ConversationSession:
 
         try:
             # Get current thread state with retry logic for connection errors
-            current_state = self._get_state_with_retry()
+            current_state = await self._get_state_with_retry()
 
             # Initialize conversation if needed
             if not current_state.values:
@@ -1351,7 +1427,9 @@ class ConversationSession:
                 if token_context:
                     self.current_token_context = token_context
 
-                result: Any = self.app.invoke(initial_state, config=self.thread_config)
+                result: Any = await self.app.ainvoke(
+                    initial_state, config=self.thread_config
+                )
             else:
                 # Existing conversation - add user message and continue
                 # Get the current state and add the new message
@@ -1369,7 +1447,7 @@ class ConversationSession:
                 if token_context:
                     self.current_token_context = token_context
 
-                result2: Any = self.app.invoke(
+                result2: Any = await self.app.ainvoke(
                     current_values, config=self.thread_config
                 )
 
@@ -1409,7 +1487,7 @@ class ConversationSession:
 
                     # Update the state to clear the data (but don't set current_state)
                     if reset_state_without_current:
-                        self.app.update_state(
+                        await self.app.aupdate_state(
                             self.thread_config, reset_state_without_current
                         )
 
@@ -1435,6 +1513,7 @@ class ConversationSession:
                 thread_id=self.thread_id,
                 error=str(e),
                 error_type=type(e).__name__,
+                exc_info=True,
             )
             return f"Error processing message: {e}"
 

@@ -117,6 +117,9 @@ class DatabaseManager:
         # Create sync connection pool for PostgresSaver
         self._sync_pool: Optional[psycopg_pool.ConnectionPool] = None
 
+        # Create async connection pool for AsyncPostgresSaver
+        self._async_pool: Optional[psycopg_pool.AsyncConnectionPool] = None
+
     async def log_database_config(self) -> None:
         """Log database configuration and test connection at startup."""
         try:
@@ -204,6 +207,52 @@ class DatabaseManager:
             # but we're using Connection[dict[str, Any]] with row_factory
             self._sync_pool.putconn(conn)  # type: ignore[arg-type]
 
+    def _get_async_pool(self) -> psycopg_pool.AsyncConnectionPool:
+        """Get or create the async connection pool for AsyncPostgresSaver."""
+        if self._async_pool is None:
+            # Build connection string for async pool
+            conn_string = f"postgresql://{self.config.user}:{self.config.password}@{self.config.host}:{self.config.port}/{self.config.database}"
+
+            self._async_pool = psycopg_pool.AsyncConnectionPool(
+                conn_string,
+                min_size=self.config.sync_pool_min_size,
+                max_size=self.config.sync_pool_max_size,
+                kwargs={
+                    "row_factory": psycopg.rows.dict_row,
+                    "autocommit": True,
+                },
+                timeout=self.config.sync_pool_timeout,
+            )
+            logger.debug(
+                "Created async connection pool for AsyncPostgresSaver",
+                min_size=self.config.sync_pool_min_size,
+                max_size=self.config.sync_pool_max_size,
+                timeout=self.config.sync_pool_timeout,
+            )
+
+        return self._async_pool
+
+    async def get_async_connection(self) -> Any:
+        """Get an asynchronous connection for LangGraph AsyncPostgresSaver.
+
+        Uses connection pooling for better performance and resource management.
+        """
+        pool = self._get_async_pool()
+
+        if self.config.echo_sql:
+            logger.debug(
+                "Getting async connection from pool",
+                host=self.config.host,
+                database=self.config.database,
+            )
+
+        return await pool.getconn()
+
+    async def put_async_connection(self, conn: Any) -> None:
+        """Return an async connection to the pool."""
+        if self._async_pool is not None:
+            await self._async_pool.putconn(conn)
+
     async def close(self) -> None:
         """Close database connections."""
         await self.engine.dispose()
@@ -213,6 +262,12 @@ class DatabaseManager:
             self._sync_pool.close()
             self._sync_pool = None
             logger.debug("Sync connection pool closed")
+
+        # Close async connection pool
+        if self._async_pool is not None:
+            await self._async_pool.close()
+            self._async_pool = None
+            logger.debug("Async connection pool closed")
 
         logger.info("Database connections closed")
 

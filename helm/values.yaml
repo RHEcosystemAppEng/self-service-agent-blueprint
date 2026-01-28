@@ -472,6 +472,19 @@ requestManagement:
     # Format: lg-prompt-<agent-name>: "path/to/prompt.yaml"
     # Example: lg-prompt-laptop-refresh: "config/lg-prompts/my-custom-prompt.yaml"
     promptOverrides: {}
+    # Fault Injection Configuration (for testing API resilience)
+    faultInjection:
+      enabled: false              # Set to true to enable fault injection
+      rate: 0.1                   # Failure rate (0.0 to 1.0) - 0.1 = 10% chance
+      errorType: "timeout"        # Error type: timeout|connection|api_error|empty_response|rand
+                                  # - timeout: Raise TimeoutError
+                                  # - connection: Raise ConnectionError
+                                  # - api_error: Raise RuntimeError
+                                  # - empty_response: Return empty response (triggers retry logic)
+                                  # - rand: Randomly choose one of the above each time
+      maxRetries: ""              # Override max retries (empty = use default from YAML config)
+                                  # Set to 0 to disable retries and see failures immediately
+                                  # Set to 1 for one retry, etc.
     # Health check configuration (dev-optimized for resource-constrained environments)
     healthChecks:
       livenessProbe:

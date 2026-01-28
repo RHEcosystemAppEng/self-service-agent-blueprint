@@ -1,7 +1,8 @@
 """Database utility functions for Request Manager."""
 
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -280,8 +281,8 @@ async def delete_inactive_sessions(
             RequestSession.updated_at < cutoff_time,
         )
 
-        result = await db.execute(stmt)
-        deleted_count = result.rowcount
+        result = cast(CursorResult[Any], await db.execute(stmt))
+        deleted_count: int = result.rowcount
         await db.commit()
 
         logger.info(
@@ -339,8 +340,8 @@ async def expire_old_sessions(
             )
         )
 
-        result = await db.execute(stmt)
-        expired_count = result.rowcount
+        result = cast(CursorResult[Any], await db.execute(stmt))
+        expired_count: int = result.rowcount
         await db.commit()
 
         if expired_count > 0:

@@ -134,6 +134,12 @@ VALIDATE_LAPTOP_DETAILS_FLAG := $(if $(filter true,$(VALIDATE_FULL_LAPTOP_DETAIL
 USE_STRUCTURED_OUTPUT ?= false
 STRUCTURED_OUTPUT_FLAG := $(if $(filter true,$(USE_STRUCTURED_OUTPUT)),--use-structured-output,)
 
+# Fault Injection Configuration (for testing)
+FAULT_INJECTION_ENABLED ?=
+FAULT_INJECTION_RATE ?=
+FAULT_INJECTION_ERROR_TYPE ?=
+FAULT_INJECTION_MAX_RETRIES ?=
+
 # Export to shell so kubectl can access them
 export SERVICENOW_INSTANCE_URL
 export SERVICENOW_API_KEY
@@ -202,6 +208,12 @@ helm_replica_count_args = \
 	$(if $(REPLICA_COUNT),--set requestManagement.requestManager.replicas=$(REPLICA_COUNT),) \
 	$(if $(REPLICA_COUNT),--set requestManagement.integrationDispatcher.replicas=$(REPLICA_COUNT),) \
 	$(if $(REPLICA_COUNT),--set requestManagement.agentService.replicas=$(REPLICA_COUNT),)
+
+helm_fault_injection_args = \
+	$(if $(FAULT_INJECTION_ENABLED),--set requestManagement.agentService.faultInjection.enabled=$(FAULT_INJECTION_ENABLED),) \
+	$(if $(FAULT_INJECTION_RATE),--set requestManagement.agentService.faultInjection.rate=$(FAULT_INJECTION_RATE),) \
+	$(if $(FAULT_INJECTION_ERROR_TYPE),--set requestManagement.agentService.faultInjection.errorType=$(FAULT_INJECTION_ERROR_TYPE),) \
+	$(if $(FAULT_INJECTION_MAX_RETRIES),--set requestManagement.agentService.faultInjection.maxRetries=$(FAULT_INJECTION_MAX_RETRIES),)
 
 COMMA := ,
 helm_test_users_args = \
@@ -1232,6 +1244,7 @@ define helm_install_common
 	@$(eval REPLICA_COUNT_ARGS := $(helm_replica_count_args))
 	@$(eval TEST_USERS_ARGS := $(helm_test_users_args))
 	@$(eval LANGFUSE_ARGS := $(if $(filter true,$(ENABLE_LANGFUSE)),--set langfuse.enabled=true,))
+	@$(eval FAULT_INJECTION_ARGS := $(helm_fault_injection_args))
 
 	@echo "Creating ServiceNow credentials secret..."
 	@echo "  Instance URL: $$SERVICENOW_INSTANCE_URL"
@@ -1273,6 +1286,7 @@ define helm_install_common
 		$(REPLICA_COUNT_ARGS) \
 		$(TEST_USERS_ARGS) \
 		$(LANGFUSE_ARGS) \
+		$(FAULT_INJECTION_ARGS) \
 		$(if $(filter-out "",$(2)),$(2),) \
 		$(EXTRA_HELM_ARGS)
 	@echo "Waiting for deployments to be ready..."

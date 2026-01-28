@@ -3,23 +3,23 @@ PostgreSQL checkpoint implementation for LangGraph.
 
 This module provides PostgreSQL-based checkpointing for LangGraph state machines.
 The LangGraph tables are set up by the database migration job, so this module
-just creates PostgresSaver instances with proper connection management.
+just creates AsyncPostgresSaver instances with proper connection management.
 """
 
 from typing import Optional
 
-from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from shared_models import configure_logging
 from shared_models.database import get_database_manager
 
 logger = configure_logging("agent-service")
 
 # Global checkpointer instance for connection reuse
-_checkpointer: Optional[PostgresSaver] = None
+_checkpointer: Optional[AsyncPostgresSaver] = None
 
 
-def get_postgres_checkpointer() -> PostgresSaver:
-    """Get a PostgresSaver instance with proper connection management using shared configuration.
+async def get_postgres_checkpointer() -> AsyncPostgresSaver:
+    """Get an AsyncPostgresSaver instance with proper connection management using shared configuration.
 
     Uses a singleton pattern to reuse the same checkpointer instance across the application,
     which improves performance by reusing the underlying database connection pool.
@@ -31,56 +31,56 @@ def get_postgres_checkpointer() -> PostgresSaver:
     if _checkpointer is None:
         try:
             # LangGraph tables should already be set up by the database migration job
-            # Get a connection from the pool for the checkpointer
+            # Get an async connection from the pool for the checkpointer
             db_manager = get_database_manager()
-            conn = db_manager.get_sync_connection()
-            _checkpointer = PostgresSaver(conn)
+            conn = await db_manager.get_async_connection()
+            _checkpointer = AsyncPostgresSaver(conn)
             logger.debug(
-                "Created PostgresSaver with shared configuration and connection pooling"
+                "Created AsyncPostgresSaver with shared configuration and connection pooling"
             )
         except Exception as e:
             logger.error(
-                "Failed to create PostgresSaver",
+                "Failed to create AsyncPostgresSaver",
                 error=str(e),
                 error_type=type(e).__name__,
             )
             _checkpointer = None
             raise
     else:
-        logger.debug("Reusing existing PostgresSaver instance")
+        logger.debug("Reusing existing AsyncPostgresSaver instance")
 
     return _checkpointer
 
 
 def close_postgres_checkpointer() -> None:
-    """Close the PostgresSaver instance and clean up resources."""
+    """Close the AsyncPostgresSaver instance and clean up resources."""
     global _checkpointer
 
     if _checkpointer is not None:
         try:
-            # PostgresSaver doesn't have an explicit close method, but we can clear our reference
+            # AsyncPostgresSaver doesn't have an explicit close method, but we can clear our reference
             # The underlying connection will be managed by the DatabaseManager
             _checkpointer = None
-            logger.debug("PostgresSaver instance cleared")
+            logger.debug("AsyncPostgresSaver instance cleared")
         except Exception as e:
             logger.warning(
-                "Error closing PostgresSaver",
+                "Error closing AsyncPostgresSaver",
                 error=str(e),
                 error_type=type(e).__name__,
             )
     else:
-        logger.debug("No PostgresSaver instance to close")
+        logger.debug("No AsyncPostgresSaver instance to close")
 
 
 def reset_postgres_checkpointer() -> None:
-    """Reset the PostgresSaver instance to force recreation on next access.
+    """Reset the AsyncPostgresSaver instance to force recreation on next access.
 
     Use this when the connection is lost to allow a new connection to be created.
     """
     global _checkpointer
 
     if _checkpointer is not None:
-        logger.warning("Resetting PostgresSaver instance due to connection issue")
+        logger.warning("Resetting AsyncPostgresSaver instance due to connection issue")
         _checkpointer = None
     else:
-        logger.debug("No PostgresSaver instance to reset")
+        logger.debug("No AsyncPostgresSaver instance to reset")
