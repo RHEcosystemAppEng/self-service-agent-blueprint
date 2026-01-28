@@ -229,7 +229,12 @@ def create_async_llamastack_client(
         timeout=timeout_val,
     )
 
-    return AsyncLlamaStackClient(
+    client = AsyncLlamaStackClient(
         base_url=base_url,
         timeout=timeout_val,
     )
+
+    # Wrap with fault injection if enabled
+    from .fault_injector import wrap_client_with_fault_injection
+
+    return wrap_client_with_fault_injection(client)

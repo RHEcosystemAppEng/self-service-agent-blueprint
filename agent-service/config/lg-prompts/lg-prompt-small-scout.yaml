@@ -314,6 +314,7 @@ states:
         next_state: "select_laptop"
         data_storage:
           user_wants_to_proceed: true
+          laptop_options_retry_count: 0
       "NO":
         response: "No problem! you will now be sent back to the router agent."
         data_storage:

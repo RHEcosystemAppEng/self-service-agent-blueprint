@@ -234,6 +234,19 @@ Generate Agent Service specific environment variables
 - name: SAFETY_URL
   value: {{ $safetyUrl | quote }}
 {{- end }}
+{{/* Fault Injection Configuration (for testing) */}}
+{{- if hasKey .Values.requestManagement.agentService "faultInjection" }}
+- name: FAULT_INJECTION_ENABLED
+  value: {{ .Values.requestManagement.agentService.faultInjection.enabled | default false | ternary "1" "0" | quote }}
+- name: FAULT_INJECTION_RATE
+  value: {{ .Values.requestManagement.agentService.faultInjection.rate | default "0.1" | quote }}
+- name: FAULT_INJECTION_ERROR_TYPE
+  value: {{ .Values.requestManagement.agentService.faultInjection.errorType | default "timeout" | quote }}
+{{- if .Values.requestManagement.agentService.faultInjection.maxRetries }}
+- name: FAULT_INJECTION_MAX_RETRIES
+  value: {{ .Values.requestManagement.agentService.faultInjection.maxRetries | quote }}
+{{- end }}
+{{- end }}
 {{- end }}
 
 {{/*
