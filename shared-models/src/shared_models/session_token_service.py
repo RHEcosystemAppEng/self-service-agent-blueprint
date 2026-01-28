@@ -1,7 +1,10 @@
 """Service layer for managing session token counts in the database."""
 
+from typing import Any, cast
+
 import structlog
 from sqlalchemy import func, select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import RequestSession
@@ -56,7 +59,12 @@ class SessionTokenService:
                 )
             )
 
-            result = await db.execute(stmt)
+            # Cast to CursorResult to access rowcount. Mypy's type inference is context-dependent:
+            # when checking shared-models alone, it can infer rowcount (redundant-cast warning),
+            # but when checking from agent-service, it cannot (needs the cast).
+            result = cast(  # type: ignore[redundant-cast, unused-ignore]
+                CursorResult[Any], await db.execute(stmt)
+            )
             await db.commit()
 
             if result.rowcount > 0:
