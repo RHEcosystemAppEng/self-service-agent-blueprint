@@ -3,12 +3,13 @@
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from shared_models import BaseSessionManager, configure_logging
 from shared_models.models import RequestSession, SessionStatus
 from shared_models.user_utils import is_uuid
 from sqlalchemy import select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = configure_logging("agent-service")
@@ -1110,7 +1111,7 @@ class ResponsesSessionManager(BaseSessionManager):
                 )
 
             # Execute and commit once for both branches
-            result = await self.db_session.execute(stmt)
+            result = cast(CursorResult[Any], await self.db_session.execute(stmt))
             await self.db_session.commit()
 
             # Log if no rows were updated

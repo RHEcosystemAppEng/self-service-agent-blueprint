@@ -29,7 +29,13 @@ class EmptyResponse:
     checks for empty responses.
     """
 
-    def __init__(self):
+    output_text: str
+    output: list[Any]
+    status: str
+    error: None
+    id: str
+
+    def __init__(self) -> None:
         self.output_text = ""  # Empty text
         self.output = []  # Empty output array
         self.status = "completed"  # Status looks OK
@@ -89,10 +95,11 @@ class FaultInjectingAsyncLlamaStackClient:
         from shared_models import configure_logging
 
         logger = configure_logging("agent-service")
+        random_value_formatted = f"{rand_value:.4f}"
         logger.info(
             "Fault injection decision",
             instance_id=self._instance_id,
-            random_value=f"{rand_value:.4f}",
+            random_value=random_value_formatted,
             failure_threshold=self._failure_rate,
             will_fail=will_fail,
         )
@@ -135,11 +142,14 @@ class FaultInjectingAsyncLlamaStackClient:
         """
 
         class NamespaceWrapper:
-            def __init__(wrapper_self, ns, should_inject):  # type: ignore[no-untyped-def]
+            _ns: Any
+            _should_inject: bool
+
+            def __init__(wrapper_self, ns: Any, should_inject: bool) -> None:
                 wrapper_self._ns = ns
                 wrapper_self._should_inject = should_inject
 
-            async def create(wrapper_self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            async def create(wrapper_self, *args: Any, **kwargs: Any) -> Any:
                 # Only inject fault if this namespace is configured for fault injection
                 if wrapper_self._should_inject and self._should_fail():
                     from shared_models import configure_logging
@@ -162,7 +172,7 @@ class FaultInjectingAsyncLlamaStackClient:
                 # Call real method
                 return await wrapper_self._ns.create(*args, **kwargs)
 
-            async def list(wrapper_self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            async def list(wrapper_self, *args: Any, **kwargs: Any) -> Any:
                 # Never inject faults in list() calls - they're used for initialization
                 return await wrapper_self._ns.list(*args, **kwargs)
 
@@ -209,9 +219,10 @@ def wrap_client_with_fault_injection(client: Any) -> Any:
         else:
             error_type_desc = error_type
 
+        failure_rate_formatted = f"{rate * 100}%"
         logger.warning(
             "FAULT INJECTION ENABLED - responses.create() calls will randomly fail",
-            failure_rate=f"{rate * 100}%",
+            failure_rate=failure_rate_formatted,
             error_type=error_type_desc,
             scope="responses.create() only - other API calls unaffected",
         )
