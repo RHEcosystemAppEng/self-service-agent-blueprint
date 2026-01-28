@@ -11,7 +11,7 @@ endif
 # - branches forked from dev: uses '0.0.2-dev' tag (dev builds)
 # - all other branches: uses base version (0.0.2) for stable builds (default)
 # Set VERSION explicitly to override this behavior (e.g., VERSION=latest)
-BASE_VERSION := 0.0.9
+BASE_VERSION := 0.0.10
 DEV_VERSION := $(BASE_VERSION)-dev
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 # Check if branch was forked from dev by comparing how close merge-bases are to branch tip
