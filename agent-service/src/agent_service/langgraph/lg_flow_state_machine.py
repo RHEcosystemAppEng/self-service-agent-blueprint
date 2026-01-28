@@ -116,6 +116,28 @@ class StateMachine:
 
     def _get_retry_count(self) -> int:
         """Get the configured retry count for empty responses."""
+        # Check for fault injection override first (for testing)
+        import os
+
+        fault_injection_retries = os.environ.get("FAULT_INJECTION_MAX_RETRIES")
+        if fault_injection_retries is not None and fault_injection_retries != "":
+            try:
+                retry_count = int(fault_injection_retries)
+                logger.info(
+                    "Using fault injection retry override",
+                    retry_count=retry_count,
+                    original_config=self.config.get("settings", {}).get(
+                        "empty_response_retry_count"
+                    ),
+                )
+                return retry_count
+            except ValueError:
+                logger.warning(
+                    "Invalid FAULT_INJECTION_MAX_RETRIES value, using config default",
+                    value=fault_injection_retries,
+                )
+
+        # Use configured value from YAML
         settings = self.config.get("settings", {})
         retry_count = settings.get("empty_response_retry_count")
         return int(retry_count) if isinstance(retry_count, (int, str)) else 3
@@ -789,6 +811,8 @@ class StateMachine:
             )
         )
         if _intent_response_failed:
+            # Add error message so user gets feedback about the failure
+            state["messages"].append(AIMessage(content=intent_response))
             failure_target = state_config.get("failure_transition", "end")
             return state, failure_target
         intent_response = intent_response.strip().upper()
