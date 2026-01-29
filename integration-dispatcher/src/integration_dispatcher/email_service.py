@@ -554,79 +554,30 @@ class EmailService:
             try:
                 # Fetch email - aioimaplib expects string email IDs
                 typ, data = await imap_client.fetch(email_id, "(RFC822)")
-                if not data or not data[0]:
+                if not data or len(data) < 2:
                     logger.warning(
                         "Failed to fetch email",
                         email_id=email_id,
+                        data_len=len(data) if data else 0,
                     )
                     return False
 
-                # Extract email body from fetch response
-                # aioimaplib returns email in chunks (bytes or bytearray) that may include IMAP status lines
-                # We need to find where the email headers start and extract from there
+                # aioimaplib returns FETCH RFC822 responses as a list:
+                # [b'1 FETCH (RFC822 {length}', message_bytes, b')', b'FETCH completed.']
+                # The actual message content is in data[1]
+                email_body = data[1]
 
-                # Flatten all chunks into a list, converting bytearray to bytes
-                all_chunks = []
-                for item in data:
-                    if isinstance(item, (bytes, bytearray)):
-                        all_chunks.append(
-                            bytes(item) if isinstance(item, bytearray) else item
-                        )
-                    elif isinstance(item, (tuple, list)):
-                        for part in item:
-                            if isinstance(part, (bytes, bytearray)):
-                                all_chunks.append(
-                                    bytes(part) if isinstance(part, bytearray) else part
-                                )
+                # Convert bytearray to bytes if needed
+                if isinstance(email_body, bytearray):
+                    email_body = bytes(email_body)
 
-                if not all_chunks:
+                if not isinstance(email_body, bytes):
                     logger.error(
-                        "No bytes found in fetch response",
+                        "Unexpected email body type from FETCH response",
                         email_id=email_id,
-                        data_type=type(data).__name__,
-                        data_len=len(data) if hasattr(data, "__len__") else None,
+                        body_type=type(email_body).__name__,
                     )
                     return False
-
-                # Search for first email header marker to strip IMAP status line prefix
-                header_markers = [
-                    b"Delivered-To:",
-                    b"Received:",
-                    b"Return-Path:",
-                    b"From:",
-                    b"Message-ID:",
-                ]
-
-                concatenated_chunks = b"".join(all_chunks)
-                email_start_chunk_idx = None
-                email_start_pos = None
-
-                for marker in header_markers:
-                    marker_pos = concatenated_chunks.find(marker)
-                    if marker_pos >= 0:
-                        # Found the marker - figure out which chunk it's in
-                        current_pos = 0
-                        for chunk_idx, chunk in enumerate(all_chunks):
-                            chunk_end = current_pos + len(chunk)
-                            if current_pos <= marker_pos < chunk_end:
-                                email_start_chunk_idx = chunk_idx
-                                email_start_pos = marker_pos - current_pos
-                                break
-                            current_pos = chunk_end
-                        break
-
-                if email_start_chunk_idx is not None:
-                    # Extract from the marker onwards
-                    email_body_parts = []
-                    email_body_parts.append(
-                        all_chunks[email_start_chunk_idx][email_start_pos:]
-                    )
-                    for chunk in all_chunks[email_start_chunk_idx + 1 :]:
-                        email_body_parts.append(chunk)
-                    email_body = b"".join(email_body_parts)
-                else:
-                    # No marker found - use all chunks (fallback for different IMAP server formats)
-                    email_body = concatenated_chunks
 
                 if not email_body or len(email_body) == 0:
                     logger.error(

@@ -757,19 +757,69 @@ Log into your ServiceNow instance and:
 Email integration enables two-way communication with the AI agent through email, allowing users to interact with the system via their email client.
 
 The quickstart uses the user's email as the authoritative user ID, therefore, the deployment needs to
-know about the email associated with your email account. You need to set TEST_USERS so that it includes your email. The mock
-data lookups and real lookups from a ServiceNow instance will fill in laptop data for emails set in TEST_USERS.
+know about the email associated with your email account. Unless you use the test email server, you need to set TEST_USERS so that it includes your email. The mock data lookups and real lookups from a ServiceNow instance will fill in laptop data for emails set in TEST_USERS.
 
-To configure those emails export TEST_USERS as follows before running any of the other steps, replacing myemail@emaildomain.com
+To configure those emails, export TEST_USERS as follows before running any of the other steps, replacing myemail@emaildomain.com
 with your email:
 
 ```
 export TEST_USERS="myemail@emaildomain.com"
 ```
 
-#### Step 1: set up email configuration
+#### Step 1: choose your email configuration
 
-See [`EMAIL_SETUP.md`](guides/EMAIL_SETUP.md) for detailed instructions.
+Choose one of the following options for email integration:
+
+##### Option A: Using the test email server (recommended for testing)
+
+For testing email functionality without configuring real email credentials, you can deploy a test email server with a
+simple web UI **before** deploying the main quickstart. The UI uses the Greenmail web server APIs to send and
+receive emails from the locally deployed email server. The UI is very simple with very basic formatting and poor whitespace
+handling. Although you will get a better experience with a real email client, it allows you to more easily try out interactions
+with the agent through email messages.
+
+```bash
+# Deploy the test email server (Greenmail with custom webmail UI)
+make deploy-email-server NAMESPACE=$NAMESPACE
+```
+
+This deploys [Greenmail](https://greenmail-mail-test.github.io/greenmail/) with a custom-built webmail UI for development and testing:
+- ✅ **Apache 2.0 License** - permissive open source
+- ✅ **Custom webmail UI** - simple interface for testing
+- ✅ **Full SMTP + IMAP** support
+- ✅ **Multiple test accounts** - separate inboxes for different users
+- ✅ **No configuration required** - works out of the box
+
+**Expected outcome:**
+- ✓ Test email server deployed with SMTP (port 3025) and IMAP (port 3143)
+- ✓ Webmail accessible via OpenShift Route
+- ✓ Both incoming and outgoing email support enabled
+- ✓ Connection details displayed for quickstart deployment
+
+After deployment completes, the command will display:
+- **Web UI URL** - where you can access the webmail interface
+- **SMTP/IMAP connection details** - to use when deploying the quickstart
+- **Complete helm command** - ready to copy and paste
+
+**Using the Webmail:**
+
+The deployment includes a custom webmail UI accessible via OpenShift Route.
+
+1. Open the Web UI URL displayed by `make deploy-email-server` (e.g., `https://test-email-server-ui-namespace.apps.cluster.com/`)
+2. **Select a user** from the dropdown (alice.johnson@company.com, john.doe@company.com, or maria.garcia@company.com)
+3. **Compose** an email (it is already configured to send to `itsupport@selfservice.local`, the agent's address)
+4. **View responses** - Agent emails appear in your conversation view
+
+**Important:** Copy the displayed helm command - you'll need it in Step 2.
+
+**To remove the test email server later:**
+```bash
+make undeploy-email-server NAMESPACE=$NAMESPACE
+```
+
+##### Option B: Using one of your existing email accounts
+
+If you want to use a real email provider instead of the test server, see [`EMAIL_SETUP.md`](guides/EMAIL_SETUP.md) for detailed instructions.
 
 **Summary:**
 1. Choose an email provider (Gmail, Outlook, or custom SMTP/IMAP)
@@ -777,26 +827,36 @@ See [`EMAIL_SETUP.md`](guides/EMAIL_SETUP.md) for detailed instructions.
 3. Get IMAP credentials for receiving emails (optional, for polling)
 4. Configure email account settings (enable IMAP if needed)
 
-#### Step 2: update deployment with email credentials
+After completing the setup in the EMAIL_SETUP.md guide, set the required environment variables:
 
 ```bash
-# add your users to those that will get responses from moc and service
-# now requests. This must match the email from which you will be sending
-# an email to the system
-export TEST_USERS=myemail@emaildomain.com
-
-# Set email configuration
+# Set real email configuration
 export SMTP_HOST=smtp.gmail.com
 export SMTP_PORT=587
 export SMTP_USERNAME=your-email@gmail.com
 export SMTP_PASSWORD=your-app-password
 export IMAP_HOST=imap.gmail.com
 export IMAP_PORT=993
+```
 
-# Uninstall
-make helm-uninstall NAMESPACE=$NAMESPACE
+**Note:** Replace the values above with your actual email provider's SMTP/IMAP settings.
 
-# Upgrade Helm deployment with email configuration
+#### Step 2: deploy quickstart with email configuration
+
+**If you chose Option A (test email server):**
+
+Use the complete helm command displayed by `make deploy-email-server`
+
+**If you chose Option B (real email provider):**
+
+```bash
+# Add your email to test users
+export TEST_USERS=myemail@emaildomain.com
+
+# Use the environment variables you set in Step 1, Option B
+# (SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, IMAP_HOST, IMAP_PORT)
+
+# Deploy quickstart with real email configuration
 make helm-install-test NAMESPACE=$NAMESPACE \
   EXTRA_HELM_ARGS="\
     --set-string security.email.smtpHost=$SMTP_HOST \
@@ -814,6 +874,9 @@ make helm-install-test NAMESPACE=$NAMESPACE \
     --set-string security.email.imapLeaseDuration=120"
 ```
 
+**Note:** Decreasing the `imapPollInterval` may cause issues with your email provider due to rate limiting. The current
+setting of 60 seconds means you will need to wait up to approximately 60 seconds for each email to be processed.
+
 #### Step 3: verify email integration
 
 Check the Integration Dispatcher health endpoint to confirm email integration is active:
@@ -830,11 +893,19 @@ oc exec deployment/self-service-agent-integration-dispatcher -n $NAMESPACE -- \
 
 #### Step 4: test email interaction
 
-Send an email to the configured email address (`FROM_EMAIL` or `SMTP_USERNAME`):
+**If using the test email server** (recommended):
+1. Open the webmail URL (displayed when you ran `make deploy-email-server`)
+2. Select a user from the dropdown (e.g., alice.johnson@company.com)
+3. Type your message in the message box:
+   - The subject is pre-filled with "Laptop refresh"
+   - **Body**: "Hi, I'd like to start a laptop refresh request"
+4. Click "Send" and the agent's response will appear in the conversation view!
 
-1. Send email from your email client to the configured address
+**If using a real email provider:**
+1. Send email to the agent's email address (the one you configured) from a different email account
 2. Subject: "I need help with my laptop refresh"
 3. Body: "Hi, I'd like to start a laptop refresh request"
+4. Check your inbox for the agent's response
 
 **Expected outcome:**
 - ✓ Email received and processed by Integration Dispatcher
@@ -845,14 +916,21 @@ Send an email to the configured email address (`FROM_EMAIL` or `SMTP_USERNAME`):
 
 #### Step 5: test email threading
 
-Reply to the agent's email to test conversation threading:
+Continue the conversation to test threading:
 
+**If using the test email server:**
+1. In the webmail UI, type another message in the message box
+2. The subject is automatically set to "re: Laptop refresh"
+3. **Body**: "I'd like to see available laptop options"
+4. Click "Send" - the agent remembers the previous conversation and the response appears in the thread!
+
+**If using a real email provider:**
 1. Reply to the agent's email (maintains In-Reply-To header)
 2. Continue the conversation: "I'd like to see available laptop options"
 3. Agent responds in the same email thread
 
 This is an example of what the messages may look like (it will depend
-on your email client):
+on your email client or the test email server UI):
 
 ![Email Example](docs/images/email-example.png)
 
