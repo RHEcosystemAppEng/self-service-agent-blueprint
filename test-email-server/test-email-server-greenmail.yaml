@@ -1,0 +1,1058 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: greenmail-users
+  labels:
+    app: test-email-server
+data:
+  users.properties: |
+    # Format: email:password:username
+    alice.johnson@company.com:testpass123:Alice Johnson
+    john.doe@company.com:testpass123:John Doe
+    maria.garcia@company.com:testpass123:Maria Garcia
+    itsupport@selfservice.local:testpass123:IT Support Agent
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webmail-backend
+  labels:
+    app: test-email-server
+data:
+  app.py: |
+    #!/usr/bin/env python3
+    """Simple webmail backend for Greenmail test server."""
+    import email
+    import imaplib
+    import smtplib
+    import requests
+    import time
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    from email.utils import make_msgid
+    from flask import Flask, request, jsonify
+    from flask_cors import CORS
+
+    app = Flask(__name__)
+    CORS(app)
+
+    SMTP_HOST = 'localhost'
+    SMTP_PORT = 3025
+    IMAP_HOST = 'localhost'
+    IMAP_PORT = 3143
+    GREENMAIL_API = 'http://localhost:8080/api'
+
+    def setup_users():
+        """Create users via Greenmail REST API."""
+        users = [
+            {'email': 'alice.johnson@company.com', 'login': 'alice.johnson@company.com', 'password': 'testpass123'},
+            {'email': 'john.doe@company.com', 'login': 'john.doe@company.com', 'password': 'testpass123'},
+            {'email': 'maria.garcia@company.com', 'login': 'maria.garcia@company.com', 'password': 'testpass123'},
+            {'email': 'itsupport@selfservice.local', 'login': 'itsupport@selfservice.local', 'password': 'testpass123'},
+        ]
+
+        print("Waiting for Greenmail API to be ready...")
+        # Wait for Greenmail to be ready (up to 60 seconds)
+        for i in range(60):
+            try:
+                # Try to access Greenmail HTTP port
+                resp = requests.get('http://localhost:8080/', timeout=2)
+                print(f"Greenmail is ready (attempt {i+1})")
+                break
+            except:
+                time.sleep(1)
+        else:
+            print("Warning: Greenmail may not be ready, attempting user creation anyway")
+
+        # Create users with retries
+        for user in users:
+            for attempt in range(5):
+                try:
+                    resp = requests.post(f'{GREENMAIL_API}/user', json=user, timeout=5)
+                    print(f"Created user {user['email']}: HTTP {resp.status_code}")
+                    break
+                except Exception as e:
+                    if attempt < 4:
+                        print(f"Retry {attempt+1} creating user {user['email']}: {e}")
+                        time.sleep(2)
+                    else:
+                        print(f"Failed to create user {user['email']}: {e}")
+
+    @app.route('/api/send', methods=['POST'])
+    def send_email():
+        """Send email via SMTP and save to Sent folder."""
+        try:
+            data = request.json
+            from_addr = data.get('from')
+            to_addr = data.get('to')
+            subject = data.get('subject', '')
+            body = data.get('body', '')
+            session_id = data.get('sessionId')
+
+            if not from_addr or not to_addr:
+                return jsonify({'error': 'Missing from or to address'}), 400
+
+            # Use simple text/plain message instead of multipart
+            msg = MIMEText(body, 'plain')
+            msg['From'] = from_addr
+            msg['To'] = to_addr
+            msg['Subject'] = subject
+            msg['Message-ID'] = make_msgid(domain=from_addr.split('@')[1] if '@' in from_addr else 'localhost')
+
+            # Add X-Session-ID header if session ID is provided
+            if session_id:
+                msg['X-Session-ID'] = session_id
+
+            # Send via SMTP
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+                server.sendmail(from_addr, to_addr, msg.as_string())
+
+            # Save to Sent folder via IMAP
+            try:
+                password = 'testpass123'
+                mail = imaplib.IMAP4(IMAP_HOST, IMAP_PORT)
+                mail.login(from_addr, password)
+
+                # Check if Sent folder exists, create if not
+                status, folders = mail.list()
+                sent_exists = any(b'Sent' in folder for folder in folders)
+                if not sent_exists:
+                    mail.create('Sent')
+
+                # Append the message to Sent folder (no need to select)
+                mail.append('Sent', '', imaplib.Time2Internaldate(time.time()), msg.as_string().encode())
+                mail.logout()
+            except Exception as e:
+                print(f"Warning: Failed to save to Sent folder: {e}")
+
+            return jsonify({'success': True, 'message': 'Email sent'}), 200
+
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/messages/<user_email>', methods=['GET'])
+    def get_messages(user_email):
+        """Fetch messages for a user via IMAP from both INBOX and Sent folders."""
+        try:
+            password = 'testpass123'
+            messages = []
+
+            mail = imaplib.IMAP4(IMAP_HOST, IMAP_PORT)
+            mail.login(user_email, password)
+
+            # Fetch from both INBOX (received) and Sent (sent messages)
+            for folder in ['INBOX', 'Sent']:
+                try:
+                    status, _ = mail.select(folder)
+                    if status != 'OK':
+                        continue
+
+                    _, message_numbers = mail.search(None, 'ALL')
+
+                    for num in message_numbers[0].split():
+                        # Fetch both BODY.PEEK[] and INTERNALDATE (PEEK doesn't mark as read)
+                        _, msg_data = mail.fetch(num, '(BODY.PEEK[] INTERNALDATE)')
+                        # BODY.PEEK[] returns data as (response_line, body)
+                        # Extract body - it's in index 1 of the tuple
+                        email_body = msg_data[0][1] if len(msg_data[0]) > 1 else msg_data[1]
+                        # Get INTERNALDATE from the fetch response
+                        internaldate = None
+                        for item in msg_data[0]:
+                            if isinstance(item, bytes) and b'INTERNALDATE' in item:
+                                # Parse INTERNALDATE from response
+                                import re
+                                match = re.search(rb'INTERNALDATE "([^"]+)"', item)
+                                if match:
+                                    internaldate = match.group(1).decode('utf-8')
+
+                        # Handle both bytes and string responses
+                        if isinstance(email_body, bytes):
+                            email_message = email.message_from_bytes(email_body)
+                        else:
+                            email_message = email.message_from_string(email_body)
+
+                        # Extract body (try text/plain first, fallback to text/html)
+                        body = ''
+                        if email_message.is_multipart():
+                            text_plain = None
+                            text_html = None
+                            for part in email_message.walk():
+                                content_type = part.get_content_type()
+                                if content_type == 'text/plain' and not text_plain:
+                                    try:
+                                        text_plain = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                                    except:
+                                        pass
+                                elif content_type == 'text/html' and not text_html:
+                                    try:
+                                        text_html = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                                    except:
+                                        pass
+                            # Prefer text/plain, fallback to text/html (strip HTML tags)
+                            if text_plain:
+                                body = text_plain
+                            elif text_html:
+                                import re
+
+                                # Remove style and script tags and their contents
+                                cleaned = re.sub(r'<style[^>]*>.*?</style>', '', text_html, flags=re.DOTALL | re.IGNORECASE)
+                                cleaned = re.sub(r'<script[^>]*>.*?</script>', '', cleaned, flags=re.DOTALL | re.IGNORECASE)
+
+                                # Convert paragraph-level elements to double newlines
+                                cleaned = re.sub(r'</p>', '\n\n', cleaned, flags=re.IGNORECASE)
+                                cleaned = re.sub(r'<p[^>]*>', '', cleaned, flags=re.IGNORECASE)
+
+                                # Convert line break elements to single newline
+                                cleaned = re.sub(r'<br\s*/?>', '\n', cleaned, flags=re.IGNORECASE)
+
+                                # Convert other block elements to newlines
+                                cleaned = re.sub(r'</(div|tr|li|h[1-6])>', '\n', cleaned, flags=re.IGNORECASE)
+                                cleaned = re.sub(r'<(div|tr|li|h[1-6])[^>]*>', '', cleaned, flags=re.IGNORECASE)
+
+                                # Strip all remaining HTML tags
+                                cleaned = re.sub(r'<[^>]+>', '', cleaned)
+
+                                # Decode HTML entities
+                                import html
+                                cleaned = html.unescape(cleaned)
+
+                                # Normalize whitespace: trim each line and remove empty lines
+                                lines = [line.strip() for line in cleaned.split('\n')]
+                                lines = [line for line in lines if line]  # Remove empty lines
+
+                                # Join with single newline, then restore paragraph breaks
+                                body = '\n'.join(lines).strip()
+                                # Keep paragraph breaks but collapse excessive ones
+                                body = re.sub(r'\n{3,}', '\n\n', body)
+                        else:
+                            try:
+                                payload = email_message.get_payload(decode=True)
+                                if payload:
+                                    body = payload.decode('utf-8', errors='ignore')
+                            except:
+                                body = str(email_message.get_payload())
+
+                        # Get date - try Date header first, fallback to INTERNALDATE, then current time
+                        from email.utils import parsedate_to_datetime
+                        from datetime import datetime
+                        import time
+
+                        date_str = ''
+                        date_timestamp = 0
+
+                        # Try Date header first
+                        msg_date = email_message.get('Date', '')
+                        if msg_date:
+                            try:
+                                date_obj = parsedate_to_datetime(msg_date)
+                                date_str = date_obj.isoformat()
+                                date_timestamp = date_obj.timestamp()
+                            except:
+                                pass
+
+                        # Fallback to INTERNALDATE
+                        if not date_str and internaldate:
+                            try:
+                                # INTERNALDATE format: "DD-Mon-YYYY HH:MM:SS +ZZZZ"
+                                date_obj = datetime.strptime(internaldate, '%d-%b-%Y %H:%M:%S %z')
+                                date_str = date_obj.isoformat()
+                                date_timestamp = date_obj.timestamp()
+                            except:
+                                pass
+
+                        # Last fallback: use current time
+                        if not date_str:
+                            date_obj = datetime.now()
+                            date_str = date_obj.isoformat()
+                            date_timestamp = date_obj.timestamp()
+
+                        messages.append({
+                            'uid': f'{folder}-{num.decode()}',
+                            'from': email_message.get('From', ''),
+                            'to': email_message.get('To', ''),
+                            'subject': email_message.get('Subject', ''),
+                            'date': date_str,
+                            'timestamp': date_timestamp,  # Add numeric timestamp for sorting
+                            'body': body,
+                            'folder': folder
+                        })
+
+                    mail.close()
+                except Exception as e:
+                    # Sent folder might not exist yet or other error
+                    print(f"Warning: Could not read {folder}: {e}")
+                    pass
+
+            mail.logout()
+
+            # Sort by timestamp (oldest first for conversation view)
+            messages.sort(key=lambda x: x.get('timestamp', 0))
+            return jsonify(messages), 200
+
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/messages/<user_email>', methods=['DELETE'])
+    def delete_all_messages(user_email):
+        """Delete all messages (INBOX and Sent) for a user."""
+        try:
+            password = 'testpass123'
+            mail = imaplib.IMAP4(IMAP_HOST, IMAP_PORT)
+            mail.login(user_email, password)
+
+            deleted_count = 0
+
+            # Delete from INBOX
+            mail.select('INBOX')
+            status, data = mail.search(None, 'ALL')
+            if status == 'OK' and data[0]:
+                message_ids = data[0].split()
+                for msg_id in message_ids:
+                    mail.store(msg_id, '+FLAGS', '\\Deleted')
+                    deleted_count += 1
+                mail.expunge()
+
+            # Delete from Sent
+            status, folders = mail.list()
+            sent_exists = any(b'Sent' in folder for folder in folders)
+            if sent_exists:
+                mail.select('Sent')
+                status, data = mail.search(None, 'ALL')
+                if status == 'OK' and data[0]:
+                    message_ids = data[0].split()
+                    for msg_id in message_ids:
+                        mail.store(msg_id, '+FLAGS', '\\Deleted')
+                        deleted_count += 1
+                    mail.expunge()
+
+            mail.logout()
+            return jsonify({'success': True, 'deleted_count': deleted_count}), 200
+
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/health', methods=['GET'])
+    def health():
+        """Health check endpoint."""
+        return jsonify({'status': 'healthy'}), 200
+
+    if __name__ == '__main__':
+        setup_users()
+        app.run(host='0.0.0.0', port=5000, debug=False)
+
+  requirements.txt: |
+    Flask==3.0.0
+    flask-cors==4.0.0
+    requests==2.31.0
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webmail-ui-config
+  labels:
+    app: test-email-server
+data:
+  nginx.conf: |
+    worker_processes auto;
+    error_log /dev/stderr info;
+    pid /tmp/nginx.pid;
+
+    events {
+        worker_connections 1024;
+    }
+
+    http {
+        default_type application/octet-stream;
+        access_log /dev/stdout;
+        include /etc/nginx/mime.types;
+
+        server {
+            listen 8081;
+            server_name _;
+            root /opt/app-root/src;
+            index index.html;
+
+            location / {
+                try_files $uri $uri/ /index.html;
+            }
+
+            # Proxy to Python backend
+            location /api/ {
+                proxy_pass http://localhost:5000/api/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header Content-Type application/json;
+            }
+        }
+    }
+
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Webmail - Test Email Server</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                background: #f5f5f5;
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
+            .header {
+                background: #1976d2;
+                color: white;
+                padding: 15px 20px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .header-left {
+                display: flex;
+                align-items: center;
+                gap: 15px;
+            }
+            .header h1 { font-size: 20px; }
+            .clear-button {
+                background: #f44336;
+                color: white;
+                border: none;
+                padding: 8px 15px;
+                border-radius: 4px;
+                font-size: 14px;
+                cursor: pointer;
+                transition: background 0.2s;
+            }
+            .clear-button:hover {
+                background: #d32f2f;
+            }
+            .user-select {
+                background: white;
+                color: #333;
+                padding: 8px 15px;
+                border: none;
+                border-radius: 4px;
+                font-size: 14px;
+            }
+            .main {
+                display: flex;
+                flex: 1;
+                min-height: 0;
+            }
+            .content {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
+            }
+            .conversation-container {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                background: white;
+                min-height: 0;
+            }
+            .messages-area {
+                flex: 1;
+                overflow-y: auto;
+                overflow-x: hidden;
+                padding: 20px;
+                background: #f5f5f5;
+                min-height: 0;
+            }
+            .message-bubble {
+                max-width: 70%;
+                min-width: 200px;
+                margin-bottom: 5px;
+                padding: 12px 16px;
+                border-radius: 8px;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+                display: block;
+            }
+            .message-bubble.sent {
+                background: #1976d2;
+                color: white;
+                margin-left: auto;
+                margin-right: 0;
+                border-bottom-right-radius: 2px;
+            }
+            .message-bubble.received {
+                background: white;
+                border: 1px solid #e0e0e0;
+                margin-left: 0;
+                margin-right: auto;
+                border-bottom-left-radius: 2px;
+            }
+            .message-subject {
+                font-weight: 600;
+                margin-bottom: 8px;
+                font-size: 14px;
+            }
+            .message-bubble.sent .message-subject {
+                color: rgba(255,255,255,0.9);
+            }
+            .message-body {
+                line-height: 1.5;
+                white-space: pre-wrap;
+                font-size: 14px;
+            }
+            .message-time {
+                font-size: 11px;
+                margin-top: 6px;
+                opacity: 0.7;
+            }
+            .message-list, .message-view {
+                display: none;
+            }
+            .compose-area {
+                background: white;
+                padding: 15px;
+                border-top: 1px solid #e0e0e0;
+            }
+            .compose-row {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 10px;
+            }
+            .compose-input {
+                flex: 1;
+                padding: 10px 15px;
+                border: 1px solid #ddd;
+                border-radius: 20px;
+                font-family: inherit;
+                font-size: 14px;
+                resize: none;
+                max-height: 120px;
+            }
+            .compose-input:focus {
+                outline: none;
+                border-color: #1976d2;
+            }
+            .send-button {
+                padding: 10px 24px;
+                background: #1976d2;
+                color: white;
+                border: none;
+                border-radius: 20px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 500;
+                white-space: nowrap;
+            }
+            .send-button:hover {
+                background: #1565c0;
+            }
+            .send-button:disabled {
+                background: #ccc;
+                cursor: not-allowed;
+            }
+            .form-group {
+                margin-bottom: 10px;
+            }
+            .form-group input {
+                width: 100%;
+                padding: 8px 15px;
+                border: 1px solid #ddd;
+                border-radius: 20px;
+                font-family: inherit;
+                font-size: 14px;
+            }
+            .empty-state {
+                text-align: center;
+                padding: 60px 20px;
+                color: #999;
+                font-size: 15px;
+            }
+            .loading {
+                text-align: center;
+                padding: 60px 20px;
+                color: #999;
+                font-size: 15px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <div class="header-left">
+                <h1>📬 Webmail</h1>
+                <button class="clear-button" onclick="clearAllMessages()">🗑️ Clear All</button>
+            </div>
+            <select class="user-select" id="userSelect">
+                <option value="alice.johnson@company.com">alice.johnson@company.com</option>
+                <option value="john.doe@company.com">john.doe@company.com</option>
+                <option value="maria.garcia@company.com">maria.garcia@company.com</option>
+            </select>
+        </div>
+        <div class="main">
+            <div class="content">
+                <div class="conversation-container">
+                    <div class="messages-area" id="messagesArea">
+                        <div class="loading">Loading conversation...</div>
+                    </div>
+                    <div class="compose-area">
+                        <div class="form-group">
+                            <input type="text" id="composeSubject" placeholder="Subject (optional)">
+                        </div>
+                        <div class="compose-row">
+                            <textarea class="compose-input" id="composeBody" placeholder="Type your message to IT Support..." rows="2"></textarea>
+                            <button class="send-button" onclick="sendEmail()" id="sendButton">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            const users = {
+                'alice.johnson@company.com': 'testpass123',
+                'john.doe@company.com': 'testpass123',
+                'maria.garcia@company.com': 'testpass123'
+            };
+
+            let currentUser = 'alice.johnson@company.com';
+            const AGENT_EMAIL = 'itsupport@selfservice.local';
+            let currentSessionId = null;
+
+            document.getElementById('userSelect').addEventListener('change', (e) => {
+                currentUser = e.target.value;
+                currentSessionId = null;  // Reset session when switching users
+                loadConversation();
+            });
+
+            // Auto-expand textarea
+            document.getElementById('composeBody').addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+            });
+
+            async function loadConversation() {
+                try {
+                    const response = await fetch(`/api/messages/${encodeURIComponent(currentUser)}`);
+                    if (!response.ok) throw new Error('Failed to load messages');
+
+                    const messages = await response.json();
+                    displayConversation(messages);
+                } catch (error) {
+                    console.error('Error loading messages:', error);
+                    document.getElementById('messagesArea').innerHTML =
+                        '<div class="empty-state">Error loading conversation: ' + error.message + '</div>';
+                }
+            }
+
+            function displayConversation(messages) {
+                const area = document.getElementById('messagesArea');
+
+                console.log('Displaying messages:', messages);
+
+                if (messages.length === 0) {
+                    area.innerHTML = '<div class="empty-state">No messages yet. Start a conversation with IT Support!</div>';
+                    // First message: use "Laptop refresh"
+                    document.getElementById('composeSubject').value = 'Laptop refresh';
+                    return;
+                }
+
+                // Separate sent and received messages
+                const conversation = messages.map(msg => {
+                    const isSent = msg.from && msg.from.includes(currentUser);
+
+                    // Extract session ID from agent responses
+                    if (!isSent && msg.body) {
+                        const sessionMatch = msg.body.match(/Session ID:\s*([a-f0-9-]+)/i);
+                        if (sessionMatch) {
+                            currentSessionId = sessionMatch[1];
+                        }
+                    }
+
+                    return {
+                        ...msg,
+                        isSent: isSent,
+                        timestamp: new Date(msg.date || Date.now())
+                    };
+                });
+
+                // Sort by timestamp
+                conversation.sort((a, b) => a.timestamp - b.timestamp);
+
+                // Subsequent messages: use "re: Laptop refresh"
+                document.getElementById('composeSubject').value = 're: Laptop refresh';
+
+                // Display messages
+                area.innerHTML = conversation.map(msg => {
+                    const bubbleClass = msg.isSent ? 'sent' : 'received';
+                    const timeStr = msg.timestamp.toLocaleString();
+
+                    const displayBody = msg.body || '(no content)';
+                    const displaySubject = msg.subject || '(no subject)';
+
+                    return `
+                        <div class="message-bubble ${bubbleClass}">
+                            <div class="message-subject">${escapeHtml(displaySubject)}</div>
+                            <div class="message-body">${escapeHtml(displayBody)}</div>
+                            <div class="message-time">${escapeHtml(timeStr)}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                // Scroll to bottom
+                area.scrollTop = area.scrollHeight;
+            }
+
+            async function sendEmail() {
+                const subject = document.getElementById('composeSubject').value.trim();
+                const body = document.getElementById('composeBody').value.trim();
+
+                if (!body) {
+                    return;
+                }
+
+                const sendButton = document.getElementById('sendButton');
+                sendButton.disabled = true;
+                sendButton.textContent = 'Sending...';
+
+                try {
+                    const emailData = {
+                        from: currentUser,
+                        to: AGENT_EMAIL,
+                        subject: subject || '(no subject)',
+                        body: body,
+                        sessionId: currentSessionId  // Include session ID if available
+                    };
+
+                    const response = await fetch('/api/send', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(emailData)
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Failed to send email');
+                    }
+
+                    // Clear form
+                    document.getElementById('composeSubject').value = '';
+                    document.getElementById('composeBody').value = '';
+                    document.getElementById('composeBody').style.height = 'auto';
+
+                    // Reload conversation after a short delay to see the sent message
+                    setTimeout(() => loadConversation(), 500);
+
+                } catch (error) {
+                    console.error('Error sending email:', error);
+                    alert('Error sending email: ' + error.message);
+                } finally {
+                    sendButton.disabled = false;
+                    sendButton.textContent = 'Send';
+                }
+            }
+
+            // Allow Enter to send (Shift+Enter for newline)
+            document.getElementById('composeBody').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendEmail();
+                }
+            });
+
+            async function clearAllMessages() {
+                if (!confirm('Are you sure you want to delete all messages for ' + currentUser + '?')) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/messages/' + encodeURIComponent(currentUser), {
+                        method: 'DELETE'
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Failed to delete messages');
+                    }
+
+                    const result = await response.json();
+
+                    // Reload conversation to show empty state
+                    loadConversation();
+
+                } catch (error) {
+                    console.error('Error deleting messages:', error);
+                    alert('Error deleting messages: ' + error.message);
+                }
+            }
+
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            // Load initial conversation
+            loadConversation();
+
+            // Auto-refresh every 10 seconds to see agent responses
+            setInterval(loadConversation, 10000);
+        </script>
+    </body>
+    </html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-email-server
+  labels:
+    app: test-email-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-email-server
+  template:
+    metadata:
+      labels:
+        app: test-email-server
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: greenmail
+        image: greenmail/standalone:2.1.0
+        ports:
+        - name: smtp
+          containerPort: 3025
+        - name: imap
+          containerPort: 3143
+        - name: pop3
+          containerPort: 3110
+        - name: smtps
+          containerPort: 3465
+        - name: imaps
+          containerPort: 3993
+        - name: http
+          containerPort: 8080
+        env:
+        - name: GREENMAIL_OPTS
+          value: "-Dgreenmail.setup.test.smtp -Dgreenmail.setup.test.imap -Dgreenmail.setup.test.pop3 -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.verbose -Dgreenmail.api.startup=true"
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          tcpSocket:
+            port: 3025
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: 3025
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      - name: webmail-backend
+        image: registry.access.redhat.com/ubi9/python-311:latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            export HOME=/tmp && \
+            pip install --no-cache-dir -r /app/requirements.txt && \
+            python /app/app.py
+        ports:
+        - name: http-backend
+          containerPort: 5000
+        volumeMounts:
+        - name: backend-code
+          mountPath: /app
+        env:
+        - name: HOME
+          value: "/tmp"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 15
+          periodSeconds: 5
+      - name: webmail-ui
+        image: registry.access.redhat.com/ubi9/nginx-120:1-126
+        command: ["nginx", "-g", "daemon off;"]
+        ports:
+        - name: http-ui
+          containerPort: 8081
+        volumeMounts:
+        - name: webmail-html
+          mountPath: /opt/app-root/src
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+          readOnly: true
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "10m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: webmail-html
+        configMap:
+          name: webmail-ui-config
+      - name: nginx-config
+        configMap:
+          name: webmail-ui-config
+      - name: backend-code
+        configMap:
+          name: webmail-backend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-email-server-smtp
+  labels:
+    app: test-email-server
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3025
+    targetPort: 3025
+    protocol: TCP
+    name: smtp
+  selector:
+    app: test-email-server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-email-server-imap
+  labels:
+    app: test-email-server
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3143
+    targetPort: 3143
+    protocol: TCP
+    name: imap
+  selector:
+    app: test-email-server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-email-server-ui
+  labels:
+    app: test-email-server
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8081
+    protocol: TCP
+    name: http
+  selector:
+    app: test-email-server
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: test-email-server-ui
+  labels:
+    app: test-email-server
+spec:
+  to:
+    kind: Service
+    name: test-email-server-ui
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+# Network Policy to allow OpenShift router to reach webmail UI
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: test-email-server-allow-ingress
+  labels:
+    app: test-email-server
+spec:
+  podSelector:
+    matchLabels:
+      app: test-email-server
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow from OpenShift router
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          network.openshift.io/policy-group: ingress
+    ports:
+    - protocol: TCP
+      port: 8081
+  # Allow from same namespace (for SMTP/IMAP from quickstart)
+  - from:
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 3025
+    - protocol: TCP
+      port: 3143
