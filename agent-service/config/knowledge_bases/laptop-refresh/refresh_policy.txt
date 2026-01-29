@@ -5,8 +5,7 @@ To ensure employees have reliable, secure, and up-to-date computing equipment th
 
 	1	Scope: This policy applies to all employees, contractors, and consultants using company-issued laptops.
 	2	Refresh Cycle
-		- Standard laptops will be refreshed every 3 years from the date of issuance.
-		- High-performance or specialized laptops (such as development, design, or engineering devices) may be refreshed on a 2-year cycle based on workload demands.
+		- All company laptops will be refreshed every 3 years from the date of issuance.
 		- Exceptions require approval from the IT Manager.
 	3	Eligibility for Refresh
 		- Employees become eligible for a laptop refresh once their current device reaches the end of its refresh cycle.

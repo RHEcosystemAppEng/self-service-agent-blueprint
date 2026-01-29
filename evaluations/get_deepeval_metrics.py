@@ -190,8 +190,11 @@ def get_metrics(
             model=custom_model,
             evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
             evaluation_steps=[
-                "Evaluate if the assistant gathers necessary information about the user's current laptop.",
-                "Check if the assistant follows a logical flow for information collection.",
+                "Evaluate if the assistant obtains necessary information about the user's current laptop.",
+                "CRITICAL: 'Gathering information' includes AUTOMATIC RETRIEVAL via tools. The agent is NOT required to ask the user questions if it can fetch the data automatically.",
+                "If the agent displays laptop details (Model, Serial, Age, etc.) retrieved from the system, this counts as SUCCESSFUL information gathering.",
+                "Do NOT penalize the agent for not asking questions if it successfully retrieved the correct data automatically.",
+                "Only fail this metric if the agent proceeds without knowing the laptop details AND failed to ask for them.",
             ],
         ),
         ConversationalGEval(
@@ -202,6 +205,8 @@ def get_metrics(
             evaluation_steps=[
                 "First, review the laptop refresh policy in the additional context below to understand the eligibility criteria. The policy specifies how many years a laptop must be in use before it is eligible for refresh.",
                 "Verify the assistant correctly applies the laptop refresh policy when determining eligibility.",
+                "IMPORTANT: The conversation takes place in a simulated future timeframe.",
+                "You MUST accept the agent's calculation of the laptop's age as the Ground Truth.",
                 "If the agent states the laptop age (e.g., '2 years and 11 months old', '5 years old', '3.5 years old'), verify the eligibility determination is logically accurate based on the policy in the additional context:",
                 "  - Compare the stated laptop age against the refresh cycle specified in the policy",
                 "  - Laptops younger than the refresh cycle should be marked as NOT eligible or not yet eligible",
