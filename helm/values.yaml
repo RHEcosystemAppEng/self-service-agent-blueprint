@@ -190,35 +190,38 @@ llama-stack:
 
   # Configure vector_io kvstore to use PostgreSQL for multi-replica support
   vectorIOKvstore:
-    type: postgres
-    db_path: null  # Explicitly unset SQLite field
     namespace: llamastack_vector_io
-    host: ${env.POSTGRES_HOST:=pgvector}
-    port: ${env.POSTGRES_PORT:=5432}
-    db: ${env.POSTGRES_DBNAME:=rag_blueprint}
-    user: ${env.POSTGRES_USER:=postgres}
-    password: ${env.POSTGRES_PASSWORD:=rag_password}
+    backend: kv_default
+
+  storage:
+    backends:
+      kv_default:
+        type: kv_postgres
+        host: ${env.POSTGRES_HOST:=pgvector}
+        port: ${env.POSTGRES_PORT:=5432}
+        db: llama_agents
+        user: ${env.POSTGRES_USER:=postgres}
+        password: ${env.POSTGRES_PASSWORD:=rag_password}
+      sql_default:
+        type: sql_postgres
+        host: ${env.POSTGRES_HOST:=pgvector}
+        port: ${env.POSTGRES_PORT:=5432}
+        db: llama_responses
+        user: ${env.POSTGRES_USER:=postgres}
+        password: ${env.POSTGRES_PASSWORD:=rag_password}
 
   providers:
     agents:
       - provider_id: meta-ref-postgres
         provider_type: inline::meta-reference
         config:
-          persistence_store:
-            type: postgres
-            namespace: null
-            host: ${env.POSTGRES_HOST:=pgvector}
-            port: ${env.POSTGRES_PORT:=5432}
-            db: llama_agents
-            user: ${env.POSTGRES_USER:=pgvector}
-            password: ${env.POSTGRES_PASSWORD:=pgvector}
-          responses_store:
-            type: postgres
-            host: ${env.POSTGRES_HOST:=pgvector}
-            port: ${env.POSTGRES_PORT:=5432}
-            db: llama_responses
-            user: ${env.POSTGRES_USER:=pgvector}
-            password: ${env.POSTGRES_PASSWORD:=pgvector}
+          persistence:
+            agent_state:
+              backend: kv_default
+              namespace: agents
+            responses:
+              backend: sql_default
+              table_name: responses
 
   # Model configurations for llama-stack
   # Add PromptGuard as a shield when enabled

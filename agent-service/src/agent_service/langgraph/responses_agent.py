@@ -137,8 +137,13 @@ class Agent:
 
         return ""
 
-    def _get_vector_store_id(self, kb_name: str) -> str:
-        """Get the vector store ID for a specific knowledge base."""
+    def _get_vector_store_id(self, kb_name: str) -> Optional[str]:
+        """Get the vector store ID for a specific knowledge base.
+
+        Returns:
+            Vector store ID if found, None if not found or error occurred.
+            Returns None instead of fallback to avoid using invalid vector store names.
+        """
         try:
             # Use LlamaStack's OpenAI-compatible vector store API
             vector_stores = self.llama_client.vector_stores.list()
@@ -149,18 +154,31 @@ class Agent:
 
             if matching_stores:
                 latest_store = max(matching_stores, key=lambda x: x.created_at)
-                logger.info(
-                    "Found existing vector store",
-                    vector_store_id=latest_store.id,
-                    vector_store_name=latest_store.name,
+                vector_store_id = (
+                    str(latest_store.id) if latest_store.id is not None else None
                 )
-                return str(latest_store.id) if latest_store.id is not None else kb_name
+                if vector_store_id:
+                    logger.info(
+                        "Found existing vector store",
+                        vector_store_id=vector_store_id,
+                        vector_store_name=latest_store.name,
+                        kb_name=kb_name,
+                    )
+                    return vector_store_id
+                else:
+                    logger.warning(
+                        "Vector store found but has no ID",
+                        vector_store_name=latest_store.name,
+                        kb_name=kb_name,
+                    )
+                    return None
             else:
                 logger.warning(
-                    "No vector store found for knowledge base, using fallback",
+                    "No vector store found for knowledge base",
                     kb_name=kb_name,
+                    available_stores=[vs.name for vs in vector_stores.data if vs.name],
                 )
-                return kb_name
+                return None
 
         except Exception as e:
             logger.error(
@@ -169,7 +187,7 @@ class Agent:
                 error=str(e),
                 error_type=type(e).__name__,
             )
-            return kb_name  # Return the kb_name as fallback
+            return None  # Return None instead of fallback to avoid invalid vector store usage
 
     def _get_mcp_tools_to_use(
         self,
@@ -197,6 +215,12 @@ class Agent:
                 vector_store_id = self._get_vector_store_id(kb_name)
                 if vector_store_id:
                     vector_store_ids.append(vector_store_id)
+                else:
+                    logger.warning(
+                        "Skipping knowledge base - vector store not found or invalid",
+                        kb_name=kb_name,
+                        agent_name=self.agent_name,
+                    )
 
             if vector_store_ids:
                 knowledge_base_tool = {
@@ -204,6 +228,12 @@ class Agent:
                     "vector_store_ids": vector_store_ids,
                 }
                 tools_to_use.append(knowledge_base_tool)
+            else:
+                logger.warning(
+                    "No valid vector stores found for knowledge bases",
+                    knowledge_bases=knowledge_bases,
+                    agent_name=self.agent_name,
+                )
 
         # Add MCP tools from server configurations
         if mcp_server_configs:

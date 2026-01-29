@@ -826,7 +826,7 @@ wheels = [
 
 [[package]]
 name = "llama-stack-client"
-version = "0.2.18"
+version = "0.3.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -845,9 +845,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/69/da/5e5a745495f8a2b8ef24fc4d01fe9031aa2277c36447cb22192ec8c8cc1e/llama_stack_client-0.2.18.tar.gz", hash = "sha256:860c885c9e549445178ac55cc9422e6e2a91215ac7aff5aaccfb42f3ce07e79e", size = 277284, upload-time = "2025-08-19T22:12:09.106Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/34/ff/b4bb891249379849e6e273a6254998c7e08562613ca4020817af2da9498e/llama_stack_client-0.3.5.tar.gz", hash = "sha256:2d954429347e920038709ae3e026c06f336ce570bd41245fc4e1e54c78879485", size = 335659, upload-time = "2025-12-15T14:10:16.444Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0a/e4/e97f8fdd8a07aa1efc7f7e37b5657d84357b664bf70dd1885a437edc0699/llama_stack_client-0.2.18-py3-none-any.whl", hash = "sha256:90f827d5476f7fc15fd993f1863af6a6e72bd064646bf6a99435eb43a1327f70", size = 367586, upload-time = "2025-08-19T22:12:07.899Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/10/84a4f0ef1cc13f44a692e55bed6a55792671e5320c95a8fd581e02848d61/llama_stack_client-0.3.5-py3-none-any.whl", hash = "sha256:b98acdc660d60839da8b71d5ae59531ba7f059e3e9656ca5ca20edca70f7d6a2", size = 425244, upload-time = "2025-12-15T14:10:14.726Z" },
 ]
 
 [[package]]
@@ -1827,7 +1827,7 @@ requires-dist = [
     { name = "langfuse", specifier = ">=3.0.0" },
     { name = "langgraph", specifier = ">=0.6.7" },
     { name = "langgraph-checkpoint-postgres", specifier = ">=2.0.0" },
-    { name = "llama-stack-client", specifier = "==0.2.18" },
+    { name = "llama-stack-client", specifier = "==0.3.5" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.17.1" },
     { name = "openai", specifier = ">=1.0.0" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = "==1.37.0" },
