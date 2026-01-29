@@ -921,6 +921,7 @@ update-lockfiles:
 	@echo
 	@echo
 	@echo "🎉 All lockfiles updated successfully!"
+	@$(MAKE) export-requirements
 
 # Individual service lockfile targets
 .PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-snow check-lockfile-mock-eventing check-lockfile-mock-employee-data check-lockfile-mock-servicenow check-lockfile-promptguard check-lockfile-servicenow-bootstrap
