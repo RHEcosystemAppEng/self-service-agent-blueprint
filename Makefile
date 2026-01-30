@@ -300,6 +300,10 @@ help:
 	@echo "  servicenow-bootstrap-create-catalog-item     - Create PC refresh service catalog item only"
 	@echo "  servicenow-bootstrap-create-evaluation-users - Create evaluation users only"
 	@echo ""
+	@echo "Test Email Server Commands:"
+	@echo "  deploy-email-server                 - Deploy test email server (Greenmail with custom UI)"
+	@echo "  undeploy-email-server               - Remove test email server from namespace"
+	@echo ""
 	@echo "Lockfile Management:"
 	@echo "  check-lockfiles                     - Check if all uv.lock files are up-to-date"
 	@echo "  check-requirements                  - Check if all requirements.txt files exist and are in sync with uv.lock"
@@ -1607,6 +1611,58 @@ jaeger-undeploy:
 	@kubectl delete networkpolicy jaeger-allow-ingress -n $(NAMESPACE) || echo "Network policy not found"
 	@kubectl delete deployment jaeger -n $(NAMESPACE) || echo "Deployment not found"
 	@echo "✅ Jaeger removed successfully!"
+
+# Test Email Server deployment targets
+.PHONY: deploy-email-server
+deploy-email-server: namespace
+	@echo "Deploying test email server (Greenmail + Custom UI) to namespace $(NAMESPACE)..."
+	@kubectl apply -f test-email-server/test-email-server-greenmail.yaml -n $(NAMESPACE)
+	@echo "Waiting for test email server deployment to be ready..."
+	@kubectl rollout status deployment/test-email-server -n $(NAMESPACE) --timeout=5m || \
+		(echo "❌ Deployment failed. Check logs with: kubectl logs -n $(NAMESPACE) deployment/test-email-server -c greenmail" && exit 1)
+	@echo ""
+	@echo "✅ Test email server (Greenmail) deployed successfully!"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "📧 Greenmail Email Server Information"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "📬 Web UI URL:"
+	@UI_ROUTE=$$(oc get route test-email-server-ui -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null); \
+	echo "  https://$$UI_ROUTE"
+	@echo ""
+	@echo "🔐 Test User Accounts (each has separate inbox):"
+	@echo "  alice.johnson@company.com     (password: testpass123)"
+	@echo "  john.doe@company.com          (password: testpass123)"
+	@echo "  maria.garcia@company.com      (password: testpass123)"
+	@echo ""
+	@echo "🚀 Deploy Quickstart with Email Integration:"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "make helm-install-test NAMESPACE=$(NAMESPACE) \\"
+	@echo "  EXTRA_HELM_ARGS=\"\\"
+	@echo "    --set-string security.email.smtpHost=test-email-server-smtp.$(NAMESPACE).svc.cluster.local \\"
+	@echo "    --set-string security.email.smtpPort=3025 \\"
+	@echo "    --set-string security.email.smtpUsername=itsupport@selfservice.local \\"
+	@echo "    --set-string security.email.smtpPassword=testpass123 \\"
+	@echo "    --set-string security.email.smtpUseTls=false \\"
+	@echo "    --set-string security.email.fromEmail=itsupport@selfservice.local \\"
+	@echo "    --set-string security.email.fromName='Self-Service Agent' \\"
+	@echo "    --set-string security.email.imapHost=test-email-server-imap.$(NAMESPACE).svc.cluster.local \\"
+	@echo "    --set-string security.email.imapPort=3143 \\"
+	@echo "    --set-string security.email.imapUsername=itsupport@selfservice.local \\"
+	@echo "    --set-string security.email.imapPassword=testpass123 \\"
+	@echo "    --set-string security.email.imapUseSsl=false \\"
+	@echo "    --set-string security.email.imapMailbox=INBOX \\"
+	@echo "    --set-string security.email.imapPollInterval=5\""
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+.PHONY: undeploy-email-server
+undeploy-email-server:
+	@echo "Removing test email server from namespace $(NAMESPACE)..."
+	@kubectl delete -f test-email-server/test-email-server-greenmail.yaml -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true
+	@echo "✅ Test email server removed successfully!"
 
 # ServiceNow PDI wake-up
 .PHONY: servicenow-wake-install
