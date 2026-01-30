@@ -100,17 +100,13 @@ def run_migrations() -> None:
     alembic_cfg.set_main_option("sqlalchemy.url", db_config.sync_connection_string)
 
     try:
-        logger.info("Starting Alembic upgrade to head...")
         # Change to the shared-db directory so Alembic can find the alembic/ folder
         original_cwd = os.getcwd()
         os.chdir(script_dir)
         logger.debug("Changed working directory", script_dir=str(script_dir))
 
-        # Run migrations
-        command.upgrade(alembic_cfg, "head")
-        logger.info("Database migrations completed successfully")
-
-        # Setup LangGraph PostgreSQL checkpoint tables
+        # Setup LangGraph PostgreSQL checkpoint tables FIRST
+        # This ensures checkpoint infrastructure is ready before application migrations
         print("Setting up LangGraph PostgreSQL checkpoint tables...")
         logger.info("Setting up LangGraph PostgreSQL checkpoint tables...")
         try:
@@ -219,6 +215,11 @@ def run_migrations() -> None:
             logger.exception("Full PostgresSaver setup error traceback:")
             # Fail the job so it can retry - checkpointing is required
             raise
+
+        # Now run Alembic migrations after checkpoint tables are ready
+        logger.info("Starting Alembic upgrade to head...")
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Database migrations completed successfully")
 
         # Restore original working directory
         os.chdir(original_cwd)
