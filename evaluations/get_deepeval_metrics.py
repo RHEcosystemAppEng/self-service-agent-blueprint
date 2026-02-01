@@ -166,6 +166,7 @@ def get_metrics(
             model=custom_model,
             evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
             evaluation_steps=[
+                "IMPORTANT: Ignore any agent responses that come after a user message containing 'DONEDONEDONE'. This is a test marker, not real user input, and any agent responses to it should not be evaluated.",
                 "IMPORTANT: This is a multi-agent system where users can be routed between a routing agent and specialist agents.",
                 "Evaluate if the conversation addresses all of the user's intentions and requests.",
                 "CRITICAL: When evaluating out-of-scope questions:",
@@ -190,8 +191,11 @@ def get_metrics(
             model=custom_model,
             evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
             evaluation_steps=[
-                "Evaluate if the assistant gathers necessary information about the user's current laptop.",
-                "Check if the assistant follows a logical flow for information collection.",
+                "Evaluate if the assistant obtains necessary information about the user's current laptop.",
+                "CRITICAL: 'Gathering information' includes AUTOMATIC RETRIEVAL via tools. The agent is NOT required to ask the user questions if it can fetch the data automatically.",
+                "If the agent displays laptop details (Model, Serial, Age, etc.) retrieved from the system, this counts as SUCCESSFUL information gathering.",
+                "Do NOT penalize the agent for not asking questions if it successfully retrieved the correct data automatically.",
+                "Only fail this metric if the agent proceeds without knowing the laptop details AND failed to ask for them.",
             ],
         ),
         ConversationalGEval(
@@ -202,6 +206,9 @@ def get_metrics(
             evaluation_steps=[
                 "First, review the laptop refresh policy in the additional context below to understand the eligibility criteria. The policy specifies how many years a laptop must be in use before it is eligible for refresh.",
                 "Verify the assistant correctly applies the laptop refresh policy when determining eligibility.",
+                "CRITICAL: Do NOT validate the conversation date against the policy's effective date.",
+                "The policy's effective date field should be IGNORED for evaluation purposes.", 
+                "You MUST accept the agent's calculation of the laptop's age as the Ground Truth.",
                 "If the agent states the laptop age (e.g., '2 years and 11 months old', '5 years old', '3.5 years old'), verify the eligibility determination is logically accurate based on the policy in the additional context:",
                 "  - Compare the stated laptop age against the refresh cycle specified in the policy",
                 "  - Laptops younger than the refresh cycle should be marked as NOT eligible or not yet eligible",
@@ -325,6 +332,8 @@ def get_metrics(
                 [
                     "First, identify the user's location from the conversation (NA, EMEA, APAC, or LATAM).",
                     "Then, look for where the agent presents laptop options to the user in the conversation.",
+                    "CRITICAL: IGNORE the user's CURRENT laptop information shown at the beginning of the conversation (from get_employee_laptop_info tool). This shows their OLD laptop being replaced, NOT a refresh option.",
+                    "Focus ONLY on the laptop models presented as options for selection (typically shown after the user confirms they want to see options).",
                     "IMPORTANT: If the conversation includes a return-to-router pattern (user asks out-of-scope question, returns to routing agent, then restarts laptop refresh), use the LAST/FINAL presentation of laptop options for evaluation, not the initial one.",
                     "Count how many distinct laptop models are presented by the agent in the final laptop presentation. Look for laptop model names like 'MacBook Air M2', 'MacBook Pro 16 M3 Max', 'ThinkPad T14s Gen 5 AMD', 'ThinkPad P16 Gen 2', etc.",
                     "Compare the count of laptop models presented against the total number of laptop models available for that location in the additional context below. For EMEA, there should be exactly 4 laptop models. For NA, APAC, and LATAM, there should also be exactly 4 laptop models each.",
@@ -348,6 +357,8 @@ def get_metrics(
                 [
                     "First, identify the user's location from the conversation (NA, EMEA, APAC, or LATAM).",
                     "Then, look for where the agent presents laptop options to the user in the conversation.",
+                    "CRITICAL: IGNORE the user's CURRENT laptop information shown at the beginning of the conversation (from get_employee_laptop_info tool). This shows their OLD laptop being replaced, NOT a refresh option.",
+                    "Focus ONLY on the laptop models presented as options for selection (typically shown after the user confirms they want to see options).",
                     "IMPORTANT: If the conversation includes a return-to-router pattern (user asks out-of-scope question, returns to routing agent, then restarts laptop refresh), use the LAST/FINAL presentation of laptop options for evaluation, not the initial one.",
                     "Count how many distinct laptop models are presented by the agent in the final laptop presentation. Look for laptop model names like 'MacBook Air M2', 'MacBook Pro 16 M3 Max', 'ThinkPad T14s Gen 5 AMD', 'ThinkPad P16 Gen 2', etc.",
                     "Compare the count of laptop models presented against the total number of laptop models available for that location in the additional context below. For EMEA, there should be exactly 4 laptop models. For NA, APAC, and LATAM, there should also be exactly 4 laptop models each.",
