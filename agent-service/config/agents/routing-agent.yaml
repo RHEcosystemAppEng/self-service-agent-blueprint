@@ -7,8 +7,8 @@ lg_state_machine_config: "config/lg-prompts/routing.yaml"
 # Layer 1: PromptGuard - attack detection
 # Layer 2: Llama Guard - Content safety
 input_shields:
-  - "meta-llama/Llama-Prompt-Guard-2-86M"
-  - "meta-llama/Llama-Guard-3-8B"
+  - "llama-prompt-guard-2-86m/meta-llama/Llama-Prompt-Guard-2-86M"
+  - "llama-guard-3-8b/meta-llama/Llama-Guard-3-8B"
 output_shields: []
 # Categories to ignore for false positives (routing agent has minimal tool usage)
 # Input shield ignores: categories to allow in user input
