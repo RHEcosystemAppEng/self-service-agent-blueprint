@@ -30,6 +30,7 @@ Transform IT service delivery using AI to lower support effort, improve complian
   - [Trying out smaller prompts](#trying-out-smaller-prompts)
   - [Setting up PromptGuard (optional)](#setting-up-promptguard-optional)
   - [Setting up safety shields (optional)](#setting-up-safety-shields-optional)
+  - [Session level observability with Langfuse (optional)](#session-level-observability-with-langfuse-optional)
   - [What you've accomplished](#what-youve-accomplished)
   - [Recommended next steps](#recommended-next-steps)
   - [Delete](#delete)
@@ -92,8 +93,10 @@ By the end of this quickstart, you will have:
 - (Optional) Slack integration for real-time user conversations
 - (Optional) Email integration for asynchronous notifications
 - (Optional) ServiceNow integration for real ticket creation
+- (Optional) Experience with different prompt configurations (big vs. multi-part prompts)
 - (Optional) PromptGuard for prompt injection protection
 - (Optional) Safety shields for content moderation
+- (Optional) Langfuse for session-level observability of multi-turn conversations
 - Understanding of how to customize for your own use cases
 
 #### Key technologies you'll learn
@@ -1661,15 +1664,123 @@ For comprehensive safety shields documentation, see the [Safety Shields Guide](g
 
 ---
 
+### Session level observability with Langfuse (optional)
+
+The earlier section on OpenTelemetry integration showed you how to capture traces for each
+request/response turn in a conversation. However, viewing these individual traces doesn't easily
+show you the complete multi-turn conversation flow. This is where tools like
+[Langfuse](https://github.com/langfuse/langfuse) excel—they're specifically designed for
+session-level observability of complete conversations.
+
+Ideally, these tools would consume the OpenTelemetry traces we're already collecting. Unfortunately,
+most session observability tools today require their own custom instrumentation.
+
+In the case of Langfuse, for example, while it uses OpenTelemetry to capture information, the
+application needs to be instrumented specifically for Langfuse to be able to view traces (or at least
+to do it easily).
+
+First, deploy with Langfuse enabled:
+
+```bash
+export LANGFUSE_ENABLED=true
+make helm-uninstall NAMESPACE=$NAMESPACE
+make helm-install-test NAMESPACE=$NAMESPACE
+```
+
+You will notice that an additional link is provided once the deployment is completed.
+It will look something like this:
+
+```
+Langfuse URL: https://self-service-agent-langfuse-{your cluster}
+```
+
+Follow that link, and you should see a login screen that looks like the following:
+
+
+![Langfuse login](docs/images/langfuse-login.png)
+
+Log in with
+
+* **email:** admin@example.com
+* **password:** langgraph_password
+
+and then select "Go to project" under the "Self Service Agent" organization:
+
+![Langfuse organization](docs/images/langfuse-organization.png)
+
+At this point, you will see that there are zero traces. Next, generate two conversations
+so that we will be able to review the traces and sessions with:
+
+```
+make generate-two-sessions
+```
+
+Once the two conversations are generated, select the `Tracing` option under the Observability
+section:
+
+![Langfuse traces](docs/images/langfuse-traces-1.png)
+
+You should now see a number of traces. Each of these traces will be for one of
+the turns in the multi-turn conversations.
+
+Select one of the traces. This will show you more detailed information
+for the trace including the LangGraph graph and the full message history
+up to the point where that trace was captured.
+
+![Langfuse trace](docs/images/langfuse-tracing-2.png)
+
+The information, however, will only be for one of the traces in the multi-turn
+conversation. Now, select the Sessions entry under the Observability section:
+
+![Langfuse sessions](docs/images/langfuse-sessions-1.png)
+
+Of particular interest is that we can see which user a session was associated
+with as a quick way to find sessions that may be related to issues reported by end users.
+
+Select one of the sessions that has 4 traces in it. This will show you
+all of the traces associated with a multi-turn session and allow you to
+dig into the details for each of the traces. At this point,
+we have the full picture of the multi-turn conversation between the
+user and the agent!
+
+![Langfuse session](docs/images/langfuse-sessions-2.png)
+
+If you generate new conversations, traces will be shown in the UI in real-time
+so you can follow a "live" session if you are working with a user that is
+still interacting with the agent.
+
+You can now explore the rest of the Langfuse UI to see what kinds of information
+you can get on conversations after they have run.
+
+Once you are done, clean up by running:
+
+```
+export LANGFUSE_ENABLED=false
+make helm-uninstall NAMESPACE=$NAMESPACE
+```
+
+---
+
 ### What you've accomplished
 
 By completing this quickstart, you have:
 
+**Core Platform:**
 - ✓ Deployed a fully functional AI agent system on OpenShift
 - ✓ Understood the core platform architecture and components
-- ✓ Tested the laptop refresh agent through multiple channels
-- ✓ Run evaluations to validate agent behavior
+- ✓ Tested the laptop refresh agent via CLI
+- ✓ Run evaluations to validate agent behavior and quality metrics
+- ✓ Explored distributed tracing with OpenTelemetry and Jaeger
 - ✓ Learned how to customize the system for your own use cases
+
+**Optional Integrations (if completed):**
+- ✓ Integrated with Slack for real-time user conversations
+- ✓ Integrated with ServiceNow for real ticket creation and management
+- ✓ Configured email integration for asynchronous communication
+- ✓ Explored different prompt configurations (big vs. multi-part prompts)
+- ✓ Set up PromptGuard for prompt injection protection
+- ✓ Configured safety shields for content moderation
+- ✓ Deployed Langfuse for session-level observability of multi-turn conversations
 
 ### Recommended next steps
 

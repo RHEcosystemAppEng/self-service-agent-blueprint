@@ -323,6 +323,7 @@ help:
 	@echo "  test-short-resp-integration-request-mgr - Run short responses integration tests with Request Manager"
 	@echo "  test-long-resp-integration-request-mgr - Run long responses integration tests with Request Manager"
 	@echo "  test-long-concurrent-integration-request-mgr - Run long concurrent responses integration tests with Request Manager (concurrency=4)"
+	@echo "  generate-two-sessions                   - Generate two sessions: one for alice.johnson@company.com and one for ahmed.hassan@company.com"
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  format                              - Run isort import sorting and Black formatting on entire codebase"
@@ -1223,6 +1224,12 @@ test-long-concurrent-integration-request-mgr:
 	@echo "Running long concurrent responses integration test with Request Manager..."
 	uv --directory evaluations run evaluate.py -n 10 --test-script chat-responses-request-mgr.py --reset-conversation --timeout=1800 --concurrency 4 --message-timeout 120 $(VALIDATE_LAPTOP_DETAILS_FLAG) $(STRUCTURED_OUTPUT_FLAG)
 	@echo "long concurrent responses integrations tests with Request Manager completed successfully!"
+
+.PHONY: generate-two-sessions
+generate-two-sessions:
+	@echo "Generating session"
+	uv --directory evaluations run generator.py 2 --test-script chat-responses-request-mgr.py --reset-conversation $(STRUCTURED_OUTPUT_FLAG)
+	@echo "Two sessions generated successfully!"
 
 # Create namespace and deploy
 namespace:
