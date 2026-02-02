@@ -189,18 +189,15 @@ def _create_conversation_golden(
 
     if use_structured_output:
         # for models with structured output like Gemini
-        # # Use FUTURE tense - Gemini struggles with past tense (assumes context already exists)
         scenario = "An Employee wants to refresh their laptop.The user will ask for help. The agent will show them a list to choose from. They will select the appropriate laptop and a service now ticket number will be returned."
-        user_description = "user who tries to answer the asssitants last question"
     else:
         # for models without structured output like Llama
         scenario = "An Employee wants to refresh their laptop. The agent shows them a list they can choose from, they select the appropriate laptop and a service now ticket number is returned."
-        user_description = "user who tries to answer the asssitants last question"
 
     conversation_golden = ConversationalGolden(
         scenario=scenario,
         expected_outcome="They get a Service now ticket number for their refresh request",
-        user_description=user_description,
+        user_description="user who tries to answer the asssitants last question",
     )
 
     return conversation_golden
