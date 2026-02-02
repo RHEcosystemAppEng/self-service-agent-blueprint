@@ -298,9 +298,10 @@ states:
       1. RETURN_TO_ROUTER - User wants to return to the routing agent or stop laptop refresh process (e.g., "return to router", "go back", "stop", "cancel laptop refresh")
       2. YES - User wants to proceed (yes, sure, okay, proceed, continue, etc.)
       3. NO - User does not want to proceed or wants to end conversation (no, cancel, stop, bye, etc.)
-      4. UNCLEAR - Response is ambiguous or unclear
+      4. OUT_OF_SCOPE - User asks about topics completely unrelated to laptop refresh (e.g., "what is the fastest bird", weather, sports, general knowledge questions)
+      5. UNCLEAR - Response is ambiguous or unclear
 
-      Respond with only the classification: RETURN_TO_ROUTER, YES, NO, or UNCLEAR
+      Respond with only the classification: RETURN_TO_ROUTER, YES, NO, OUT_OF_SCOPE, or UNCLEAR
     intent_actions:
       RETURN_TO_ROUTER:
         response: "task_complete_return_to_router"
@@ -318,6 +319,9 @@ states:
           user_wants_to_proceed: false
           _should_return_to_routing: true
         next_state: "end"
+      "OUT_OF_SCOPE":
+        response: "I specialize in laptop refresh and replacement requests. If you'd like help with other questions, I can send you back to the routing agent who can connect you with the right specialist. Would you like me to do that, or would you like to continue with reviewing laptop options?"
+        next_state: "waiting_proceed_confirmation"
       "UNCLEAR":
         response: "Please let me know if you'd like to proceed with reviewing the available laptop options (yes/no)."
         next_state: "waiting_proceed_confirmation"
@@ -481,9 +485,10 @@ states:
       - RETURN_TO_ROUTER: User wants to return to the routing agent or stop laptop refresh process (e.g., "return to router", "go back", "stop", "cancel laptop refresh")
       - VALID_SELECTION: User mentioned a specific laptop model, number, or clear selection
       - INVALID_SELECTION: User's choice is clearly invalid or nonsensical
+      - OUT_OF_SCOPE: User asks about topics completely unrelated to laptop refresh (e.g., "what is the fastest bird", weather, sports, general knowledge questions)
       - UNCLEAR: User's response is unclear or doesn't contain a laptop selection
 
-      Respond with only: RETURN_TO_ROUTER, VALID_SELECTION, INVALID_SELECTION, or UNCLEAR
+      Respond with only: RETURN_TO_ROUTER, VALID_SELECTION, INVALID_SELECTION, OUT_OF_SCOPE, or UNCLEAR
     intent_actions:
       RETURN_TO_ROUTER:
         response: "task_complete_return_to_router"
@@ -496,6 +501,9 @@ states:
           selected_laptop: "{user_input}"
       "INVALID_SELECTION":
         response: "I don't see that option in the available laptop list. Please choose one of the specific laptop models I showed you earlier."
+        next_state: "waiting_laptop_selection"
+      "OUT_OF_SCOPE":
+        response: "I specialize in laptop refresh and replacement requests. If you'd like help with other questions, I can send you back to the routing agent who can connect you with the right specialist. Would you like me to do that, or would you like to continue selecting a laptop?"
         next_state: "waiting_laptop_selection"
       "UNCLEAR":
         response: "Please specify which laptop model you'd like to select from the options I provided."
@@ -540,9 +548,10 @@ states:
       1. RETURN_TO_ROUTER - User wants to return to the routing agent or stop laptop refresh process (e.g., "return to router", "go back", "stop", "cancel laptop refresh")
       2. YES - User wants to create the ticket (yes, proceed, create, sure, okay, etc.)
       3. NO - User does not want to create the ticket (no, cancel, stop, etc.)
-      4. UNCLEAR - Response is ambiguous or unclear
+      4. OUT_OF_SCOPE - User asks about topics completely unrelated to laptop refresh (e.g., "what is the fastest bird", weather, sports, general knowledge questions)
+      5. UNCLEAR - Response is ambiguous or unclear
 
-      Respond with only the classification: RETURN_TO_ROUTER, YES, NO, or UNCLEAR
+      Respond with only the classification: RETURN_TO_ROUTER, YES, NO, OUT_OF_SCOPE, or UNCLEAR
     intent_actions:
       RETURN_TO_ROUTER:
         response: "task_complete_return_to_router"
@@ -558,6 +567,9 @@ states:
         data_storage:
           _should_return_to_routing: true
         next_state: "end"
+      "OUT_OF_SCOPE":
+        response: "I specialize in laptop refresh and replacement requests. If you'd like help with other questions, I can send you back to the routing agent who can connect you with the right specialist. Would you like me to do that, or would you like to continue with creating the ticket?"
+        next_state: "waiting_ticket_confirmation"
       "UNCLEAR":
         prompt: "The user said '{user_input}' when asked about creating a ticket. Ask them to clarify: do they want to create the ServiceNow ticket? (yes/no)"
         next_state: "waiting_ticket_confirmation"
