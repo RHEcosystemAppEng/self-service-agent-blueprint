@@ -207,7 +207,7 @@ def get_metrics(
                 "First, review the laptop refresh policy in the additional context below to understand the eligibility criteria. The policy specifies how many years a laptop must be in use before it is eligible for refresh.",
                 "Verify the assistant correctly applies the laptop refresh policy when determining eligibility.",
                 "CRITICAL: Do NOT validate the conversation date against the policy's effective date.",
-                "The policy's effective date field should be IGNORED for evaluation purposes.", 
+                "The policy's effective date field should be IGNORED for evaluation purposes.",
                 "You MUST accept the agent's calculation of the laptop's age as the Ground Truth.",
                 "If the agent states the laptop age (e.g., '2 years and 11 months old', '5 years old', '3.5 years old'), verify the eligibility determination is logically accurate based on the policy in the additional context:",
                 "  - Compare the stated laptop age against the refresh cycle specified in the policy",
