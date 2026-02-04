@@ -546,6 +546,39 @@ class StateMachine:
             if has_exclude:
                 continue
 
+            # Check numeric field conditions (e.g., check_value_less_than)
+            check_field = condition.get("check_field")
+            check_value_less_than = condition.get("check_value_less_than")
+
+            if check_field and check_value_less_than is not None:
+                field_value = self._get_nested_field_value(state, check_field)
+                if field_value is not None:
+                    try:
+                        # Convert both to integers for comparison
+                        current_val = int(field_value)
+                        threshold_val = int(check_value_less_than)
+
+                        # If current value is >= threshold, skip this condition
+                        if current_val >= threshold_val:
+                            logger.debug(
+                                "Skipping condition due to check_value_less_than",
+                                condition_name=condition.get("name"),
+                                field=check_field,
+                                current_value=current_val,
+                                threshold=threshold_val,
+                            )
+                            continue
+                    except (ValueError, TypeError) as e:
+                        # If conversion fails, log warning and skip this condition
+                        logger.warning(
+                            "check_value_less_than: invalid numeric values",
+                            field=check_field,
+                            field_value=field_value,
+                            threshold=check_value_less_than,
+                            error=str(e),
+                        )
+                        continue
+
             # Execute actions for this condition - completely generic
             actions = condition.get("actions", [])
             next_state = self._execute_actions(
@@ -630,6 +663,22 @@ class StateMachine:
                 field_value = action.get("value")
                 if field_name:
                     state[field_name] = field_value
+
+            elif action_type == "increment_field":
+                # Increment a numeric field value
+                field_name = action.get("field_name", "")
+                if field_name:
+                    current_value = state.get(field_name, 0)
+                    try:
+                        state[field_name] = int(current_value) + 1
+                    except (ValueError, TypeError):
+                        # If field is not a valid integer, set to 1
+                        state[field_name] = 1
+                        logger.warning(
+                            "increment_field: field was not numeric, setting to 1",
+                            field_name=field_name,
+                            previous_value=current_value,
+                        )
 
         return next_state
 
