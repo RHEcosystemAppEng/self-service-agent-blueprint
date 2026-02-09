@@ -332,8 +332,6 @@ def get_metrics(
                 [
                     "First, identify the user's location from the conversation (NA, EMEA, APAC, or LATAM).",
                     "Then, look for where the agent presents laptop options to the user in the conversation.",
-                    "CRITICAL: IGNORE the user's CURRENT laptop information shown at the beginning of the conversation (from get_employee_laptop_info tool). This shows their OLD laptop being replaced, NOT a refresh option.",
-                    "Focus ONLY on the laptop models presented as options for selection (typically shown after the user confirms they want to see options).",
                     "IMPORTANT: If the conversation includes a return-to-router pattern (user asks out-of-scope question, returns to routing agent, then restarts laptop refresh), use the LAST/FINAL presentation of laptop options for evaluation, not the initial one.",
                     "Count how many distinct laptop models are presented by the agent in the final laptop presentation. Look for laptop model names like 'MacBook Air M2', 'MacBook Pro 16 M3 Max', 'ThinkPad T14s Gen 5 AMD', 'ThinkPad P16 Gen 2', etc.",
                     "Compare the count of laptop models presented against the total number of laptop models available for that location in the additional context below. For EMEA, there should be exactly 4 laptop models. For NA, APAC, and LATAM, there should also be exactly 4 laptop models each.",
@@ -357,8 +355,6 @@ def get_metrics(
                 [
                     "First, identify the user's location from the conversation (NA, EMEA, APAC, or LATAM).",
                     "Then, look for where the agent presents laptop options to the user in the conversation.",
-                    "CRITICAL: IGNORE the user's CURRENT laptop information shown at the beginning of the conversation (from get_employee_laptop_info tool). This shows their OLD laptop being replaced, NOT a refresh option.",
-                    "Focus ONLY on the laptop models presented as options for selection (typically shown after the user confirms they want to see options).",
                     "IMPORTANT: If the conversation includes a return-to-router pattern (user asks out-of-scope question, returns to routing agent, then restarts laptop refresh), use the LAST/FINAL presentation of laptop options for evaluation, not the initial one.",
                     "Count how many distinct laptop models are presented by the agent in the final laptop presentation. Look for laptop model names like 'MacBook Air M2', 'MacBook Pro 16 M3 Max', 'ThinkPad T14s Gen 5 AMD', 'ThinkPad P16 Gen 2', etc.",
                     "Compare the count of laptop models presented against the total number of laptop models available for that location in the additional context below. For EMEA, there should be exactly 4 laptop models. For NA, APAC, and LATAM, there should also be exactly 4 laptop models each.",

@@ -189,15 +189,17 @@ def _create_conversation_golden(
 
     if use_structured_output:
         # for models with structured output like Gemini
-        scenario = "An Employee wants to refresh their laptop.The user will ask for help. The agent will show them a list to choose from. They will select the appropriate laptop and a service now ticket number will be returned."
+        scenario = "An Employee wants to refresh their laptop. The user initiates the conversation by asking to refresh their laptop. Then, if the agent provides a list of options, the user selects the appropriate laptop."
+        user_description = "An employee interacting with an IT self-service agent."
     else:
         # for models without structured output like Llama
         scenario = "An Employee wants to refresh their laptop. The agent shows them a list they can choose from, they select the appropriate laptop and a service now ticket number is returned."
+        user_description = "user who tries to answer the asssitants last question"
 
     conversation_golden = ConversationalGolden(
         scenario=scenario,
         expected_outcome="They get a Service now ticket number for their refresh request",
-        user_description="user who tries to answer the asssitants last question",
+        user_description=user_description,
     )
 
     return conversation_golden
