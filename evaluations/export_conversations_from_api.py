@@ -28,6 +28,7 @@ Usage:
   uv run export_conversations_from_api.py -n 20
   NAMESPACE=tommy uv run export_conversations_from_api.py -n 10
   uv run export_conversations_from_api.py -n 5 --namespace tommy --user-email user@example.com
+  uv run export_conversations_from_api.py -n 20 --start-date 2026-01-01T00:00:00Z --end-date 2026-01-31T23:59:59Z
 """
 
 import argparse
@@ -60,6 +61,14 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--user-email", help="Filter by user email")
     parser.add_argument("--user-id", help="Filter by user ID")
     parser.add_argument("--session-id", help="Filter by session ID")
+    parser.add_argument(
+        "--start-date",
+        help="Filter from date; ISO 8601 format (e.g., 2026-01-01T00:00:00Z)",
+    )
+    parser.add_argument(
+        "--end-date",
+        help="Filter to date; ISO 8601 format (e.g., 2026-01-31T23:59:59Z)",
+    )
     parser.add_argument(
         "--no-messages",
         action="store_true",
@@ -184,6 +193,10 @@ def _fetch_via_exec(args: argparse.Namespace) -> dict[str, Any] | None:
         cmd.extend(["--session-id", args.session_id])
     if args.agent_id:
         cmd.extend(["--agent-id", args.agent_id])
+    if args.start_date:
+        cmd.extend(["--start-date", args.start_date])
+    if args.end_date:
+        cmd.extend(["--end-date", args.end_date])
     if args.no_messages:
         cmd.append("--no-messages")
     if args.random:

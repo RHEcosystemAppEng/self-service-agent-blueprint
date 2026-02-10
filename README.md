@@ -31,6 +31,7 @@ Transform IT service delivery using AI to lower support effort, improve complian
   - [Setting up PromptGuard (optional)](#setting-up-promptguard-optional)
   - [Setting up safety shields (optional)](#setting-up-safety-shields-optional)
   - [Session level observability with Langfuse (optional)](#session-level-observability-with-langfuse-optional)
+  - [Post-run audit and evaluations (optional)](#post-run-audit-and-evaluations-optional)
   - [What you've accomplished](#what-youve-accomplished)
   - [Recommended next steps](#recommended-next-steps)
   - [Delete](#delete)
@@ -1761,6 +1762,140 @@ make helm-uninstall NAMESPACE=$NAMESPACE
 ```
 
 ---
+### Post-run audit and evaluations (optional)
+
+The section on evaluations provided insight on how to validate conversations
+as you develop and update the application. The section on Langfuse demonstrated
+how you can view either live or past conversations in a user interface to manually
+review them, likely when reported by an end user as being sub-optimal. The final
+step is to regularly audit and evaluate conversations to ensure real-life
+conversations are performing as expected.
+
+The quickstart supports automating the audit and evaluation process through the
+[evaluations/export_conversations_from_api.py](https://github.com/rh-ai-quickstart/it-self-service-agent/blob/dev/evaluations/export_conversations_from_api.py)
+script which allows you to export a subset of the conversations that
+have taken place.
+
+It supports the following options which control what conversations are exported:
+
+1) Controlling the conversations which are exported.
+
+   * -n NUM_CONVERSATIONS
+   * --offset OFFSET
+   * --start-date START_DATE
+   * --end-date END_DATE
+   * --random
+   * --no-random
+
+   These allow you to specify how many conversations to get, which conversation to
+   start at, and whether to select all conversations or a random subset. As a concrete
+   example, you might want to pull 10 random conversations each day by using a command like
+   the following for a specific day.
+
+```bash
+uv run export_conversations_from_api.py -n 10 --random --start-date=2026-01-02T00:00:00Z --end-date=2026-01-02T00:00:00Z
+```
+
+2) Filters to limit to a specific agent, user, or session:
+
+  * --agent-id AGENT_ID
+  * --user-email USER_EMAIL
+  * --user-id USER_ID
+  * --session-id SESSION_ID
+
+  These filters would more often be used to export conversations for users or sessions that
+  have been reported as problematic so that you can review the conversations manually or run
+  evaluations on them.
+
+Exported conversations are saved by default to evaluations/results/conversation_results with the
+prefix `from_api_{session}_{date}_{time}.json`. As a couple of examples:
+
+```
+results/conversation_results/from_api_b7cd85bd_20260210_163542.json
+results/conversation_results/from_api_908fdda5_20260210_163542.json
+```
+
+These files are in the same format as the conversation files generated when running either
+predefined or generated conversations augmented with some additional fields like the session_id.
+This allows them to be evaluated using the deep_eval.py script just like the previously generated
+conversations.
+
+To make it easy to export and evaluate conversations, the evaluate.py script supports the
+--conversation-source option which, when set to `export`, will export and evaluate
+conversations instead of generating them.
+
+Now let's try out the process of pulling a random audit of recent conversations and
+evaluating them.
+
+First let's stop/start the quickstart and clean out the `evaluations/results/conversation_results` directory:
+
+```bash
+make helm-uninstall NAMESPACE=$NAMESPACE
+make helm-install-test NAMESPACE=$NAMESPACE
+rm evaluations/results/conversation_results/success*
+rm evaluations/results/conversation_results/return*
+```
+
+Next let's manually run through a conversation. Start the client and
+complete a conversation similar to ones you did earlier in the quickstart.
+
+```bash
+# Start interactive chat session
+oc exec -it deploy/self-service-agent-request-manager -n $NAMESPACE -- \
+  python test/chat-responses-request-mgr.py \
+  --user-id alice.johnson@company.com
+``` 
+
+Run through the conversation and use CTRL-C to exit once complete.
+
+Next let's export and evaluate the conversation. Since there is only
+one conversation, we won't use the --start-date and --end-date options or
+other filters:
+
+```bash
+cd evaluations/
+
+# Set LLM endpoint for evaluation (can use different model than agent)
+export LLM_API_TOKEN=your-api-token
+export LLM_URL=https://your-evaluation-llm-endpoint
+export LLM_ID=llama-3-3-70b-instruct-w8a8
+
+uv venv
+source .venv/bin/activate
+uv sync
+
+uv run evaluate.py --conversation-source export
+```
+
+Since there is only a single conversation in the system, it should create one
+new file `results/conversation_results/from_api_{session}_{date}_{time}.json` and then
+run the evaluations on that file along with `known_good_flow.json` which is in
+the results directory by default. The evaluations on the exported conversation should
+look something like:
+
+![Evaluations on exported conversation](docs/images/export-evaluations.png)
+
+You can also cat the file to confirm it contains the conversation you just had:
+
+```bash
+cat results/conversation_results/from_api_{session}_{date}_{time}.json
+```
+
+where you substitute in the actual values (or use tab complete) to match your run.
+
+This capability lets you easily configure a cronjob in OpenShift to run once a day to
+extract a random subset of the conversations for that day, run the evaluations on them,
+and then trigger notifications if conversations fail, thus ensuring that real-life
+conversations, just like the ones generated during development, meet the business
+requirements defined by the evaluations.
+
+To finish up, run the following to stop the quickstart:
+
+```bash
+make helm-uninstall NAMESPACE=$NAMESPACE
+```
+
+---
 
 ### What you've accomplished
 
@@ -1782,6 +1917,7 @@ By completing this quickstart, you have:
 - ✓ Set up PromptGuard for prompt injection protection
 - ✓ Configured safety shields for content moderation
 - ✓ Deployed Langfuse for session-level observability of multi-turn conversations
+- ✓ Exported and evaluated conversations for post-run audit and evaluation of conversations
 
 ### Recommended next steps
 

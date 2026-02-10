@@ -14,6 +14,7 @@ Usage:
     python evaluate.py                    # Use default (generate 20 conversations)
     python evaluate.py -n 5              # Generate 5 conversations
     python evaluate.py --conversation-source export -n 20  # Export 20 from API instead of generating
+    python evaluate.py --conversation-source export -n 20 --start-date 2026-01-01T00:00:00Z --end-date 2026-01-31T23:59:59Z  # Export with date filter
     python evaluate.py -n 10 --concurrency 4  # Generate 40 conversations (10 per worker × 4 workers)
 
 Environment Variables:
@@ -576,6 +577,14 @@ def _parse_arguments() -> argparse.Namespace:
         help="Source for evaluation conversations: 'generate' runs generator.py; 'export' runs export_conversations_from_api.py. "
         "Only one runs (default: generate).",
     )
+    parser.add_argument(
+        "--start-date",
+        help="Filter from date when using --conversation-source export; ISO 8601 format (e.g., 2026-01-01T00:00:00Z)",
+    )
+    parser.add_argument(
+        "--end-date",
+        help="Filter to date when using --conversation-source export; ISO 8601 format (e.g., 2026-01-31T23:59:59Z)",
+    )
     return parser.parse_args()
 
 
@@ -892,6 +901,8 @@ def run_evaluation_pipeline(
     validate_full_laptop_details: bool = True,
     use_structured_output: bool = False,
     conversation_source: str = "generate",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
 ) -> int:
     """
     Run the complete evaluation pipeline.
@@ -913,6 +924,8 @@ def run_evaluation_pipeline(
         validate_full_laptop_details: Enable validation of all 15 laptop specification fields (default: True)
         use_structured_output: Enable structured output with Pydantic schema validation (default: False)
         conversation_source: "generate" to run generator.py, "export" to run export_conversations_from_api.py (default: generate)
+        start_date: Filter from date when using conversation_source="export"; ISO 8601 format (e.g., 2026-01-01T00:00:00Z)
+        end_date: Filter to date when using conversation_source="export"; ISO 8601 format (e.g., 2026-01-31T23:59:59Z)
 
     Returns:
         Exit code (0 for success, 1 for any failures)
@@ -991,6 +1004,10 @@ def run_evaluation_pipeline(
             f"📥 Step {step_label}: Exporting up to {num_conversations} conversations from Request Manager API..."
         )
         export_args = ["-n", str(num_conversations)]
+        if start_date:
+            export_args.extend(["--start-date", start_date])
+        if end_date:
+            export_args.extend(["--end-date", end_date])
         if not run_script(
             "export_conversations_from_api.py", args=export_args, timeout=120
         ):
@@ -1093,6 +1110,8 @@ def main() -> int:
                 validate_full_laptop_details=args.validate_full_laptop_details,
                 use_structured_output=args.use_structured_output,
                 conversation_source=args.conversation_source,
+                start_date=args.start_date,
+                end_date=args.end_date,
             )
     except KeyboardInterrupt:
         logger.warning("⚠️  Pipeline interrupted by user")
