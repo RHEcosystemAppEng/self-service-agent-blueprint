@@ -2,6 +2,9 @@
 
 Transform IT service delivery using AI to lower support effort, improve compliance, and increase throughput.
 
+- Blog post with business value overview: [From manual to agentic: streamlining IT processes with Red Hat OpenShift AI](https://www.redhat.com/en/blog/manual-agentic-streamlining-it-processes-red-hat-openshift-ai)
+- Technical insights blog post series: [AI quickstart: Self-service agent for IT process automation](https://developers.redhat.com/articles/2026/01/26/ai-quickstart-self-service-agent-it-process-automation)
+
 ## Table of contents
 
 - [Detailed description](#detailed-description)
