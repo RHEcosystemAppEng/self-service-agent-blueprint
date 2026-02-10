@@ -1212,6 +1212,12 @@ sync-evaluations:
 	uv --directory evaluations sync
 	@echo "Syncing evaluations libraries completed successfully!"
 
+.PHONY: check-known-bad-conversations
+check-known-bad-conversations: sync-evaluations
+	@echo "Running evaluation check on known bad conversations..."
+	uv --directory evaluations run evaluate.py --check
+	@echo "Evaluation check completed successfully!"
+
 .PHONY: test-short-resp-integration-request-mgr
 test-short-resp-integration-request-mgr:
 	@echo "Running short responses integration test with Request Manager..."

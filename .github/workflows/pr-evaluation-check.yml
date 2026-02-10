@@ -1,0 +1,81 @@
+name: Pull Request - Evaluation Check
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+# Cancel any previous runs of this workflow for the same PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  # uv version must match Makefile UV_VERSION (currently 0.8.9)
+  # Update this when UV_VERSION in Makefile changes
+  UV_VERSION: "0.8.9"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  evaluation-check:
+    name: Run evaluation check on known bad conversations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate LLM_API_TOKEN_EVAL secret
+        shell: bash
+        env:
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL }}
+        run: |
+          if [ -z "${LLM_API_TOKEN}" ]; then
+            echo "LLM_API_TOKEN_EVAL secret is missing or empty. Set it in repository or organization secrets."
+            exit 1
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Check uv version matches requirement
+        run: make check-uv-version
+
+      - name: Run evaluation check
+        shell: bash
+        run: make check-known-bad-conversations
+        env:
+          LLM_URL: ${{ vars.LLM_URL_EVAL }}
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL }}
+
+      - name: Create evaluations tarball
+        if: always()
+        shell: bash
+        run: |
+          if [ -d "evaluations/results" ]; then
+            tar -czf evaluations-check-results-${{ github.run_id }}.tar.gz -C evaluations results/
+            echo "Tarball created successfully from evaluations/results/"
+            ls -lh evaluations-check-results-${{ github.run_id }}.tar.gz
+          else
+            echo "evaluations/results directory not found, creating empty marker"
+            mkdir -p evaluations/results
+            echo "No evaluation results were generated" > evaluations/results/README.txt
+            tar -czf evaluations-check-results-${{ github.run_id }}.tar.gz -C evaluations results/
+          fi
+
+      - name: Upload evaluations artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluations-check-results-${{ github.run_id }}
+          path: evaluations-check-results-${{ github.run_id }}.tar.gz
+          retention-days: 30
+          if-no-files-found: warn
