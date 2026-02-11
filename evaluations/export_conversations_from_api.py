@@ -26,7 +26,7 @@ Uses the same -n/--num-conversations as the pipeline.
 Usage:
   # Default: kubectl exec into request-manager pod (set NAMESPACE or use --namespace)
   uv run export_conversations_from_api.py -n 20
-  NAMESPACE=tommy uv run export_conversations_from_api.py -n 10
+  NAMESPACE=<namespace> uv run export_conversations_from_api.py -n 10
   uv run export_conversations_from_api.py -n 5 --namespace tommy --user-email user@example.com
   uv run export_conversations_from_api.py -n 20 --start-date 2026-01-01T00:00:00Z --end-date 2026-01-31T23:59:59Z
 """
