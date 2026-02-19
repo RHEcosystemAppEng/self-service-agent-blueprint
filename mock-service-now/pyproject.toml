@@ -21,6 +21,7 @@ dependencies = [
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.24.0",
     "pydantic>=2.0.0",
+    "orjson>=3.11.7",
     "requests>=2.31.0",
     "mock-employee-data",
     "self-service-agent-shared-models",

@@ -6,10 +6,12 @@ ARG USE_PIP_INSTALL=false
 ARG UV_VERSION=0.8.9
 
 # Builder stage
-FROM registry.access.redhat.com/ubi9/python-312:latest as builder
+# Use 9.7 tag for glibc >= 2.34-231.el9_7.10
+FROM registry.access.redhat.com/ubi9/python-312:9.7 as builder
 
 USER root
-# Install uv version (defaults to 0.8.9 to match CI, can be overridden via --build-arg UV_VERSION=<version>)
+# Ensure pip is at least 26.0, then install uv (defaults to 0.8.9 to match CI, can be overridden via --build-arg UV_VERSION=<version>)
+RUN pip3 install --upgrade 'pip>=26.0'
 ARG UV_VERSION
 RUN pip3 install --no-cache-dir uv==${UV_VERSION}
 
@@ -42,7 +44,8 @@ RUN if [ "$USE_PIP_INSTALL" = "true" ]; then \
     fi
 
 # Production stage
-FROM registry.access.redhat.com/ubi9/python-312-minimal:latest
+# Use 9.7 tag for glibc >= 2.34-231.el9_7.10
+FROM registry.access.redhat.com/ubi9/python-312-minimal:9.7
 
 WORKDIR /app
 
