@@ -209,6 +209,9 @@ helm_generic_args = \
 	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set otelExporter=$(OTEL_EXPORTER_OTLP_ENDPOINT),) \
 	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set llama-stack.otelExporter=$(OTEL_EXPORTER_OTLP_ENDPOINT),) \
 	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set-string llama-stack.secrets.OTEL_SERVICE_NAME=llamastack,) \
+	$(if $(findstring jaeger,$(OTEL_EXPORTER_OTLP_ENDPOINT)),--set-string llama-stack.secrets.OTEL_METRICS_EXPORTER=none,) \
+	$(if $(findstring jaeger,$(OTEL_EXPORTER_OTLP_ENDPOINT)),--set-string llama-stack.secrets.OTEL_LOGS_EXPORTER=none,) \
+	$(if $(findstring jaeger,$(OTEL_EXPORTER_OTLP_ENDPOINT)),--set-string llama-stack.secrets.OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,) \
 	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set mcp-servers.mcp-servers.self-service-agent-snow.env.OTEL_EXPORTER_OTLP_ENDPOINT="$(OTEL_EXPORTER_OTLP_ENDPOINT)")
 
 helm_replica_count_args = \
