@@ -208,6 +208,7 @@ helm_request_management_args = \
 helm_generic_args = \
 	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set otelExporter=$(OTEL_EXPORTER_OTLP_ENDPOINT),) \
 	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set llama-stack.otelExporter=$(OTEL_EXPORTER_OTLP_ENDPOINT),) \
+	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set 'llama-stack.env[0].name=RUN_CONFIG_PATH' --set 'llama-stack.env[0].value=/app-config/config.yaml' --set 'llama-stack.env[1].name=OTEL_SERVICE_NAME' --set 'llama-stack.env[1].value=llamastack',) \
 	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set mcp-servers.mcp-servers.self-service-agent-snow.env.OTEL_EXPORTER_OTLP_ENDPOINT="$(OTEL_EXPORTER_OTLP_ENDPOINT)")
 
 helm_replica_count_args = \
