@@ -145,6 +145,8 @@ async def chat_completions(request: ChatCompletionRequest):
             prediction = torch.argmax(probabilities, dim=-1).item()
             confidence = probabilities[0][prediction].item()
 
+        # Translate PromptGuard output to Llama Guard format: "unsafe\nS9" or "safe"
+        # S9 maps prompt injection attacks to Llama Guard's category system to catch the malicious intent.
         result = "unsafe\nS9" if prediction == 1 else "safe"
         completion_tokens = tokenizer(result, return_tensors="pt")["input_ids"].shape[1]
 
