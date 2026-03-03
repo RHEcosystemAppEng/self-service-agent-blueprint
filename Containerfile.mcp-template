@@ -6,7 +6,7 @@ ARG USE_PIP_INSTALL=false
 ARG UV_VERSION=0.8.9
 
 # Builder stage
-# Use 9.7 tag for glibc >= 2.34-231.el9_7.10
+# Use 9.7 tag for glibc >= 2.34-231.el9_7.10 
 FROM registry.access.redhat.com/ubi9/python-312:9.7 as builder
 
 USER root
