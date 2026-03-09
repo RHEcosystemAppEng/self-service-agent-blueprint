@@ -49,6 +49,7 @@ from .schemas import (
     SlackRequest,
     ToolRequest,
     WebRequest,
+    ZammadRequest,
 )
 
 # Configure structured logging and auto tracing
@@ -788,7 +789,7 @@ async def _handle_request_created_event_from_data(
         }
 
         # Create request object based on integration type
-        request: Union[SlackRequest, EmailRequest]
+        request: Union[SlackRequest, EmailRequest, ZammadRequest]
         if integration_type == IntegrationType.SLACK:
             slack_user_id = request_data.get("slack_user_id") or user_id
             slack_team_id = request_data.get("slack_team_id", "")
@@ -816,6 +817,43 @@ async def _handle_request_created_event_from_data(
                 email_message_id=request_data.get("email_message_id"),
                 email_in_reply_to=request_data.get("email_in_reply_to"),
                 email_references=request_data.get("email_references"),
+            )
+        elif integration_type == IntegrationType.ZAMMAD:
+            ticket_id = request_data.get("ticket_id")
+            article_id = request_data.get("article_id")
+            group_id = request_data.get("group_id")
+            zammad_delivery_id = request_data.get("zammad_delivery_id")
+            created_by_id = request_data.get("created_by_id")
+            if (
+                ticket_id is None
+                or article_id is None
+                or group_id is None
+                or not zammad_delivery_id
+                or created_by_id is None
+            ):
+                logger.error(
+                    "Missing required Zammad fields in request event data",
+                    ticket_id=ticket_id,
+                    article_id=article_id,
+                    group_id=group_id,
+                    zammad_delivery_id=bool(zammad_delivery_id),
+                    created_by_id=created_by_id,
+                )
+                return await create_cloudevent_response(
+                    status="error",
+                    message="Missing required Zammad fields (ticket_id, article_id, group_id, zammad_delivery_id, created_by_id)",
+                    details={"event_id": event_id},
+                )
+            request = ZammadRequest(
+                **base_fields,
+                request_type=request_data.get("request_type", "zammad_ticket_article"),
+                ticket_id=int(ticket_id),
+                article_id=int(article_id),
+                group_id=int(group_id),
+                group_name=request_data.get("group_name"),
+                owner_id=request_data.get("owner_id"),
+                created_by_id=int(created_by_id),
+                zammad_delivery_id=str(zammad_delivery_id),
             )
         else:
             logger.warning(

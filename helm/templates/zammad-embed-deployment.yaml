@@ -1,0 +1,57 @@
+{{- if and .Values.zammad.enabled .Values.zammad.embedPage.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-zammad-embed
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zammad-embed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "self-service-agent.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: zammad-embed
+  template:
+    metadata:
+      labels:
+        {{- include "self-service-agent.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: zammad-embed
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: nginx
+        image: nginxinc/nginx-unprivileged:alpine
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        volumeMounts:
+        - name: embed-content
+          mountPath: /usr/share/nginx/html
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+      volumes:
+      - name: embed-content
+        configMap:
+          name: {{ include "self-service-agent.fullname" . }}-zammad-embed
+      - name: tmp
+        emptyDir: {}
+{{- end }}

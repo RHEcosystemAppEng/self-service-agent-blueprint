@@ -1,6 +1,6 @@
 # Makefile for RAG Deployment
 ifeq ($(NAMESPACE),)
-ifneq (,$(filter namespace install uninstall helm-install-test helm-install-prod helm-install-demo helm-export-demo helm-export-validate-demo ansible-apply-demo ansible-teardown-demo helm-uninstall helm-status helm-cleanup-eventing helm-cleanup-jobs deploy-email-server undeploy-email-server print-urls verify-triggers jaeger-deploy jaeger-undeploy test-session-serialization-integration test-session-reclaim-integration test-session-background-reclaim-integration,$(MAKECMDGOALS)))
+ifneq (,$(filter namespace install uninstall helm-install-test helm-install-prod helm-install-demo helm-install-ticketing helm-export-demo helm-export-validate-demo ansible-apply-demo ansible-teardown-demo helm-uninstall helm-status helm-cleanup-eventing helm-cleanup-jobs deploy-email-server undeploy-email-server deploy-zammad undeploy-zammad zammad-set-token zammad-bootstrap-token zammad-trigger-autowizard zammad-update-embed-url print-urls verify-triggers jaeger-deploy jaeger-undeploy test-session-serialization-integration test-session-reclaim-integration test-session-background-reclaim-integration,$(MAKECMDGOALS)))
 $(error NAMESPACE is not set)
 endif
 endif
@@ -239,6 +239,18 @@ helm_demo_email_args = \
 	--set-string security.email.smtpHost=test-email-server-smtp.$(NAMESPACE).svc.cluster.local \
 	--set-string security.email.imapHost=test-email-server-imap.$(NAMESPACE).svc.cluster.local
 
+# Ticketing: Zammad in-cluster URL and MCP secret wiring (exec bootstrap uses railsserver)
+ZAMMAD_CREDENTIALS_SECRET ?= $(MAIN_CHART_NAME)-zammad-credentials
+ZAMMAD_ADMIN_EMAIL ?= admin@zammad.local
+ZAMMAD_ADMIN_PASSWORD ?= ZammadR0cks!
+ZAMMAD_AUTOWIZARD_TOKEN ?= ssa-zammad-autowizard-9f3a2b1c
+helm_ticketing_args = \
+	--set zammad.url=$(ZAMMAD_URL) \
+	--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_URL.name=$(ZAMMAD_CREDENTIALS_SECRET) \
+	--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_URL.key=zammad-url \
+	--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_HTTP_TOKEN.name=$(ZAMMAD_CREDENTIALS_SECRET) \
+	--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_HTTP_TOKEN.key=zammad-http-token
+
 # Version target
 .PHONY: version
 version:
@@ -264,6 +276,7 @@ help:
 	@echo "  helm-install-test                   - Install with mock eventing service (testing/development/CI - default)"
 	@echo "  helm-install-prod                   - Install with full Knative eventing (production)"
 	@echo "  helm-install-demo                  - Install demo config (mock eventing, Greenmail, resource constraints)"
+	@echo "  helm-install-ticketing             - Install with ticketing channel (Zammad + MCP; one-shot deploy)"
 	@echo "  helm-export-demo                    - Export demo manifests to ansible/helm-export/ (from NAMESPACE, VERSION, REGISTRY, SERVICENOW_*, etc.)"
 	@echo "  helm-export-validate-demo           - Export then validate with kubeconform (no cluster; CI)"
 	@echo "  ansible-apply-demo                  - Export then apply demo via Ansible (requires ansible-playbook)"
@@ -353,6 +366,12 @@ help:
 	@echo "Test Email Server Commands:"
 	@echo "  deploy-email-server                 - Deploy test email server (Greenmail with custom UI)"
 	@echo "  undeploy-email-server               - Remove test email server from namespace"
+	@echo "  deploy-zammad                       - Deploy Zammad instance (prerequisite for ticketing channel)"
+	@echo "  undeploy-zammad                     - Remove Zammad instance from namespace"
+	@echo "  zammad-set-token                    - Set Zammad API token in secret and restart MCP (ZAMMAD_TOKEN=xxx, NAMESPACE=)"
+	@echo "  zammad-bootstrap-token              - Create API token via Zammad API (autoWizard admin); update secret and restart MCP"
+	@echo "  zammad-trigger-autowizard           - Trigger autoWizard via HTTP (run before bootstrap if 401)"
+	@echo "  zammad-update-embed-url             - Update embed page with Zammad Route URL (fixes YOUR-ZAMMAD-URL placeholder)"
 	@echo ""
 	@echo "Lockfile Management:"
 	@echo "  check-lockfiles                     - Check if all uv.lock files are up-to-date"
@@ -1546,6 +1565,115 @@ helm-install-demo: namespace helm-depend deploy-email-server
 		true)
 	@$(MAKE) print-urls
 
+# Install with ticketing channel (Zammad + MCP).
+# Order: install our chart first (creates Route), deploy Zammad with FQDN from Route, then bootstrap token.
+# Zammad gets correct FQDN at deploy (passed from Route host).
+.PHONY: helm-install-ticketing
+helm-install-ticketing: namespace helm-depend
+	@echo "Step 1/4: Creating placeholder secret and installing our chart (creates Route)..."
+	@ZAMMAD_URL="http://zammad-nginx.$(NAMESPACE).svc.cluster.local:8080"; \
+	kubectl create secret generic $(ZAMMAD_CREDENTIALS_SECRET) \
+		--from-literal=zammad-url="$$ZAMMAD_URL/api/v1" \
+		--from-literal=zammad-http-token="" \
+		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
+	$(MAKE) _helm-install-ticketing-single ZAMMAD_URL="$$ZAMMAD_URL"
+	@echo "Step 2/4: Getting Route host and deploying Zammad with FQDN..."
+	@ZAMMAD_ROUTE=$$(oc get route ssa-zammad -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null); \
+	if [ -z "$$ZAMMAD_ROUTE" ]; then ZAMMAD_ROUTE=$$(oc get route -n $(NAMESPACE) -l app.kubernetes.io/component=zammad -o jsonpath='{.items[0].spec.host}' 2>/dev/null); fi; \
+	if [ -z "$$ZAMMAD_ROUTE" ]; then ZAMMAD_ROUTE=$$(oc get route -n $(NAMESPACE) -l app.kubernetes.io/instance=zammad -o jsonpath='{.items[0].spec.host}' 2>/dev/null); fi; \
+		if [ -n "$$ZAMMAD_ROUTE" ]; then \
+		echo "Route host: $$ZAMMAD_ROUTE (passing as ZAMMAD_FQDN)"; \
+		$(MAKE) _zammad-patch-embed-configmap NAMESPACE=$(NAMESPACE) ZAMMAD_ROUTE="$$ZAMMAD_ROUTE"; \
+		$(MAKE) deploy-zammad NAMESPACE=$(NAMESPACE) ZAMMAD_FQDN="$$ZAMMAD_ROUTE"; \
+	else \
+		echo "No Route found; deploying Zammad without FQDN (port-forward will work)"; \
+		$(MAKE) deploy-zammad NAMESPACE=$(NAMESPACE); \
+	fi
+	@echo "Step 3/4: Triggering autoWizard and creating API token..."
+	@$(MAKE) zammad-trigger-autowizard NAMESPACE=$(NAMESPACE) 2>/dev/null || true; \
+	ZAMMAD_URL="http://zammad-nginx.$(NAMESPACE).svc.cluster.local:8080"; \
+	ZAMMAD_TOKEN=$$(kubectl get secret $(ZAMMAD_CREDENTIALS_SECRET) -n $(NAMESPACE) -o jsonpath='{.data.zammad-http-token}' 2>/dev/null | base64 -d 2>/dev/null || true); \
+	if [ -z "$$ZAMMAD_TOKEN" ]; then \
+		echo "Creating Zammad API token via exec..."; \
+		ZAMMAD_TOKEN=$$(kubectl exec deploy/zammad-railsserver -n $(NAMESPACE) -- env ZAMMAD_ADMIN_EMAIL='$(ZAMMAD_ADMIN_EMAIL)' ZAMMAD_ADMIN_PASSWORD='$(ZAMMAD_ADMIN_PASSWORD)' ruby -rnet/http -rjson -e 'uri=URI("http://localhost:3000/api/v1/user_access_token");req=Net::HTTP::Post.new(uri);req.basic_auth(ENV["ZAMMAD_ADMIN_EMAIL"],ENV["ZAMMAD_ADMIN_PASSWORD"]);req["Content-Type"]="application/json";req.body=JSON.generate({"name"=>"mcp-agent","permission"=>["admin","ticket.agent"]});res=Net::HTTP.start(uri.hostname,uri.port){|h|h.request(req)};d=JSON.parse(res.body);t=d["token"];t ? puts(t) : ($$stderr.puts("Zammad API #{res.code}: #{res.body[0,500]}");exit 1)' ) || ZAMMAD_TOKEN=""; \
+	fi; \
+	if [ -n "$$ZAMMAD_TOKEN" ]; then \
+		echo "✅ Token created"; \
+		kubectl create secret generic $(ZAMMAD_CREDENTIALS_SECRET) \
+			--from-literal=zammad-url="$$ZAMMAD_URL/api/v1" \
+			--from-literal=zammad-http-token="$$ZAMMAD_TOKEN" \
+			-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
+		echo "Restarting Zammad MCP..."; \
+		kubectl rollout restart deployment/mcp-zammad-mcp -n $(NAMESPACE) 2>/dev/null || true; \
+		kubectl rollout status deployment/mcp-zammad-mcp -n $(NAMESPACE) --timeout=2m 2>/dev/null || true; \
+	else \
+		echo "⚠ Token creation failed (run make zammad-bootstrap-token NAMESPACE=$(NAMESPACE) after completing autoWizard)"; \
+	fi
+	@echo "Step 4/4: Printing checklist..."
+	@$(MAKE) _helm-install-ticketing-print-checklist NAMESPACE=$(NAMESPACE)
+
+.PHONY: _helm-install-ticketing-single
+_helm-install-ticketing-single:
+	@$(call helm_install_common,with ticketing config - Zammad MCP,\
+		-f helm/values-test.yaml \
+		-f helm/values-ticketing.yaml \
+		--set zammad.url=$(ZAMMAD_URL) \
+		--set mcp-servers.mcp-servers.zammad-mcp.enabled=true \
+		--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_URL.name=$(ZAMMAD_CREDENTIALS_SECRET) \
+		--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_URL.key=zammad-url \
+		--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_HTTP_TOKEN.name=$(ZAMMAD_CREDENTIALS_SECRET) \
+		--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_HTTP_TOKEN.key=zammad-http-token \
+		$(PROMPT_OVERRIDES),\
+		true)
+	@$(MAKE) print-urls
+
+# Patch embed ConfigMap with Zammad URL and restart deployment (no helm upgrade)
+.PHONY: _zammad-patch-embed-configmap
+_zammad-patch-embed-configmap: namespace
+	@ZAMMAD_URL="https://$(ZAMMAD_ROUTE)"; \
+	sed "s|__ZAMMAD_URL__|$$ZAMMAD_URL|g" helm/static/zammad-embed-index.html.template > /tmp/zammad-embed-index.$$$$.html; \
+	kubectl create configmap $(MAIN_CHART_NAME)-zammad-embed \
+		--from-file=index.html=/tmp/zammad-embed-index.$$$$.html \
+		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
+	rm -f /tmp/zammad-embed-index.$$$$.html; \
+	kubectl rollout restart deployment/$(MAIN_CHART_NAME)-zammad-embed -n $(NAMESPACE) 2>/dev/null || true; \
+	echo "Embed ConfigMap updated with $$ZAMMAD_URL"
+
+.PHONY: _helm-install-ticketing-print-checklist
+_helm-install-ticketing-print-checklist:
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🎫 Ticketing Channel - Follow-up Steps"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "  1. Get the Zammad URL (Route or port-forward):"
+	@ZAMMAD_ROUTE=$$(oc get route ssa-zammad -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null); \
+	ZAMMAD_EMBED_ROUTE=$$(oc get route ssa-zammad-embed -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null); \
+	if [ -z "$$ZAMMAD_ROUTE" ]; then ZAMMAD_ROUTE=$$(oc get route -n $(NAMESPACE) -l app.kubernetes.io/instance=zammad -o jsonpath='{.items[0].spec.host}' 2>/dev/null); fi; \
+	if [ -n "$$ZAMMAD_ROUTE" ]; then \
+		echo "     Web UI: https://$$ZAMMAD_ROUTE"; \
+		echo "     API:    https://$$ZAMMAD_ROUTE/api/v1"; \
+		if [ -n "$$ZAMMAD_EMBED_ROUTE" ]; then echo "     Embed:  https://$$ZAMMAD_EMBED_ROUTE (copy-paste chat widget code)"; fi; \
+	else \
+		echo "     Port-forward: kubectl port-forward -n $(NAMESPACE) svc/zammad-nginx 8080:8080"; \
+		echo "     Web UI: http://localhost:8080"; \
+		echo "     API:    http://localhost:8080/api/v1"; \
+	fi
+	@echo ""
+	@echo "  2. Zammad FQDN: configured at deploy (from Route host) so Route loads correctly"
+	@echo ""
+	@echo "  3. If token was not auto-created:"
+	@echo "     - make zammad-bootstrap-token NAMESPACE=$(NAMESPACE)"
+	@echo "     - Or create token in Zammad UI, then: make zammad-set-token NAMESPACE=$(NAMESPACE) ZAMMAD_TOKEN=<token>"
+	@echo ""
+	@echo "  4. Enable chat widget: Admin → Channels → Chat (Section 5.3; full flow: chat → agent → reply)"
+	@echo ""
+	@echo "  5. (Optional) Configure webhook trigger: docs/TICKETING_CHANNEL_GAMEPLAN.md Section 5.2"
+	@echo "     If embed page shows YOUR-ZAMMAD-URL: make zammad-update-embed-url NAMESPACE=$(NAMESPACE)"
+	@echo ""
+	@echo "  See docs/TICKETING_CHANNEL_GAMEPLAN.md for full integration steps."
+	@echo ""
+
 # Install with full Knative eventing (production mode)
 .PHONY: helm-install-prod
 helm-install-prod: namespace helm-depend
@@ -1736,8 +1864,11 @@ helm-uninstall:
 	@echo "Step 4: Final cleanup of namespace $(NAMESPACE)..."
 	@$(MAKE) helm-cleanup-jobs
 	@$(MAKE) undeploy-email-server
+	@$(MAKE) undeploy-zammad
 	@echo "Removing ServiceNow credentials secret from $(NAMESPACE)"
 	@kubectl delete secret $(MAIN_CHART_NAME)-servicenow-credentials -n $(NAMESPACE) --ignore-not-found || true
+	@echo "Removing Zammad credentials secret from $(NAMESPACE)"
+	@kubectl delete secret $(ZAMMAD_CREDENTIALS_SECRET) -n $(NAMESPACE) --ignore-not-found || true
 	@echo "Removing pgvector, init job, and LangFuse PVCs from $(NAMESPACE)"
 	@kubectl get pvc -n $(NAMESPACE) -o custom-columns=NAME:.metadata.name 2>/dev/null | grep -E '^(pg.*-data|self-service-agent-init-status|data-self-service-agent-(clickhouse|redis|minio)-.*)' | xargs -I {} kubectl delete pvc -n $(NAMESPACE) {} --ignore-not-found ||:
 	@echo "Deleting remaining pods in namespace $(NAMESPACE)"
@@ -1910,6 +2041,158 @@ undeploy-email-server:
 	@echo "Removing test email server from namespace $(NAMESPACE)..."
 	@kubectl delete -f test-email-server/test-email-server-greenmail.yaml -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true
 	@echo "✅ Test email server removed successfully!"
+
+# Zammad deployment (prerequisite for ticketing channel)
+ZAMMAD_HELM_REPO ?= https://zammad.github.io/zammad-helm
+ZAMMAD_CHART_VERSION ?= 16.0.4
+
+# ZAMMAD_FQDN: when set (e.g. from Route host), passed as extraEnv so Zammad accepts Route requests.
+# Used by helm-install-ticketing which installs our chart first (creates Route), then deploys Zammad.
+.PHONY: deploy-zammad
+deploy-zammad: namespace
+	@echo "Deploying Zammad instance to namespace $(NAMESPACE)..."
+	@echo "This may take 10-15 minutes (Zammad brings elasticsearch, postgresql, redis, memcached)..."
+	@helm repo add zammad $(ZAMMAD_HELM_REPO) 2>/dev/null || helm repo add zammad $(ZAMMAD_HELM_REPO) --force-update
+	@helm repo update zammad
+	@ZAMMAD_UID=$$(kubectl get namespace $(NAMESPACE) -o jsonpath='{.metadata.annotations.openshift\.io/sa\.scc\.uid-range}' 2>/dev/null | cut -d'/' -f1); \
+	ZAMMAD_ARGS="-f helm/values-zammad-deploy.yaml"; \
+	if [ -n "$$ZAMMAD_UID" ]; then \
+		ZAMMAD_ARGS="$$ZAMMAD_ARGS --set securityContext.runAsUser=$$ZAMMAD_UID --set securityContext.runAsGroup=$$ZAMMAD_UID --set securityContext.fsGroup=$$ZAMMAD_UID"; \
+		echo "OpenShift: using namespace UID $$ZAMMAD_UID for restricted SCC"; \
+	fi; \
+	if [ -n "$(ZAMMAD_FQDN)" ]; then \
+		echo "Configuring Zammad FQDN for Route: $(ZAMMAD_FQDN)"; \
+		TMPFQDN=$$(mktemp); \
+		echo "extraEnv:" > $$TMPFQDN; \
+		echo "  - name: ZAMMAD_FQDN" >> $$TMPFQDN; \
+		echo "    value: \"$(ZAMMAD_FQDN)\"" >> $$TMPFQDN; \
+		echo "  - name: ZAMMAD_HTTP_TYPE" >> $$TMPFQDN; \
+		echo "    value: \"https\"" >> $$TMPFQDN; \
+		ZAMMAD_ARGS="$$ZAMMAD_ARGS -f $$TMPFQDN"; \
+	fi; \
+	helm upgrade --install zammad zammad/zammad \
+		--version $(ZAMMAD_CHART_VERSION) \
+		-n $(NAMESPACE) \
+		$$ZAMMAD_ARGS \
+		--timeout 20m \
+		--wait; \
+	if [ -n "$(ZAMMAD_FQDN)" ] && [ -n "$$TMPFQDN" ]; then rm -f $$TMPFQDN; fi
+	@echo ""
+	@echo "✅ Zammad instance deployed successfully!"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🎫 Zammad Ticketing Instance"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "📋 Next steps:"
+	@echo "  1. Get the Zammad URL (Route or port-forward):"
+	@ZAMMAD_ROUTE=$$(oc get route ssa-zammad -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null); \
+	if [ -z "$$ZAMMAD_ROUTE" ]; then ZAMMAD_ROUTE=$$(oc get route -n $(NAMESPACE) -l app.kubernetes.io/instance=zammad -o jsonpath='{.items[0].spec.host}' 2>/dev/null); fi; \
+	if [ -n "$$ZAMMAD_ROUTE" ]; then \
+		echo "     Web UI: https://$$ZAMMAD_ROUTE"; \
+		echo "     API:    https://$$ZAMMAD_ROUTE/api/v1"; \
+	else \
+		echo "     Port-forward: kubectl port-forward -n $(NAMESPACE) svc/zammad-nginx 8080:8080"; \
+		echo "     Web UI: http://localhost:8080"; \
+		echo "     API:    http://localhost:8080/api/v1"; \
+	fi
+	@echo ""
+	@echo "  2. Complete autoWizard: visit <zammad-url>/#getting_started/auto_wizard/$(ZAMMAD_AUTOWIZARD_TOKEN)"
+	@echo "  3. Create API token: make zammad-bootstrap-token NAMESPACE=$(NAMESPACE)  (or Admin → Token Access)"
+	@echo "  4. Enable chat widget: Admin → Channels → Chat (full flow: chat → webhook → agent → reply in chat)"
+	@echo "  5. Enable ticketing in quickstart: set zammad.enabled=true, zammad.url, create Secret with token"
+	@echo ""
+	@echo "  See docs/TICKETING_CHANNEL_GAMEPLAN.md for full integration steps."
+	@echo ""
+
+.PHONY: undeploy-zammad
+undeploy-zammad:
+	@echo "Removing Zammad instance from namespace $(NAMESPACE)..."
+	@helm uninstall zammad -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true
+	@echo "Waiting for pods to terminate, then removing Zammad PVCs..."
+	@sleep 5
+	@kubectl delete pvc -n $(NAMESPACE) -l app.kubernetes.io/instance=zammad --ignore-not-found 2>/dev/null || true
+	@for pvc in $$(kubectl get pvc -n $(NAMESPACE) -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n' | grep -E '^data-zammad-' || true); do kubectl delete pvc $$pvc -n $(NAMESPACE) --ignore-not-found; done
+	@echo "✅ Zammad instance removed successfully!"
+
+# Trigger autoWizard via HTTP (creates admin user). Run once before zammad-bootstrap-token.
+# Uses GET /api/v1/getting_started/auto_wizard/:token
+.PHONY: zammad-trigger-autowizard
+zammad-trigger-autowizard: namespace
+	@echo "Triggering autoWizard via HTTP..."; \
+	RES=$$(kubectl exec deploy/zammad-railsserver -n $(NAMESPACE) -- ruby -rnet/http -e 'uri=URI("http://zammad-nginx:8080/api/v1/getting_started/auto_wizard/$(ZAMMAD_AUTOWIZARD_TOKEN)");res=Net::HTTP.get_response(uri);puts res.code' 2>/dev/null) || RES=""; \
+	if [ "$$RES" = "200" ] || [ "$$RES" = "204" ]; then \
+		echo "✅ autoWizard triggered (HTTP $$RES). Waiting 5s for setup..."; \
+		sleep 5; \
+	else \
+		echo "⚠ autoWizard request returned HTTP $$RES (may already be done or system not ready)"; \
+	fi
+
+# Create Zammad API token via exec into railsserver (uses admin from autoWizard), update secret, restart MCP.
+# Idempotent: if secret already has a token, skips creation. Use ZAMMAD_FORCE_BOOTSTRAP=1 to recreate.
+.PHONY: zammad-bootstrap-token
+zammad-bootstrap-token: namespace zammad-trigger-autowizard
+	@ZAMMAD_URL="http://zammad-nginx.$(NAMESPACE).svc.cluster.local:8080"; \
+	ZAMMAD_TOKEN=$$(kubectl get secret $(ZAMMAD_CREDENTIALS_SECRET) -n $(NAMESPACE) -o jsonpath='{.data.zammad-http-token}' 2>/dev/null | base64 -d 2>/dev/null || true); \
+	if [ -n "$$ZAMMAD_TOKEN" ] && [ "$(ZAMMAD_FORCE_BOOTSTRAP)" != "1" ]; then \
+		echo "Secret already has token (idempotent). Use ZAMMAD_FORCE_BOOTSTRAP=1 to recreate."; \
+		exit 0; \
+	fi; \
+	echo "Creating Zammad API token via exec..."; \
+	ZAMMAD_TOKEN=$$(kubectl exec deploy/zammad-railsserver -n $(NAMESPACE) -- env ZAMMAD_ADMIN_EMAIL='$(ZAMMAD_ADMIN_EMAIL)' ZAMMAD_ADMIN_PASSWORD='$(ZAMMAD_ADMIN_PASSWORD)' ruby -rnet/http -rjson -e 'uri=URI("http://localhost:3000/api/v1/user_access_token");req=Net::HTTP::Post.new(uri);req.basic_auth(ENV["ZAMMAD_ADMIN_EMAIL"],ENV["ZAMMAD_ADMIN_PASSWORD"]);req["Content-Type"]="application/json";req.body=JSON.generate({"name"=>"mcp-agent","permission"=>["admin","ticket.agent"]});res=Net::HTTP.start(uri.hostname,uri.port){|h|h.request(req)};d=JSON.parse(res.body);t=d["token"];t ? puts(t) : ($$stderr.puts("Zammad API #{res.code}: #{res.body[0,500]}");exit 1)' ) || ZAMMAD_TOKEN=""; \
+	if [ -z "$$ZAMMAD_TOKEN" ]; then \
+		echo "❌ Token creation failed (401 = invalid credentials)."; \
+		echo "   Complete autoWizard first: visit <zammad-url>/#getting_started/auto_wizard/$(ZAMMAD_AUTOWIZARD_TOKEN)"; \
+		echo "   (Port-forward: kubectl port-forward -n $(NAMESPACE) svc/zammad-nginx 8080:8080, then http://localhost:8080/...)"; \
+		exit 1; \
+	fi; \
+	kubectl create secret generic $(ZAMMAD_CREDENTIALS_SECRET) \
+		--from-literal=zammad-url="$$ZAMMAD_URL/api/v1" \
+		--from-literal=zammad-http-token="$$ZAMMAD_TOKEN" \
+		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
+	echo "Restarting Zammad MCP..."; \
+	kubectl rollout restart deployment/mcp-zammad-mcp -n $(NAMESPACE); \
+	kubectl rollout status deployment/mcp-zammad-mcp -n $(NAMESPACE) --timeout=2m; \
+	echo "✅ Zammad token created and MCP restarted."
+
+# Update Zammad API token and restart MCP. Run after creating token in Zammad Admin → Token Access.
+# Update embed page with actual Zammad URL (fixes placeholder when embed shows YOUR-ZAMMAD-URL)
+.PHONY: zammad-update-embed-url
+zammad-update-embed-url: namespace
+	@ZAMMAD_ROUTE=$$(oc get route ssa-zammad -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null); \
+	if [ -z "$$ZAMMAD_ROUTE" ]; then \
+		ZAMMAD_ROUTE=$$(oc get route -n $(NAMESPACE) -l app.kubernetes.io/component=zammad -o jsonpath='{.items[0].spec.host}' 2>/dev/null); \
+	fi; \
+	if [ -z "$$ZAMMAD_ROUTE" ]; then \
+		ZAMMAD_ROUTE=$$(oc get route -n $(NAMESPACE) -l app.kubernetes.io/instance=zammad -o jsonpath='{.items[0].spec.host}' 2>/dev/null); \
+	fi; \
+	if [ -z "$$ZAMMAD_ROUTE" ]; then \
+		echo "❌ No Zammad Route found in $(NAMESPACE). Deploy Zammad and ensure ssa-zammad Route exists."; \
+		exit 1; \
+	fi; \
+	$(MAKE) _zammad-patch-embed-configmap NAMESPACE=$(NAMESPACE) ZAMMAD_ROUTE="$$ZAMMAD_ROUTE"; \
+	EMBED_HOST=$$(oc get route ssa-zammad-embed -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null); \
+	if [ -n "$$EMBED_HOST" ]; then echo "✅ Embed page updated. Visit https://$$EMBED_HOST to verify."; \
+	else echo "✅ Embed ConfigMap updated."; fi
+
+.PHONY: zammad-set-token
+zammad-set-token: namespace
+	@if [ -z "$(ZAMMAD_TOKEN)" ]; then \
+		echo "❌ Error: ZAMMAD_TOKEN is required."; \
+		echo "  1. Create token in Zammad: Admin → Token Access → add HTTP Token"; \
+		echo "  2. Run: make zammad-set-token NAMESPACE=$(NAMESPACE) ZAMMAD_TOKEN=<your-token>"; \
+		exit 1; \
+	fi
+	@ZAMMAD_URL="http://zammad-nginx.$(NAMESPACE).svc.cluster.local:8080"; \
+	echo "Updating Zammad credentials secret with token..."; \
+	kubectl create secret generic $(ZAMMAD_CREDENTIALS_SECRET) \
+		--from-literal=zammad-url="$$ZAMMAD_URL/api/v1" \
+		--from-literal=zammad-http-token="$(ZAMMAD_TOKEN)" \
+		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
+	echo "Restarting Zammad MCP deployment..."; \
+	kubectl rollout restart deployment/mcp-zammad-mcp -n $(NAMESPACE); \
+	kubectl rollout status deployment/mcp-zammad-mcp -n $(NAMESPACE) --timeout=2m; \
+	echo "✅ Zammad token set and MCP restarted."
 
 # ServiceNow PDI wake-up
 .PHONY: servicenow-wake-install

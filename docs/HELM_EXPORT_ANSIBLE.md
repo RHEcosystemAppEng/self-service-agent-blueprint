@@ -60,6 +60,7 @@ ansible-playbook -i localhost, ansible/playbooks/apply-demo-manifests.yml \
 | **install** | Deploy to cluster (alias for `helm-install-$(INSTALL_MODE)`, default: test). Use `INSTALL_MODE=demo|prod` to change. |
 | **uninstall** | `helm-uninstall` + delete namespace (full teardown). |
 | **helm-install-demo** | Helm-only: deploy Greenmail + install with demo values (no Ansible). Use `uninstall` to remove (includes test-email-server). |
+| **helm-install-ticketing** | One-shot: deploy Zammad + install with ticketing channel (zammad.enabled, zammad-mcp). Requires manual API token creation after Zammad is ready. See [TICKETING_CHANNEL_GAMEPLAN.md](TICKETING_CHANNEL_GAMEPLAN.md). |
 | **helm-export-demo** | Export demo manifests to `ansible/helm-export/` from passed-in vars (NAMESPACE, VERSION, REGISTRY, SERVICENOW_*, etc.) |
 | **ansible-apply-demo** | Export then apply demo via Ansible |
 | **ansible-teardown-demo** | Delete demo namespace |

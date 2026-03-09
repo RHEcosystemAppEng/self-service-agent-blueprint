@@ -430,7 +430,7 @@ class TestWaitForTurnAndProcessOne:
         mock_db = AsyncMock()
         mock_lock_db = AsyncMock()
 
-        # Phase 1: check returns None (no existing row), so create_request_log_entry_unified is called
+        # check returns None (no existing row), so create_request_log_entry_unified is called
         check_result = MagicMock()
         check_result.scalar_one_or_none.return_value = None
         mock_lock_db.execute = AsyncMock(return_value=check_result)

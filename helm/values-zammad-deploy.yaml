@@ -1,0 +1,100 @@
+# Values for make deploy-zammad (Zammad instance for dev/testing)
+# Use with: helm upgrade --install zammad zammad/zammad -n NAMESPACE -f helm/values-zammad-deploy.yaml
+#
+# After deployment:
+# - Set zammad.url in main chart to your Zammad instance URL (Route/Ingress or port-forward)
+#   With helm-install-ticketing: main chart can create OpenShift Route (zammad.externalRoute.enabled)
+# - Create an API token in Zammad Admin and set zammad.mcp.token in the Secret
+#   OR use: make zammad-bootstrap-token (automated, uses admin from autoWizard below)
+# - See docs/TICKETING_CHANNEL_GAMEPLAN.md Section 5.0
+#
+# Note: Zammad chart brings elasticsearch, postgresql, redis, memcached. First deploy may take 10+ minutes.
+
+# AutoWizard: seeds admin user so zammad-bootstrap-token can create API token via API.
+# First user = Admin+Agent; add Users with "roles": ["Customer"] for end users (view own tickets, open new ones).
+# Override via --set autoWizard.config=... or env ZAMMAD_ADMIN_EMAIL, ZAMMAD_ADMIN_PASSWORD.
+# Token must match ZAMMAD_AUTOWIZARD_TOKEN in Makefile (for zammad-trigger-autowizard).
+autoWizard:
+  enabled: true
+  config: |
+    {
+      "Token": "ssa-zammad-autowizard-9f3a2b1c",
+      "TextModuleLocale": { "Locale": "en-us" },
+      "Users": [
+        {
+          "login": "admin@zammad.local",
+          "firstname": "Admin",
+          "lastname": "User",
+          "email": "admin@zammad.local",
+          "organization": "Default",
+          "password": "ZammadR0cks!"
+        },
+        {
+          "login": "alice@example.com",
+          "firstname": "Alice",
+          "lastname": "Customer",
+          "email": "alice@example.com",
+          "organization": "Default",
+          "password": "Customer123!",
+          "roles": ["Customer"]
+        },
+        {
+          "login": "bob@example.com",
+          "firstname": "Bob",
+          "lastname": "Customer",
+          "email": "bob@example.com",
+          "organization": "Default",
+          "password": "Customer123!",
+          "roles": ["Customer"]
+        }
+      ],
+      "Organizations": [{"name": "Default"}],
+      "Settings": [
+        {"name": "product_name", "value": "Zammad Demo"},
+        {"name": "system_online_service", "value": true}
+      ]
+    }
+
+# Pod Security: disable privileged init containers (volumePermissions, sysctl).
+# Zammad chart defaults (runAsUser/fsGroup: 1000) conflict with OpenShift restricted SCC.
+# Makefile deploy-zammad auto-detects namespace UID range on OpenShift and passes via --set.
+#
+# FQDN: Zammad needs ZAMMAD_FQDN to accept requests via Route. helm-install-ticketing installs
+# our chart first (creates Route), then deploys Zammad with ZAMMAD_FQDN=<route-host> at deploy.
+# Port-forward works without it (Host: localhost).
+#
+# trustedProxies: Required for OpenShift Route. Traffic arrives from the router (cluster internal
+# IPs). Without this, Zammad may not trust X-Forwarded-Proto/Host and redirects/scheme break.
+zammadConfig:
+  initContainers:
+    volumePermissions:
+      enabled: false  # Privileged init container incompatible with restricted SCC
+  nginx:
+    # Trust cluster-internal IPs (OpenShift router forwards from these ranges)
+    trustedProxies:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+  railsserver:
+    # RAILS_TRUSTED_PROXIES: same ranges so Rails trusts X-Forwarded-* from the route
+    trustedProxies: "['127.0.0.1', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16']"
+  # ingress: set manually for deploy-zammad-only (helm-install-ticketing passes FQDN at deploy)
+  # ingress: { enabled: true, host: zammad.example.com }
+
+postgresql:
+  volumePermissions:
+    enabled: false  # Privileged; incompatible with restricted SCC
+  global:
+    compatibility:
+      openshift:
+        adaptSecurityContext: force  # Use OpenShift-allocated UIDs
+
+elasticsearch:
+  sysctlImage:
+    enabled: false  # Privileged; vm.max_map_count often set at node level on OpenShift
+  volumePermissions:
+    enabled: false
+  global:
+    compatibility:
+      openshift:
+        adaptSecurityContext: force  # Use OpenShift-allocated UIDs

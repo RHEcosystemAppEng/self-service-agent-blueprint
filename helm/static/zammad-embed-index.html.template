@@ -1,0 +1,27 @@
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Zammad Chat Embed</title>
+      <style>
+        body { font-family: system-ui, sans-serif; max-width: 680px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+        pre { background: #f5f5f5; padding: 1rem; overflow-x: auto; border-radius: 4px; }
+        code { font-size: 0.9em; }
+        h1 { font-size: 1.25rem; }
+      </style>
+    </head>
+    <body>
+      <h1>Zammad Chat - Embed Code</h1>
+      <p>Insert the widget code into the source code of every page the chat shall be visible on. It should be placed at the end of the page's source code before the <code>&lt;/body&gt;</code> closing tag.</p>
+      <pre><code>&lt;script src="__ZAMMAD_URL__/assets/chat/chat-no-jquery.min.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+(function() { new ZammadChat({ fontSize: '12px', chatId: 1 }); })();
+&lt;/script&gt;</code></pre>
+      <p><strong>Note:</strong> The chat widget only appears when at least one agent is available (Admin → Channels → Chat).</p>
+      <script src="__ZAMMAD_URL__/assets/chat/chat-no-jquery.min.js"></script>
+      <script>
+      (function() { new ZammadChat({ fontSize: '12px', chatId: 1 }); })();
+      </script>
+    </body>
+    </html>

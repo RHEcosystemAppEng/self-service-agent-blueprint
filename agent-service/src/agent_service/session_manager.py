@@ -101,6 +101,8 @@ class ResponsesSessionManager(BaseSessionManager):
         text: str,
         request_manager_session_id: Optional[str] = None,
         session_name: Optional[str] = None,
+        target_agent_id: Optional[str] = None,
+        requires_routing: bool = True,
     ) -> str:
         """Handle a message in responses mode with full conversation management."""
         if not self.user_id:
@@ -121,6 +123,8 @@ class ResponsesSessionManager(BaseSessionManager):
             message_preview=text[:100],
             request_manager_session_id=request_manager_session_id,
             session_name=session_name,
+            target_agent_id=target_agent_id,
+            requires_routing=requires_routing,
             has_current_session=bool(self.current_session),
             current_agent=self.current_agent_name,
         )
@@ -162,8 +166,14 @@ class ResponsesSessionManager(BaseSessionManager):
                         "Creating initial session for responses mode",
                         user_id=self.user_id,
                         session_name=session_name,
+                        target_agent_id=target_agent_id,
+                        requires_routing=requires_routing,
                     )
-                    success = await self._create_initial_session(session_name)
+                    success = await self._create_initial_session(
+                        session_name,
+                        target_agent_id=target_agent_id,
+                        requires_routing=requires_routing,
+                    )
                     if not success:
                         logger.error(
                             "Failed to create initial session",
@@ -205,8 +215,13 @@ class ResponsesSessionManager(BaseSessionManager):
                 )
                 await self._reset_conversation_state()
                 # Recursively call with the actual user message to create new routing session
+                # Return to routing agent - pass None/True to create routing session
                 return await self.handle_responses_message(
-                    text, request_manager_session_id, session_name
+                    text,
+                    request_manager_session_id,
+                    session_name,
+                    target_agent_id=None,
+                    requires_routing=True,
                 )
 
             # Intercept special commands before passing to conversation
@@ -272,28 +287,42 @@ class ResponsesSessionManager(BaseSessionManager):
             )
             return f"Error: {str(e)}"
 
-    async def _create_initial_session(self, session_name: Optional[str] = None) -> bool:
+    async def _create_initial_session(
+        self,
+        session_name: Optional[str] = None,
+        target_agent_id: Optional[str] = None,
+        requires_routing: bool = True,
+    ) -> bool:
         """Create an initial session for responses mode."""
         try:
             logger.debug(
                 "Creating initial session for responses mode",
                 user_id=self.user_id,
                 session_name=session_name,
+                target_agent_id=target_agent_id,
+                requires_routing=requires_routing,
             )
 
-            # Get routing agent
+            # Get agent: specialist when target_agent_id set and requires_routing=False
             if self.agent_manager is None:
                 logger.error(
                     "Agent manager not initialized. Cannot create initial session."
                 )
                 return False
 
-            routing_agent = self.agent_manager.get_agent(self.ROUTING_AGENT_NAME)
-            if not routing_agent:
+            use_specialist = target_agent_id is not None and not requires_routing
+            agent_name: str = (
+                target_agent_id
+                if (use_specialist and target_agent_id)
+                else self.ROUTING_AGENT_NAME
+            )
+
+            agent = self.agent_manager.get_agent(agent_name)
+            if not agent:
                 logger.error(
-                    "Core routing agent not available",
+                    "Agent not available",
                     user_id=self.user_id,
-                    routing_agent_name=self.ROUTING_AGENT_NAME,
+                    agent_name=agent_name,
                     available_agents=(
                         list(self.agent_manager.agents_dict.keys())
                         if self.agent_manager
@@ -302,11 +331,12 @@ class ResponsesSessionManager(BaseSessionManager):
                 )
                 return False
 
-            # Debug: Check routing agent configuration
-            lg_config = routing_agent.config.get("lg_state_machine_config")
+            # Debug: Check agent configuration
+            lg_config = agent.config.get("lg_state_machine_config")
             logger.info(
-                "Routing agent configuration",
+                "Agent configuration",
                 lg_state_machine_config=lg_config,
+                agent_name=agent_name,
             )
 
             # Generate session name and create session
@@ -315,12 +345,12 @@ class ResponsesSessionManager(BaseSessionManager):
                 "Creating LangGraph session",
                 user_id=self.user_id,
                 session_name=session_name,
-                routing_agent=self.ROUTING_AGENT_NAME,
+                agent_name=agent_name,
             )
 
             session = await self._create_session_for_agent(
-                routing_agent,
-                self.ROUTING_AGENT_NAME,
+                agent,
+                agent_name,
                 session_name=session_name,
             )
 
@@ -335,9 +365,9 @@ class ResponsesSessionManager(BaseSessionManager):
 
             # Set up the new session
             self.conversation_session = session
-            self.current_agent_name = self.ROUTING_AGENT_NAME
+            self.current_agent_name = agent_name
             self.current_session = self._build_session_data(
-                routing_agent, self.ROUTING_AGENT_NAME, session, session_name
+                agent, agent_name, session, session_name
             )
 
             logger.debug(
@@ -357,7 +387,7 @@ class ResponsesSessionManager(BaseSessionManager):
             )
 
             await self._update_database_session_state(
-                self.ROUTING_AGENT_NAME,
+                agent_name,
                 session.thread_id,
                 self.request_manager_session_id,
             )

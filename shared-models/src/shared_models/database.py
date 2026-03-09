@@ -313,7 +313,7 @@ class DatabaseManager:
 
         # Determine expected version from parameter, environment, or default
         if expected_version is None:
-            expected_version = os.getenv("EXPECTED_MIGRATION_VERSION", "001")
+            expected_version = os.getenv("EXPECTED_MIGRATION_VERSION", "002")
 
         start_time = time()
         logger.info(

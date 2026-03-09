@@ -73,6 +73,19 @@ class ToolRequest(BaseRequest):
     tool_context: Dict[str, Any] = Field(default_factory=dict)
 
 
+class ZammadRequest(BaseRequest):
+    """Zammad ticketing request schema."""
+
+    integration_type: IntegrationType = IntegrationType.ZAMMAD
+    ticket_id: int = Field(..., ge=1)
+    article_id: int = Field(..., ge=1)
+    group_id: int = Field(..., ge=0)
+    group_name: Optional[str] = Field(None, max_length=255)
+    owner_id: Optional[int] = Field(None, ge=0)
+    created_by_id: int = Field(..., ge=0)
+    zammad_delivery_id: str = Field(..., min_length=1, max_length=255)
+
+
 # NormalizedRequest is now imported from shared_models.models
 
 

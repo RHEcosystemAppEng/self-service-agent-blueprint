@@ -99,6 +99,11 @@ class TemplateEngine:
             formatted_subject = f"[TEST] {subject or 'Agent Response'}"
             formatted_body = f"🧪 TEST DELIVERY\n\n{content}"
 
+        elif integration_type == IntegrationType.ZAMMAD:
+            # Zammad: No-op handler uses this; agent delivers via MCP
+            formatted_subject = subject or "Agent Response"
+            formatted_body = content
+
         else:
             # Default formatting
             formatted_subject = subject or "Agent Response"

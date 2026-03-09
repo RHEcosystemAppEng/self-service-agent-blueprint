@@ -45,6 +45,7 @@ from .integrations.email import EmailIntegrationHandler
 from .integrations.slack import SlackIntegrationHandler
 from .integrations.test import TestIntegrationHandler
 from .integrations.webhook import WebhookIntegrationHandler
+from .integrations.zammad import ZammadIntegrationHandler
 from .outbox_publisher import run_outbox_publisher
 from .schemas import (
     DeliveryLogResponse,
@@ -72,6 +73,7 @@ class IntegrationDispatcher:
             IntegrationType.EMAIL: EmailIntegrationHandler(),
             IntegrationType.WEBHOOK: WebhookIntegrationHandler(),
             IntegrationType.TEST: TestIntegrationHandler(),
+            IntegrationType.ZAMMAD: ZammadIntegrationHandler(),
         }
         self.template_engine = TemplateEngine()
 

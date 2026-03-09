@@ -1,0 +1,32 @@
+# Ticketing channel (Zammad) - use with helm-install-ticketing
+# Extends values-test. Requires: make deploy-zammad first (or external Zammad).
+# zammad.url is set via --set in Makefile (namespace-dependent: Route or in-cluster).
+#
+# After install: Create API token in Zammad, update the zammad-credentials Secret,
+# then restart the MCP pod. See printed checklist.
+
+# Enable Zammad ticketing channel and MCP
+zammad:
+  enabled: true
+  # url set via --set in Makefile (http://zammad-nginx.NAMESPACE.svc.cluster.local:8080 or Route)
+  url: ""  # Override required
+  webhookSecret: ""
+  allowedGroups: []
+  aiAgentUserId: null
+  mcp:
+    enabled: true
+    uri: "http://mcp-zammad:8000/mcp"
+  # OpenShift Route for Zammad Web UI (enabled for ticketing profile on OpenShift)
+  externalRoute:
+    enabled: true
+  # Embed page: copy-paste chat widget code (publicUrl set via Makefile from Route host)
+  embedPage:
+    enabled: true
+    publicUrl: ""  # Set by helm-install-ticketing from ssa-zammad Route host
+    chatId: 1
+
+# Enable zammad-mcp MCP server
+mcp-servers:
+  mcp-servers:
+    zammad-mcp:
+      enabled: true

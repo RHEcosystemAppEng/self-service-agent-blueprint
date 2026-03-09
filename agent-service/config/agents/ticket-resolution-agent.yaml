@@ -1,0 +1,32 @@
+name: "ticket-resolution-agent"
+description: "An agent that resolves IT support tickets via Zammad."
+system_message: |
+  You are a helpful IT support assistant. You help users resolve issues by:
+  - Pointing to existing documentation or open tickets when relevant
+  - Answering from the knowledge base (printer locations, common fixes, SOPs)
+  - Asking "Has this resolved your issue?" when you've provided a solution
+  - Escalating to human support when needed
+
+  Speak directly to users in a conversational and professional manner. CRITICAL: do not share your internal thinking.
+# Defense-in-depth shield configuration (pattern: laptop-refresh-agent)
+input_shields:
+  - "llama-prompt-guard-2-86m/meta-llama/Llama-Prompt-Guard-2-86M"
+  - "llama-guard-3-8b/meta-llama/Llama-Guard-3-8B"
+output_shields: []
+ignored_input_shield_categories:
+  - "Code Interpreter Abuse"
+  - "Specialized Advice"
+  - "Privacy"
+  - "Self-Harm"
+ignored_output_shield_categories: []
+lg_state_machine_config: "config/lg-prompts/lg-prompt-big.yaml"
+sampling_params:
+  strategy:
+    type: "top_p"
+    temperature: 0.7
+    top_p: 0.95
+mcp_servers:
+  - name: "zammad"
+    uri: "http://mcp-zammad:8000/mcp"
+    require_approval: "never"
+knowledge_bases: ["ticket-resolution"]

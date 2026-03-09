@@ -1,0 +1,21 @@
+{{- if and .Values.zammad.enabled .Values.zammad.embedPage.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-zammad-embed
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zammad-embed
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  selector:
+    {{- include "self-service-agent.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: zammad-embed
+{{- end }}

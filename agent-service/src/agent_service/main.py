@@ -542,6 +542,8 @@ class AgentService:
                 response_content = await session_manager.handle_responses_message(
                     text=request.content,
                     request_manager_session_id=request.session_id,
+                    target_agent_id=request.target_agent_id,
+                    requires_routing=request.requires_routing,
                 )
 
                 # Create response with automatic timing calculation
@@ -558,6 +560,8 @@ class AgentService:
                             await session_manager.handle_responses_message(
                                 text=request.content,
                                 request_manager_session_id=request.session_id,
+                                target_agent_id=request.target_agent_id,
+                                requires_routing=request.requires_routing,
                             )
                         )
                         # Check again after retry
