@@ -34,7 +34,7 @@ RUN if [ "$USE_PIP_INSTALL" = "true" ]; then \
         if [ -s /tmp/editable-requirements.txt ]; then \
             .venv/bin/pip install --no-deps -r /tmp/editable-requirements.txt; \
         fi && \
-        .venv/bin/pip install --require-hashes -r /tmp/non-editable-requirements.txt && \
+        .venv/bin/pip install --require-hashes --use-deprecated=legacy-resolver -r /tmp/non-editable-requirements.txt && \
         rm -f /tmp/editable-requirements.txt /tmp/non-editable-requirements.txt; \
     else \
         # Default: Use uv sync (faster and more reliable)
