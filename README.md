@@ -2,12 +2,10 @@
 
 Transform IT service delivery using AI to lower support effort, improve compliance, and increase throughput.
 
-- Blog post with business value overview: [From manual to agentic: streamlining IT processes with Red Hat OpenShift AI](https://www.redhat.com/en/blog/manual-agentic-streamlining-it-processes-red-hat-openshift-ai)
-- Technical insights blog post series: [AI quickstart: Self-service agent for IT process automation](https://developers.redhat.com/articles/2026/01/26/ai-quickstart-self-service-agent-it-process-automation)
-
 ## Table of contents
 
 - [Detailed description](#detailed-description)
+  - [Related blog posts](#related-blog-posts)
   - [Who is this for?](#who-is-this-for)
   - [The business case for AI-driven IT self-service](#the-business-case-for-ai-driven-it-self-service)
   - [Example use cases](#example-use-cases)
@@ -56,6 +54,13 @@ This quickstart guide is designed for:
 - **DevOps engineers** deploying agent-based systems
 - **Solution architects** evaluating AI automation platforms
 - **Organizations** looking to streamline IT processes with generative AI
+
+### Related blog posts
+
+If you would like to read blog posts related to the quickstart before diving into the details, here are two good starting points:
+
+- Blog post with business value overview: [From manual to agentic: streamlining IT processes with Red Hat OpenShift AI](https://www.redhat.com/en/blog/manual-agentic-streamlining-it-processes-red-hat-openshift-ai)
+- Technical insights blog post series: [AI quickstart: Self-service agent for IT process automation](https://developers.redhat.com/articles/2026/01/26/ai-quickstart-self-service-agent-it-process-automation)
 
 ### The business case for AI-driven IT self-service
 
