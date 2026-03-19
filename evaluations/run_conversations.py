@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import argparse
+import sys
+from pathlib import Path
 
 from helpers.run_conversation_flow import ConversationFlowTester
 
@@ -13,13 +15,22 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--test-script",
         type=str,
-        default="chat-responses-request-mgr.py",
-        help="Name of the test script to execute (default: chat-responses-request-mgr.py)",
+        default=None,
+        help="Name of the test script to execute (default: chat-responses-request-mgr.py, "
+        "or the flow's DEFAULT_TEST_SCRIPT when --flow is used)",
     )
     parser.add_argument(
         "--reset-conversation",
         action="store_true",
         help="Send 'reset' message at the start of each conversation",
+    )
+    parser.add_argument(
+        "--flow",
+        type=str,
+        default=None,
+        metavar="FLOW_NAME",
+        help="Run predefined conversations for a specific flow (e.g., ticket_laptop_refresh). "
+        "Uses flows/{name}/conversations/ as input and results/{name}/conversation_results/ as output.",
     )
     return parser.parse_args()
 
@@ -27,10 +38,32 @@ def _parse_arguments() -> argparse.Namespace:
 if __name__ == "__main__":
     args = _parse_arguments()
 
+    if args.flow:
+        # Flow mode: use flow-specific directories and settings
+        eval_dir = str(Path(__file__).parent)
+        if eval_dir not in sys.path:
+            sys.path.insert(0, eval_dir)
+
+        from flow_registry import get_flow_paths, load_flow
+
+        flow_module = load_flow(args.flow)
+        flow_paths = get_flow_paths(args.flow)
+
+        conversations_dir = str(flow_paths.conversations_dir)
+        output_dir = str(flow_paths.results_conv_dir)
+        flow_paths.results_conv_dir.mkdir(parents=True, exist_ok=True)
+
+        default_test_script = getattr(
+            flow_module, "DEFAULT_TEST_SCRIPT", "chat-responses-request-mgr.py"
+        )
+        test_script = args.test_script or default_test_script
+    else:
+        # Default mode: existing behavior
+        conversations_dir = "conversations_config/conversations"
+        output_dir = "results/conversation_results"
+        test_script = args.test_script or "chat-responses-request-mgr.py"
+
     tester = ConversationFlowTester(
-        test_script=args.test_script, reset_conversation=args.reset_conversation
+        test_script=test_script, reset_conversation=args.reset_conversation
     )
-    tester.run_flows(
-        "conversations_config/conversations",
-        "results/conversation_results",
-    )
+    tester.run_flows(conversations_dir, output_dir)

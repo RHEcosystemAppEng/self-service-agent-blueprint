@@ -72,5 +72,66 @@ def copy_context_files() -> None:
         logger.warning(f"ServiceNow data file not found: {snow_data_source}")
 
 
+def copy_flow_context(flow_name: str) -> None:
+    """
+    Copy context files for the named flow into flows/{name}/context/.
+
+    Reads KNOWLEDGE_BASE_DIRS and INCLUDE_SNOW_DATA from the flow module and
+    copies the corresponding files from the agent-service knowledge bases and
+    mock-employee-data into the flow's context directory.
+
+    Args:
+        flow_name: Name of the flow (must match a subdirectory under evaluations/flows/)
+    """
+    import sys
+
+    # Ensure evaluations dir is on path so flow_registry can be imported
+    evaluations_dir = str(Path(__file__).parent.parent)
+    if evaluations_dir not in sys.path:
+        sys.path.insert(0, evaluations_dir)
+
+    from flow_registry import get_flow_paths, load_flow
+
+    flow_module = load_flow(flow_name)
+    knowledge_base_dirs = getattr(flow_module, "KNOWLEDGE_BASE_DIRS", [])
+    include_snow_data = getattr(flow_module, "INCLUDE_SNOW_DATA", False)
+
+    flow_paths = get_flow_paths(flow_name)
+    target_dir = flow_paths.context_dir
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    workspace_root = Path(__file__).parent.parent.parent
+
+    for kb_dir_name in knowledge_base_dirs:
+        source = (
+            workspace_root
+            / "agent-service"
+            / "config"
+            / "knowledge_bases"
+            / kb_dir_name
+        )
+        if source.exists():
+            for file_path in source.iterdir():
+                if file_path.is_file():
+                    shutil.copy2(file_path, target_dir / file_path.name)
+                    logger.info(f"Copied {file_path.name} to {target_dir}")
+        else:
+            logger.warning(f"Source directory not found: {source}")
+
+    if include_snow_data:
+        snow_source = (
+            workspace_root
+            / "mock-employee-data"
+            / "src"
+            / "mock_employee_data"
+            / "data.py"
+        )
+        if snow_source.exists():
+            shutil.copy2(snow_source, target_dir / "snow_data.py")
+            logger.info(f"Copied snow_data.py to {target_dir}")
+        else:
+            logger.warning(f"ServiceNow data file not found: {snow_source}")
+
+
 if __name__ == "__main__":
     copy_context_files()

@@ -111,16 +111,20 @@ def run_script(
         return False
 
 
-def _cleanup_generated_files() -> None:
+def _cleanup_generated_files(flow_name: Optional[str] = None) -> None:
     """
     Remove all files starting with 'generated_flow' and 'from_api_' from
-    results/conversation_results/ and all token usage files from results/token_usage/.
+    results/conversation_results/ (or the flow's results dir) and all token usage files
+    from results/token_usage/.
 
     This ensures a clean slate for each evaluation run by removing files from
     previous executions. Step 2 (generator) and step 3 (export) then write fresh files.
     """
     # Clean up generated and exported conversation files
-    conversation_results_dir = Path("results/conversation_results")
+    if flow_name:
+        conversation_results_dir = Path(f"results/{flow_name}/conversation_results")
+    else:
+        conversation_results_dir = Path("results/conversation_results")
     if conversation_results_dir.exists():
         generated_files = list(conversation_results_dir.glob("generated_flow*"))
         from_api_files = list(conversation_results_dir.glob("from_api_*"))
@@ -585,6 +589,20 @@ def _parse_arguments() -> argparse.Namespace:
         "--end-date",
         help="Filter to date when using --conversation-source export; ISO 8601 format (e.g., 2026-01-31T23:59:59Z)",
     )
+    parser.add_argument(
+        "--flow",
+        type=str,
+        default=None,
+        metavar="FLOW_NAME",
+        help="Run the evaluation pipeline for a specific flow (e.g., ticket_laptop_refresh). "
+        "Uses flow-specific directories, metrics, and chatbot role.",
+    )
+    parser.add_argument(
+        "--all-flows",
+        action="store_true",
+        default=False,
+        help="Run the evaluation pipeline for the default mode AND all registered flows sequentially.",
+    )
     return parser.parse_args()
 
 
@@ -592,6 +610,7 @@ def run_check_known_bad_conversations(
     timeout: int = 600,
     validate_full_laptop_details: bool = True,
     use_structured_output: bool = False,
+    flow: Optional[str] = None,
 ) -> int:
     """
     Check known bad conversations by running deepeval on them.
@@ -613,8 +632,23 @@ def run_check_known_bad_conversations(
 
     check_start_time = time.time()
 
+    # Resolve paths based on flow or default
+    if flow:
+        import sys as _sys
+
+        _eval_dir = str(Path(__file__).parent)
+        if _eval_dir not in _sys.path:
+            _sys.path.insert(0, _eval_dir)
+        from flow_registry import get_flow_paths
+
+        flow_paths = get_flow_paths(flow)
+        known_bad_dir = flow_paths.known_bad_dir
+        deep_eval_results_dir = flow_paths.results_known_bad_dir
+    else:
+        known_bad_dir = Path("results/known_bad_conversation_results")
+        deep_eval_results_dir = Path("results/deep_eval_results")
+
     # Check if the known bad conversations directory exists
-    known_bad_dir = Path("results/known_bad_conversation_results")
     if not known_bad_dir.exists():
         logger.error(f"❌ Directory {known_bad_dir} does not exist")
         return 1
@@ -632,20 +666,24 @@ def run_check_known_bad_conversations(
 
     # Run deepeval on the known bad conversations
     logger.info("📊 Running deepeval on known bad conversations...")
-    deep_eval_args = ["--results-dir", "results/known_bad_conversation_results"]
+    deep_eval_args = [
+        "--results-dir",
+        str(known_bad_dir),
+        "--output-dir",
+        str(deep_eval_results_dir),
+    ]
     if validate_full_laptop_details:
         deep_eval_args.append("--validate-full-laptop-details")
     else:
         deep_eval_args.append("--no-validate-full-laptop-details")
     if use_structured_output:
         deep_eval_args.append("--use-structured-output")
+    if flow:
+        deep_eval_args.extend(["--flow", flow])
     # For the check option, we want to run deep_eval and analyze the results
     # even if it returns a non-zero exit code (which indicates it found issues)
     run_script("deep_eval.py", args=deep_eval_args, timeout=timeout)
     logger.info("📊 DeepEval completed, analyzing results...")
-
-    # Check the results to see if the conversations failed as expected
-    deep_eval_results_dir = Path("results/deep_eval_results")
     if not deep_eval_results_dir.exists():
         logger.error("❌ DeepEval results directory not found")
         return 1
@@ -903,6 +941,7 @@ def run_evaluation_pipeline(
     conversation_source: str = "generate",
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    flow: Optional[str] = None,
 ) -> int:
     """
     Run the complete evaluation pipeline.
@@ -934,7 +973,7 @@ def run_evaluation_pipeline(
     logger.info("=" * 80)
 
     # Clean up generated files from previous runs
-    _cleanup_generated_files()
+    _cleanup_generated_files(flow_name=flow)
     logger.info("-" * 60)
 
     pipeline_start_time = time.time()
@@ -952,6 +991,8 @@ def run_evaluation_pipeline(
         run_conversations_args = ["--test-script", test_script]
         if reset_conversation:
             run_conversations_args.append("--reset-conversation")
+        if flow:
+            run_conversations_args.extend(["--flow", flow])
         if not run_script(
             "run_conversations.py", args=run_conversations_args, timeout=timeout
         ):
@@ -992,6 +1033,8 @@ def run_evaluation_pipeline(
             generator_args.append("--reset-conversation")
         if use_structured_output:
             generator_args.append("--use-structured-output")
+        if flow:
+            generator_args.extend(["--flow", flow])
         if not run_script("generator.py", args=generator_args, timeout=timeout):
             failed_steps.append("generator.py")
             logger.error(
@@ -1031,6 +1074,8 @@ def run_evaluation_pipeline(
         deep_eval_args.append("--no-validate-full-laptop-details")
     if use_structured_output:
         deep_eval_args.append("--use-structured-output")
+    if flow:
+        deep_eval_args.extend(["--flow", flow])
     if not run_script("deep_eval.py", args=deep_eval_args, timeout=timeout):
         failed_steps.append("deep_eval.py")
         logger.error(f"❌ Step {step_label} failed")
@@ -1092,14 +1137,28 @@ def main() -> int:
         if len(sys.argv) > 1 and any(arg in ["-h", "--help"] for arg in sys.argv):
             return 0
 
+        if args.flow and args.all_flows:
+            logger.error("--flow and --all-flows are mutually exclusive")
+            return 1
+
         if args.check:
             return run_check_known_bad_conversations(
                 timeout=args.timeout,
                 validate_full_laptop_details=args.validate_full_laptop_details,
                 use_structured_output=args.use_structured_output,
+                flow=args.flow,
             )
-        else:
-            return run_evaluation_pipeline(
+
+        if args.all_flows:
+            # Run default pipeline then each registered flow sequentially
+            import sys as _sys
+
+            _eval_dir = str(Path(__file__).parent)
+            if _eval_dir not in _sys.path:
+                _sys.path.insert(0, _eval_dir)
+            from flow_registry import list_flows
+
+            pipeline_kwargs = dict(
                 num_conversations=args.num_conversations,
                 timeout=args.timeout,
                 max_turns=args.max_turns,
@@ -1113,6 +1172,37 @@ def main() -> int:
                 start_date=args.start_date,
                 end_date=args.end_date,
             )
+
+            overall = 0
+
+            logger.info("=== Running default pipeline ===")
+            overall = max(
+                overall, run_evaluation_pipeline(**pipeline_kwargs, flow=None)
+            )
+
+            for flow_name in list_flows():
+                logger.info(f"=== Running pipeline for flow '{flow_name}' ===")
+                overall = max(
+                    overall, run_evaluation_pipeline(**pipeline_kwargs, flow=flow_name)
+                )
+
+            return overall
+
+        return run_evaluation_pipeline(
+            num_conversations=args.num_conversations,
+            timeout=args.timeout,
+            max_turns=args.max_turns,
+            test_script=args.test_script,
+            reset_conversation=args.reset_conversation,
+            concurrency=args.concurrency,
+            message_timeout=args.message_timeout,
+            validate_full_laptop_details=args.validate_full_laptop_details,
+            use_structured_output=args.use_structured_output,
+            conversation_source=args.conversation_source,
+            start_date=args.start_date,
+            end_date=args.end_date,
+            flow=args.flow,
+        )
     except KeyboardInterrupt:
         logger.warning("⚠️  Pipeline interrupted by user")
         return 130

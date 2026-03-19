@@ -10,8 +10,9 @@ from typing import Any, Dict, List, Optional
 from deepeval.evaluate import DisplayConfig, evaluate
 from deepeval.test_case import ConversationalTestCase, Turn
 from deepeval.test_run import global_test_run_manager
+from flow_registry import get_flow_paths, list_flows, load_flow, load_flow_metrics
 from get_deepeval_metrics import get_metrics
-from helpers.copy_context import copy_context_files
+from helpers.copy_context import copy_context_files, copy_flow_context
 from helpers.custom_llm import CustomLLM, get_api_configuration
 from helpers.deep_eval_summary import print_final_summary
 from helpers.extract_deepeval_metrics import extract_metrics_from_results
@@ -38,6 +39,23 @@ def _no_op_wrap_up_test_run(*args: Any, **kwargs: Any) -> None:
 
 # Override DeepEval's default behavior to prevent online connectivity
 global_test_run_manager.wrap_up_test_run = _no_op_wrap_up_test_run  # type: ignore[method-assign]
+
+_DEFAULT_CHATBOT_ROLE = """You are an IT Support Agent specializing in hardware replacement.
+
+Your responsibilities:
+1. Determine if the authenticated user's laptop is eligible for replacement based on company policy
+2. Clearly communicate the eligibility status and policy reasons to the user
+3. If the user is NOT eligible:
+   - Inform them of their ineligibility with the policy reason (e.g., laptop age)
+   - Provide clear, factual information that proceeding may require additional approvals or be rejected
+   - Allow them to continue with the laptop selection process if they choose to
+4. Guide the user through laptop selection
+5. After the user selects a laptop, ALWAYS ask for explicit confirmation before creating the ServiceNow ticket (e.g., "Would you like to proceed with creating a ServiceNow ticket for this laptop?")
+6. Only create the ServiceNow ticket AFTER the user confirms they want to proceed
+7. After creating the ticket, provide the ticket number and next steps
+8. Maintain a professional, helpful, and informative tone throughout
+
+Note: Providing clear, factual information about potential rejection or additional approvals is sufficient. You do not need to be overly cautionary or repeatedly emphasize warnings. Always confirm with the user before creating tickets."""
 
 
 def _convert_to_turns(conversation_data: List[Dict[str, str]]) -> List[Turn]:
@@ -81,6 +99,9 @@ def _evaluate_conversations(
     context_dir: Optional[str] = None,
     validate_full_laptop_details: bool = True,
     use_structured_output: bool = False,
+    metrics: Optional[List[Any]] = None,
+    chatbot_role: Optional[str] = None,
+    default_context_dir: Optional[str] = None,
 ) -> int:
     """
     Main evaluation function that processes conversation files and generates assessment reports.
@@ -88,7 +109,7 @@ def _evaluate_conversations(
     This function orchestrates the complete evaluation workflow:
     1. Configures the LLM model for evaluation
     2. Loads conversation files from the results directory
-    3. Applies laptop refresh-specific evaluation metrics
+    3. Applies evaluation metrics
     4. Generates individual and combined evaluation reports
     5. Provides detailed pass/fail analysis with scoring
 
@@ -103,28 +124,41 @@ def _evaluate_conversations(
         context_dir: Optional path to directory with context files for conversations
         validate_full_laptop_details: Enable validation of all 15 laptop specification fields
         use_structured_output: Enable structured output with Pydantic schema validation and retries
+        metrics: Pre-loaded metrics list. If None, uses default get_metrics() with a new model.
+        chatbot_role: Override for the chatbot role description. If None, uses the default role.
+        default_context_dir: Override for the default context directory. If None, uses the standard path.
 
     Returns:
         int: Exit code (0 for success, 1 for failure) indicating evaluation outcome
     """
-    api_key_found, current_endpoint, model_name = get_api_configuration(
-        api_endpoint, api_key
-    )
-    if not api_key_found:
-        logger.error("No API key configured. Cannot proceed with evaluation.")
-        return 1
+    if metrics is None:
+        api_key_found, current_endpoint, model_name = get_api_configuration(
+            api_endpoint, api_key
+        )
+        if not api_key_found:
+            logger.error("No API key configured. Cannot proceed with evaluation.")
+            return 1
 
-    # At this point, api_key_found is guaranteed to be non-None
-    assert api_key_found is not None
-    custom_model = CustomLLM(
-        api_key=api_key_found,
-        base_url=current_endpoint or "",
-        model_name=model_name,
-        use_structured_output=use_structured_output,
+        assert api_key_found is not None
+        custom_model = CustomLLM(
+            api_key=api_key_found,
+            base_url=current_endpoint or "",
+            model_name=model_name,
+            use_structured_output=use_structured_output,
+        )
+        if not custom_model:
+            logger.error(
+                "Could not create model object. Cannot proceed with evaluation."
+            )
+            return 1
+
+        metrics = get_metrics(
+            custom_model, validate_full_laptop_details=validate_full_laptop_details
+        )
+
+    effective_chatbot_role = (
+        chatbot_role if chatbot_role is not None else _DEFAULT_CHATBOT_ROLE
     )
-    if not custom_model:
-        logger.error("Could not create model object. Cannot proceed with evaluation.")
-        return 1
 
     if not os.path.exists(results_dir):
         logger.error(f"Results directory {results_dir} does not exist")
@@ -141,10 +175,6 @@ def _evaluate_conversations(
 
     print(f"Found {len(json_files)} conversation files to evaluate")
 
-    metrics = get_metrics(
-        custom_model, validate_full_laptop_details=validate_full_laptop_details
-    )
-
     # Initialize tracking for evaluation results and success metrics
     all_results = []
     failed_evaluations = []
@@ -157,7 +187,9 @@ def _evaluate_conversations(
         try:
             print(f"Processing {filename}")
             # Load relevant context data for this specific conversation
-            context_for_file = load_context_for_file(filename, context_dir)
+            context_for_file = load_context_for_file(
+                filename, context_dir, default_context_dir
+            )
 
             # Load single conversation
             with open(file_path, "r", encoding="utf-8") as f:
@@ -205,30 +237,12 @@ def _evaluate_conversations(
                     f"Using {len(context_for_file)} context item(s) for {filename}"
                 )
 
-            # Set chatbot role
-            chatbot_role = """You are an IT Support Agent specializing in hardware replacement.
-
-Your responsibilities:
-1. Determine if the authenticated user's laptop is eligible for replacement based on company policy
-2. Clearly communicate the eligibility status and policy reasons to the user
-3. If the user is NOT eligible:
-   - Inform them of their ineligibility with the policy reason (e.g., laptop age)
-   - Provide clear, factual information that proceeding may require additional approvals or be rejected
-   - Allow them to continue with the laptop selection process if they choose to
-4. Guide the user through laptop selection
-5. After the user selects a laptop, ALWAYS ask for explicit confirmation before creating the ServiceNow ticket (e.g., "Would you like to proceed with creating a ServiceNow ticket for this laptop?")
-6. Only create the ServiceNow ticket AFTER the user confirms they want to proceed
-7. After creating the ticket, provide the ticket number and next steps
-8. Maintain a professional, helpful, and informative tone throughout
-
-Note: Providing clear, factual information about potential rejection or additional approvals is sufficient. You do not need to be overly cautionary or repeatedly emphasize warnings. Always confirm with the user before creating tickets."""
-
             # Note: DeepEval's type hints incorrectly say context is Optional[str]
             # but the runtime implementation in __post_init__ expects List[str]
             test_case = ConversationalTestCase(
                 turns=turns,
                 context=test_case_context if test_case_context else None,  # type: ignore[arg-type]
-                chatbot_role=chatbot_role,
+                chatbot_role=effective_chatbot_role,
             )
 
             # Execute evaluation with suppressed output for cleaner reporting
@@ -422,17 +436,44 @@ def _parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--flow",
+        type=str,
+        default=None,
+        metavar="FLOW_NAME",
+        help="Run evaluation for a specific flow (e.g., ticket_laptop_refresh). "
+        "Uses flow-specific directories, metrics, and chatbot role.",
+    )
+
+    parser.add_argument(
+        "--all-flows",
+        action="store_true",
+        default=False,
+        help="Run evaluation for the default mode AND all registered flows sequentially.",
+    )
+
+    parser.add_argument(
+        "--known-bad",
+        action="store_true",
+        default=False,
+        help="Evaluate known-bad conversations instead of generated conversations. "
+        "For default mode uses results/known_bad_conversation_results/. "
+        "For flows uses flows/{name}/known_bad_conversations/.",
+    )
+
+    parser.add_argument(
         "--results-dir",
         type=str,
-        default="results/conversation_results",
-        help="Directory containing conversation result files (default: results/conversation_results)",
+        default=None,
+        help="Directory containing conversation result files. "
+        "Overrides the default path for the selected mode.",
     )
 
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="results/deep_eval_results",
-        help="Directory to save deepeval results and reports (default: results/deep_eval_results)",
+        default=None,
+        help="Directory to save deepeval results and reports. "
+        "Overrides the default path for the selected mode.",
     )
 
     parser.add_argument(
@@ -473,14 +514,17 @@ def _parse_arguments() -> argparse.Namespace:
 if __name__ == "__main__":
     args = _parse_arguments()
 
-    # Ensure context files are available in the expected location
-    copy_context_files()
+    if args.flow and args.all_flows:
+        print("Error: --flow and --all-flows are mutually exclusive")
+        sys.exit(1)
+
+    final_api_endpoint = args.api_endpoint or os.getenv("LLM_URL")
+    final_api_key = args.api_key or os.getenv("LLM_API_TOKEN")
 
     # Print configuration
     print("=" * 80)
     print("DEEPEVAL CONVERSATION EVALUATION")
     print("=" * 80)
-    print(f"Directory with conversations to analyze: {args.results_dir}")
 
     if args.api_key:
         print("API key: Provided via command line")
@@ -492,7 +536,6 @@ if __name__ == "__main__":
     if os.getenv("LLM_ID"):
         print(f"LLM Model ID: {os.getenv('LLM_ID')}")
 
-    final_api_endpoint = args.api_endpoint or os.getenv("LLM_URL")
     print(f"Custom endpoint: {final_api_endpoint}")
 
     if args.use_structured_output:
@@ -502,22 +545,103 @@ if __name__ == "__main__":
     else:
         print("Structured output: DISABLED (using standard JSON mode)")
 
+    if args.flow:
+        print(f"Mode: single flow '{args.flow}'")
+    elif args.all_flows:
+        print(f"Mode: all flows (default + {list_flows()})")
+    else:
+        print("Mode: default")
+
+    if args.known_bad:
+        print("Evaluating: known-bad conversations")
+
     print("=" * 80)
     print("")
 
-    # Use command line API key or fall back to environment variable
-    final_api_key = args.api_key or os.getenv("LLM_API_TOKEN")
-
-    # Run evaluation with provided arguments and environment fallbacks
-    exit_code = _evaluate_conversations(
-        api_endpoint=final_api_endpoint,
-        api_key=final_api_key,
-        results_dir=args.results_dir,
-        output_dir=args.output_dir,
-        context_dir=args.context_dir,
-        validate_full_laptop_details=args.validate_full_laptop_details,
-        use_structured_output=args.use_structured_output,
+    # Determine which evaluations to run
+    run_default = not args.flow  # default runs unless a specific flow is selected
+    flows_to_run = (
+        [args.flow] if args.flow else (list_flows() if args.all_flows else [])
     )
+
+    overall_exit_code = 0
+
+    # --- Default evaluation ---
+    if run_default:
+        copy_context_files()
+
+        if args.known_bad:
+            results_dir = args.results_dir or "results/known_bad_conversation_results"
+            output_dir = args.output_dir or "results/known_bad_eval_results"
+        else:
+            results_dir = args.results_dir or "results/conversation_results"
+            output_dir = args.output_dir or "results/deep_eval_results"
+
+        print(f"Running default evaluation: {results_dir} -> {output_dir}")
+        exit_code = _evaluate_conversations(
+            api_endpoint=final_api_endpoint,
+            api_key=final_api_key,
+            results_dir=results_dir,
+            output_dir=output_dir,
+            context_dir=args.context_dir,
+            validate_full_laptop_details=args.validate_full_laptop_details,
+            use_structured_output=args.use_structured_output,
+        )
+        overall_exit_code = max(overall_exit_code, exit_code)
+
+    # --- Flow evaluations ---
+    for flow_name in flows_to_run:
+        copy_flow_context(flow_name)
+
+        flow_module = load_flow(flow_name)
+        flow_paths = get_flow_paths(flow_name)
+
+        if args.known_bad:
+            results_dir = args.results_dir or str(flow_paths.known_bad_dir)
+            output_dir = args.output_dir or str(flow_paths.results_known_bad_dir)
+        else:
+            results_dir = args.results_dir or str(flow_paths.results_conv_dir)
+            output_dir = args.output_dir or str(flow_paths.results_eval_dir)
+
+        # Create model and load flow-specific metrics
+        api_key_found, current_endpoint, model_name = get_api_configuration(
+            final_api_endpoint, final_api_key
+        )
+        if not api_key_found:
+            logger.error(f"No API key configured for flow '{flow_name}'. Skipping.")
+            overall_exit_code = max(overall_exit_code, 1)
+            continue
+
+        assert api_key_found is not None
+        custom_model = CustomLLM(
+            api_key=api_key_found,
+            base_url=current_endpoint or "",
+            model_name=model_name,
+            use_structured_output=args.use_structured_output,
+        )
+
+        flow_metrics_module = load_flow_metrics(flow_name)
+        flow_metrics = flow_metrics_module.get_metrics(
+            custom_model,
+            validate_full_laptop_details=args.validate_full_laptop_details,
+        )
+        flow_chatbot_role = getattr(flow_module, "CHATBOT_ROLE", None)
+        flow_context_dir = str(flow_paths.context_dir)
+
+        print(f"Running flow '{flow_name}': {results_dir} -> {output_dir}")
+        exit_code = _evaluate_conversations(
+            api_endpoint=final_api_endpoint,
+            api_key=final_api_key,
+            results_dir=results_dir,
+            output_dir=output_dir,
+            context_dir=args.context_dir,
+            validate_full_laptop_details=args.validate_full_laptop_details,
+            use_structured_output=args.use_structured_output,
+            metrics=flow_metrics,
+            chatbot_role=flow_chatbot_role,
+            default_context_dir=flow_context_dir,
+        )
+        overall_exit_code = max(overall_exit_code, exit_code)
 
     # Print token usage summary using shared function
     print("\n" + "=" * 80)
@@ -531,4 +655,4 @@ if __name__ == "__main__":
     print("=" * 80)
 
     # Exit with appropriate code: 0 for success, 1 for failure
-    sys.exit(exit_code)
+    sys.exit(overall_exit_code)

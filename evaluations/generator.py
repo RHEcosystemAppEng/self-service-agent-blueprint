@@ -179,6 +179,14 @@ def _parse_arguments() -> argparse.Namespace:
         help="Enable structured output mode using Pydantic schema validation with retries. "
         "Recommended for models like Gemini that benefit from explicit schema validation.",
     )
+    parser.add_argument(
+        "--flow",
+        type=str,
+        default=None,
+        metavar="FLOW_NAME",
+        help="Generate conversations for a specific flow (e.g., ticket_laptop_refresh). "
+        "Uses flow-specific scenario and saves to results/{flow}/conversation_results/.",
+    )
     return parser.parse_args()
 
 
@@ -214,6 +222,8 @@ def _run_worker(
     reset_conversation: bool,
     message_timeout: int = 60,
     use_structured_output: bool = False,
+    results_dir: str = "results/conversation_results",
+    flow_scenario: Optional[tuple[str, ...]] = None,
 ) -> dict[str, Any]:
     """
     Worker function to generate conversations in parallel.
@@ -227,6 +237,9 @@ def _run_worker(
         reset_conversation: Whether to reset conversation at start
         message_timeout: Timeout for individual message send/response operations
         use_structured_output: Enable structured output with Pydantic schema validation
+        results_dir: Directory to save generated conversations
+        flow_scenario: Optional tuple of (scenario, expected_outcome, user_description)
+                       to use instead of _create_conversation_golden()
 
     Returns:
         Dictionary with saved_files, token_counts, and test_case_count
@@ -354,9 +367,17 @@ def _run_worker(
             worker_client.get_agent_initialization()
 
             # Create conversation golden
-            conversation_golden = _create_conversation_golden(
-                conversation_number, use_structured_output=use_structured_output
-            )
+            if flow_scenario is not None:
+                scenario, expected_outcome, user_description = flow_scenario
+                conversation_golden = ConversationalGolden(
+                    scenario=scenario,
+                    expected_outcome=expected_outcome,
+                    user_description=user_description,
+                )
+            else:
+                conversation_golden = _create_conversation_golden(
+                    conversation_number, use_structured_output=use_structured_output
+                )
 
             # Simulate conversation
             conversational_test_cases = simulator.simulate(
@@ -396,7 +417,9 @@ def _run_worker(
                     base_filename = (
                         f"generated_flow_worker{worker_id}_{test_case_count}"
                     )
-                    saved_file = _save_conversation_to_file(conversation, base_filename)
+                    saved_file = _save_conversation_to_file(
+                        conversation, base_filename, results_dir
+                    )
                     saved_files.append(saved_file)
 
         except Exception as e:
@@ -464,20 +487,21 @@ def _convert_test_case_to_conversation_format(
 
 
 def _save_conversation_to_file(
-    conversation: dict[str, Any], base_filename: str = "generated_conversation"
+    conversation: dict[str, Any],
+    base_filename: str = "generated_conversation",
+    results_dir: str = "results/conversation_results",
 ) -> str:
     """
-    Save conversation to a uniquely named file in results/conversation_results
+    Save conversation to a uniquely named file in the given results directory.
 
     Args:
         conversation: Dictionary with metadata and conversation turns
         base_filename: Base name for the file (will have timestamp added)
+        results_dir: Directory to save the conversation file
 
     Returns:
         The path to the saved file
     """
-    # Create results directory if it doesn't exist
-    results_dir = "results/conversation_results"
     os.makedirs(results_dir, exist_ok=True)
 
     # Generate unique filename with timestamp
@@ -497,6 +521,27 @@ def _save_conversation_to_file(
 if __name__ == "__main__":
     # Parse command line arguments
     args = _parse_arguments()
+
+    # Resolve flow-specific settings if --flow is provided
+    flow_scenario: Optional[tuple[str, ...]] = None
+    results_dir = "results/conversation_results"
+    test_script = args.test_script
+
+    if args.flow:
+        import sys as _sys
+
+        _eval_dir = str(Path(__file__).parent)
+        if _eval_dir not in _sys.path:
+            _sys.path.insert(0, _eval_dir)
+        from flow_registry import get_flow_paths, load_flow
+
+        flow_module = load_flow(args.flow)
+        flow_paths = get_flow_paths(args.flow)
+        flow_paths.results_conv_dir.mkdir(parents=True, exist_ok=True)
+        results_dir = str(flow_paths.results_conv_dir)
+        test_script = getattr(flow_module, "DEFAULT_TEST_SCRIPT", args.test_script)
+        flow_scenario = flow_module.get_scenario(args.use_structured_output)
+        logger.info(f"Using flow '{args.flow}': saving to {results_dir}")
 
     # Get API configuration from environment variables
     api_key, api_endpoint, model_name = get_api_configuration()
@@ -551,10 +596,12 @@ if __name__ == "__main__":
                 user_partitions[i],
                 args.num_conversations,
                 args.max_turns,
-                args.test_script,
+                test_script,
                 args.reset_conversation,
                 args.message_timeout,
                 args.use_structured_output,
+                results_dir,
+                flow_scenario,
             )
             for i in range(args.concurrency)
         ]

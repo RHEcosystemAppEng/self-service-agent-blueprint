@@ -103,34 +103,44 @@ def load_context_files_from_directory(
     return context_list
 
 
-def load_default_context() -> List[str]:
+def load_default_context(context_dir: Optional[str] = None) -> List[str]:
     """
     Load default context files that apply to all conversations.
 
     This method loads all context files from the default context directory
     (conversations_config/default_context/) without requiring any parameters.
 
+    Args:
+        context_dir: Optional override for the context directory path.
+                     Defaults to "conversations_config/default_context".
+
     Returns:
         List of context strings loaded from default context files.
         Returns empty list if no default context files are available.
     """
-    default_context_dir = "conversations_config/default_context"
+    effective_dir = (
+        context_dir
+        if context_dir is not None
+        else "conversations_config/default_context"
+    )
     default_contexts = load_context_files_from_directory(
-        default_context_dir, "default context"
+        effective_dir, "default context"
     )
 
     if default_contexts:
         logger.info(
-            f"Loaded {len(default_contexts)} default context file(s) from {default_context_dir}"
+            f"Loaded {len(default_contexts)} default context file(s) from {effective_dir}"
         )
     else:
-        logger.info(f"No default context files found in {default_context_dir}")
+        logger.info(f"No default context files found in {effective_dir}")
 
     return default_contexts
 
 
 def load_context_for_file(
-    filename: str, context_dir: Optional[str] = None
+    filename: str,
+    context_dir: Optional[str] = None,
+    default_context_dir: Optional[str] = None,
 ) -> Optional[List[str]]:
     """
     Load context for a specific conversation file from multiple sources
@@ -151,9 +161,13 @@ def load_context_for_file(
     base_name = os.path.splitext(filename)[0]
 
     # 1. Load default context files (applied to all conversations)
-    default_context_dir = "conversations_config/default_context"
+    effective_default_dir = (
+        default_context_dir
+        if default_context_dir is not None
+        else "conversations_config/default_context"
+    )
     default_contexts = load_context_files_from_directory(
-        default_context_dir, "default context"
+        effective_default_dir, "default context"
     )
     if default_contexts:
         context_list.extend(default_contexts)

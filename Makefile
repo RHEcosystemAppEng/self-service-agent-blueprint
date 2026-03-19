@@ -371,6 +371,7 @@ help:
 	@echo "  test-mock-employee-data            - Run tests for mock employee data"
 	@echo "  test-mock-servicenow               - Run tests for mock ServiceNow"
 	@echo "  test-short-resp-integration-request-mgr - Run short responses integration tests with Request Manager"
+	@echo "  test-short-ticket-laptop-refresh   - Run short responses integration tests for ticket-laptop-refresh flow"
 	@echo "  test-long-resp-integration-request-mgr - Run long responses integration tests with Request Manager"
 	@echo "  test-long-concurrent-integration-request-mgr - Run long concurrent responses integration tests with Request Manager (concurrency=4)"
 	@echo "  test-session-serialization-integration - Run session serialization integration test (requires cluster, NAMESPACE=test)"
@@ -1315,6 +1316,12 @@ check-known-bad-conversations: sync-evaluations
 	@echo "Running evaluation check on known bad conversations..."
 	uv --directory evaluations run evaluate.py --check
 	@echo "Evaluation check completed successfully!"
+
+.PHONY: test-short-ticket-laptop-refresh
+test-short-ticket-laptop-refresh:
+	@echo "Running short responses integration test for ticket-laptop-refresh flow..."
+	uv --directory evaluations run evaluate.py -n 1 --test-script chat-responses-request-mgr.py --reset-conversation --flow ticket_laptop_refresh $(VALIDATE_LAPTOP_DETAILS_FLAG) $(STRUCTURED_OUTPUT_FLAG)
+	@echo "short responses integration test for ticket-laptop-refresh flow completed successfully!"
 
 .PHONY: test-short-resp-integration-request-mgr
 test-short-resp-integration-request-mgr:
