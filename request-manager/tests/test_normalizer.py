@@ -1,13 +1,7 @@
 """Tests for request normalizer."""
 
 from request_manager.normalizer import RequestNormalizer
-from request_manager.schemas import (
-    CLIRequest,
-    SlackRequest,
-    ToolRequest,
-    WebRequest,
-    ZammadRequest,
-)
+from request_manager.schemas import CLIRequest, SlackRequest, ToolRequest, WebRequest
 from shared_models.models import IntegrationType
 
 
@@ -130,32 +124,6 @@ class TestRequestNormalizer:
         assert normalized.integration_context["platform"] == "cli"
         assert normalized.integration_context["cli_session_id"] == "cli-session-456"
         assert normalized.user_context["command_context"]["command"] == "agent"
-
-    def test_normalize_zammad_request(self) -> None:
-        """Test Zammad request normalization."""
-        zammad_request = ZammadRequest(
-            user_id="zammad-8",
-            content="Where is the printer?",
-            ticket_id=81,
-            article_id=104,
-            group_id=3,
-            group_name="Support",
-            owner_id=None,
-            created_by_id=8,
-            zammad_delivery_id="delivery-abc123",
-        )
-
-        normalized = self.normalizer.normalize_request(zammad_request, self.session_id)
-
-        assert normalized.integration_type == IntegrationType.ZAMMAD
-        assert normalized.target_agent_id == "ticket-resolution-agent"
-        assert normalized.requires_routing is False
-        assert normalized.session_id == "zammad-81"
-        assert normalized.integration_context["platform"] == "zammad"
-        assert normalized.integration_context["ticket_id"] == 81
-        assert normalized.integration_context["article_id"] == 104
-        assert normalized.integration_context["group_id"] == 3
-        assert normalized.integration_context["zammad_delivery_id"] == "delivery-abc123"
 
     def test_normalize_tool_request(self) -> None:
         """Test tool request normalization."""

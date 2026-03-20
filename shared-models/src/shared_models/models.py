@@ -66,7 +66,6 @@ class IntegrationType(str, Enum):
     TEAMS = "TEAMS"
     DISCORD = "DISCORD"
     TEST = "TEST"
-    ZAMMAD = "ZAMMAD"
 
 
 class SessionStatus(str, Enum):

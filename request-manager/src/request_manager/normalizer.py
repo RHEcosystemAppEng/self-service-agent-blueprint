@@ -14,7 +14,6 @@ from .schemas import (
     SlackRequest,
     ToolRequest,
     WebRequest,
-    ZammadRequest,
 )
 
 
@@ -24,13 +23,7 @@ class RequestNormalizer:
     def normalize_request(
         self,
         request: Union[
-            BaseRequest,
-            SlackRequest,
-            WebRequest,
-            CLIRequest,
-            EmailRequest,
-            ToolRequest,
-            ZammadRequest,
+            BaseRequest, SlackRequest, WebRequest, CLIRequest, EmailRequest, ToolRequest
         ],
         session_id: str,
         current_agent_id: Optional[str] = None,
@@ -68,8 +61,6 @@ class RequestNormalizer:
             return self._normalize_email_request(request, base_data)
         elif isinstance(request, ToolRequest):
             return self._normalize_tool_request(request, base_data)
-        elif isinstance(request, ZammadRequest):
-            return self._normalize_zammad_request(request, base_data)
         else:
             return self._normalize_base_request(request, base_data)
 
@@ -154,30 +145,6 @@ class RequestNormalizer:
             integration_context=integration_context,
             user_context=user_context,
             requires_routing=True,
-        )
-
-    def _normalize_zammad_request(
-        self, request: ZammadRequest, base_data: Dict[str, Any]
-    ) -> NormalizedRequest:
-        """Normalize Zammad ticketing request. Routes directly to ticket-resolution-agent."""
-        integration_context = {
-            "ticket_id": request.ticket_id,
-            "article_id": request.article_id,
-            "group_id": request.group_id,
-            "zammad_delivery_id": request.zammad_delivery_id,
-            "platform": "zammad",
-        }
-
-        # Zammad requests bypass routing; go directly to ticket-resolution-agent
-        base_data["target_agent_id"] = "ticket-resolution-agent"
-        # Session continuity: use ticket_id for session_id
-        base_data["session_id"] = f"zammad-{request.ticket_id}"
-
-        return NormalizedRequest(
-            **base_data,
-            integration_context=integration_context,
-            user_context={"platform_user_id": str(request.created_by_id)},
-            requires_routing=False,
         )
 
     def _normalize_tool_request(

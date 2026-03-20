@@ -1,8 +1,8 @@
 # Ticketing Channel: Game Plan
 
-**Status**: Phase 1 Complete (PR 1 ready)  
-**Branch**: ticketingChannel  
-**Last updated**: 2025-03-16
+**Status**: **Phase 0 and 0.5 are fully implemented in-repo** (Zammad Helm deploy, undeploy, values, Route/embed, `helm-install-ticketing`, token/bootstrap helpers). What remains is **operator work** (finish autoWizard if needed, confirm secret/token) and later **Phase 1+** application code.  
+**Branch**: `zammadHelm`  
+**Last updated**: 2026-03-20
 
 ---
 
@@ -205,11 +205,14 @@ Each PR delivers something testable and working:
 
 **Goal:** Deploy a Zammad instance for local/dev testing of MCP and webhooks (or use external Zammad).
 
+**Implementation status:** All **automated** Phase 0 items below are done in this repository. The unchecked items are **not missing features**—they are steps a human (or your pipeline) performs against a live cluster.
+
 - [x] `make deploy-zammad` — Helm install of official Zammad chart (`zammad/zammad` 16.0.4)
 - [x] `make undeploy-zammad` — Remove Zammad from namespace (also runs during `helm-uninstall`)
 - [x] `helm/values-zammad-deploy.yaml` — Optional overrides for dev deployment
-- [ ] **Manual:** Complete Zammad Web UI setup (admin user, org), create API token
-- [ ] **Manual:** Set `zammad.url` and create Secret with `zammad.mcp.token` when enabling ticketing
+- [x] **Helpers:** `zammad-trigger-autowizard`, `zammad-bootstrap-token`, `zammad-set-token`, `zammad-update-embed-url` (see `make help`)
+- [ ] **Ops / manual:** Complete Zammad setup (autoWizard URL or Web UI), obtain API token — *required once per environment*
+- [ ] **Ops / manual:** Ensure `zammad.url` and credentials Secret align with how you enable ticketing (`helm-install-ticketing` creates/patches the secret when possible)
 
 **Zammad chart: autoWizard** — The official Zammad Helm chart supports `autoWizard.enabled` with a JSON config that can seed:
   - **Users** (admin: login, email, password, organization)
@@ -230,7 +233,7 @@ autoWizard:
     }
 ```
 
-**API token:** Not configurable via autowizard. Token creation (Admin → Token Access → HTTP Token) is manual, or can be automated via Zammad API: `POST /api/v1/user_access_token` (requires auth). A post-install script/job could: sign in with admin creds from autowizard → create token via API → `kubectl create secret`. TBD whether to implement.
+**API token:** Not configurable via autowizard JSON alone. **Implemented:** `make zammad-bootstrap-token` (and the token step inside `helm-install-ticketing`) calls the Zammad API from `zammad-railsserver` to create a token and updates the K8s secret. Manual path: Admin → Token Access → HTTP Token, then `make zammad-set-token`.
 
 **Usage:** `make deploy-zammad NAMESPACE=my-namespace` (requires NAMESPACE). First deploy takes ~10–15 minutes (elasticsearch, postgresql, redis, memcached).
 
@@ -257,21 +260,21 @@ autoWizard:
 - [ ] PR: Merge ticketingChannel into dev (docs only, no code risk)
 - [ ] Outcome: Planning docs live on dev; team has single source of truth
 
-### Phase 1: Foundation (Zammad) — PR 1 ✅ Complete
+### Phase 1: Foundation (Zammad) — PR 1 (deferred on `zammadHelm`)
 
 **Dependency order:** shared-models (IntegrationType) → Alembic migration → request-manager, agent-service, helm. Integration Dispatcher Phase 2 depends on shared-models for IntegrationType.ZAMMAD.
 
-- [x] Alembic migration: Add `ZAMMAD` to IntegrationType enum (`002_add_zammad_integration_type.py`)
-- [x] shared-models: Add `ZAMMAD` to IntegrationType
-- [x] request-manager: Add ZammadRequest schema
-- [x] request-manager: Add ZAMMAD branch in CloudEvent handler
-- [x] normalizer: Add `_normalize_zammad_request`; set `target_agent_id="ticket-resolution-agent"`, `requires_routing=False`, `session_id="zammad-{ticket_id}"`; populate `integration_context` with `ticket_id`, `article_id`, `group_id`, `zammad_delivery_id` for agent use
-- [x] agent-service: Create ticket-resolution-agent.yaml (Zammad MCP + `knowledge_bases: ["ticket-resolution"]`); configure input/output shields (pattern: laptop-refresh-agent)
-- [x] agent-service: Pass `target_agent_id` and `requires_routing` from NormalizedRequest to session manager; when `target_agent_id` set and `requires_routing=False`, create specialist session directly (skip routing-agent)
-- [x] agent-service: Create `config/knowledge_bases/ticket-resolution/` with seed .txt files (SOPs, FAQs for RAG)
-- [x] helm: Add `zammad-mcp` block to `mcp-servers.mcp-servers`; add `zammad` values block (see Section 5.1)
-- [x] integration-dispatcher: Add no-op `ZammadIntegrationHandler` (done in Phase 1 so delivery pipeline works when Zammad events are processed)
-- [x] **Deliverable:** Agent can receive ZammadRequests and process them (no webhook yet — test via mock/inject); unit test `test_normalize_zammad_request` added
+- [ ] Alembic migration: Add `ZAMMAD` to IntegrationType enum (`002_add_zammad_integration_type.py`)
+- [ ] shared-models: Add `ZAMMAD` to IntegrationType
+- [ ] request-manager: Add ZammadRequest schema
+- [ ] request-manager: Add ZAMMAD branch in CloudEvent handler
+- [ ] normalizer: Add `_normalize_zammad_request`; set `target_agent_id="ticket-resolution-agent"`, `requires_routing=False`, `session_id="zammad-{ticket_id}"`; populate `integration_context` with `ticket_id`, `article_id`, `group_id`, `zammad_delivery_id` for agent use
+- [ ] agent-service: Create ticket-resolution-agent.yaml (Zammad MCP + `knowledge_bases: ["ticket-resolution"]`); configure input/output shields (pattern: laptop-refresh-agent)
+- [ ] agent-service: Pass `target_agent_id` and `requires_routing` from NormalizedRequest to session manager; when `target_agent_id` set and `requires_routing=False`, create specialist session directly (skip routing-agent)
+- [ ] agent-service: Create `config/knowledge_bases/ticket-resolution/` with seed .txt files (SOPs, FAQs for RAG)
+- [x] helm: Add `zammad-mcp` block to `mcp-servers.mcp-servers`; add `zammad` values block (see Section 5.1) — *done as part of Phase 0.5 / deploy wiring on this branch*
+- [ ] integration-dispatcher: Add no-op `ZammadIntegrationHandler` (typically Phase 1 so delivery pipeline works when Zammad events are processed)
+- [ ] **Deliverable:** Agent can receive ZammadRequests and process them (no webhook yet — test via mock/inject); unit test `test_normalize_zammad_request` added
 
 **Agent config details:** File `agent-service/config/agents/ticket-resolution-agent.yaml` with `name: "ticket-resolution-agent"` (must match for `get_agent()`). MCP config: `uri` from Helm (`http://mcp-zammad:8000/mcp` or similar); `knowledge_bases: ["ticket-resolution"]`. Shields: pattern from `laptop-refresh-agent.yaml` (`input_shields`, `output_shields`, `ignored_input_shield_categories`).
 
@@ -287,12 +290,12 @@ autoWizard:
   - Build `event_data` per Section 2.1; call `cloudevent_sender.send_request_event()`
 - [ ] integration-dispatcher: **user_id derivation:** Use `ticket.customer_id` or `article.origin_by_id`; for v1 use synthetic `zammad-{customer_id}` unless UserIntegrationMapping supports ZAMMAD (customer email → canonical user)
 - [ ] integration-dispatcher: **Idempotency:** Use `X-Zammad-Delivery` header as `event_id`; check `ProcessedEvent` table before sending (pattern: Slack/Email); skip if already seen; Zammad retries up to 4× on failure
-- [x] integration-dispatcher: Add no-op `ZammadIntegrationHandler` — *completed in Phase 1*
+- [ ] integration-dispatcher: Add no-op `ZammadIntegrationHandler` — *depends on Phase 1*
 - [ ] **Deliverable:** Real Zammad webhook → Integration Dispatcher → Request Manager → Agent → MCP
 
 ### Phase 3: Chat Widget & Seeding — PR 3
 
-- [ ] Zammad instance deployment (optional component or external; pattern: `make deploy-zammad` like `deploy-email-server`)
+- [x] Zammad instance deployment — *covered by Phase 0 (`make deploy-zammad` / `helm-install-ticketing`); use external Zammad instead if preferred*
 - [ ] AI agent user in Zammad, Agent role, availability config (or "Leave a message" mode)
 - [ ] Chat widget config in Zammad Admin (Channels → Chat); embed script on target site
 - [ ] **Seeding** (see below)
