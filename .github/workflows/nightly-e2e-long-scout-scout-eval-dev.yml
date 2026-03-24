@@ -85,6 +85,8 @@ jobs:
         env:
           LLM_URL: ${{ vars.LLM_URL_EVAL_SCOUT }}
           LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL_SCOUT }}
+          LLM: {{ vars.LLM_INFERENCE_SCOUT }}
+          LLM_ID: {{ vars.LLM_INFERENCE_SCOUT }}
 
       - name: Inspect Cluster - Self-Service Agent
         if: failure()
