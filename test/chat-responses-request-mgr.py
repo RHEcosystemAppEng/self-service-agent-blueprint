@@ -28,12 +28,14 @@ async def main() -> None:
     parser = argparse.ArgumentParser(description="CLI Chat with Request Manager")
     parser.add_argument("--user-id", help="User ID for the chat session")
     parser.add_argument("--request-manager-url", help="Request Manager URL")
+    parser.add_argument("--initial-message", help="Initial message to send to the agent")
     args = parser.parse_args()
 
     # Use command line args or environment variables
     # Priority: command line arg > USER_ID env var > AUTHORITATIVE_USER_ID env var
     user_id = args.user_id or USER_ID or AUTHORITATIVE_USER_ID
     request_manager_url = args.request_manager_url or REQUEST_MANAGER_URL
+    initial_message = args.initial_message or "please introduce yourself and tell me how you can help"
 
     # Create chat client with optional user_id
     chat_client = CLIChatClient(
@@ -51,12 +53,12 @@ async def main() -> None:
     # Interactive mode: run the chat loop (default)
     if sys.stdin.isatty():
         await chat_client.chat_loop(
-            initial_message="please introduce yourself and tell me how you can help",
+            initial_message=initial_message,
         )
     else:
         # Test mode: use a modified chat loop for test framework
         await chat_client.chat_loop_test_mode(
-            initial_message="please introduce yourself and tell me how you can help",
+            initial_message=initial_message,
         )
 
 

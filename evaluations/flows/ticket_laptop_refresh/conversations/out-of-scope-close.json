@@ -1,0 +1,25 @@
+{
+    "metadata": {
+        "authoritative_user_id": "yuki.tanaka@company.com",
+        "description": "User asks out-of-scope questions (password reset, monitor) — agent redirects each time, then user closes the ticket",
+        "use_first_message_as_initial": true
+    },
+    "conversation": [
+        {
+            "role": "user",
+            "content": "I would like to refresh laptop"
+        },
+        {
+            "role": "user",
+            "content": "actually can you help me reset my password? I'm locked out"
+        },
+        {
+            "role": "user",
+            "content": "ok what about my external monitor, it stopped working yesterday"
+        },
+        {
+            "role": "user",
+            "content": "close the ticket"
+        }
+    ]
+}

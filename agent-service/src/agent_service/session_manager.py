@@ -1,6 +1,7 @@
 """Session Management for Agent Service."""
 
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional, cast
@@ -45,7 +46,7 @@ class ResponsesSessionManager(BaseSessionManager):
     Used by Responses API for full conversation state management.
     """
 
-    ROUTING_AGENT_NAME = "routing-agent"
+    ROUTING_AGENT_NAME = os.environ.get("DEFAULT_AGENT_ID", "routing-agent")
 
     def __init__(
         self,

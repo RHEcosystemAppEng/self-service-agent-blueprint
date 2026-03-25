@@ -223,7 +223,9 @@ def _run_worker(
     message_timeout: int = 60,
     use_structured_output: bool = False,
     results_dir: str = "results/conversation_results",
-    flow_scenario: Optional[tuple[str, ...]] = None,
+    flow_scenario: Optional[list[tuple[str, str, str]]] = None,
+    initial_message: Optional[str] = None,
+    skip_initial_message: bool = False,
 ) -> dict[str, Any]:
     """
     Worker function to generate conversations in parallel.
@@ -360,15 +362,20 @@ def _run_worker(
                 test_script=test_script,
                 reset_conversation=reset_conversation,
                 message_timeout=message_timeout,
+                initial_message=initial_message,
+                skip_initial_message=skip_initial_message,
             )
 
             # Start session
             worker_client.start_session()
-            worker_client.get_agent_initialization()
+            init_response = worker_client.get_agent_initialization()
 
             # Create conversation golden
             if flow_scenario is not None:
-                scenario, expected_outcome, user_description = flow_scenario
+                scenario, expected_outcome, user_description = random.choice(flow_scenario)
+                option_number = random.randint(1, 4)
+                scenario = scenario.format(option_number=option_number)
+                user_description = user_description.format(option_number=option_number)
                 conversation_golden = ConversationalGolden(
                     scenario=scenario,
                     expected_outcome=expected_outcome,
@@ -413,6 +420,12 @@ def _run_worker(
                 conversation = _convert_test_case_to_conversation_format(
                     test_case, conversation_user_id
                 )
+                # Prepend the initial message exchange if reset was used
+                if reset_conversation and initial_message and init_response and conversation.get("conversation"):
+                    conversation["conversation"] = [
+                        {"role": "user", "content": initial_message},
+                        {"role": "assistant", "content": init_response},
+                    ] + conversation["conversation"]
                 if conversation.get("conversation"):
                     base_filename = (
                         f"generated_flow_worker{worker_id}_{test_case_count}"
@@ -523,9 +536,12 @@ if __name__ == "__main__":
     args = _parse_arguments()
 
     # Resolve flow-specific settings if --flow is provided
-    flow_scenario: Optional[tuple[str, ...]] = None
+    flow_scenario: Optional[list[tuple[str, str, str]]] = None
     results_dir = "results/conversation_results"
     test_script = args.test_script
+    reset_conversation = args.reset_conversation
+    initial_message: Optional[str] = None
+    skip_initial_message: bool = False
 
     if args.flow:
         import sys as _sys
@@ -540,6 +556,9 @@ if __name__ == "__main__":
         flow_paths.results_conv_dir.mkdir(parents=True, exist_ok=True)
         results_dir = str(flow_paths.results_conv_dir)
         test_script = getattr(flow_module, "DEFAULT_TEST_SCRIPT", args.test_script)
+        reset_conversation = args.reset_conversation or getattr(flow_module, "DEFAULT_RESET_CONVERSATION", False)
+        initial_message = getattr(flow_module, "DEFAULT_INITIAL_MESSAGE", None)
+        skip_initial_message = getattr(flow_module, "DEFAULT_SKIP_INITIAL_MESSAGE", False)
         flow_scenario = flow_module.get_scenario(args.use_structured_output)
         logger.info(f"Using flow '{args.flow}': saving to {results_dir}")
 
@@ -597,11 +616,13 @@ if __name__ == "__main__":
                 args.num_conversations,
                 args.max_turns,
                 test_script,
-                args.reset_conversation,
+                reset_conversation,
                 args.message_timeout,
                 args.use_structured_output,
                 results_dir,
                 flow_scenario,
+                initial_message,
+                skip_initial_message,
             )
             for i in range(args.concurrency)
         ]

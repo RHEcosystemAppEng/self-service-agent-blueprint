@@ -1,0 +1,17 @@
+{
+    "metadata": {
+        "authoritative_user_id": "john.doe@company.com",
+        "description": "Not eligible user (laptop ~24 months old) chooses to close the ticket",
+        "use_first_message_as_initial": true
+    },
+    "conversation": [
+        {
+            "role": "user",
+            "content": "I would like to refresh my laptop"
+        },
+        {
+            "role": "user",
+            "content": "close the ticket"
+        }
+    ]
+}

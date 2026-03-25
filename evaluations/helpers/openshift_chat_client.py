@@ -20,6 +20,8 @@ class OpenShiftChatClient:
         deployment_name: str = "deploy/self-service-agent-request-manager",
         test_script: str = "chat-responses-request-mgr.py",
         reset_conversation: bool = False,
+        initial_message: Optional[str] = None,
+        skip_initial_message: bool = False,
         message_timeout: int = 60,
     ):
         """
@@ -30,12 +32,18 @@ class OpenShiftChatClient:
             deployment_name: Name of the OpenShift deployment to connect to
             test_script: Name of the test script to execute (default: "chat-responses-request-mgr.py")
             reset_conversation: If True, send "reset" message after initialization
+            initial_message: Message to send after reset instead of the default introduction prompt.
+                             Only used when reset_conversation is True.
+            skip_initial_message: If True, skip sending any initial message after reset, allowing
+                                  the caller to send the first message. Only used when reset_conversation is True.
             message_timeout: Timeout in seconds for individual message send/response operations (default: 60)
         """
         self.deployment_name = deployment_name
         self.test_script = test_script
         self.authoritative_user_id = authoritative_user_id
         self.reset_conversation = reset_conversation
+        self.initial_message = initial_message
+        self.skip_initial_message = skip_initial_message
         self.message_timeout = message_timeout
         self.process: Optional[subprocess.Popen[str]] = None
         self.session_active = False
@@ -127,11 +135,14 @@ class OpenShiftChatClient:
                 f"Reset response: {reset_response[:100] if reset_response else 'empty'}..."
             )
 
-            # After reset, ask for introduction
-            logger.info("Requesting agent introduction after reset")
-            intro_response = self.send_message(
-                "please introduce yourself and tell me how you can help"
-            )
+            # After reset, send initial message unless skipped
+            if self.skip_initial_message:
+                logger.info("Skipping initial message after reset — caller will send first message")
+                return ""
+
+            message = self.initial_message or "please introduce yourself and tell me how you can help"
+            logger.info(f"Sending initial message after reset: {message[:100]}...")
+            intro_response = self.send_message(message)
             logger.info(
                 f"Introduction response: {intro_response[:100] if intro_response else 'empty'}..."
             )

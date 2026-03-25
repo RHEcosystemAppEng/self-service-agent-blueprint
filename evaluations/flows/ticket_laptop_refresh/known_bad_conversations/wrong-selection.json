@@ -10,7 +10,7 @@
     },
     {
       "role": "assistant",
-      "content": "Your laptop, a ThinkPad X1 Carbon, was purchased on 2022-11-10 and is currently 2 years and 11 months old. The company's laptop refresh policy states that standard laptops will be refreshed every 3 years from the date of issuance. Since your laptop is less than 3 years old, you are not eligible for a laptop refresh. You may proceed anyway but the request for refresh may require additional approvals or be rejected. Would you like to proceed with reviewing the available laptop options for your location?"
+      "content": "According to the knowledge base, the refresh interval is 3 years.\nHere is your laptop information:\nEmployee Name: Maria Garcia\nEmployee Location: LATAM\nLaptop Model: ThinkPad X1 Carbon\nLaptop Serial Number: TP1C003\nLaptop Purchase Date: 2022-11-10\nLaptop Age: 3 years and 4 months\nLaptop Warranty Expiry Date: 2025-11-10\nLaptop Warranty: Expired\nYour laptop, a ThinkPad X1 Carbon, was purchased on 2022-11-10 and is currently 3 years and 4 months old (40 total months). The company's laptop refresh policy states that standard laptops will be refreshed every 3 years (36 months) from the date of issuance. Since your laptop is 3 years or older (40 months >= 36 months), you are eligible for a laptop refresh. Would you like to proceed with reviewing the available laptop options for your location?"
     },
     {
       "role": "user",

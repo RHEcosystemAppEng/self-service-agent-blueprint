@@ -1,0 +1,25 @@
+{
+    "metadata": {
+        "authoritative_user_id": "oliver.smith@company.com",
+        "description": "Eligible user selects a laptop and requests manager send in the same message — agent must still ask for confirmation separately before sending",
+        "use_first_message_as_initial": true
+    },
+    "conversation": [
+        {
+            "role": "user",
+            "content": "I would like to refresh my laptop"
+        },
+        {
+            "role": "user",
+            "content": "yes, show me the available options"
+        },
+        {
+            "role": "user",
+            "content": "I'll take option 1, please send it to my manager for approval"
+        },
+        {
+            "role": "user",
+            "content": "yes"
+        }
+    ]
+}

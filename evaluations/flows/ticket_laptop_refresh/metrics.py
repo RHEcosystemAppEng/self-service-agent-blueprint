@@ -83,9 +83,11 @@ def get_metrics(
                 "  - Completely ignore the user's question or request",
                 "  - Provide unrelated information",
                 "  - Fail to address the user's actual need",
+                "CRITICAL: When a user asks an out-of-scope question (e.g., password reset, monitor issue, software problem), a specialist agent that (a) states it can only help with laptop refresh AND (b) offers to escalate or redirect — is FULLY addressing the user's need within its role. This response is 100% RELEVANT. Do NOT mark it as irrelevant or partially irrelevant. Do NOT penalize for not solving the out-of-scope request directly.",
                 "Do NOT mark as irrelevant:",
                 "  - Specialist agent responses that stay within their scope",
                 "  - Asking if the user would like to escalate for out-of-scope questions",
+                "  - Repeating scope boundaries across multiple out-of-scope questions — this is correct behavior, not irrelevance",
             ],
         ),
         ConversationalGEval(
@@ -168,7 +170,8 @@ def get_metrics(
             model=custom_model,
             evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
             evaluation_steps=[
-                "Assess if the assistant presents appropriate laptop options based on user location when the user is engaged in the laptop refresh process.",
+                "FIRST: Determine whether the agent found the user NOT ELIGIBLE for a laptop refresh. If the agent explicitly stated the user is not eligible and offered to escalate or close the ticket instead of presenting laptop options, The agent behavior is PERFECT for this metric. STOP HERE. Do NOT evaluate any further criteria. Do NOT penalize for the absence of laptop options.",
+                "If the user WAS eligible: assess if the assistant presents appropriate laptop options based on user location.",
                 "Evaluate if laptop specifications are clearly and completely presented.",
                 "Check if the assistant guides the user through selection process effectively.",
                 "IGNORE any portions of the conversation involving:",
@@ -263,7 +266,9 @@ def get_metrics(
             evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
             evaluation_steps=(
                 [
-                    "First, identify the user's location from the conversation (NA, EMEA, APAC, or LATAM).",
+                    "FIRST: Determine whether the agent found the user NOT ELIGIBLE for a laptop refresh. If the agent explicitly stated the user is not eligible and offered to escalate or close the ticket instead of presenting laptop options, The agent behavior is PERFECT for this metric. STOP HERE. Do NOT evaluate any further criteria. Do NOT penalize for the absence of laptop options.",
+                    "SECOND: Determine if the user asked to escalte or close the ticket. If the user asked to escalate or close the ticket the agent behavior is PERFECT for this metric. STOP HERE. Do NOT evaluate any further criteria. Do NOT penalize for the absence of laptop options.",
+                    "If the user WAS eligible: identify the user's location from the conversation (NA, EMEA, APAC, or LATAM).",
                     "Then, look for where the agent presents laptop options to the user in the conversation.",
                     "Count how many distinct laptop models are presented by the agent in the final laptop presentation. Look for laptop model names like 'MacBook Air M2', 'MacBook Pro 16 M3 Max', 'ThinkPad T14s Gen 5 AMD', 'ThinkPad P16 Gen 2', etc.",
                     "Compare the count of laptop models presented against the total number of laptop models available for that location in the additional context below. For EMEA, there should be exactly 4 laptop models. For NA, APAC, and LATAM, there should also be exactly 4 laptop models each.",
@@ -285,7 +290,8 @@ def get_metrics(
                 ]
                 if validate_full_laptop_details
                 else [
-                    "First, identify the user's location from the conversation (NA, EMEA, APAC, or LATAM).",
+                    "FIRST: Determine whether the agent found the user NOT ELIGIBLE for a laptop refresh. If the agent explicitly stated the user is not eligible and offered to escalate or close the ticket instead of presenting laptop options, The agent behavior is PERFECT for this metric. STOP HERE. Do NOT evaluate any further criteria. Do NOT penalize for the absence of laptop options.",
+                    "If the user WAS eligible: identify the user's location from the conversation (NA, EMEA, APAC, or LATAM).",
                     "Then, look for where the agent presents laptop options to the user in the conversation.",
                     "Count how many distinct laptop models are presented by the agent in the final laptop presentation. Look for laptop model names like 'MacBook Air M2', 'MacBook Pro 16 M3 Max', 'ThinkPad T14s Gen 5 AMD', 'ThinkPad P16 Gen 2', etc.",
                     "Compare the count of laptop models presented against the total number of laptop models available for that location in the additional context below. For EMEA, there should be exactly 4 laptop models. For NA, APAC, and LATAM, there should also be exactly 4 laptop models each.",
@@ -302,12 +308,14 @@ def get_metrics(
             model=custom_model,
             evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
             evaluation_steps=[
+                "FIRST: Determine whether the agent found the user NOT ELIGIBLE for a laptop refresh. If the agent explicitly stated the user is not eligible and offered to escalate or close the ticket instead of presenting laptop options, The agent behavior is PERFECT for this metric. STOP HERE. Do NOT evaluate any further criteria. Do NOT penalize for the absence of a laptop selection.",
                 "This metric ONLY checks whether the agent correctly recorded the laptop the user selected. It does not evaluate confirmation, eligibility, or any other part of the conversation.",
-                "Find where the user selects a laptop (e.g., 'I'd like option 3, the Lenovo ThinkPad T14 Gen 4 Intel', 'I'll take the MacBook Air M2', etc.).",
-                "Find where the agent acknowledges or echoes back the selected laptop (e.g., 'You've selected the...', 'I'll proceed with the...', or any statement naming the chosen laptop).",
-                "Verify that the laptop name the agent echoes back matches the laptop the user actually selected.",
-                "PASS this metric if the agent correctly names the laptop the user chose.",
-                "FAIL this metric if the agent names a different laptop than the one the user selected (e.g., user selects 'Lenovo ThinkPad T14 Gen 4 Intel' but agent says 'You've selected the Apple MacBook Air M2').",
+                "Find where the user selects a laptop. The user may select by name (e.g., 'I'll take the MacBook Air M2') OR by number (e.g., '1', 'option 1', 'I'd like option 3'). Both are valid selection methods.",
+                "If the user selected by NUMBER: look at the numbered laptop list the agent presented just before the selection. Find which laptop name corresponds to that number in the list. That is the laptop the user selected.",
+                "Find where the agent acknowledges or echoes back the selected laptop by name (e.g., 'You've selected the...', 'I'll proceed with the...').",
+                "Verify that the laptop name the agent echoes back matches the laptop the user actually selected (whether selected by name or by number).",
+                "PASS this metric if the agent correctly names the laptop corresponding to the user's choice.",
+                "FAIL this metric ONLY if the agent echoes back a DIFFERENT laptop name than the one the user selected (e.g., user selects option 1 which is MacBook Air M2 in the list, but agent says 'You've selected the ThinkPad').",
                 "IMPORTANT: This metric only evaluates the correctness of the selection echo. Do NOT consider whether the laptop was valid, whether confirmation was asked, or any other aspect of the conversation.",
             ],
         ),
@@ -329,6 +337,7 @@ def get_metrics(
                 "If the agent asked for confirmation and the user responded affirmatively, this metric PASSES — regardless of whether the ticket was actually sent afterwards.",
                 "PASS this metric if: the agent asked for confirmation and the user responded affirmatively.",
                 "PASS this metric if: the ticket was never sent to the manager at all (nothing to have skipped confirmation on — Process Completion will catch the missing action).",
+                "PASS this metric if: the ticket was ESCALATED or CLOSED instead of sent to a manager — escalation and closure are separate actions that do not require a manager confirmation step.",
                 "FAIL this metric ONLY if: the ticket is explicitly sent to the manager WITHOUT the agent having asked for confirmation first, or before the user responds.",
                 "IMPORTANT: Do NOT require the agent to confirm the ticket was sent. Do NOT fail this metric because the ticket was never sent. Do NOT consider whether the laptop selection was valid or invalid.",
             ],

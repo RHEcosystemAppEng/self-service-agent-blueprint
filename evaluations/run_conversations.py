@@ -57,13 +57,19 @@ if __name__ == "__main__":
             flow_module, "DEFAULT_TEST_SCRIPT", "chat-responses-request-mgr.py"
         )
         test_script = args.test_script or default_test_script
+        default_reset_conversation = getattr(
+            flow_module, "DEFAULT_RESET_CONVERSATION", False
+        )
+        reset_conversation = args.reset_conversation or default_reset_conversation
     else:
         # Default mode: existing behavior
         conversations_dir = "conversations_config/conversations"
         output_dir = "results/conversation_results"
         test_script = args.test_script or "chat-responses-request-mgr.py"
+        reset_conversation = args.reset_conversation
 
     tester = ConversationFlowTester(
-        test_script=test_script, reset_conversation=args.reset_conversation
+        test_script=test_script,
+        reset_conversation=reset_conversation,
     )
     tester.run_flows(conversations_dir, output_dir)

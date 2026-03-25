@@ -482,6 +482,10 @@ help:
 	@echo "      LG_PROMPT_EMAIL_UPDATE          - Override email-update agent"
 	@echo "    Usage: make helm-install-test LG_PROMPT_LAPTOP_REFRESH=config/lg-prompts/custom.yaml"
 	@echo ""
+	@echo "  Routing Agent Configuration:"
+	@echo "    DEFAULT_AGENT_ID                  - Override the default routing agent (default: routing-agent)"
+	@echo "    Usage: make helm-install-test DEFAULT_AGENT_ID=my-custom-agent"
+	@echo ""
 	@echo "  Evaluation Configuration:"
 	@echo "    VALIDATE_FULL_LAPTOP_DETAILS    - Enable full laptop details validation (default: true)"
 	@echo "                                        Set to 'false' to disable: VALIDATE_FULL_LAPTOP_DETAILS=false"
@@ -1558,6 +1562,7 @@ endef
 # Install with mock eventing service (testing/development/CI mode - default)
 # Extract all LG_PROMPT_* variables and convert them to Helm --set arguments
 PROMPT_OVERRIDES := $(foreach var,$(filter LG_PROMPT_%,$(.VARIABLES)),--set requestManagement.agentService.promptOverrides.lg-prompt-$(shell echo $(var:LG_PROMPT_%=%) | tr '[:upper:]' '[:lower:]' | tr '_' '-')=$($(var)))
+DEFAULT_AGENT_ID_ARG := $(if $(DEFAULT_AGENT_ID),--set agent.defaultAgentId=$(DEFAULT_AGENT_ID),)
 
 .PHONY: helm-install-test
 helm-install-test: namespace helm-depend
@@ -1565,7 +1570,8 @@ helm-install-test: namespace helm-depend
 		-f helm/values-test.yaml \
 		--set requestManagement.knative.mockEventing.enabled=true \
 		--set testIntegrationEnabled=true \
-		$(PROMPT_OVERRIDES),\
+		$(PROMPT_OVERRIDES) \
+		$(DEFAULT_AGENT_ID_ARG),\
 		true)
 	@$(MAKE) print-urls
 
@@ -1576,7 +1582,8 @@ helm-install-demo: namespace helm-depend deploy-email-server
 		-f helm/values-test.yaml \
 		-f helm/values-demo.yaml \
 		$(helm_demo_email_args) \
-		$(PROMPT_OVERRIDES),\
+		$(PROMPT_OVERRIDES) \
+		$(DEFAULT_AGENT_ID_ARG),\
 		true)
 	@$(MAKE) print-urls
 
@@ -1638,7 +1645,8 @@ _helm-install-ticketing-single:
 		--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_URL.key=zammad-url \
 		--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_HTTP_TOKEN.name=$(ZAMMAD_CREDENTIALS_SECRET) \
 		--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_HTTP_TOKEN.key=zammad-http-token \
-		$(PROMPT_OVERRIDES),\
+		$(PROMPT_OVERRIDES) \
+		$(DEFAULT_AGENT_ID_ARG),\
 		true)
 	@$(MAKE) print-urls
 
@@ -1818,7 +1826,8 @@ helm-export-demo: helm-depend
 		-f helm/values-test.yaml \
 		-f helm/values-demo.yaml \
 		$(helm_demo_email_args) \
-		$(PROMPT_OVERRIDES))
+		$(PROMPT_OVERRIDES) \
+		$(DEFAULT_AGENT_ID_ARG))
 	@echo "Adding ServiceNow credentials secret to export..."
 	@kubectl create secret generic $(MAIN_CHART_NAME)-servicenow-credentials \
 		--from-literal=servicenow-instance-url="$${SERVICENOW_INSTANCE_URL:-http://self-service-agent-mock-servicenow:8080}" \

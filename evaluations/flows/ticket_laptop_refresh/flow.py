@@ -4,6 +4,8 @@ from typing import List
 
 FLOW_NAME: str = "ticket_laptop_refresh"
 DEFAULT_TEST_SCRIPT: str = "chat-responses-request-mgr.py"
+DEFAULT_RESET_CONVERSATION: bool = True
+DEFAULT_SKIP_INITIAL_MESSAGE: bool = True
 KNOWLEDGE_BASE_DIRS: List[str] = ["laptop-refresh"]
 INCLUDE_SNOW_DATA: bool = True
 
@@ -24,15 +26,45 @@ Your responsibilities:
 Note: Providing clear, factual information about potential rejection or additional approvals is sufficient. You do not need to be overly cautionary or repeatedly emphasize warnings. Always confirm with the user before creating tickets."""
 
 
-def get_scenario(use_structured_output: bool) -> tuple[tuple[str, str, str], str, str]:
-    """Return (scenario, expected_outcome, user_description) for conversation generation."""
-    expected_outcome = "They get a Service now ticket number for their refresh request"
+_USER_DESCRIPTION = (
+    "An employee responding to comments on their IT support ticket in a ticketing system. "
+    "Their messages are brief and direct, as typical ticket comments — for example: 'requesting a laptop refresh', "
+    "'please show me the options', 'option 3', 'yes proceed' — not conversational chat messages. "
+    "When selecting from a numbered list of options, the employee selects option {option_number} from the list. "
+    "The employee responds directly to the agent's most recent question without asking for confirmation "
+    "of information that has already been provided."
+)
 
-    scenario = (
-        "A ticket is created by the user asking to refresh their laptop. An agents responsds on the ticket with their current laptop information and their elligibiblity for a fresh based on the company policy",
-        "If the user is elligible the agent will provide a list of options, the user selects one and the agent will ask if they would like the ticket to be sent to their manager for approval.",
-        "If the user is not elligible the agent will ask if the user would like to close or escalate the ticket.",
-    )
-    user_description = "An employee interacting with an IT self-service agent through a ticket in a ticketing system."
+_SCENARIOS = [
+    (
+        "An employee has submitted a ticket requesting a laptop refresh. The employee opens the conversation by "
+        "requesting a laptop refresh in a short, direct comment. The agent replies with the employee's current laptop "
+        "details and their eligibility status based on company policy. "
+        "The employee responds with short, direct ticket comments and ONLY reacts to what the agent has already said — "
+        "they never select a laptop or take an action before the agent has explicitly presented that option. "
+        "If the agent says they ARE eligible and presents a list of laptops, the employee selects one from the list "
+        "(specifically option {option_number}), "
+        "then confirms when the agent asks before the ticket is sent to their manager for approval. "
+        "If the agent says they are NOT eligible, the employee chooses to escalate the ticket to request an exception.",
+        "The ticket is either routed to the user's manager for approval (if eligible) or escalated for an exception (if not eligible).",
+        _USER_DESCRIPTION,
+    ),
+    (
+        "An employee has submitted a ticket requesting a laptop refresh. The employee opens the conversation by "
+        "requesting a laptop refresh in a short, direct comment. The agent replies with the employee's current laptop "
+        "details and their eligibility status based on company policy. "
+        "The employee responds with short, direct ticket comments and ONLY reacts to what the agent has already said — "
+        "they never select a laptop or take an action before the agent has explicitly presented that option. "
+        "If the agent says they ARE eligible and presents a list of laptops, the employee selects one from the list "
+        "(specifically option {option_number}), "
+        "then confirms when the agent asks before the ticket is sent to their manager for approval. "
+        "If the agent says they are NOT eligible, the employee chooses to close the ticket.",
+        "The ticket is either routed to the user's manager for approval (if eligible) or closed (if not eligible).",
+        _USER_DESCRIPTION,
+    ),
+]
 
-    return scenario, expected_outcome, user_description
+
+def get_scenario(use_structured_output: bool) -> list[tuple[str, str, str]]:
+    """Return a list of (scenario, expected_outcome, user_description) tuples for conversation generation."""
+    return _SCENARIOS

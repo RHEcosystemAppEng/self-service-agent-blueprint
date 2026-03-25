@@ -1,0 +1,21 @@
+{
+    "metadata": {
+        "authoritative_user_id": "david.chen@company.com",
+        "description": "Eligible user explicitly requests escalation after seeing laptop options — tests CRITICAL STOP CONDITION mid-flow",
+        "use_first_message_as_initial": true
+    },
+    "conversation": [
+        {
+            "role": "user",
+            "content": "I would like to refresh my laptop"
+        },
+        {
+            "role": "user",
+            "content": "yes, show me the laptop options"
+        },
+        {
+            "role": "user",
+            "content": "please escalate this ticket, I want a human to handle it"
+        }
+    ]
+}

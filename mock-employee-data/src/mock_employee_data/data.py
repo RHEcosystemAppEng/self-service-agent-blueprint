@@ -34,7 +34,7 @@ MOCK_EMPLOYEE_DATA = {
         "active": "true",
         "laptop_model": "MacBook Pro 14-inch",
         "laptop_serial_number": "MBP14002",
-        "purchase_date": "2023-03-20",
+        "purchase_date": "2024-03-20",
         "warranty_expiry": "2026-03-20",
         "warranty_status": "Active",
         "asset_tag": "ASSET-002",

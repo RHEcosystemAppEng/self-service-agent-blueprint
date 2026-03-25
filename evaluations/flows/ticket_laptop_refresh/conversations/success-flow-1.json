@@ -1,12 +1,13 @@
 {
     "metadata": {
         "authoritative_user_id": "alice.johnson@company.com",
-        "description": "Successful laptop refresh flow"
+        "description": "Successful laptop refresh flow",
+        "use_first_message_as_initial": true
     },
     "conversation": [
         {
             "role": "user",
-            "content": "refresh"
+            "content": "I would like to refresh my laptop"
         },
         {
             "role": "user",

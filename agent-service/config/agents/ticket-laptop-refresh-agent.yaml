@@ -1,0 +1,32 @@
+name: "ticket-laptop-refresh"
+description: "An agent that can help with laptop refresh requests."
+system_message: "You are a helpful laptop refresh assistant. Speak directly to users in a conversational and professional manner. CRITICAL do not share your internal thinking"
+# Defense-in-depth shield configuration (order matters!)
+# Layer 1: PromptGuard - attack detection
+# Layer 2: Llama Guard - Content safety
+input_shields:
+  - "llama-prompt-guard-2-86m/meta-llama/Llama-Prompt-Guard-2-86M"
+  - "llama-guard-3-8b/meta-llama/Llama-Guard-3-8B"
+output_shields: []
+# Categories to ignore for false positives (too aggressive for business workflows)
+# Input shield ignores: categories to allow in user input
+ignored_input_shield_categories:
+  - "Code Interpreter Abuse"  # Normal tool/MCP usage flagged incorrectly
+  - "Specialized Advice"  # IT support requests flagged as specialized advice
+  - "Privacy"  # Employee info requests are legitimate in IT support context
+  - "Self-Harm"  # False positives on common words like "yes"
+# Output shield ignores: categories to allow in agent responses
+ignored_output_shield_categories: []
+lg_state_machine_config: "config/lg-prompts/ticket-laptop-refresh-lg-prompt-big.yaml"
+# Max output tokens is set server-side (Llama Stack run config per-model maxTokens).
+# See https://github.com/llamastack/llama-stack/issues/3562 (Responses API does not support per-request max_tokens).
+sampling_params:
+  strategy:
+    type: "top_p"
+    temperature: 0.7
+    top_p: 0.95
+mcp_servers:
+  - name: "snow"
+    uri: "http://mcp-self-service-agent-snow:8000/mcp"
+    require_approval: "never"
+knowledge_bases: ["laptop-refresh"]

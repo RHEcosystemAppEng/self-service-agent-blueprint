@@ -3,7 +3,7 @@
 import json
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from .openshift_chat_client import OpenShiftChatClient
 
@@ -19,6 +19,8 @@ class ConversationFlowTester:
         self,
         test_script: str = "chat-responses-request-mgr.py",
         reset_conversation: bool = False,
+        initial_message: Optional[str] = None,
+        skip_initial_message: bool = False,
     ) -> None:
         """
         Initialize the ConversationFlowTester.
@@ -26,14 +28,23 @@ class ConversationFlowTester:
         Args:
             test_script: Name of the test script to execute (default: "chat-responses-request-mgr.py")
             reset_conversation: If True, send 'reset' message at the start of each conversation
+            initial_message: Message to send after reset instead of the default introduction prompt.
+                             Only used when reset_conversation is True.
+            skip_initial_message: If True, skip sending any initial message after reset, allowing
+                                  the first question to serve as the opening message.
         """
         self.test_script = test_script
         self.reset_conversation = reset_conversation
+        self.initial_message = initial_message
+        self.skip_initial_message = skip_initial_message
         self.conversation_history: list[Any] = []
         self.total_app_tokens = {"input": 0, "output": 0, "total": 0, "calls": 0}
 
     def run_flow(
-        self, questions: list[str], authoritative_user_id: str
+        self,
+        questions: list[str],
+        authoritative_user_id: str,
+        initial_message: Optional[str] = None,
     ) -> List[Dict[str, str]]:
         """
         Run a conversation flow with the given questions.
@@ -58,6 +69,8 @@ class ConversationFlowTester:
             authoritative_user_id,
             test_script=self.test_script,
             reset_conversation=self.reset_conversation,
+            initial_message=initial_message or self.initial_message,
+            skip_initial_message=self.skip_initial_message,
         )
 
         try:
@@ -65,7 +78,13 @@ class ConversationFlowTester:
 
             # First, get the agent initialization message
             agent_init = client.get_agent_initialization()
-            conversation.append({"role": "assistant", "content": agent_init})
+            # If an initial message was sent, record it as the first user turn
+            effective_initial = initial_message or self.initial_message
+            if effective_initial and self.reset_conversation:
+                conversation.append({"role": "user", "content": effective_initial})
+            # Only record agent_init if it's non-empty (skip_initial_message returns "")
+            if agent_init:
+                conversation.append({"role": "assistant", "content": agent_init})
 
             # Then process user questions
             for i, question in enumerate(questions):
@@ -185,12 +204,21 @@ class ConversationFlowTester:
                     logger.warning(f"No user questions found in {filename}")
                     continue
 
+                # Optionally use the first user message as the post-reset initial message
+                initial_message = None
+                if metadata.get("use_first_message_as_initial") and self.reset_conversation:
+                    initial_message = questions[0]
+                    questions = questions[1:]
+                    logger.info(
+                        f"Using first message as initial: {initial_message[:100]}"
+                    )
+
                 logger.info(
                     f"Processing {filename} with {len(questions)} questions using authoritative_user_id: {authoritative_user_id}"
                 )
 
                 # Run the flow with extracted questions and authoritative_user_id
-                results = self.run_flow(questions, authoritative_user_id)
+                results = self.run_flow(questions, authoritative_user_id, initial_message=initial_message)
 
                 # Format results in the new conversation format with metadata
                 formatted_results = {
