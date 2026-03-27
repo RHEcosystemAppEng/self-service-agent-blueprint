@@ -137,10 +137,15 @@ class OpenShiftChatClient:
 
             # After reset, send initial message unless skipped
             if self.skip_initial_message:
-                logger.info("Skipping initial message after reset — caller will send first message")
+                logger.info(
+                    "Skipping initial message after reset — caller will send first message"
+                )
                 return ""
 
-            message = self.initial_message or "please introduce yourself and tell me how you can help"
+            message = (
+                self.initial_message
+                or "please introduce yourself and tell me how you can help"
+            )
             logger.info(f"Sending initial message after reset: {message[:100]}...")
             intro_response = self.send_message(message)
             logger.info(

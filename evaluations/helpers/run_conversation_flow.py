@@ -206,7 +206,10 @@ class ConversationFlowTester:
 
                 # Optionally use the first user message as the post-reset initial message
                 initial_message = None
-                if metadata.get("use_first_message_as_initial") and self.reset_conversation:
+                if (
+                    metadata.get("use_first_message_as_initial")
+                    and self.reset_conversation
+                ):
                     initial_message = questions[0]
                     questions = questions[1:]
                     logger.info(
@@ -218,7 +221,9 @@ class ConversationFlowTester:
                 )
 
                 # Run the flow with extracted questions and authoritative_user_id
-                results = self.run_flow(questions, authoritative_user_id, initial_message=initial_message)
+                results = self.run_flow(
+                    questions, authoritative_user_id, initial_message=initial_message
+                )
 
                 # Format results in the new conversation format with metadata
                 formatted_results = {

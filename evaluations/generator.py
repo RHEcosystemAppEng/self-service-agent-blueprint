@@ -372,7 +372,9 @@ def _run_worker(
 
             # Create conversation golden
             if flow_scenario is not None:
-                scenario, expected_outcome, user_description = random.choice(flow_scenario)
+                scenario, expected_outcome, user_description = random.choice(
+                    flow_scenario
+                )
                 option_number = random.randint(1, 4)
                 scenario = scenario.format(option_number=option_number)
                 user_description = user_description.format(option_number=option_number)
@@ -421,7 +423,12 @@ def _run_worker(
                     test_case, conversation_user_id
                 )
                 # Prepend the initial message exchange if reset was used
-                if reset_conversation and initial_message and init_response and conversation.get("conversation"):
+                if (
+                    reset_conversation
+                    and initial_message
+                    and init_response
+                    and conversation.get("conversation")
+                ):
                     conversation["conversation"] = [
                         {"role": "user", "content": initial_message},
                         {"role": "assistant", "content": init_response},
@@ -556,9 +563,13 @@ if __name__ == "__main__":
         flow_paths.results_conv_dir.mkdir(parents=True, exist_ok=True)
         results_dir = str(flow_paths.results_conv_dir)
         test_script = getattr(flow_module, "DEFAULT_TEST_SCRIPT", args.test_script)
-        reset_conversation = args.reset_conversation or getattr(flow_module, "DEFAULT_RESET_CONVERSATION", False)
+        reset_conversation = args.reset_conversation or getattr(
+            flow_module, "DEFAULT_RESET_CONVERSATION", False
+        )
         initial_message = getattr(flow_module, "DEFAULT_INITIAL_MESSAGE", None)
-        skip_initial_message = getattr(flow_module, "DEFAULT_SKIP_INITIAL_MESSAGE", False)
+        skip_initial_message = getattr(
+            flow_module, "DEFAULT_SKIP_INITIAL_MESSAGE", False
+        )
         flow_scenario = flow_module.get_scenario(args.use_structured_output)
         logger.info(f"Using flow '{args.flow}': saving to {results_dir}")
 
