@@ -187,10 +187,8 @@ class ServiceNowClient:
 
         # Step 2: Check if there's already an open request for the same laptop model
         current_laptop_model = params.laptop_choices
-        existing_request = (
-            self._has_existing_request_for_laptop_model(
-                existing_requests, current_laptop_model
-            )
+        existing_request = self._has_existing_request_for_laptop_model(
+            existing_requests, current_laptop_model
         )
         if existing_request:
             return {
