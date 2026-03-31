@@ -95,7 +95,7 @@ class ServiceNowClient:
 
     def _has_existing_request_for_laptop_model(
         self, existing_requests: List[Dict[str, Any]], laptop_model: str
-    ) -> tuple[bool, Optional[Dict[str, Any]]]:
+    ) -> Optional[Dict[str, Any]]:
         """
         Check if there's already an open request for the same laptop model.
 
@@ -104,13 +104,11 @@ class ServiceNowClient:
             laptop_model: The laptop model to check for.
 
         Returns:
-            Tuple of (bool, Optional[Dict]):
-            - True if existing request found, False otherwise
             - The existing request data if found, None otherwise
         """
         # If avoid_duplicates is disabled, skip the duplicate check entirely
         if not self.laptop_avoid_duplicates:
-            return False, None
+            return None
 
         for request in existing_requests:
             # Extract laptop choice from request - using new sc_req_item format
@@ -129,9 +127,9 @@ class ServiceNowClient:
                 # to maintain interface compatibility with calling code
                 modified_request = request.copy()
                 modified_request["number"] = req_number
-                return True, modified_request
+                return modified_request
 
-        return False, None
+        return None
 
     def _would_exceed_request_limit(
         self, existing_requests: List[Dict[str, Any]]
@@ -189,15 +187,12 @@ class ServiceNowClient:
 
         # Step 2: Check if there's already an open request for the same laptop model
         current_laptop_model = params.laptop_choices
-        has_existing_model_request, existing_request = (
+        existing_request = (
             self._has_existing_request_for_laptop_model(
                 existing_requests, current_laptop_model
             )
         )
-        if has_existing_model_request:
-            assert (
-                existing_request is not None
-            ), "existing_request should not be None when has_existing_model_request is True"
+        if existing_request:
             return {
                 "success": True,
                 "message": f"Existing open request found for the same laptop model: {existing_request.get('number', 'N/A')}",
