@@ -177,12 +177,15 @@ class ServiceNowClient:
         if self.laptop_avoid_duplicates or self.laptop_request_limits is not None:
             user_sys_id = params.who_is_this_request_for
             logger.info("Checking for existing open requests", user_sys_id=user_sys_id)
-            existing_requests_result = self.get_open_laptop_requests_for_user(user_sys_id)
+            existing_requests_result = self.get_open_laptop_requests_for_user(
+                user_sys_id
+            )
             if not existing_requests_result["success"]:
                 return existing_requests_result
             existing_requests = existing_requests_result["requests"]
             logger.info(
-                "Found existing open request(s)", existing_requests=len(existing_requests)
+                "Found existing open request(s)",
+                existing_requests=len(existing_requests),
             )
 
         # Step 2: Check if there's already an open request for the same laptop model
