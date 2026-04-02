@@ -1497,6 +1497,7 @@ define helm_install_common
 		$(TEST_USERS_ARGS) \
 		$(LANGFUSE_ARGS) \
 		$(FAULT_INJECTION_ARGS) \
+		$(DEFAULT_AGENT_ID_ARG) \
 		$(if $(filter-out "",$(2)),$(2),) \
 		$(EXTRA_HELM_ARGS)
 	@echo "Waiting for deployments to be ready..."
@@ -1570,8 +1571,7 @@ helm-install-test: namespace helm-depend
 		-f helm/values-test.yaml \
 		--set requestManagement.knative.mockEventing.enabled=true \
 		--set testIntegrationEnabled=true \
-		$(PROMPT_OVERRIDES) \
-		$(DEFAULT_AGENT_ID_ARG),\
+		$(PROMPT_OVERRIDES),\
 		true)
 	@$(MAKE) print-urls
 
@@ -1582,8 +1582,7 @@ helm-install-demo: namespace helm-depend deploy-email-server
 		-f helm/values-test.yaml \
 		-f helm/values-demo.yaml \
 		$(helm_demo_email_args) \
-		$(PROMPT_OVERRIDES) \
-		$(DEFAULT_AGENT_ID_ARG),\
+		$(PROMPT_OVERRIDES),\
 		true)
 	@$(MAKE) print-urls
 
@@ -1645,8 +1644,7 @@ _helm-install-ticketing-single:
 		--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_URL.key=zammad-url \
 		--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_HTTP_TOKEN.name=$(ZAMMAD_CREDENTIALS_SECRET) \
 		--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_HTTP_TOKEN.key=zammad-http-token \
-		$(PROMPT_OVERRIDES) \
-		$(DEFAULT_AGENT_ID_ARG),\
+		$(PROMPT_OVERRIDES),\
 		true)
 	@$(MAKE) print-urls
 
