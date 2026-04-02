@@ -1555,6 +1555,7 @@ define helm_export
 		$(helm_test_users_args) \
 		$(if $(filter true,$(ENABLE_LANGFUSE)),--set langfuse.enabled=true,) \
 		$(helm_fault_injection_args) \
+		$(DEFAULT_AGENT_ID_ARG) \
 		$(if $(filter-out "",$(1)),$(1),) \
 		$(EXTRA_HELM_ARGS)
 	@echo "Helm export complete."
@@ -1824,8 +1825,7 @@ helm-export-demo: helm-depend
 		-f helm/values-test.yaml \
 		-f helm/values-demo.yaml \
 		$(helm_demo_email_args) \
-		$(PROMPT_OVERRIDES) \
-		$(DEFAULT_AGENT_ID_ARG))
+		$(PROMPT_OVERRIDES))
 	@echo "Adding ServiceNow credentials secret to export..."
 	@kubectl create secret generic $(MAIN_CHART_NAME)-servicenow-credentials \
 		--from-literal=servicenow-instance-url="$${SERVICENOW_INSTANCE_URL:-http://self-service-agent-mock-servicenow:8080}" \
