@@ -1,0 +1,10 @@
+apiVersion: v2
+name: zammad-stack
+description: Zammad instance with bootstrap configuration (group, users, custom attributes)
+type: application
+version: 0.1.0
+appVersion: "16.0.4"
+dependencies:
+  - name: zammad
+    version: "16.0.4"
+    repository: https://zammad.github.io/zammad-helm

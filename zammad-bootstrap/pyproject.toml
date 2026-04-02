@@ -1,0 +1,15 @@
+[project]
+name = "zammad-bootstrap"
+version = "0.1.0"
+description = "Zammad bootstrap job: creates group, custom attribute, and users"
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.31.0",
+    "mock-employee-data",
+]
+
+[tool.uv.sources]
+mock-employee-data = { path = "../mock-employee-data" }
+
+[tool.uv]
+package = false

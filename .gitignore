@@ -208,6 +208,7 @@ ansible/helm-export/
 
 # Helm Chart deployment tgz files
 helm/charts/*.tgz
+helm/zammad/charts/*.tgz
 helm/tmpcharts*
 evaluations/.deepeval/*
 evaluations/results/deep_eval_results/*.json

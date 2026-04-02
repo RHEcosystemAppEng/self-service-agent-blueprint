@@ -1,100 +1,85 @@
 # Values for make deploy-zammad (Zammad instance for dev/testing)
-# Use with: helm upgrade --install zammad zammad/zammad -n NAMESPACE -f helm/values-zammad-deploy.yaml
+# Used with the helm/zammad/ wrapper chart which includes the Zammad subchart and bootstrap Job.
+# Use with: helm upgrade --install zammad-stack helm/zammad/ -n NAMESPACE -f helm/values-zammad-deploy.yaml
 #
-# After deployment (automated path — no UI required for token):
-# - `make helm-install-ticketing`: installs chart + Zammad, triggers autoWizard, creates API token
-#   in-cluster (`kubectl exec` → Zammad API), writes the zammad-credentials Secret (see Makefile), restarts MCP.
-# - If token step fails (Zammad still starting): `make zammad-bootstrap-token NAMESPACE=...` (same automation).
-# - Manual fallback only if needed: Admin → Token Access → `make zammad-set-token ZAMMAD_TOKEN=...`
-# - See root Makefile: `helm-install-ticketing`, `zammad-bootstrap-token`, `deploy-zammad`.
+# Zammad subchart values are nested under "zammad:".
+# Bootstrap Job config is under "bootstrap:".
 #
 # Note: Zammad chart brings elasticsearch, postgresql, redis, memcached. First deploy may take 10+ minutes.
 
-# AutoWizard: seeds admin user so zammad-bootstrap-token can create API token via API.
-# First user = Admin+Agent; add Users with "roles": ["Customer"] for end users (view own tickets, open new ones).
-# Override via --set autoWizard.config=... or env ZAMMAD_ADMIN_EMAIL, ZAMMAD_ADMIN_PASSWORD.
-# Token must match ZAMMAD_AUTOWIZARD_TOKEN in Makefile (for zammad-trigger-autowizard).
-autoWizard:
-  enabled: true
-  config: |
-    {
-      "Token": "ssa-zammad-autowizard-9f3a2b1c",
-      "TextModuleLocale": { "Locale": "en-us" },
-      "Users": [
-        {
-          "login": "admin@zammad.local",
-          "firstname": "Admin",
-          "lastname": "User",
-          "email": "admin@zammad.local",
-          "organization": "Default",
-          "password": "ZammadR0cks!"
-        },
-        {
-          "login": "alice@example.com",
-          "firstname": "Alice",
-          "lastname": "Customer",
-          "email": "alice@example.com",
-          "organization": "Default",
-          "password": "Customer123!",
-          "roles": ["Customer"]
-        },
-        {
-          "login": "bob@example.com",
-          "firstname": "Bob",
-          "lastname": "Customer",
-          "email": "bob@example.com",
-          "organization": "Default",
-          "password": "Customer123!",
-          "roles": ["Customer"]
-        }
-      ],
-      "Organizations": [{"name": "Default"}],
-      "Settings": [
-        {"name": "product_name", "value": "Zammad Demo"},
-        {"name": "system_online_service", "value": true}
-      ]
-    }
+# Bootstrap Job configuration
+bootstrap:
+  image: "quay.io/rh-ai-quickstart/self-service-agent-zammad-bootstrap:latest"
+  # Must match zammad.autoWizard.config Users[0] and Token below
+  adminEmail: "admin@zammad.local"
+  adminPassword: "ZammadR0cks!"
+  autowizardToken: "ssa-zammad-autowizard-9f3a2b1c"
 
-# Pod Security: disable privileged init containers (volumePermissions, sysctl).
-# Zammad chart defaults (runAsUser/fsGroup: 1000) conflict with OpenShift restricted SCC.
-# Makefile deploy-zammad auto-detects namespace UID range on OpenShift and passes via --set.
-#
-# FQDN: Zammad needs ZAMMAD_FQDN to accept requests via Route. helm-install-ticketing installs
-# our chart first (creates Route), then deploys Zammad with ZAMMAD_FQDN=<route-host> at deploy.
-# Port-forward works without it (Host: localhost).
-#
-# trustedProxies: Required for OpenShift Route. Traffic arrives from the router (cluster internal
-# IPs). Without this, Zammad may not trust X-Forwarded-Proto/Host and redirects/scheme break.
-zammadConfig:
-  initContainers:
+# Zammad subchart values
+zammad:
+  # AutoWizard: seeds admin user on first boot.
+  # Token must match ZAMMAD_AUTOWIZARD_TOKEN in Makefile (for zammad-trigger-autowizard).
+  autoWizard:
+    enabled: true
+    config: |
+      {
+        "Token": "ssa-zammad-autowizard-9f3a2b1c",
+        "TextModuleLocale": { "Locale": "en-us" },
+        "Users": [
+          {
+            "login": "admin@zammad.local",
+            "firstname": "Admin",
+            "lastname": "User",
+            "email": "admin@zammad.local",
+            "organization": "Default",
+            "password": "ZammadR0cks!"
+          }
+        ],
+        "Organizations": [{"name": "Default"}],
+        "Settings": [
+          {"name": "product_name", "value": "Zammad Demo"},
+          {"name": "system_online_service", "value": true}
+        ]
+      }
+
+  # Pod Security: disable privileged init containers (volumePermissions, sysctl).
+  # Zammad chart defaults (runAsUser/fsGroup: 1000) conflict with OpenShift restricted SCC.
+  # Makefile deploy-zammad auto-detects namespace UID range on OpenShift and passes via --set.
+  #
+  # FQDN: Zammad needs ZAMMAD_FQDN to accept requests via Route. helm-install-ticketing installs
+  # our chart first (creates Route), then deploys Zammad with ZAMMAD_FQDN=<route-host> at deploy.
+  # Port-forward works without it (Host: localhost).
+  #
+  # trustedProxies: Required for OpenShift Route. Traffic arrives from the router (cluster internal
+  # IPs). Without this, Zammad may not trust X-Forwarded-Proto/Host and redirects/scheme break.
+  zammadConfig:
+    initContainers:
+      volumePermissions:
+        enabled: false  # Privileged init container incompatible with restricted SCC
+    nginx:
+      # Trust cluster-internal IPs (OpenShift router forwards from these ranges)
+      trustedProxies:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    railsserver:
+      # RAILS_TRUSTED_PROXIES: same ranges so Rails trusts X-Forwarded-* from the route
+      trustedProxies: "['127.0.0.1', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16']"
+
+  postgresql:
     volumePermissions:
-      enabled: false  # Privileged init container incompatible with restricted SCC
-  nginx:
-    # Trust cluster-internal IPs (OpenShift router forwards from these ranges)
-    trustedProxies:
-      - 10.0.0.0/8
-      - 172.16.0.0/12
-      - 192.168.0.0/16
-  railsserver:
-    # RAILS_TRUSTED_PROXIES: same ranges so Rails trusts X-Forwarded-* from the route
-    trustedProxies: "['127.0.0.1', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16']"
-  # ingress: set manually for deploy-zammad-only (helm-install-ticketing passes FQDN at deploy)
-  # ingress: { enabled: true, host: zammad.example.com }
+      enabled: false  # Privileged; incompatible with restricted SCC
+    global:
+      compatibility:
+        openshift:
+          adaptSecurityContext: force  # Use OpenShift-allocated UIDs
 
-postgresql:
-  volumePermissions:
-    enabled: false  # Privileged; incompatible with restricted SCC
-  global:
-    compatibility:
-      openshift:
-        adaptSecurityContext: force  # Use OpenShift-allocated UIDs
-
-elasticsearch:
-  sysctlImage:
-    enabled: false  # Privileged; vm.max_map_count often set at node level on OpenShift
-  volumePermissions:
-    enabled: false
-  global:
-    compatibility:
-      openshift:
-        adaptSecurityContext: force  # Use OpenShift-allocated UIDs
+  elasticsearch:
+    sysctlImage:
+      enabled: false  # Privileged; vm.max_map_count often set at node level on OpenShift
+    volumePermissions:
+      enabled: false
+    global:
+      compatibility:
+        openshift:
+          adaptSecurityContext: force  # Use OpenShift-allocated UIDs

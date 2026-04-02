@@ -1,0 +1,55 @@
+ARG UV_VERSION=0.8.9
+ARG USE_PIP_INSTALL=false
+
+# Builder stage
+# Use 9.7 tag for glibc >= 2.34-231.el9_7.10
+FROM registry.access.redhat.com/ubi9/python-312:9.7 as builder
+
+USER root
+ARG UV_VERSION
+RUN pip3 install --no-cache-dir uv==${UV_VERSION}
+
+WORKDIR /app
+
+COPY mock-employee-data/ ./mock-employee-data/
+COPY zammad-bootstrap/pyproject.toml zammad-bootstrap/uv.lock zammad-bootstrap/requirements.txt ./zammad-bootstrap/
+
+WORKDIR /app/zammad-bootstrap
+
+ARG USE_PIP_INSTALL
+# Conditional dependency installation: USE_PIP_INSTALL=true uses pip (workaround for QEMU on Mac M1)
+# Default: uv sync (faster). When USE_PIP_INSTALL=true: pip install from requirements.txt
+RUN if [ "$USE_PIP_INSTALL" = "true" ]; then \
+        python3 -m venv .venv && \
+        grep -E "^(-e |\.\./)" requirements.txt | grep -v "^#" > /tmp/editable-requirements.txt 2>/dev/null || true && \
+        grep -vE "^(-e |\.\./)" requirements.txt | grep -v "^#" > /tmp/non-editable-requirements.txt && \
+        if [ -s /tmp/editable-requirements.txt ]; then \
+            .venv/bin/pip install --no-deps -r /tmp/editable-requirements.txt; \
+        fi && \
+        .venv/bin/pip install --require-hashes --use-deprecated=legacy-resolver -r /tmp/non-editable-requirements.txt && \
+        rm -f /tmp/*-requirements.txt; \
+    else \
+        uv sync --frozen --no-dev; \
+    fi
+
+# Production stage
+# Use 9.7 tag for glibc >= 2.34-231.el9_7.10
+FROM registry.access.redhat.com/ubi9/python-312-minimal:9.7
+
+WORKDIR /app
+
+# Ensure pip is at least 26.0 in the final image (CVE-2025-8869: https://nvd.nist.gov/vuln/detail/CVE-2025-8869)
+USER root
+RUN pip3 install --no-cache-dir --upgrade 'pip>=26.0'
+
+COPY --from=builder /app/zammad-bootstrap/.venv /app/.venv
+COPY --from=builder /app/mock-employee-data /app/mock-employee-data
+COPY zammad-bootstrap/bootstrap.py /app/bootstrap.py
+
+ENV VIRTUAL_ENV=/app/.venv
+ENV PATH="/usr/bin:${VIRTUAL_ENV}/bin:$PATH"
+ENV PYTHONPATH="${VIRTUAL_ENV}/lib/python3.12/site-packages:/app/mock-employee-data/src:$PYTHONPATH"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+USER 1001

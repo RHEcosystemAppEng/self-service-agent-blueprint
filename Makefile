@@ -77,6 +77,7 @@ MCP_SNOW_IMG ?= $(REGISTRY)/self-service-agent-snow-mcp:$(VERSION)
 MOCK_EVENTING_IMG ?= $(REGISTRY)/self-service-agent-mock-eventing:$(VERSION)
 MOCK_SERVICENOW_IMG ?= $(REGISTRY)/self-service-agent-mock-servicenow:$(VERSION)
 PROMPTGUARD_IMG ?= $(REGISTRY)/self-service-agent-promptguard:$(VERSION)
+ZAMMAD_BOOTSTRAP_IMG ?= $(REGISTRY)/self-service-agent-zammad-bootstrap:$(VERSION)
 
 # For retag-all-images: tag from REGISTRY/VERSION to NEW_REGISTRY/NEW_VERSION (set both when retagging)
 NEW_REGISTRY ?=
@@ -269,6 +270,7 @@ help:
 	@echo "  build-mcp-snow-image                 - Build the snow MCP server container image (checks lockfiles first)"
 	@echo "  build-mock-eventing-image            - Build the mock eventing service container image (checks lockfiles first)"
 	@echo "  build-mock-servicenow-image          - Build the mock ServiceNow server container image (checks lockfiles first)"
+	@echo "  build-zammad-bootstrap-image         - Build the Zammad bootstrap container image (checks lockfiles first)"
 	@echo "  build-promptguard-image              - Build the PromptGuard service container image (checks lockfiles first)"
 	@echo "  build-request-mgr-image              - Build the request manager container image (checks lockfiles first)"
 	@echo "                                        💡 Tip: If you encounter QEMU issues on Mac M1/M2/M3, add USE_PIP_INSTALL=true"
@@ -331,6 +333,7 @@ help:
 	@echo "  pull-mock-eventing-image            - Pull mock eventing image"
 	@echo "  pull-mock-servicenow-image          - Pull mock ServiceNow image"
 	@echo "  pull-promptguard-image              - Pull PromptGuard image"
+	@echo "  pull-zammad-bootstrap-image         - Pull Zammad bootstrap image"
 	@echo ""
 	@echo "Retag Commands (pull at REGISTRY/VERSION then tag -> NEW_REGISTRY/NEW_VERSION; set both NEW_* vars):"
 	@echo "  retag-all-images                    - Pull all images, then retag all to NEW_REGISTRY/NEW_VERSION"
@@ -341,6 +344,7 @@ help:
 	@echo "  retag-mock-eventing-image           - Retag mock eventing image"
 	@echo "  retag-mock-servicenow-image         - Retag mock ServiceNow image"
 	@echo "  retag-promptguard-image             - Retag PromptGuard image"
+	@echo "  retag-zammad-bootstrap-image        - Retag Zammad bootstrap image"
 	@echo ""
 	@echo "Push Commands:"
 	@echo "  push-all-images                     - Push all container images to registry"
@@ -435,6 +439,7 @@ help:
 	@echo "    INTEGRATION_DISPATCHER_IMG        - Full integration dispatcher image name (default: \$${REGISTRY}/self-service-agent-integration-dispatcher:\$${VERSION})"
 	@echo "    MCP_SNOW_IMG                      - Full snow MCP image name (default: \$${REGISTRY}/self-service-agent-snow-mcp:\$${VERSION})"
 	@echo "    MOCK_SERVICENOW_IMG               - Full mock ServiceNow image name (default: \$${REGISTRY}/self-service-agent-mock-servicenow:\$${VERSION})"
+	@echo "    ZAMMAD_BOOTSTRAP_IMG              - Full Zammad bootstrap image name (default: \$${REGISTRY}/self-service-agent-zammad-bootstrap:\$${VERSION})"
 	@echo "    REQUEST_MGR_IMG                   - Full request manager image name (default: \$${REGISTRY}/self-service-agent-request-manager:\$${VERSION})"
 	@echo "    USE_PIP_INSTALL                   - Use pip install from requirements.txt instead of uv sync (default: false)"
 	@echo "                                        ⚠️  Troubleshooting: If you encounter QEMU segmentation faults when building"
@@ -597,7 +602,7 @@ check-deps-mcp-template: check-lockfile-shared-models
 
 # Build container images
 .PHONY: build-all-images
-build-all-images: build-request-mgr-image build-agent-service-image build-integration-dispatcher-image build-mcp-snow-image build-mock-eventing-image build-mock-servicenow-image build-promptguard-image
+build-all-images: build-request-mgr-image build-agent-service-image build-integration-dispatcher-image build-mcp-snow-image build-mock-eventing-image build-mock-servicenow-image build-promptguard-image build-zammad-bootstrap-image
 	@echo "All container images built successfully!"
 
 
@@ -630,9 +635,19 @@ build-mock-eventing-image: check-lockfile-mock-eventing check-deps-services-temp
 build-mock-servicenow-image: check-lockfile-mock-servicenow check-deps-services-template
 	$(call build_template_image,$(MOCK_SERVICENOW_IMG),mock ServiceNow server image,Containerfile.services-template,mock-service-now,mock_servicenow.server,.)
 
+.PHONY: build-zammad-bootstrap-image
+build-zammad-bootstrap-image: check-lockfile-zammad-bootstrap check-lockfile-mock-employee-data
+	@echo "Building Zammad bootstrap image: $(ZAMMAD_BOOTSTRAP_IMG)"
+	$(CONTAINER_TOOL) build -t $(ZAMMAD_BOOTSTRAP_IMG) --platform=$(ARCH) \
+		-f zammad-bootstrap/Containerfile.zammad-bootstrap \
+		--build-arg UV_VERSION=$(UV_VERSION) \
+		--build-arg USE_PIP_INSTALL=$(USE_PIP_INSTALL) \
+		.
+	@echo "Successfully built $(ZAMMAD_BOOTSTRAP_IMG)"
+
 # Push container images
 .PHONY: push-all-images
-push-all-images: push-request-mgr-image push-agent-service-image push-integration-dispatcher-image push-mcp-snow-image push-mock-eventing-image push-mock-servicenow-image push-promptguard-image
+push-all-images: push-request-mgr-image push-agent-service-image push-integration-dispatcher-image push-mcp-snow-image push-mock-eventing-image push-mock-servicenow-image push-promptguard-image push-zammad-bootstrap-image
 	@echo "All container images pushed successfully!"
 
 
@@ -662,13 +677,17 @@ push-mock-eventing-image:
 push-mock-servicenow-image:
 	$(call push_image,$(MOCK_SERVICENOW_IMG) $(PUSH_EXTRA_AGRS),mock ServiceNow server image)
 
+.PHONY: push-zammad-bootstrap-image
+push-zammad-bootstrap-image:
+	$(call push_image,$(ZAMMAD_BOOTSTRAP_IMG) $(PUSH_EXTRA_AGRS),Zammad bootstrap image)
+
 .PHONY: push-promptguard-image
 push-promptguard-image:
 	$(call push_image,$(PROMPTGUARD_IMG) $(PUSH_EXTRA_AGRS),PromptGuard service image)
 
 # Pull images at REGISTRY/VERSION with --platform=$(ARCH)
 .PHONY: pull-all-images
-pull-all-images: pull-request-mgr-image pull-agent-service-image pull-integration-dispatcher-image pull-mcp-snow-image pull-mock-eventing-image pull-mock-servicenow-image pull-promptguard-image
+pull-all-images: pull-request-mgr-image pull-agent-service-image pull-integration-dispatcher-image pull-mcp-snow-image pull-mock-eventing-image pull-mock-servicenow-image pull-promptguard-image pull-zammad-bootstrap-image
 	@echo "All images pulled successfully!"
 
 .PHONY: pull-request-mgr-image
@@ -695,13 +714,17 @@ pull-mock-eventing-image:
 pull-mock-servicenow-image:
 	$(call pull_image,$(MOCK_SERVICENOW_IMG),mock ServiceNow server image)
 
+.PHONY: pull-zammad-bootstrap-image
+pull-zammad-bootstrap-image:
+	$(call pull_image,$(ZAMMAD_BOOTSTRAP_IMG),Zammad bootstrap image)
+
 .PHONY: pull-promptguard-image
 pull-promptguard-image:
 	$(call pull_image,$(PROMPTGUARD_IMG),PromptGuard service image)
 
 # Retag images from REGISTRY/VERSION to NEW_REGISTRY/NEW_VERSION (both NEW_* must be set)
 .PHONY: retag-all-images
-retag-all-images: retag-request-mgr-image retag-agent-service-image retag-integration-dispatcher-image retag-mcp-snow-image retag-mock-eventing-image retag-mock-servicenow-image retag-promptguard-image
+retag-all-images: retag-request-mgr-image retag-agent-service-image retag-integration-dispatcher-image retag-mcp-snow-image retag-mock-eventing-image retag-mock-servicenow-image retag-promptguard-image retag-zammad-bootstrap-image
 	@echo "All images retagged to $(NEW_REGISTRY)/*:$(NEW_VERSION)"
 
 .PHONY: retag-request-mgr-image
@@ -727,6 +750,10 @@ retag-mock-eventing-image: pull-mock-eventing-image
 .PHONY: retag-mock-servicenow-image
 retag-mock-servicenow-image: pull-mock-servicenow-image
 	$(call retag_image,self-service-agent-mock-servicenow,mock ServiceNow server image)
+
+.PHONY: retag-zammad-bootstrap-image
+retag-zammad-bootstrap-image: pull-zammad-bootstrap-image
+	$(call retag_image,self-service-agent-zammad-bootstrap,Zammad bootstrap image)
 
 .PHONY: retag-promptguard-image
 retag-promptguard-image: pull-promptguard-image
@@ -1030,7 +1057,7 @@ test-all: test-shared-models test-shared-clients test-request-manager test-agent
 MAKE_SAME := $(MAKE) -f $(firstword $(MAKEFILE_LIST))
 # All directories that have uv.lock (for check-lockfiles and update-lockfiles).
 # Export of requirements.txt only runs for dirs also in REQUIREMENTS_DIRS (see update_lockfile).
-LOCKFILE_DIRS := shared-models shared-clients agent-service request-manager integration-dispatcher mcp-servers/snow mock-eventing-service mock-employee-data promptguard-service scripts/servicenow-bootstrap
+LOCKFILE_DIRS := shared-models shared-clients agent-service request-manager integration-dispatcher mcp-servers/snow mock-eventing-service mock-employee-data promptguard-service scripts/servicenow-bootstrap zammad-bootstrap
 
 define check_lockfile
 	@echo "📦 Checking $(1)..."
@@ -1102,7 +1129,7 @@ update-lockfiles: check-uv-version
 	@echo "🎉 All lockfiles updated successfully!"
 
 # Individual service lockfile targets
-.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-snow check-lockfile-mock-eventing check-lockfile-mock-employee-data check-lockfile-mock-servicenow check-lockfile-promptguard check-lockfile-servicenow-bootstrap
+.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-snow check-lockfile-mock-eventing check-lockfile-mock-employee-data check-lockfile-mock-servicenow check-lockfile-promptguard check-lockfile-servicenow-bootstrap check-lockfile-zammad-bootstrap
 check-lockfile-root:
 	@echo "📦 Checking root project..."
 	@if uv lock --check; then \
@@ -1144,8 +1171,11 @@ check-lockfile-promptguard:
 check-lockfile-servicenow-bootstrap:
 	$(call check_lockfile,scripts/servicenow-bootstrap)
 
+check-lockfile-zammad-bootstrap:
+	$(call check_lockfile,zammad-bootstrap)
 
-.PHONY: update-lockfile-shared-models update-lockfile-shared-clients update-lockfile-agent-service update-lockfile-request-manager update-lockfile-integration-dispatcher update-lockfile-mcp-snow update-lockfile-mock-eventing update-lockfile-mock-employee-data update-lockfile-mock-servicenow update-lockfile-promptguard update-lockfile-servicenow-bootstrap
+
+.PHONY: update-lockfile-shared-models update-lockfile-shared-clients update-lockfile-agent-service update-lockfile-request-manager update-lockfile-integration-dispatcher update-lockfile-mcp-snow update-lockfile-mock-eventing update-lockfile-mock-employee-data update-lockfile-mock-servicenow update-lockfile-promptguard update-lockfile-servicenow-bootstrap update-lockfile-zammad-bootstrap
 update-lockfile-shared-models:
 	$(call update_lockfile,shared-models)
 
@@ -1179,6 +1209,9 @@ update-lockfile-promptguard:
 update-lockfile-servicenow-bootstrap:
 	$(call update_lockfile,scripts/servicenow-bootstrap)
 
+update-lockfile-zammad-bootstrap:
+	$(call update_lockfile,zammad-bootstrap)
+
 # Full export for one directory: check, cd, uv export, add_torch_hash, echo. Single line so Make does not echo the recipe.
 # Usage: $(call export_requirements,dir) or: $(MAKE) _export-one-dir DIR=<dir>
 define export_requirements
@@ -1201,7 +1234,7 @@ _export-one-dir:
 # CI uses: astral-sh/setup-uv@v5 with version: "0.8.9"
 # To install locally: curl -LsSf https://astral.sh/uv/0.8.9/install.sh | sh
 # Or update: uv self update (may install newer version - check with make check-uv-version)
-REQUIREMENTS_DIRS := agent-service integration-dispatcher promptguard-service request-manager mock-eventing-service mock-service-now mcp-servers/snow shared-models shared-clients mock-employee-data
+REQUIREMENTS_DIRS := agent-service integration-dispatcher promptguard-service request-manager mock-eventing-service mock-service-now mcp-servers/snow shared-models shared-clients mock-employee-data zammad-bootstrap
 # UV_VERSION: uv version for CI validation and container builds (default: 0.8.9, can be overridden)
 UV_VERSION ?= 0.8.9
 EXTRACT_TORCH_HASH_SCRIPT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))scripts/extract_torch_hash.py)
@@ -1593,7 +1626,7 @@ helm-install-demo: namespace helm-depend deploy-email-server
 .PHONY: helm-install-ticketing
 helm-install-ticketing: namespace helm-depend
 	@echo "Step 1/4: Creating placeholder secret and installing our chart (creates Route)..."
-	@ZAMMAD_URL="http://zammad-nginx.$(NAMESPACE).svc.cluster.local:8080"; \
+	@ZAMMAD_URL="http://zammad-stack-nginx.$(NAMESPACE).svc.cluster.local:8080"; \
 	kubectl create secret generic $(ZAMMAD_CREDENTIALS_SECRET) \
 		--from-literal=zammad-url="$$ZAMMAD_URL/api/v1" \
 		--from-literal=zammad-http-token="" \
@@ -1613,11 +1646,11 @@ helm-install-ticketing: namespace helm-depend
 	fi
 	@echo "Step 3/4: Triggering autoWizard and creating API token..."
 	@$(MAKE) zammad-trigger-autowizard NAMESPACE=$(NAMESPACE) 2>/dev/null || true; \
-	ZAMMAD_URL="http://zammad-nginx.$(NAMESPACE).svc.cluster.local:8080"; \
+	ZAMMAD_URL="http://zammad-stack-nginx.$(NAMESPACE).svc.cluster.local:8080"; \
 	ZAMMAD_TOKEN=$$(kubectl get secret $(ZAMMAD_CREDENTIALS_SECRET) -n $(NAMESPACE) -o jsonpath='{.data.zammad-http-token}' 2>/dev/null | base64 -d 2>/dev/null || true); \
 	if [ -z "$$ZAMMAD_TOKEN" ]; then \
 		echo "Creating Zammad API token via exec..."; \
-		ZAMMAD_TOKEN=$$(kubectl exec deploy/zammad-railsserver -n $(NAMESPACE) -- env ZAMMAD_ADMIN_EMAIL='$(ZAMMAD_ADMIN_EMAIL)' ZAMMAD_ADMIN_PASSWORD='$(ZAMMAD_ADMIN_PASSWORD)' ruby -rnet/http -rjson -e 'uri=URI("http://localhost:3000/api/v1/user_access_token");req=Net::HTTP::Post.new(uri);req.basic_auth(ENV["ZAMMAD_ADMIN_EMAIL"],ENV["ZAMMAD_ADMIN_PASSWORD"]);req["Content-Type"]="application/json";req.body=JSON.generate({"name"=>"mcp-agent","permission"=>["admin","ticket.agent"]});res=Net::HTTP.start(uri.hostname,uri.port){|h|h.request(req)};d=JSON.parse(res.body);t=d["token"];t ? puts(t) : ($$stderr.puts("Zammad API #{res.code}: #{res.body[0,500]}");exit 1)' ) || ZAMMAD_TOKEN=""; \
+		ZAMMAD_TOKEN=$$(kubectl exec deploy/zammad-stack-railsserver -n $(NAMESPACE) -- env ZAMMAD_ADMIN_EMAIL='$(ZAMMAD_ADMIN_EMAIL)' ZAMMAD_ADMIN_PASSWORD='$(ZAMMAD_ADMIN_PASSWORD)' ruby -rnet/http -rjson -e 'uri=URI("http://localhost:3000/api/v1/user_access_token");req=Net::HTTP::Post.new(uri);req.basic_auth(ENV["ZAMMAD_ADMIN_EMAIL"],ENV["ZAMMAD_ADMIN_PASSWORD"]);req["Content-Type"]="application/json";req.body=JSON.generate({"name"=>"mcp-agent","permission"=>["admin","ticket.agent"]});res=Net::HTTP.start(uri.hostname,uri.port){|h|h.request(req)};d=JSON.parse(res.body);t=d["token"];t ? puts(t) : ($$stderr.puts("Zammad API #{res.code}: #{res.body[0,500]}");exit 1)' ) || ZAMMAD_TOKEN=""; \
 	fi; \
 	if [ -n "$$ZAMMAD_TOKEN" ]; then \
 		echo "✅ Token created"; \
@@ -1677,7 +1710,7 @@ _helm-install-ticketing-print-checklist:
 		echo "     API:    https://$$ZAMMAD_ROUTE/api/v1"; \
 		if [ -n "$$ZAMMAD_EMBED_ROUTE" ]; then echo "     Embed:  https://$$ZAMMAD_EMBED_ROUTE (Zammad chat widget — embed snippet + live preview)"; fi; \
 	else \
-		echo "     Port-forward: kubectl port-forward -n $(NAMESPACE) svc/zammad-nginx 8080:8080"; \
+		echo "     Port-forward: kubectl port-forward -n $(NAMESPACE) svc/zammad-stack-nginx 8080:8080"; \
 		echo "     Web UI: http://localhost:8080"; \
 		echo "     API:    http://localhost:8080/api/v1"; \
 	fi
@@ -2078,24 +2111,25 @@ deploy-zammad: namespace
 	@echo "This may take 10-15 minutes (Zammad brings elasticsearch, postgresql, redis, memcached)..."
 	@helm repo add zammad $(ZAMMAD_HELM_REPO) 2>/dev/null || helm repo add zammad $(ZAMMAD_HELM_REPO) --force-update
 	@helm repo update zammad
+	@helm dependency update helm/zammad/
 	@ZAMMAD_UID=$$(kubectl get namespace $(NAMESPACE) -o jsonpath='{.metadata.annotations.openshift\.io/sa\.scc\.uid-range}' 2>/dev/null | cut -d'/' -f1); \
-	ZAMMAD_ARGS="-f helm/values-zammad-deploy.yaml"; \
+	ZAMMAD_ARGS="-f helm/values-zammad-deploy.yaml --set bootstrap.image=$(ZAMMAD_BOOTSTRAP_IMG)"; \
 	if [ -n "$$ZAMMAD_UID" ]; then \
-		ZAMMAD_ARGS="$$ZAMMAD_ARGS --set securityContext.runAsUser=$$ZAMMAD_UID --set securityContext.runAsGroup=$$ZAMMAD_UID --set securityContext.fsGroup=$$ZAMMAD_UID"; \
+		ZAMMAD_ARGS="$$ZAMMAD_ARGS --set zammad.securityContext.runAsUser=$$ZAMMAD_UID --set zammad.securityContext.runAsGroup=$$ZAMMAD_UID --set zammad.securityContext.fsGroup=$$ZAMMAD_UID"; \
 		echo "OpenShift: using namespace UID $$ZAMMAD_UID for restricted SCC"; \
 	fi; \
 	if [ -n "$(ZAMMAD_FQDN)" ]; then \
 		echo "Configuring Zammad FQDN for Route: $(ZAMMAD_FQDN)"; \
 		TMPFQDN=$$(mktemp); \
-		echo "extraEnv:" > $$TMPFQDN; \
-		echo "  - name: ZAMMAD_FQDN" >> $$TMPFQDN; \
-		echo "    value: \"$(ZAMMAD_FQDN)\"" >> $$TMPFQDN; \
-		echo "  - name: ZAMMAD_HTTP_TYPE" >> $$TMPFQDN; \
-		echo "    value: \"https\"" >> $$TMPFQDN; \
+		echo "zammad:" > $$TMPFQDN; \
+		echo "  extraEnv:" >> $$TMPFQDN; \
+		echo "    - name: ZAMMAD_FQDN" >> $$TMPFQDN; \
+		echo "      value: \"$(ZAMMAD_FQDN)\"" >> $$TMPFQDN; \
+		echo "    - name: ZAMMAD_HTTP_TYPE" >> $$TMPFQDN; \
+		echo "      value: \"https\"" >> $$TMPFQDN; \
 		ZAMMAD_ARGS="$$ZAMMAD_ARGS -f $$TMPFQDN"; \
 	fi; \
-	helm upgrade --install zammad zammad/zammad \
-		--version $(ZAMMAD_CHART_VERSION) \
+	helm upgrade --install zammad-stack helm/zammad/ \
 		-n $(NAMESPACE) \
 		$$ZAMMAD_ARGS \
 		--timeout 20m \
@@ -2115,25 +2149,20 @@ deploy-zammad: namespace
 	if [ -n "$$ZAMMAD_ROUTE" ]; then \
 		echo "     Web UI: https://$$ZAMMAD_ROUTE"; \
 		echo "     API:    https://$$ZAMMAD_ROUTE/api/v1"; \
-		AUTO_WIZ_URL="https://$$ZAMMAD_ROUTE/#getting_started/auto_wizard/$(ZAMMAD_AUTOWIZARD_TOKEN)"; \
 	else \
-		echo "     Port-forward: kubectl port-forward -n $(NAMESPACE) svc/zammad-nginx 8080:8080"; \
+		echo "     Port-forward: kubectl port-forward -n $(NAMESPACE) svc/zammad-stack-nginx 8080:8080"; \
 		echo "     Web UI / API: http://localhost:8080 (and /api/v1)"; \
-		AUTO_WIZ_URL="http://localhost:8080/#getting_started/auto_wizard/$(ZAMMAD_AUTOWIZARD_TOKEN)"; \
 	fi; \
 	echo ""; \
-	echo "  2. Admin login (autoWizard seed; must match helm/values-zammad-deploy.yaml unless you overrode it):"; \
+	echo "  2. Admin login:"; \
 	echo "       Email:    $(ZAMMAD_ADMIN_EMAIL)"; \
-	echo "       Password: same as Users[0].password in helm/values-zammad-deploy.yaml (Makefile: ZAMMAD_ADMIN_PASSWORD; not printed—override on make targets if you customized autoWizard)"; \
+	echo "       Password: $(ZAMMAD_ADMIN_PASSWORD)"; \
 	echo ""; \
-	echo "  3. Finish autoWizard if needed (or run make zammad-trigger-autowizard):"; \
-	echo "       $$AUTO_WIZ_URL"; \
+	echo "  3. HTTP API token for MCP: make zammad-bootstrap-token NAMESPACE=$(NAMESPACE)"; \
+	echo "     If you ran this deploy via make helm-install-ticketing, token bootstrap runs next in that recipe—skip if you see success below."; \
 	echo ""; \
-	echo "  4. HTTP API token for MCP: make zammad-bootstrap-token NAMESPACE=$(NAMESPACE)"; \
-	echo "     If you ran this deploy via make helm-install-ticketing, token bootstrap runs next in that recipe—skip 3–4 if you see success below."; \
-	echo ""; \
-	echo "  5. Chat widget: Admin → Channels → Chat (agents must be available for the widget to appear)."; \
-	echo "  6. Main chart: zammad.enabled, zammad.url, credentials Secret (use helm-install-ticketing or manual Secret)."; \
+	echo "  4. Chat widget: Admin → Channels → Chat (agents must be available for the widget to appear)."; \
+	echo "  5. Main chart: zammad.enabled, zammad.url, credentials Secret (use helm-install-ticketing or manual Secret)."; \
 	echo ""; \
 	echo "  More: README.md, docs/HELM_EXPORT_ANSIBLE.md"
 	@echo ""
@@ -2141,10 +2170,10 @@ deploy-zammad: namespace
 .PHONY: undeploy-zammad
 undeploy-zammad:
 	@echo "Removing Zammad instance from namespace $(NAMESPACE)..."
-	@helm uninstall zammad -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true
+	@helm uninstall zammad-stack -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true
 	@echo "Waiting for pods to terminate, then removing Zammad PVCs..."
 	@sleep 5
-	@kubectl delete pvc -n $(NAMESPACE) -l app.kubernetes.io/instance=zammad --ignore-not-found 2>/dev/null || true
+	@kubectl delete pvc -n $(NAMESPACE) -l app.kubernetes.io/instance=zammad-stack --ignore-not-found 2>/dev/null || true
 	@for pvc in $$(kubectl get pvc -n $(NAMESPACE) -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n' | grep -E '^data-zammad-' || true); do kubectl delete pvc $$pvc -n $(NAMESPACE) --ignore-not-found; done
 	@echo "✅ Zammad instance removed successfully!"
 
@@ -2153,7 +2182,7 @@ undeploy-zammad:
 .PHONY: zammad-trigger-autowizard
 zammad-trigger-autowizard: namespace
 	@echo "Triggering autoWizard via HTTP..."; \
-	RES=$$(kubectl exec deploy/zammad-railsserver -n $(NAMESPACE) -- ruby -rnet/http -e 'uri=URI("http://zammad-nginx:8080/api/v1/getting_started/auto_wizard/$(ZAMMAD_AUTOWIZARD_TOKEN)");res=Net::HTTP.get_response(uri);puts res.code' 2>/dev/null) || RES=""; \
+	RES=$$(kubectl exec deploy/zammad-stack-railsserver -n $(NAMESPACE) -- ruby -rnet/http -e 'uri=URI("http://zammad-stack-nginx:8080/api/v1/getting_started/auto_wizard/$(ZAMMAD_AUTOWIZARD_TOKEN)");res=Net::HTTP.get_response(uri);puts res.code' 2>/dev/null) || RES=""; \
 	if [ "$$RES" = "200" ] || [ "$$RES" = "204" ]; then \
 		echo "✅ autoWizard triggered (HTTP $$RES). Waiting 5s for setup..."; \
 		sleep 5; \
@@ -2165,18 +2194,18 @@ zammad-trigger-autowizard: namespace
 # Idempotent: if secret already has a token, skips creation. Use ZAMMAD_FORCE_BOOTSTRAP=1 to recreate.
 .PHONY: zammad-bootstrap-token
 zammad-bootstrap-token: namespace zammad-trigger-autowizard
-	@ZAMMAD_URL="http://zammad-nginx.$(NAMESPACE).svc.cluster.local:8080"; \
+	@ZAMMAD_URL="http://zammad-stack-nginx.$(NAMESPACE).svc.cluster.local:8080"; \
 	ZAMMAD_TOKEN=$$(kubectl get secret $(ZAMMAD_CREDENTIALS_SECRET) -n $(NAMESPACE) -o jsonpath='{.data.zammad-http-token}' 2>/dev/null | base64 -d 2>/dev/null || true); \
 	if [ -n "$$ZAMMAD_TOKEN" ] && [ "$(ZAMMAD_FORCE_BOOTSTRAP)" != "1" ]; then \
 		echo "Secret already has token (idempotent). Use ZAMMAD_FORCE_BOOTSTRAP=1 to recreate."; \
 		exit 0; \
 	fi; \
 	echo "Creating Zammad API token via exec..."; \
-	ZAMMAD_TOKEN=$$(kubectl exec deploy/zammad-railsserver -n $(NAMESPACE) -- env ZAMMAD_ADMIN_EMAIL='$(ZAMMAD_ADMIN_EMAIL)' ZAMMAD_ADMIN_PASSWORD='$(ZAMMAD_ADMIN_PASSWORD)' ruby -rnet/http -rjson -e 'uri=URI("http://localhost:3000/api/v1/user_access_token");req=Net::HTTP::Post.new(uri);req.basic_auth(ENV["ZAMMAD_ADMIN_EMAIL"],ENV["ZAMMAD_ADMIN_PASSWORD"]);req["Content-Type"]="application/json";req.body=JSON.generate({"name"=>"mcp-agent","permission"=>["admin","ticket.agent"]});res=Net::HTTP.start(uri.hostname,uri.port){|h|h.request(req)};d=JSON.parse(res.body);t=d["token"];t ? puts(t) : ($$stderr.puts("Zammad API #{res.code}: #{res.body[0,500]}");exit 1)' ) || ZAMMAD_TOKEN=""; \
+	ZAMMAD_TOKEN=$$(kubectl exec deploy/zammad-stack-railsserver -n $(NAMESPACE) -- env ZAMMAD_ADMIN_EMAIL='$(ZAMMAD_ADMIN_EMAIL)' ZAMMAD_ADMIN_PASSWORD='$(ZAMMAD_ADMIN_PASSWORD)' ruby -rnet/http -rjson -e 'uri=URI("http://localhost:3000/api/v1/user_access_token");req=Net::HTTP::Post.new(uri);req.basic_auth(ENV["ZAMMAD_ADMIN_EMAIL"],ENV["ZAMMAD_ADMIN_PASSWORD"]);req["Content-Type"]="application/json";req.body=JSON.generate({"name"=>"mcp-agent","permission"=>["admin","ticket.agent"]});res=Net::HTTP.start(uri.hostname,uri.port){|h|h.request(req)};d=JSON.parse(res.body);t=d["token"];t ? puts(t) : ($$stderr.puts("Zammad API #{res.code}: #{res.body[0,500]}");exit 1)' ) || ZAMMAD_TOKEN=""; \
 	if [ -z "$$ZAMMAD_TOKEN" ]; then \
 		echo "❌ Token creation failed (401 = invalid credentials)."; \
 		echo "   Complete autoWizard first: visit <zammad-url>/#getting_started/auto_wizard/$(ZAMMAD_AUTOWIZARD_TOKEN)"; \
-		echo "   (Port-forward: kubectl port-forward -n $(NAMESPACE) svc/zammad-nginx 8080:8080, then http://localhost:8080/...)"; \
+		echo "   (Port-forward: kubectl port-forward -n $(NAMESPACE) svc/zammad-stack-nginx 8080:8080, then http://localhost:8080/...)"; \
 		exit 1; \
 	fi; \
 	kubectl create secret generic $(ZAMMAD_CREDENTIALS_SECRET) \
@@ -2216,7 +2245,7 @@ zammad-set-token: namespace
 		echo "  2. Run: make zammad-set-token NAMESPACE=$(NAMESPACE) ZAMMAD_TOKEN=<your-token>"; \
 		exit 1; \
 	fi
-	@ZAMMAD_URL="http://zammad-nginx.$(NAMESPACE).svc.cluster.local:8080"; \
+	@ZAMMAD_URL="http://zammad-stack-nginx.$(NAMESPACE).svc.cluster.local:8080"; \
 	echo "Updating Zammad credentials secret with token..."; \
 	kubectl create secret generic $(ZAMMAD_CREDENTIALS_SECRET) \
 		--from-literal=zammad-url="$$ZAMMAD_URL/api/v1" \
