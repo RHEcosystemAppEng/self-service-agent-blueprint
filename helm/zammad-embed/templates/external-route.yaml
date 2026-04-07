@@ -1,0 +1,23 @@
+{{- if .Values.enabled }}
+---
+# OpenShift Route for Zammad chat widget embed page (snippet + live preview)
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ssa-zammad-embed
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: zammad-embed
+spec:
+  to:
+    kind: Service
+    name: {{ .Release.Name }}
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+{{- end }}

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: zammad-embed
+description: Zammad chat widget embed page (nginx serving the embed snippet)
+type: application
+version: 0.1.0

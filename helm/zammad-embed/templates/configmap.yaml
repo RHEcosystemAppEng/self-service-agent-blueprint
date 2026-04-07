@@ -1,12 +1,22 @@
-{{- if and .Values.zammad.enabled .Values.zammad.embedPage.enabled }}
+{{- if .Values.enabled }}
+{{- $zammadUrl := .Values.publicUrl | default "" | trimSuffix "/" }}
+{{- if not $zammadUrl }}
+{{-   $route := lookup "route.openshift.io/v1" "Route" .Release.Namespace "ssa-zammad" }}
+{{-   if $route }}
+{{-     $zammadUrl = printf "https://%s" $route.spec.host }}
+{{-   else }}
+{{-     $zammadUrl = "https://YOUR-ZAMMAD-URL" }}
+{{-   end }}
+{{- end }}
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "self-service-agent.fullname" . }}-zammad-embed
+  name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/component: zammad-embed
 data:
   index.html: |
@@ -26,10 +36,9 @@ data:
     <body>
       <h1>Zammad Chat - Embed Code</h1>
       <p>Copy the following code into your website before the closing <code>&lt;/body&gt;</code> tag:</p>
-      <pre><code>{{- $zammadUrl := (.Values.zammad.embedPage.publicUrl | default "https://YOUR-ZAMMAD-URL") | trimSuffix "/" -}}
-    &lt;script src="{{ $zammadUrl }}/assets/chat/chat-no-jquery.min.js"&gt;&lt;/script&gt;
+      <pre><code>&lt;script src="{{ $zammadUrl }}/assets/chat/chat-no-jquery.min.js"&gt;&lt;/script&gt;
     &lt;script&gt;
-    (function() { new ZammadChat({{ "{" }} fontSize: '12px', chatId: {{ default 1 .Values.zammad.embedPage.chatId }} {{ "}" }}); })();
+    (function() { new ZammadChat({{ "{" }} fontSize: '12px', chatId: {{ .Values.chatId | default 1 }} {{ "}" }}); })();
     &lt;/script&gt;</code></pre>
       <p><strong>Note:</strong> The chat widget only appears when at least one agent is available (Admin → Channels → Chat).</p>
     </body>

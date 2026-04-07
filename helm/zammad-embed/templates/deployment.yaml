@@ -1,24 +1,27 @@
-{{- if and .Values.zammad.enabled .Values.zammad.embedPage.enabled }}
+{{- if .Values.enabled }}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "self-service-agent.fullname" . }}-zammad-embed
+  name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "self-service-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/component: zammad-embed
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "self-service-agent.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
       app.kubernetes.io/component: zammad-embed
   template:
     metadata:
       labels:
-        {{- include "self-service-agent.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: zammad-embed
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
       securityContext:
         runAsNonRoot: true
@@ -26,7 +29,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: nginx
-        image: nginxinc/nginx-unprivileged:alpine
+        image: {{ .Values.image }}
         imagePullPolicy: IfNotPresent
         ports:
         - name: http
@@ -51,7 +54,7 @@ spec:
       volumes:
       - name: embed-content
         configMap:
-          name: {{ include "self-service-agent.fullname" . }}-zammad-embed
+          name: {{ .Release.Name }}
       - name: tmp
         emptyDir: {}
 {{- end }}

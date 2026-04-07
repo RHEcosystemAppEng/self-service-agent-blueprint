@@ -1,0 +1,29 @@
+{{- if .Values.externalRoute.enabled }}
+---
+# Allow ingress from OpenShift router to Zammad nginx (for ssa-zammad Route)
+# Zammad pods use app.kubernetes.io/instance=zammad, not self-service-agent
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-allow-zammad-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: zammad
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: zammad
+      app.kubernetes.io/component: zammad-nginx
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          network.openshift.io/policy-group: ingress
+    ports:
+    - protocol: TCP
+      port: 8080
+{{- end }}

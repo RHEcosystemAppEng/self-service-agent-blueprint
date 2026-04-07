@@ -1,0 +1,25 @@
+{{- if .Values.externalRoute.enabled }}
+---
+# OpenShift Route for Zammad Web UI
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ssa-zammad
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: zammad
+  annotations:
+    haproxy.router.openshift.io/timeout: "300s"
+spec:
+  to:
+    kind: Service
+    name: {{ .Release.Name }}-nginx
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+{{- end }}

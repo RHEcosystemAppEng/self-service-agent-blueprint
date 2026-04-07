@@ -1,6 +1,6 @@
 # Values for make deploy-zammad (Zammad instance for dev/testing)
 # Used with the helm/zammad/ wrapper chart which includes the Zammad subchart and bootstrap Job.
-# Use with: helm upgrade --install zammad-stack helm/zammad/ -n NAMESPACE -f helm/values-zammad-deploy.yaml
+# Use with: helm upgrade --install zammad helm/zammad/ -n NAMESPACE -f helm/values-zammad-deploy.yaml
 #
 # Zammad subchart values are nested under "zammad:".
 # Bootstrap Job config is under "bootstrap:".
@@ -14,6 +14,10 @@ bootstrap:
   adminEmail: "admin@zammad.local"
   adminPassword: "ZammadR0cks!"
   autowizardToken: "ssa-zammad-autowizard-9f3a2b1c"
+
+# Enable OpenShift Route by default for deploy-zammad
+externalRoute:
+  enabled: true
 
 # Zammad subchart values
 zammad:

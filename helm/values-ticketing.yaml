@@ -16,14 +16,6 @@ zammad:
   mcp:
     enabled: true
     uri: "http://mcp-zammad:8000/mcp"
-  # OpenShift Route for Zammad Web UI (enabled for ticketing profile on OpenShift)
-  externalRoute:
-    enabled: true
-  # Embed page: Zammad chat widget snippet + live preview (publicUrl set via Makefile from Route host)
-  embedPage:
-    enabled: true
-    publicUrl: ""  # Set by helm-install-ticketing from ssa-zammad Route host
-    chatId: 1
 
 # Enable zammad-mcp MCP server
 mcp-servers:

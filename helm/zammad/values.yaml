@@ -1,8 +1,12 @@
-# Default values for the zammad-stack wrapper chart.
+# Default values for the zammad wrapper chart.
 # Zammad subchart values go under the "zammad" key.
 # Override with helm/values-zammad-deploy.yaml.
 
 zammad: {}
+
+# OpenShift Route for external access to Zammad Web UI
+externalRoute:
+  enabled: false
 
 bootstrap:
   image: "quay.io/rh-ai-quickstart/self-service-agent-zammad-bootstrap:latest"

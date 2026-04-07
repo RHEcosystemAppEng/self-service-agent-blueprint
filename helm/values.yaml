@@ -295,17 +295,6 @@ zammad:
   mcp:
     enabled: false
     uri: "http://mcp-zammad:8000/mcp"
-  # OpenShift Route for external access to Zammad Web UI (when Zammad is deployed via deploy-zammad)
-  # Requires zammad-nginx service in namespace (created by Zammad chart)
-  externalRoute:
-    enabled: false  # Set to true to create OpenShift Route for Zammad (e.g. when using helm-install-ticketing)
-    serviceName: zammad-nginx  # Override if Zammad chart uses different service name (e.g. zammad-zammad-nginx)
-  # Embed page: nginx serves Zammad chat widget embed snippet + live preview
-  # publicUrl: Zammad base URL for script src (e.g. https://ssa-zammad-<ns>.<cluster>). Set via Makefile when using helm-install-ticketing.
-  embedPage:
-    enabled: false
-    publicUrl: ""  # Required when enabled; e.g. https://ssa-zammad-mynamespace.apps.example.com
-    chatId: 1  # Zammad chat channel ID (Admin → Channels → Chat)
 
 # Enable/disable the llm-service dependency
 llm-service:

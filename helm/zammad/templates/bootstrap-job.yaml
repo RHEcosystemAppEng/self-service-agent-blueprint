@@ -7,6 +7,9 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/component: zammad-bootstrap
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-delete-policy": before-hook-creation
 spec:
   backoffLimit: 10
   ttlSecondsAfterFinished: 86400
@@ -36,7 +39,7 @@ spec:
           command: ["python3", "/app/bootstrap.py"]
           env:
             - name: ZAMMAD_BASE_URL
-              value: "http://zammad-stack-nginx:8080"
+              value: "http://zammad-nginx:8080"
             - name: ZAMMAD_AUTOWIZARD_TOKEN
               value: {{ .Values.bootstrap.autowizardToken | quote }}
             - name: ZAMMAD_ADMIN_EMAIL
