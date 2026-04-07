@@ -79,7 +79,11 @@ class OpenShiftChatClient:
             if os.environ.get("TEST_MODE"):
                 env_vars += " PYTHONPATH=/opt/app-root/agent-service/src:/opt/app-root/slack-service/src:/opt/app-root/session-manager/src:"
 
-            script_path = '/app/test/' + self.test_script if not self.test_script.startswith('/') else self.test_script
+            script_path = (
+                "/app/test/" + self.test_script
+                if not self.test_script.startswith("/")
+                else self.test_script
+            )
             script_cmd = f"/app/.venv/bin/python {script_path}"
             if self.initial_message:
                 escaped_msg = self.initial_message.replace("'", "'\\''")
