@@ -527,8 +527,9 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--test-script",
         type=str,
-        default="chat-responses-request-mgr.py",
-        help="Name of the test script to execute (default: chat-responses-request-mgr.py)",
+        default=None,
+        help="Name of the test script to execute (default: chat-responses-request-mgr.py, "
+        "or the flow's DEFAULT_TEST_SCRIPT when --flow is used)",
     )
     parser.add_argument(
         "--reset-conversation",
@@ -1141,6 +1142,21 @@ def main() -> int:
             logger.error("--flow and --all-flows are mutually exclusive")
             return 1
 
+        # Resolve test_script and reset_conversation from flow defaults when --flow is used
+        import sys as _sys
+        _eval_dir = str(Path(__file__).parent)
+        if _eval_dir not in _sys.path:
+            _sys.path.insert(0, _eval_dir)
+
+        if args.flow:
+            from flow_registry import load_flow as _load_flow
+            _flow_module = _load_flow(args.flow)
+            test_script = args.test_script or getattr(_flow_module, "DEFAULT_TEST_SCRIPT", "chat-responses-request-mgr.py")
+            reset_conversation = args.reset_conversation or getattr(_flow_module, "DEFAULT_RESET_CONVERSATION", False)
+        else:
+            test_script = args.test_script or "chat-responses-request-mgr.py"
+            reset_conversation = args.reset_conversation
+
         if args.check:
             return run_check_known_bad_conversations(
                 timeout=args.timeout,
@@ -1162,8 +1178,8 @@ def main() -> int:
                 num_conversations=args.num_conversations,
                 timeout=args.timeout,
                 max_turns=args.max_turns,
-                test_script=args.test_script,
-                reset_conversation=args.reset_conversation,
+                test_script=test_script,
+                reset_conversation=reset_conversation,
                 concurrency=args.concurrency,
                 message_timeout=args.message_timeout,
                 validate_full_laptop_details=args.validate_full_laptop_details,
@@ -1192,8 +1208,8 @@ def main() -> int:
             num_conversations=args.num_conversations,
             timeout=args.timeout,
             max_turns=args.max_turns,
-            test_script=args.test_script,
-            reset_conversation=args.reset_conversation,
+            test_script=test_script,
+            reset_conversation=reset_conversation,
             concurrency=args.concurrency,
             message_timeout=args.message_timeout,
             validate_full_laptop_details=args.validate_full_laptop_details,

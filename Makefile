@@ -1377,7 +1377,7 @@ check-known-bad-conversations: sync-evaluations
 .PHONY: test-short-ticket-laptop-refresh
 test-short-ticket-laptop-refresh:
 	@echo "Running short responses integration test for ticket-laptop-refresh flow..."
-	uv --directory evaluations run evaluate.py -n 1 --test-script chat-responses-request-mgr.py --reset-conversation --flow ticket_laptop_refresh $(VALIDATE_LAPTOP_DETAILS_FLAG) $(STRUCTURED_OUTPUT_FLAG)
+	uv --directory evaluations run evaluate.py -n 1 --flow ticket_laptop_refresh $(VALIDATE_LAPTOP_DETAILS_FLAG) $(STRUCTURED_OUTPUT_FLAG)
 	@echo "short responses integration test for ticket-laptop-refresh flow completed successfully!"
 
 .PHONY: test-short-resp-integration-request-mgr
@@ -1648,9 +1648,11 @@ helm-install-ticketing: namespace helm-depend
 			--from-literal=zammad-url="$$ZAMMAD_URL/api/v1" \
 			--from-literal=zammad-http-token="$$ZAMMAD_TOKEN" \
 			-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
-		echo "Restarting Zammad MCP..."; \
+		echo "Restarting Zammad MCP and agent-service..."; \
 		kubectl rollout restart deployment/mcp-zammad-mcp -n $(NAMESPACE) 2>/dev/null || true; \
+		kubectl rollout restart deployment/$(MAIN_CHART_NAME)-request-manager -n $(NAMESPACE) 2>/dev/null || true; \
 		kubectl rollout status deployment/mcp-zammad-mcp -n $(NAMESPACE) --timeout=2m 2>/dev/null || true; \
+		kubectl rollout status deployment/$(MAIN_CHART_NAME)-request-manager -n $(NAMESPACE) --timeout=2m 2>/dev/null || true; \
 	else \
 		echo "⚠ Token creation failed (run make zammad-bootstrap-token NAMESPACE=$(NAMESPACE) after completing autoWizard)"; \
 	fi

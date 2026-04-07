@@ -1,5 +1,6 @@
 """Header extraction utilities for ServiceNow MCP server."""
 
+import re
 from typing import Any
 
 from mcp.server.fastmcp import Context
@@ -26,7 +27,11 @@ def extract_authoritative_user_id(ctx: Context[Any, Any]) -> str | None:
                 user_id = headers.get("AUTHORITATIVE_USER_ID") or headers.get(
                     "authoritative_user_id"
                 )
-                return str(user_id) if user_id is not None else None
+                if user_id is None:
+                    return None
+                # Strip ticket-number suffix added by ticket-responses-request-mgr.py
+                # Format: {email}-{ticket_number}, e.g. alice@example.com-12345
+                return re.sub(r"-\d+$", "", str(user_id))
     except Exception as e:
         logger.debug(
             "Error extracting headers from request context",

@@ -3,9 +3,10 @@
 from typing import List
 
 FLOW_NAME: str = "ticket_laptop_refresh"
-DEFAULT_TEST_SCRIPT: str = "chat-responses-request-mgr.py"
-DEFAULT_RESET_CONVERSATION: bool = True
+DEFAULT_TEST_SCRIPT: str = "ticket-responses-request-mgr.py"
+DEFAULT_RESET_CONVERSATION: bool = False
 DEFAULT_SKIP_INITIAL_MESSAGE: bool = True
+DEFAULT_INITIAL_MESSAGE: str = "requesting a laptop refresh"
 KNOWLEDGE_BASE_DIRS: List[str] = ["laptop-refresh"]
 INCLUDE_SNOW_DATA: bool = True
 
