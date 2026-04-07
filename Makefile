@@ -1633,6 +1633,8 @@ helm-install-ticketing: namespace helm-depend
 	$(MAKE) _helm-install-ticketing-single ZAMMAD_URL="$$ZAMMAD_URL"
 	@echo "Step 2/4: Deploying Zammad (auto-detects Route hostname for FQDN and embed URL)..."
 	@$(MAKE) deploy-zammad NAMESPACE=$(NAMESPACE)
+	@echo "Waiting for Zammad railsserver to be ready (may take 10+ minutes on first deploy)..."
+	@kubectl rollout status deployment/zammad-railsserver -n $(NAMESPACE) --timeout=15m
 	@echo "Step 3/4: Creating API token..."
 	@ZAMMAD_URL="http://zammad-nginx.$(NAMESPACE).svc.cluster.local:8080"; \
 	ZAMMAD_TOKEN=$$(kubectl get secret $(ZAMMAD_CREDENTIALS_SECRET) -n $(NAMESPACE) -o jsonpath='{.data.zammad-http-token}' 2>/dev/null | base64 -d 2>/dev/null || true); \
