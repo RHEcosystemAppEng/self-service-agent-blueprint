@@ -1648,7 +1648,7 @@ helm-install-ticketing: namespace helm-depend
 			--from-literal=zammad-url="$$ZAMMAD_URL/api/v1" \
 			--from-literal=zammad-http-token="$$ZAMMAD_TOKEN" \
 			-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
-		echo "Restarting Zammad MCP and agent-service..."; \
+		echo "Restarting Zammad MCP and request manager ..."; \
 		kubectl rollout restart deployment/mcp-zammad-mcp -n $(NAMESPACE) 2>/dev/null || true; \
 		kubectl rollout restart deployment/$(MAIN_CHART_NAME)-request-manager -n $(NAMESPACE) 2>/dev/null || true; \
 		kubectl rollout status deployment/mcp-zammad-mcp -n $(NAMESPACE) --timeout=2m 2>/dev/null || true; \
