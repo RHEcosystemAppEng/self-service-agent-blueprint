@@ -130,13 +130,13 @@ flowchart TD
 
 Before using the evaluation framework, ensure you have the following prerequisites in place:
 
-**Python 3.12+ Requirements**
+**Python 3.12 - 3.13 Requirements**
 
-The evaluation framework requires Python 3.12 or higher. It uses modern Python features and type hints that are not available in earlier versions.
+The evaluation framework requires Python 3.12 or 3.13. It uses modern Python features and type hints that are not available in versions earlier than 3.12. It also uses the grpcio library, which doesn't have pre-compiled binary packages for versions of Python later than 3.13 yet.
 
 ```bash
 # Check Python version
-python --version  # Should show Python 3.12.x or higher
+python --version  # Should be 3.12 or 3.13
 
 # Or with python3
 python3 --version
@@ -216,7 +216,7 @@ oc whoami           # Should show your username
 oc project          # Should show current project/namespace
 
 # Check Python version
-python --version    # Should be 3.12 or higher
+python --version    # Should be 3.12 or 3.13
 ```
 
 ### 1.4 Types of Test Conversations
@@ -356,8 +356,10 @@ make deps-evaluations
 # Or from the evaluations directory:
 cd evaluations/
 uv sync
-# Note: uv automatically creates a .venv directory if it doesn't exist
+
 ```
+
+**Note:** `uv` automatically creates a `.venv` directory if it doesn't exist.
 
 **Verify Installation**
 
@@ -370,7 +372,7 @@ source .venv/bin/activate  # On Linux/Mac
 .venv\Scripts\activate  # On Windows
 
 # Check Python version
-python --version  # Should be 3.12 or higher
+python --version  # Should be 3.12 or 3.13
 
 # Verify deepeval is installed
 python -c "import deepeval; print(deepeval.__version__)"
@@ -441,7 +443,7 @@ oc whoami           # Should show your username
 oc project          # Should show current namespace
 
 # 3. Check Python and dependencies
-python --version    # Should be 3.12 or higher
+python --version    # Should be 3.12 or 3.13
 python -c "import deepeval, openai"  # Should run without errors
 
 # 4. Verify agent pods are running

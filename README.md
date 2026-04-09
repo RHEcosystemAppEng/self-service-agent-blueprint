@@ -330,7 +330,9 @@ The following are the resources you need to add on top of your existing OpenShif
 ### Minimum software requirements
 
 **Local Tools:**
-* [Python 3.12+](https://www.python.org/downloads/)
+* [Python 3.12 - 3.13](https://www.python.org/downloads/)
+**Note:** Python 3.12 is the minimum supported version since it requires modern Python features and type hints that are not available in earlier versions. Python 3.13 is the maximum supported version since the `grpcio` library doesn't have pre-compiled binary packages for versions later than 3.13 yet.
+
 * [uv](https://github.com/astral-sh/uv) - Fast Python package installer (version 0.8.9 required to match CI)
   * Install specific version: `curl -LsSf https://astral.sh/uv/0.8.9/install.sh | sh`
   * Update to latest: `uv self update` (may install newer version)
