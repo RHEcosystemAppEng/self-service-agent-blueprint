@@ -32,6 +32,12 @@ def _parse_arguments() -> argparse.Namespace:
         help="Run predefined conversations for a specific flow (e.g., ticket_laptop_refresh). "
         "Uses flows/{name}/conversations/ as input and results/{name}/conversation_results/ as output.",
     )
+    parser.add_argument(
+        "--message-timeout",
+        type=int,
+        default=60,
+        help="Timeout in seconds for individual message send/response operations (default: 60)",
+    )
     return parser.parse_args()
 
 
@@ -71,5 +77,6 @@ if __name__ == "__main__":
     tester = ConversationFlowTester(
         test_script=test_script,
         reset_conversation=reset_conversation,
+        message_timeout=args.message_timeout,
     )
     tester.run_flows(conversations_dir, output_dir)

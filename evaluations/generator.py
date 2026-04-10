@@ -226,6 +226,7 @@ def _run_worker(
     flow_scenario: Optional[list[tuple[str, str, str]]] = None,
     initial_message: Optional[str] = None,
     skip_initial_message: bool = False,
+    ticket_title: Optional[str] = None,
 ) -> dict[str, Any]:
     """
     Worker function to generate conversations in parallel.
@@ -364,6 +365,7 @@ def _run_worker(
                 message_timeout=message_timeout,
                 initial_message=initial_message,
                 skip_initial_message=skip_initial_message,
+                ticket_title=ticket_title,
             )
 
             # Start session
@@ -549,6 +551,7 @@ if __name__ == "__main__":
     reset_conversation = args.reset_conversation
     initial_message: Optional[str] = None
     skip_initial_message: bool = False
+    ticket_title: Optional[str] = None
 
     if args.flow:
         import sys as _sys
@@ -570,6 +573,10 @@ if __name__ == "__main__":
         skip_initial_message = getattr(
             flow_module, "DEFAULT_SKIP_INITIAL_MESSAGE", False
         )
+        ticket_title = getattr(flow_module, "DEFAULT_TICKET_TITLE", None)
+        flow_max_turns = getattr(flow_module, "DEFAULT_MAX_TURNS", None)
+        if flow_max_turns is not None:
+            args.max_turns = flow_max_turns
         flow_scenario = flow_module.get_scenario(args.use_structured_output)
         logger.info(f"Using flow '{args.flow}': saving to {results_dir}")
 
@@ -634,6 +641,7 @@ if __name__ == "__main__":
                 flow_scenario,
                 initial_message,
                 skip_initial_message,
+                ticket_title,
             )
             for i in range(args.concurrency)
         ]

@@ -1,7 +1,9 @@
 """Zammad ticket MCP"""
 
 import functools
+import json
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Any, AsyncGenerator, Callable, Literal, ParamSpec, cast
 
 from mcp.server.fastmcp import Context, FastMCP
@@ -22,6 +24,30 @@ from zammad_mcp.zammad_rest_client import fetch_zammad_customer_user_rest
 SERVICE_NAME = "zammad-mcp-server"
 logger = configure_logging(SERVICE_NAME)
 auto_tracing_run(SERVICE_NAME, logger)
+
+
+def _calculate_laptop_age(purchase_date_str: str) -> str:
+    """Calculate laptop age in years and months from a YYYY-MM-DD purchase date."""
+    try:
+        from datetime import datetime
+
+        purchase_date = datetime.strptime(purchase_date_str, "%Y-%m-%d")
+        current_date = datetime.now()
+        years = current_date.year - purchase_date.year
+        months = current_date.month - purchase_date.month
+        if current_date.day < purchase_date.day:
+            months -= 1
+        if months < 0:
+            years -= 1
+            months += 12
+        if years == 0:
+            return f"{months} month{'s' if months != 1 else ''}"
+        elif months == 0:
+            return f"{years} year{'s' if years != 1 else ''}"
+        else:
+            return f"{years} year{'s' if years != 1 else ''} and {months} month{'s' if months != 1 else ''}"
+    except (ValueError, TypeError):
+        return "Unable to calculate age (invalid date format)"
 
 
 def _tool_error_text(exc: BaseException) -> str:
@@ -102,7 +128,9 @@ def _authorize_ticket(ctx: Context[Any, Any]) -> tuple[str, int, int]:
 @mcp.tool()
 @_handle_tool_errors
 @trace_mcp_tool()
-def mark_as_agent_managed_laptop_refresh(ctx: Context[Any, Any]) -> str:
+def mark_as_agent_managed_laptop_refresh(
+    ctx: Context[Any, Any], dummy_parameter: str = ""
+) -> str:
     """Tag this ticket for agent-managed laptop refresh."""
     _, ticket_id, _ = _authorize_ticket(ctx)
     tag = zammad_mcp_settings.ZAMMAD_MCP_SETTINGS.agent_managed_tag
@@ -124,7 +152,7 @@ def mark_as_agent_managed_laptop_refresh(ctx: Context[Any, Any]) -> str:
 @mcp.tool()
 @_handle_tool_errors
 @trace_mcp_tool()
-def close(ctx: Context[Any, Any]) -> str:
+def close(ctx: Context[Any, Any], dummy_parameter: str = "") -> str:
     """Close the ticket."""
     _, ticket_id, _ = _authorize_ticket(ctx)
     state = zammad_mcp_settings.ZAMMAD_MCP_SETTINGS.state_closed
@@ -135,7 +163,7 @@ def close(ctx: Context[Any, Any]) -> str:
 @mcp.tool()
 @_handle_tool_errors
 @trace_mcp_tool()
-def escalate_for_human_review(ctx: Context[Any, Any]) -> str:
+def escalate_for_human_review(ctx: Context[Any, Any], dummy_parameter: str = "") -> str:
     """Escalate this ticket to the human escalation queue."""
     _, ticket_id, _ = _authorize_ticket(ctx)
     tag = zammad_mcp_settings.ZAMMAD_MCP_SETTINGS.tag_escalate_human
@@ -156,7 +184,7 @@ def escalate_for_human_review(ctx: Context[Any, Any]) -> str:
 @mcp.tool()
 @_handle_tool_errors
 @trace_mcp_tool()
-def send_to_manager_review(ctx: Context[Any, Any]) -> str:
+def send_to_manager_review(ctx: Context[Any, Any], dummy_parameter: str = "") -> str:
     """Assign this ticket to the customer's manager for approval."""
     _, ticket_id, cust_uid = _authorize_ticket(ctx)
     customer_user = fetch_zammad_customer_user_rest(cust_uid)
@@ -184,7 +212,9 @@ def send_to_manager_review(ctx: Context[Any, Any]) -> str:
 @mcp.tool()
 @_handle_tool_errors
 @trace_mcp_tool()
-def route_to_human_managed_queue(ctx: Context[Any, Any]) -> str:
+def route_to_human_managed_queue(
+    ctx: Context[Any, Any], dummy_parameter: str = ""
+) -> str:
     """Route this ticket to the human-managed queue."""
     _, ticket_id, _ = _authorize_ticket(ctx)
     gname = zammad_mcp_settings.ZAMMAD_MCP_SETTINGS.group_human_managed
@@ -196,6 +226,83 @@ def route_to_human_managed_queue(ctx: Context[Any, Any]) -> str:
         )
     gmsg = f"group {gname!r}" if gstrip else "no group change"
     return f"Ticket {ticket_id} routed to {gmsg}."
+
+
+@mcp.tool()
+@_handle_tool_errors
+@trace_mcp_tool()
+def get_employee_laptop_info(
+    ctx: Context[Any, Any],
+    dummy_parameter: str = "",
+) -> str:
+    """Get laptop information for an employee using their authoritative user ID from request headers.
+
+    Reads laptop data from the employee's Zammad user profile (current_laptop field)
+    and returns it in a formatted string identical to the ServiceNow MCP server output.
+
+    Args:
+        dummy_parameter: Optional parameter as validation fails unless there is at least one parameter
+
+    Returns:
+        A formatted multi-line string containing the following information:
+        - Employee Name: Full name of the employee
+        - Employee Location: Geographic region (EMEA, LATAM, APAC, etc.)
+        - Laptop Model: Brand and model of the laptop
+        - Laptop Serial Number: Unique serial number
+        - Laptop Purchase Date: Date when laptop was purchased (YYYY-MM-DD format)
+        - Laptop Age: Calculated age in years and months from purchase date to current date
+        - Laptop Warranty Expiry Date: When the warranty expires (YYYY-MM-DD format)
+        - Laptop Warranty: Current warranty status (Active/Expired)
+    """
+    email, _ticket_id, cust_uid = _authorize_ticket(ctx)
+    user = fetch_zammad_customer_user_rest(cust_uid)
+
+    logger.info(
+        "Getting laptop info from Zammad user profile",
+        tool="get_employee_laptop_info",
+        authoritative_user_id=email,
+    )
+
+    current_laptop_raw = user.get("current_laptop")
+    if not current_laptop_raw:
+        raise ValueError(
+            f"No laptop data found for user {email}. "
+            "Ensure the 'current_laptop' field is populated on the Zammad user profile."
+        )
+
+    laptop = json.loads(current_laptop_raw)
+
+    purchase_date = laptop.get("purchase_date", "N/A")
+    warranty_expiry = laptop.get("warranty_expiry", "N/A")
+
+    laptop_age = _calculate_laptop_age(purchase_date)
+
+    warranty_status = "Unknown"
+    if warranty_expiry and warranty_expiry != "N/A":
+        try:
+            expiry_date = datetime.strptime(warranty_expiry, "%Y-%m-%d")
+            warranty_status = "Active" if expiry_date > datetime.now() else "Expired"
+        except ValueError:
+            pass
+
+    result = f"""
+Employee Name: {laptop.get("name", "N/A")}
+Employee Location: {laptop.get("location", "N/A")}
+Laptop Model: {laptop.get("laptop_model", "N/A")}
+Laptop Serial Number: {laptop.get("serial_number", "N/A")}
+Laptop Purchase Date: {purchase_date}
+Laptop Age: {laptop_age}
+Laptop Warranty Expiry Date: {warranty_expiry}
+Laptop Warranty: {warranty_status}
+"""
+
+    logger.info(
+        "Returning laptop info for employee",
+        tool="get_employee_laptop_info",
+        authoritative_user_id=email,
+    )
+
+    return result
 
 
 def main() -> None:

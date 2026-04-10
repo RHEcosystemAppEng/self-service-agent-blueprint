@@ -171,7 +171,8 @@ def get_metrics(
             evaluation_params=[TurnParams.CONTENT, TurnParams.ROLE],
             evaluation_steps=[
                 "FIRST: Determine whether the agent found the user NOT ELIGIBLE for a laptop refresh. If the agent explicitly stated the user is not eligible and offered to escalate or close the ticket instead of presenting laptop options, The agent behavior is PERFECT for this metric. STOP HERE. Do NOT evaluate any further criteria. Do NOT penalize for the absence of laptop options.",
-                "If the user WAS eligible: assess if the assistant presents appropriate laptop options based on user location.",
+                "SECOND: Determine whether the user closed or escalated the ticket before reaching the laptop selection step. If the conversation ended (closed or escalated) before the user ever requested to see laptop options — regardless of eligibility — the agent could not have presented options, so PASS this metric. STOP HERE. Do NOT penalize for absent laptop options when the user terminated the conversation early.",
+                "If the user WAS eligible and did not terminate early: assess if the assistant presents appropriate laptop options based on user location.",
                 "Evaluate if laptop specifications are clearly and completely presented.",
                 "Check if the assistant guides the user through selection process effectively.",
                 "IGNORE any portions of the conversation involving:",

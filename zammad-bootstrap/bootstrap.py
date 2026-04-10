@@ -10,6 +10,7 @@ Required env vars:
   ZAMMAD_ADMIN_PASSWORD matching password
 """
 
+import json
 import os
 import sys
 import time
@@ -138,6 +139,24 @@ def get_or_create_group(name):
 # ---------------------------------------------------------------------------
 
 
+def build_current_laptop_json(emp: dict) -> str:
+    """Build the JSON string to store in the current_laptop Zammad field."""
+    purchase_date = emp.get("purchase_date", "N/A")
+    warranty_expiry = emp.get("warranty_expiry", "N/A")
+    location = (emp.get("location") or "N/A").upper()
+
+    return json.dumps(
+        {
+            "name": emp.get("name", "N/A"),
+            "location": location,
+            "laptop_model": emp.get("laptop_model", "N/A"),
+            "serial_number": emp.get("laptop_serial_number", "N/A"),
+            "purchase_date": purchase_date,
+            "warranty_expiry": warranty_expiry,
+        }
+    )
+
+
 def ensure_manager_email_attribute():
     for a in api("GET", "object_manager_attributes"):
         if a.get("object") == "User" and a.get("name") == "manager_email":
@@ -156,6 +175,44 @@ def ensure_manager_email_attribute():
             "data_option": {
                 "type": "email",
                 "maxlength": 255,
+                "null": True,
+                "note": "",
+            },
+            "active": True,
+            "screens": {
+                "edit": {
+                    "Admin": {"shown": True, "required": False},
+                    "Agent": {"shown": True, "required": False},
+                },
+                "view": {
+                    "Admin": {"shown": True, "required": False},
+                    "Agent": {"shown": True, "required": False},
+                },
+            },
+        },
+    )
+    print("  Executing attribute migrations...")
+    api("POST", "object_manager_attributes_execute_migrations")
+    print("  Attribute migration complete.")
+
+
+def ensure_current_laptop_attribute():
+    for a in api("GET", "object_manager_attributes"):
+        if a.get("object") == "User" and a.get("name") == "current_laptop":
+            print("  Custom attribute 'current_laptop' already exists.")
+            return
+
+    print("  Creating custom attribute 'current_laptop' on User...")
+    api(
+        "POST",
+        "object_manager_attributes",
+        json={
+            "object": "User",
+            "name": "current_laptop",
+            "display": "Current Laptop",
+            "data_type": "textarea",
+            "data_option": {
+                "maxlength": 5000,
                 "null": True,
                 "note": "",
             },
@@ -208,7 +265,14 @@ def find_user_by_email(email):
 
 
 def get_or_create_user(
-    login, firstname, lastname, email, role_ids, group_ids=None, manager_email=None
+    login,
+    firstname,
+    lastname,
+    email,
+    role_ids,
+    group_ids=None,
+    manager_email=None,
+    current_laptop=None,
 ):
     existing = find_user_by_email(email)
     payload = {
@@ -224,6 +288,8 @@ def get_or_create_user(
         payload["group_ids"] = group_ids
     if manager_email:
         payload["manager_email"] = manager_email
+    if current_laptop:
+        payload["current_laptop"] = current_laptop
 
     if existing:
         print(f"  User '{email}' already exists (id={existing['id']}), updating...")
@@ -243,10 +309,12 @@ def main():
     trigger_autowizard()
     acquire_token()
 
-    print("\n[1/5] Ensuring custom attribute 'manager_email' exists...")
+    print("\n[1/5] Ensuring custom attributes exist...")
     ensure_manager_email_attribute()
+    ensure_current_laptop_attribute()
 
     print("\n[2/5] Creating groups...")
+    users_group_id = get_or_create_group("Users")
     group_id = get_or_create_group("human_managed_tickets")
     escalated_group_id = get_or_create_group("escalated_laptop_refresh_tickets")
 
@@ -256,6 +324,24 @@ def main():
     customer_role_ids = [role_map["Customer"]]
     print(f"  Agent role id={agent_role_ids}, Customer role id={customer_role_ids}")
 
+    print("\n[3b/5] Adding admin user to all groups...")
+    admin = find_user_by_email("admin@zammad.local")
+    if admin:
+        api(
+            "PUT",
+            f"users/{admin['id']}",
+            json={
+                "group_ids": {
+                    str(users_group_id): ["full"],
+                    str(group_id): ["full"],
+                    str(escalated_group_id): ["full"],
+                }
+            },
+        )
+        print(f"  Admin user (id={admin['id']}) added to all groups.")
+    else:
+        print("  WARNING: admin@zammad.local not found, skipping group assignment.")
+
     print("\n[4/5] Creating ticket handlers, managers and specialists...")
     get_or_create_user(
         "agent.laptop-specialist",
@@ -263,7 +349,7 @@ def main():
         "Specialist",
         "agent.laptop-specialist@example.com",
         role_ids=agent_role_ids,
-        group_ids={str(group_id): ["full"]},
+        group_ids={str(users_group_id): ["full"]},
     )
     get_or_create_user(
         "ticket_handler1",
@@ -302,14 +388,16 @@ def main():
         "Manager",
         "One",
         MANAGER1_EMAIL,
-        role_ids=agent_role_ids,
+        role_ids=agent_role_ids + customer_role_ids,
+        group_ids={str(users_group_id): ["full"]},
     )
     get_or_create_user(
         "manager2",
         "Manager",
         "Two",
         MANAGER2_EMAIL,
-        role_ids=agent_role_ids,
+        role_ids=agent_role_ids + customer_role_ids,
+        group_ids={str(users_group_id): ["full"]},
     )
 
     print("\n[5/5] Creating employees from mock-employee-data...")
@@ -324,6 +412,7 @@ def main():
             emp["email"],
             role_ids=customer_role_ids,
             manager_email=manager_email,
+            current_laptop=build_current_laptop_json(emp),
         )
 
     print("\nZammad bootstrap complete.")

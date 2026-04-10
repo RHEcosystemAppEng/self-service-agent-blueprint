@@ -27,6 +27,8 @@ states:
   classify_user_intent:
     type: "llm_processor"
     temperature: 0.1  # Very deterministic for classification
+    allowed_tools: []  # Classification only — no tools needed
+    uses_tools: "No"  # Scout model fix: forces skip_all_tools=True, sends empty tools array
     failure_transition: "classify_user_intent"
     prompt: |
       You are an agent that reviews new tickets to figure out if the ticket is related to a request to refresh the user's laptop. Be helpful, friendly, and efficient in determining their needs.
@@ -57,7 +59,7 @@ states:
             - type: "add_message"
               message: "laptop-refresh"
             - type: "transition"
-              target: "end"
+              target: "handle_laptop_refresh_ticket"
         - name: "other_request"
           trigger_phrases: ["OTHER"]
           actions:
@@ -65,15 +67,37 @@ states:
               target: "handle_other_request"
       default_transition: "handle_other_request"
 
-  # State 3: Handle Other/Unclear Requests
-  handle_other_request:
+  # State 3a: Mark laptop refresh ticket in Zammad, then end
+  handle_laptop_refresh_ticket:
     type: "llm_processor"
-    temperature: 0.3
+    temperature: 0.1
+    allowed_tools: ["mark_as_agent_managed_laptop_refresh"]
     failure_transition: "end"
     prompt: |
-      The user said: "{last_user_message}"
+      This ticket has been classified as a laptop refresh request.
+      Call the mark_as_agent_managed_laptop_refresh tool to tag this ticket in Zammad as agent-managed.
+      After the tool call succeeds, output exactly: LAPTOP_REFRESH_TAGGED
+    response_analysis:
+      conditions:
+        - name: "tagged"
+          trigger_phrases: ["LAPTOP_REFRESH_TAGGED"]
+          actions:
+            - type: "transition"
+              target: "end"
+      default_transition: "end"
 
-      Reply ONLY with: Your ticket has been escalated for human review
+  # State 3b: Handle Other/Unclear Requests — route to human-managed queue in Zammad
+  handle_other_request:
+    type: "llm_processor"
+    temperature: 0.1
+    allowed_tools: ["route_to_human_managed_queue"]
+    failure_transition: "end"
+    prompt: |
+      This ticket has been classified as a non-laptop-refresh request.
+      You MUST immediately call the route_to_human_managed_queue tool. It requires no arguments.
+      Do not ask for more information. Do not explain. Just call the tool.
+      If the tool call succeeds, reply ONLY with: Your ticket has been escalated for human review
+      If the tool call fails, reply ONLY with: We were unable to escalate your ticket for human review due to a temporary issue. Please try again later.
 
     transitions:
       success: "end"

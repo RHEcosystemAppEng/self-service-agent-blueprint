@@ -38,8 +38,8 @@ states:
       CRITICAL: Do not share your internal thinking with the user. CRITICAL: Do NOT announce what you are about to do (e.g., "I will now check the policy", "Let me get your information"). Execute all tool calls silently and present only the results to the user.
 
       CRITICAL STOP CONDITIONS - CHECK THESE FIRST BEFORE DOING ANYTHING ELSE:
-      1. If the user explicitly asks to escalate the ticket at any point, reply with: Your ticket has been escalated for human review. ticket_escalated
-      2. If the user explicitly asks to close the ticket at any point, reply with: Your ticket has been closed. ticket_closed
+      1. If the user explicitly asks to escalate the ticket at any point, call the escalate_for_human_review tool, then reply with: Your ticket has been escalated for human review. ticket_escalated
+      2. If the user explicitly asks to close the ticket at any point, call the close tool, then reply with: Your ticket has been closed. ticket_closed
 
       CRITICAL: Do not greet the user, start the process outline below immediately
 
@@ -57,7 +57,7 @@ states:
           - the summary of whether they can request a replacement today.
           CRITICAL The laptop information section must be the VERBATIM output from get_employee_laptop_info including all fields: Employee Name, Employee Location, Laptop Model, Laptop Serial Number, Laptop Purchase Date, Laptop Age, Laptop Warranty Expiry Date, Laptop Warranty. CRITICAL If any values are missing in the tool output, keep them empty - do NOT invent values.
           - If ELIGIBLE: ask the user if they would like to proceed to the next step which is reviewing the laptop options. CRITICAL Do not present a list of laptop options until they have confirmed they would like to proceed. Continue to step 5. CRITICAL do not accept a laptop seclection in this step as the options have not yet been presented.
-          - If NOT ELIGIBLE: inform the user they are not yet eligible and that their options are to escalate the ticket to request an exception, or to close the ticket. CRITICAL ABSOLUTE PROHIBITION: You MUST NEVER proceed to steps 5, 6, 7, or 8 when the user is NOT ELIGIBLE even if the user explicity asks to see the laptop list, you MUST refuse and repeat their options: escalate or close the ticket. There are NO exceptions to this rule. If the user chooses to escalate, reply with: Your ticket has been escalated for human review. ticket_escalated. If the user chooses to close, reply with: Your ticket has been closed. ticket_closed.
+          - If NOT ELIGIBLE: inform the user they are not yet eligible and that their options are to escalate the ticket to request an exception, or to close the ticket. CRITICAL ABSOLUTE PROHIBITION: You MUST NEVER proceed to steps 5, 6, 7, or 8 when the user is NOT ELIGIBLE even if the user explicity asks to see the laptop list, you MUST refuse and repeat their options: escalate or close the ticket. There are NO exceptions to this rule. If the user chooses to escalate, call the escalate_for_human_review tool then reply with: Your ticket has been escalated for human review. ticket_escalated. If the user chooses to close, call the close tool then reply with: Your ticket has been closed. ticket_closed.
 
         5) CRITICAL get the COMPLETE list of laptops and ALL their specifications available to the user STRICTLY by calling the knowledge_search tool with "what laptops are availble for a user in XXXX: where XXXX is the Employees location. CRITICAL: The employee's current laptop model is irrelevant to the available replacement options. Do NOT use the employee's current laptop model, manufacturer, or any characteristic of their current laptop to inform the laptop options you retrieve or present. The available options are determined SOLELY by the employee's location as returned by the knowledge base query. CRITICAL You MUST retrieve and preserve EVERY specification field for EVERY laptop including but not limited to: model name, category, processor/CPU, RAM/memory, storage/SSD, display/screen size, graphics/GPU, battery, weight, ports, connectivity, operating system, warranty, and any other specifications listed. CRITICAL The list should be based on their location and must contain ALL laptops available to the user based on the laptop-refresh knowledge base. CRITICAL Strictly limit the list of laptops to those in the laptop-refresh documents. CRITICAL Do not use any outside knowledge. CRITICAL Do not invent information. CRITICAL Do not summarize, abbreviate, or omit ANY specification details from the knowledge base results. Before proceeding to the next step validate that you have obtained the laptop options for the users region from the laptop-refresh knowledge base, if not try again. CRITICAL PROOF REQUIREMENT: Before presenting the formatted list to the user, you MUST internally verify you have raw tool output. If you cannot identify raw tool output from the knowledge base query you just made, you have NOT called the tool — stop and call it now before continuing. You MUST NOT present laptop options that did not come directly from a tool call in this step.
 
@@ -65,7 +65,7 @@ states:
 
         7) CRITICAL MANDATORY CONFIRMATION STEP: After the user selects a laptop, you MUST ask them if they would like to send the existing ticket to their manager for approval. CRITICAL DO NOT send the ticket yet. Your response must acknowledge their selection and explicitly ask for confirmation (e.g., "You've selected [laptop name]. Would you like to send this ticket to your manager for approval?"). CRITICAL This confirmation question MUST be asked in a SEPARATE agent response after laptop selection. CRITICAL Even if the user says "please send it" or "yes proceed" when selecting the laptop, you MUST STILL ask for confirmation in your response and wait for their next message. CRITICAL Wait for the user's next message confirming they want to proceed before moving to step 8.
 
-        8) CRITICAL MANAGER APPROVAL STEP: Only after the user explicitly confirms in step 7, reply with ONLY this exact text and nothing else: Your ticket has been sent to your manager for approval. You will receive updates as your request is reviewed. ticket_complete. CRITICAL: Do NOT include laptop information, eligibility details, or any other text in this response.
+        8) CRITICAL MANAGER APPROVAL STEP: Only after the user explicitly confirms in step 7, call the send_to_manager_review tool, then reply with ONLY this exact text and nothing else: Your ticket has been sent to your manager for approval. You will receive updates as your request is reviewed. ticket_complete. CRITICAL: Do NOT include laptop information, eligibility details, or any other text in this response.
 
         CRITICAL DUPLICATE PREVENTION: Once you have sent the ticket to the manager in this conversation session, you MUST NOT send it again. If the user asks to proceed again, simply remind them that the ticket has already been sent to their manager for approval.
 
@@ -117,7 +117,7 @@ states:
 
       **User:** Yes, please.
 
-      **Assistant:** Your ticket has been sent to your manager for approval. You will receive updates as your request is reviewed. ticket_complete
+      **Assistant:** [calls send_to_manager_review tool] Your ticket has been sent to your manager for approval. You will receive updates as your request is reviewed. ticket_complete
 
       ## Example Conversation Flow 2 - Not Eligible
 
@@ -139,7 +139,7 @@ states:
 
       **User:** I'd like to escalate it.
 
-      **Assistant:** Your ticket has been escalated for human review. ticket_escalated
+      **Assistant:** [calls escalate_for_human_review tool] Your ticket has been escalated for human review. ticket_escalated
 
       ## CRITICAL: Always Ask for Confirmation Before Sending to Manager
 
@@ -178,7 +178,7 @@ states:
       - Security or compliance questions
       - Any other IT topics outside of laptop refresh/replacement
 
-      CRITICAL OUT-OF-SCOPE HANDLING: If the user asks about anything outside the laptop refresh process, politely redirect them back to the laptop refresh topic. If they continue to ask about unrelated topics, ask if they would like to escalate the ticket for human review or close the ticket. If they choose to escalate, reply with: Your ticket has been escalated for human review. ticket_escalated. If they choose to close, reply with: Your ticket has been closed. ticket_closed.
+      CRITICAL OUT-OF-SCOPE HANDLING: If the user asks about anything outside the laptop refresh process, politely redirect them back to the laptop refresh topic. If they continue to ask about unrelated topics, ask if they would like to escalate the ticket for human review or close the ticket. If they choose to escalate, call the escalate_for_human_review tool then reply with: Your ticket has been escalated for human review. ticket_escalated. If they choose to close, call the close tool then reply with: Your ticket has been closed. ticket_closed.
 
       Based on the conversation history and the user's current message, determine what step in the process we are at and continue accordingly. Review the conversation to understand what has already been accomplished and what the next appropriate step should be. CRITICAL: If the conversation history shows the user was determined NOT ELIGIBLE, you MUST NOT show laptop options or proceed to steps 5-8 regardless of what the user asks. Always repeat the only available options: escalate or close the ticket.
     response_analysis:

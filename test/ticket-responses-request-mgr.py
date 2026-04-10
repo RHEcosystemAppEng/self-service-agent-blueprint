@@ -51,16 +51,16 @@ def _zammad_get_state_map(base_url: str, token: str) -> dict[int, str]:
     return {s["id"]: s["name"] for s in response.json()}
 
 
-TICKET_TITLE = "Laptop refresh help request"
+DEFAULT_TICKET_TITLE = "Laptop refresh help request"
 
 
 def _zammad_create_ticket(
-    base_url: str, token: str, customer_email: str
+    base_url: str, token: str, customer_email: str, title: str = DEFAULT_TICKET_TITLE
 ) -> tuple[int, str]:
     """Create a Zammad ticket and return (ticket_id, ticket_number)."""
     url = f"{_zammad_api_base(base_url)}/tickets"
     payload = {
-        "title": TICKET_TITLE,
+        "title": title,
         "group": "Users",
         "customer": customer_email,
     }
@@ -303,6 +303,11 @@ async def main() -> None:
         "--initial-message", help="Initial message to send to the agent"
     )
     parser.add_argument(
+        "--ticket-title",
+        default=DEFAULT_TICKET_TITLE,
+        help=f"Title for the created Zammad ticket (default: '{DEFAULT_TICKET_TITLE}')",
+    )
+    parser.add_argument(
         "--delete-ticket-on-close",
         action="store_true",
         help="Delete the Zammad ticket when the session ends",
@@ -335,15 +340,16 @@ async def main() -> None:
                 zammad_base_url, zammad_token, AGENT_EMAIL
             )
             ticket_id, ticket_number = _zammad_create_ticket(
-                zammad_base_url, zammad_token, base_user_id
+                zammad_base_url, zammad_token, base_user_id, title=args.ticket_title
             )
             print(f"Created Zammad ticket #{ticket_number} (id={ticket_id})")
         except Exception as e:
             print(f"Warning: could not create Zammad ticket: {e}", file=sys.stderr)
 
-    # Append ticket number to user_id for session uniqueness
-    if ticket_number:
-        user_id = f"{base_user_id}-{ticket_number}"
+    # Append internal ticket id (not display number) to user_id for session uniqueness
+    # The Zammad MCP server expects the internal id from /api/v1/tickets/{id}, not the display number
+    if ticket_id:
+        user_id = f"{base_user_id}-{ticket_id}"
     else:
         user_id = base_user_id
 

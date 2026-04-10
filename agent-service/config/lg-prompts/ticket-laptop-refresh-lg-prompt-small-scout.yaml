@@ -248,15 +248,13 @@ states:
       Respond with only the classification: ESCALATE, CLOSE, or GENERAL_QUESTION
     intent_actions:
       ESCALATE:
-        response: "Your ticket has been escalated for human review. ticket_escalated"
         data_storage:
           ticket_action: "escalated"
-        next_state: "end"
+        next_state: "escalate_ticket"
       CLOSE:
-        response: "Your ticket has been closed. ticket_closed"
         data_storage:
           ticket_action: "closed"
-        next_state: "end"
+        next_state: "close_ticket"
       GENERAL_QUESTION:
         prompt: |
           Previously retrieved information on laptop eligibility: {laptop_eligibility.response}
@@ -293,15 +291,13 @@ states:
         data_storage:
           laptop_options_retry_count: 0
       ESCALATE:
-        response: "Your ticket has been escalated for human review. ticket_escalated"
         data_storage:
           ticket_action: "escalated"
-        next_state: "end"
+        next_state: "escalate_ticket"
       CLOSE:
-        response: "Your ticket has been closed. ticket_closed"
         data_storage:
           ticket_action: "closed"
-        next_state: "end"
+        next_state: "close_ticket"
       OUT_OF_SCOPE:
         response: "I'm only able to assist with laptop refresh requests. Would you like to proceed with reviewing the available laptop options, escalate the ticket, or close the ticket?"
         next_state: "waiting_proceed_confirmation"
@@ -435,15 +431,13 @@ states:
       Respond with only: VALID_SELECTION, ESCALATE, CLOSE, OUT_OF_SCOPE, INVALID_SELECTION, or UNCLEAR
     intent_actions:
       ESCALATE:
-        response: "Your ticket has been escalated for human review. ticket_escalated"
         data_storage:
           ticket_action: "escalated"
-        next_state: "end"
+        next_state: "escalate_ticket"
       CLOSE:
-        response: "Your ticket has been closed. ticket_closed"
         data_storage:
           ticket_action: "closed"
-        next_state: "end"
+        next_state: "close_ticket"
       OUT_OF_SCOPE:
         response: "I'm only able to assist with laptop refresh requests. Please select one of the laptop options shown above, or let me know if you'd like to escalate or close the ticket."
         next_state: "waiting_laptop_selection"
@@ -505,15 +499,13 @@ states:
       "YES":
         next_state: "send_to_manager"
       ESCALATE:
-        response: "Your ticket has been escalated for human review. ticket_escalated"
         data_storage:
           ticket_action: "escalated"
-        next_state: "end"
+        next_state: "escalate_ticket"
       CLOSE:
-        response: "Your ticket has been closed. ticket_closed"
         data_storage:
           ticket_action: "closed"
-        next_state: "end"
+        next_state: "close_ticket"
       "UNCLEAR":
         response: "Please let me know if you'd like to send this ticket to your manager for approval (yes/no)."
         next_state: "waiting_manager_confirmation"
@@ -522,9 +514,9 @@ states:
   send_to_manager:
     type: "llm_processor"
     temperature: 0.1
-    uses_tools: "No"
+    allowed_tools: ["send_to_manager_review"]
     prompt: |
-      Reply with ONLY this exact text and nothing else:
+      Call the send_to_manager_review tool, then reply with ONLY this exact text and nothing else:
       Your ticket has been sent to your manager for approval. You will receive updates as your request is reviewed. ticket_complete
     response_analysis:
       conditions:
@@ -534,6 +526,42 @@ states:
             - type: "set_field"
               field_name: "ticket_action"
               value: "complete"
+            - type: "transition"
+              target: "end"
+      default_transition: "end"
+
+  # State: Escalate ticket in Zammad then end
+  escalate_ticket:
+    type: "llm_processor"
+    temperature: 0.1
+    allowed_tools: ["escalate_for_human_review"]
+    failure_transition: "end"
+    prompt: |
+      Call the escalate_for_human_review tool, then reply with ONLY this exact text and nothing else:
+      Your ticket has been escalated for human review. ticket_escalated
+    response_analysis:
+      conditions:
+        - name: "ticket_escalated"
+          trigger_phrases: ["ticket_escalated"]
+          actions:
+            - type: "transition"
+              target: "end"
+      default_transition: "end"
+
+  # State: Close ticket in Zammad then end
+  close_ticket:
+    type: "llm_processor"
+    temperature: 0.1
+    allowed_tools: ["close"]
+    failure_transition: "end"
+    prompt: |
+      Call the close tool, then reply with ONLY this exact text and nothing else:
+      Your ticket has been closed. ticket_closed
+    response_analysis:
+      conditions:
+        - name: "ticket_closed"
+          trigger_phrases: ["ticket_closed"]
+          actions:
             - type: "transition"
               target: "end"
       default_transition: "end"

@@ -21,5 +21,8 @@ ignored_output_shield_categories:
   - "Specialized Advice"  # IT support routing flagged as specialized advice
   - "Privacy"  # Routing responses may mention employee/IT topics
   - "Non-Violent Crimes"  # IT support routing falsely flagged
-mcp_servers: []
+mcp_servers:
+  - name: "zammad-mcp"
+    uri: "http://mcp-zammad-mcp:8000/mcp"
+    require_approval: "never"
 knowledge_bases: []

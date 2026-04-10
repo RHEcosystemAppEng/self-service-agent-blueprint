@@ -989,7 +989,12 @@ def run_evaluation_pipeline(
         step_num += 1
         step_label = f"{step_num}/{step_total}"
         logger.info(f"📋 Step {step_label}: Running predefined conversation flows...")
-        run_conversations_args = ["--test-script", test_script]
+        run_conversations_args = [
+            "--test-script",
+            test_script,
+            "--message-timeout",
+            str(message_timeout),
+        ]
         if reset_conversation:
             run_conversations_args.append("--reset-conversation")
         if flow:

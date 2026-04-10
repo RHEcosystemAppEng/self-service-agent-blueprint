@@ -23,6 +23,7 @@ class OpenShiftChatClient:
         initial_message: Optional[str] = None,
         skip_initial_message: bool = False,
         message_timeout: int = 60,
+        ticket_title: Optional[str] = None,
     ):
         """
         Initialize the OpenShift chat client.
@@ -37,6 +38,7 @@ class OpenShiftChatClient:
             skip_initial_message: If True, skip sending any initial message after reset, allowing
                                   the caller to send the first message. Only used when reset_conversation is True.
             message_timeout: Timeout in seconds for individual message send/response operations (default: 60)
+            ticket_title: Optional title to pass as --ticket-title to the test script.
         """
         self.deployment_name = deployment_name
         self.test_script = test_script
@@ -45,6 +47,7 @@ class OpenShiftChatClient:
         self.initial_message = initial_message
         self.skip_initial_message = skip_initial_message
         self.message_timeout = message_timeout
+        self.ticket_title = ticket_title
         self.process: Optional[subprocess.Popen[str]] = None
         self.session_active = False
         self.session_output: list[str] = []  # Capture all output for token parsing
@@ -88,6 +91,9 @@ class OpenShiftChatClient:
             if self.initial_message:
                 escaped_msg = self.initial_message.replace("'", "'\\''")
                 script_cmd += f" --initial-message '{escaped_msg}'"
+            if self.ticket_title:
+                escaped_title = self.ticket_title.replace("'", "'\\''")
+                script_cmd += f" --ticket-title '{escaped_title}'"
             cmd = [
                 "oc",
                 "exec",
