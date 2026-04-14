@@ -45,9 +45,7 @@ def _extract_context_from_request(args: tuple[Any, ...], kwargs: dict[str, Any])
                     trace_id=span.get_span_context().trace_id,
                 )
             return extracted_context
-    except BaseException as e:
-        if isinstance(e, (KeyboardInterrupt, SystemExit)):
-            raise
+    except Exception as e:
         logger.debug("Failed to extract context from request", error=str(e))
 
     return context.get_current()
@@ -95,9 +93,7 @@ def trace_mcp_tool(
                     result = func(*args, **kwargs)
                     span.set_status(Status(StatusCode.OK))
                     return result
-                except BaseException as e:
-                    if isinstance(e, (KeyboardInterrupt, SystemExit)):
-                        raise
+                except Exception as e:
                     span.record_exception(e)
                     span.set_status(Status(StatusCode.ERROR, str(e)))
                     raise
