@@ -13,7 +13,7 @@ env:
   ASSET_MANAGER_DIR: asset-manager
   # uv version must match Makefile UV_VERSION (currently 0.8.9)
   # Update this when UV_VERSION in Makefile changes
-  UV_VERSION: "0.8.9"    
+  UV_VERSION: "0.8.9"
 
 jobs:
   code-quality-check:

@@ -274,16 +274,49 @@ mcp-servers:
       replicas: 1
       deploymentMode: deployment
       image:
-        repository: ghcr.io/basher83/zammad-mcp
-        tag: "1.1.0"
+        repository: quay.io/rh-ai-quickstart/self-service-agent-zammad-mcp
+        tag: "0.0.12"
       port: 8000
       targetPort: 8000
-      transport: http
-      imagePullPolicy: IfNotPresent
+      transport: streamable-http
+      imagePullPolicy: Always
+      extraContainers:
+        - name: basher-zammad-mcp
+          image: ghcr.io/basher83/zammad-mcp:1.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: basher-http
+              containerPort: 8001
+              protocol: TCP
+          env:
+            - name: ZAMMAD_URL
+              valueFrom:
+                secretKeyRef:
+                  name: self-service-agent-zammad-credentials
+                  key: zammad-api-url
+            - name: ZAMMAD_HTTP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: self-service-agent-zammad-credentials
+                  key: zammad-http-token
+            - name: MCP_TRANSPORT
+              value: "http"
+            - name: MCP_HOST
+              value: "127.0.0.1"
+            - name: MCP_PORT
+              value: "8001"
       env:
-        MCP_TRANSPORT: "http"
-        MCP_PORT: "8000"
-        # ZAMMAD_URL and ZAMMAD_HTTP_TOKEN from Secret (zammad.url, zammad.mcp.token)
+        MCP_TRANSPORT: "streamable-http"
+        UVICORN_WORKERS: "2"
+        # No trailing slash: avoids some Basher/streamable-http 307 redirect quirks (see basher_client).
+        ZAMMAD_BASHER_MCP_URL: "http://127.0.0.1:8001/mcp"
+        ZAMMAD_MCP_TIMEOUT_SECONDS: "120"
+        ZAMMAD_GROUP_HUMAN_MANAGED: "human_managed_tickets"
+        ZAMMAD_GROUP_ESCALATED_LAPTOP: "escalated_laptop_refresh_tickets"
+        ZAMMAD_LAPTOP_SPECIALIST_OWNER: "agent.laptop-specialist@example.com"
+        ZAMMAD_USER_MANAGER_FIELD: "manager_email"
+        # Fallback owner for send_to_manager_review when customer has no manager_email (bootstrap agents below).
+        ZAMMAD_MANAGER_EMAIL: "manager1@example.com"
 
 # Zammad ticketing channel (optional)
 zammad:

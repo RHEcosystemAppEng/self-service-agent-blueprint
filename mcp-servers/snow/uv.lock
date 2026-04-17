@@ -864,6 +864,25 @@ cli = [
 ]
 
 [[package]]
+name = "mcp-common"
+version = "0.1.0"
+source = { directory = "../mcp-common" }
+dependencies = [
+    { name = "mcp", extra = ["cli"] },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "self-service-agent-shared-models" },
+    { name = "tracing-config" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "mcp", extras = ["cli"], specifier = ">=1.23" },
+    { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.37.0" },
+    { name = "self-service-agent-shared-models", directory = "../../shared-models" },
+    { name = "tracing-config", directory = "../../tracing-config" },
+]
+
+[[package]]
 name = "mdurl"
 version = "0.1.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1726,6 +1745,7 @@ dependencies = [
     { name = "httpx" },
     { name = "logging" },
     { name = "mcp", extra = ["cli"] },
+    { name = "mcp-common" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "opentelemetry-instrumentation-fastapi" },
     { name = "opentelemetry-instrumentation-httpx" },
@@ -1755,6 +1775,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "logging", specifier = ">=0.4.9.6" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.23" },
+    { name = "mcp-common", directory = "../mcp-common" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.37.0" },
     { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.58b0" },
     { name = "opentelemetry-instrumentation-httpx", specifier = ">=0.58b0" },

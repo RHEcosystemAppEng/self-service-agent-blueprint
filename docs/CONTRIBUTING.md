@@ -86,6 +86,7 @@ Ensure you have the required tools installed:
    make deps-all
    ```
 
+
    Or install specific components:
    ```bash
    make deps                       # Self-service agent dependencies (root)
@@ -93,6 +94,7 @@ Ensure you have the required tools installed:
    make deps-agent-service         # Agent service dependencies
    make deps-integration-dispatcher # Integration dispatcher dependencies
    make deps-mcp-snow              # ServiceNow MCP dependencies
+   make deps-mcp-zammad            # Zammad MCP dependencies
    ```
 
    **Note:** `make install` deploys to a cluster (Helm); use `INSTALL_MODE=test|demo|prod` (default: test). `make uninstall` removes the deployment and namespace; `make helm-uninstall` removes the deployment only (keeps namespace).
@@ -101,6 +103,8 @@ Ensure you have the required tools installed:
    ```bash
    make test-all
    ```
+
+   `test-all` includes the Zammad MCP package; install its deps first 
 
 ### Local Development with Kind Cluster
 

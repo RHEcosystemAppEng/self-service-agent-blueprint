@@ -17,6 +17,7 @@ WORKDIR /app
 
 COPY shared-models ./shared-models/
 COPY tracing-config/ ./tracing-config
+COPY mcp-servers/mcp-common ./mcp-servers/mcp-common
 
 ARG SERVICE_NAME
 ARG USE_PIP_INSTALL

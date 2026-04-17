@@ -212,6 +212,7 @@ helm/zammad/charts/*.tgz
 helm/tmpcharts*
 evaluations/.deepeval/*
 evaluations/results/deep_eval_results/*.json
+evaluations/results/ticket_laptop_refresh/*.json
 
 # Os specific files
 .DS_Store

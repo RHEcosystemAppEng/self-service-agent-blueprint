@@ -74,6 +74,7 @@ REQUEST_MGR_IMG ?= $(REGISTRY)/self-service-agent-request-manager:$(VERSION)
 AGENT_SERVICE_IMG ?= $(REGISTRY)/self-service-agent-service:$(VERSION)
 INTEGRATION_DISPATCHER_IMG ?= $(REGISTRY)/self-service-agent-integration-dispatcher:$(VERSION)
 MCP_SNOW_IMG ?= $(REGISTRY)/self-service-agent-snow-mcp:$(VERSION)
+MCP_ZAMMAD_IMG ?= $(REGISTRY)/self-service-agent-zammad-mcp:$(VERSION)
 MOCK_EVENTING_IMG ?= $(REGISTRY)/self-service-agent-mock-eventing:$(VERSION)
 MOCK_SERVICENOW_IMG ?= $(REGISTRY)/self-service-agent-mock-servicenow:$(VERSION)
 PROMPTGUARD_IMG ?= $(REGISTRY)/self-service-agent-promptguard:$(VERSION)
@@ -246,8 +247,12 @@ ZAMMAD_CREDENTIALS_SECRET ?= $(MAIN_CHART_NAME)-zammad-credentials
 ZAMMAD_ADMIN_EMAIL ?= admin@zammad.local
 ZAMMAD_ADMIN_PASSWORD ?= ZammadR0cks!
 ZAMMAD_AUTOWIZARD_TOKEN ?= ssa-zammad-autowizard-9f3a2b1c
+
+# Used only by _helm-install-ticketing-single (zammad.enabled + zammad-mcp.enabled in values-ticketing.yaml).
 helm_ticketing_args = \
 	--set zammad.url=$(ZAMMAD_URL) \
+	--set mcp-servers.mcp-servers.zammad-mcp.image.repository=$(REGISTRY)/self-service-agent-zammad-mcp \
+	--set mcp-servers.mcp-servers.zammad-mcp.image.tag=$(VERSION) \
 	--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_URL.name=$(ZAMMAD_CREDENTIALS_SECRET) \
 	--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_URL.key=zammad-url \
 	--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_HTTP_TOKEN.name=$(ZAMMAD_CREDENTIALS_SECRET) \
@@ -268,6 +273,7 @@ help:
 	@echo "  build-agent-service-image            - Build the agent service container image (checks lockfiles first)"
 	@echo "  build-integration-dispatcher-image   - Build the integration dispatcher container image (checks lockfiles first)"
 	@echo "  build-mcp-snow-image                 - Build the snow MCP server container image (checks lockfiles first)"
+	@echo "  build-mcp-zammad-image               - Build the Zammad MCP server container image (checks lockfiles first)"
 	@echo "  build-mock-eventing-image            - Build the mock eventing service container image (checks lockfiles first)"
 	@echo "  build-mock-servicenow-image          - Build the mock ServiceNow server container image (checks lockfiles first)"
 	@echo "  build-zammad-bootstrap-image         - Build the Zammad bootstrap container image (checks lockfiles first)"
@@ -301,6 +307,7 @@ help:
 	@echo "  deps-agent-service                   - Install dependencies for agent service"
 	@echo "  deps-integration-dispatcher          - Install dependencies for integration dispatcher"
 	@echo "  deps-mcp-snow                        - Install dependencies for snow MCP server"
+	@echo "  deps-mcp-zammad                      - Install dependencies for Zammad MCP server"
 	@echo "  deps-request-manager                 - Install dependencies for request manager"
 	@echo "  deps-shared-models                   - Install dependencies for shared models"
 	@echo "  deps-shared-clients                  - Install dependencies for shared clients"
@@ -312,11 +319,12 @@ help:
 	@echo "  deps-evaluations                     - Install dependencies for evaluations"
 	@echo ""
 	@echo "Reinstall Commands:"
-	@echo "  reinstall-all                       - Force reinstall dependencies for all projects (uv sync --reinstall)"
+	@echo "  reinstall-all                       - Force reinstall dependencies for all projects"
 	@echo "  reinstall                           - Force reinstall self-service agent dependencies (uv sync --reinstall)"
 	@echo "  reinstall-agent-service             - Force reinstall agent service dependencies"
 	@echo "  reinstall-integration-dispatcher    - Force reinstall integration dispatcher dependencies"
 	@echo "  reinstall-mcp-snow                  - Force reinstall snow MCP dependencies"
+	@echo "  reinstall-mcp-zammad                - Force reinstall Zammad MCP dependencies"
 	@echo "  reinstall-request-manager           - Force reinstall request manager dependencies"
 	@echo "  reinstall-shared-models             - Force reinstall shared models dependencies"
 	@echo "  reinstall-shared-clients            - Force reinstall shared clients dependencies"
@@ -330,6 +338,7 @@ help:
 	@echo "  pull-agent-service-image            - Pull agent service image"
 	@echo "  pull-integration-dispatcher-image   - Pull integration dispatcher image"
 	@echo "  pull-mcp-snow-image                 - Pull snow MCP image"
+	@echo "  pull-mcp-zammad-image               - Pull Zammad MCP image"
 	@echo "  pull-mock-eventing-image            - Pull mock eventing image"
 	@echo "  pull-mock-servicenow-image          - Pull mock ServiceNow image"
 	@echo "  pull-promptguard-image              - Pull PromptGuard image"
@@ -341,6 +350,7 @@ help:
 	@echo "  retag-agent-service-image           - Retag agent service image"
 	@echo "  retag-integration-dispatcher-image  - Retag integration dispatcher image"
 	@echo "  retag-mcp-snow-image                - Retag snow MCP image"
+	@echo "  retag-mcp-zammad-image              - Retag Zammad MCP image"
 	@echo "  retag-mock-eventing-image           - Retag mock eventing image"
 	@echo "  retag-mock-servicenow-image         - Retag mock ServiceNow image"
 	@echo "  retag-promptguard-image             - Retag PromptGuard image"
@@ -351,6 +361,7 @@ help:
 	@echo "  push-agent-service-image            - Push the agent service container image to registry"
 	@echo "  push-integration-dispatcher-image   - Push the integration dispatcher container image to registry"
 	@echo "  push-mcp-snow-image                 - Push the snow MCP server container image to registry"
+	@echo "  push-mcp-zammad-image               - Push the Zammad MCP server container image to registry"
 	@echo "  push-mock-eventing-image            - Push the mock eventing service container image to registry"
 	@echo "  push-promptguard-image              - Push the PromptGuard service container image to registry"
 	@echo "  push-request-mgr-image              - Push the request manager container image to registry"
@@ -388,6 +399,7 @@ help:
 	@echo "  test-agent-service                  - Run tests for agent service"
 	@echo "  test-integration-dispatcher         - Run tests for integration dispatcher"
 	@echo "  test-mcp-snow                       - Run tests for snow MCP server"
+	@echo "  test-mcp-zammad                     - Run tests for Zammad MCP server"
 	@echo "  test-request-manager                - Run tests for request manager"
 	@echo "  test-shared-models                  - Run tests for shared models"
 	@echo "  test-servicenow-bootstrap          - Run tests for ServiceNow automation scripts"
@@ -597,11 +609,11 @@ endef
 check-deps-services-template: check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-mock-employee-data
 
 .PHONY: check-deps-mcp-template
-check-deps-mcp-template: check-lockfile-shared-models
+check-deps-mcp-template: check-lockfile-shared-models check-lockfile-mcp-common
 
 # Build container images
 .PHONY: build-all-images
-build-all-images: build-request-mgr-image build-agent-service-image build-integration-dispatcher-image build-mcp-snow-image build-mock-eventing-image build-mock-servicenow-image build-promptguard-image build-zammad-bootstrap-image
+build-all-images: build-request-mgr-image build-agent-service-image build-integration-dispatcher-image build-mcp-snow-image build-mcp-zammad-image build-mock-eventing-image build-mock-servicenow-image build-promptguard-image build-zammad-bootstrap-image
 	@echo "All container images built successfully!"
 
 
@@ -626,6 +638,10 @@ build-promptguard-image: check-lockfile-promptguard check-deps-services-template
 build-mcp-snow-image: check-lockfile-mcp-snow check-deps-mcp-template
 	$(call build_template_image,$(MCP_SNOW_IMG),snow MCP image,Containerfile.mcp-template,mcp-servers/snow,snow.server,.)
 
+.PHONY: build-mcp-zammad-image
+build-mcp-zammad-image: check-lockfile-mcp-zammad check-deps-mcp-template
+	$(call build_template_image,$(MCP_ZAMMAD_IMG),Zammad MCP image,Containerfile.mcp-template,mcp-servers/zammad,zammad_mcp.server,.)
+
 .PHONY: build-mock-eventing-image
 build-mock-eventing-image: check-lockfile-mock-eventing check-deps-services-template
 	$(call build_template_image,$(MOCK_EVENTING_IMG),mock eventing service image,Containerfile.services-template,mock-eventing-service,mock_eventing_service.main,.)
@@ -646,7 +662,7 @@ build-zammad-bootstrap-image: check-lockfile-zammad-bootstrap check-lockfile-moc
 
 # Push container images
 .PHONY: push-all-images
-push-all-images: push-request-mgr-image push-agent-service-image push-integration-dispatcher-image push-mcp-snow-image push-mock-eventing-image push-mock-servicenow-image push-promptguard-image push-zammad-bootstrap-image
+push-all-images: push-request-mgr-image push-agent-service-image push-integration-dispatcher-image push-mcp-snow-image push-mcp-zammad-image push-mock-eventing-image push-mock-servicenow-image push-promptguard-image push-zammad-bootstrap-image
 	@echo "All container images pushed successfully!"
 
 
@@ -668,6 +684,10 @@ push-integration-dispatcher-image:
 push-mcp-snow-image:
 	$(call push_image,$(MCP_SNOW_IMG) $(PUSH_EXTRA_AGRS),snow MCP image)
 
+.PHONY: push-mcp-zammad-image
+push-mcp-zammad-image:
+	$(call push_image,$(MCP_ZAMMAD_IMG) $(PUSH_EXTRA_AGRS),Zammad MCP image)
+
 .PHONY: push-mock-eventing-image
 push-mock-eventing-image:
 	$(call push_image,$(MOCK_EVENTING_IMG) $(PUSH_EXTRA_AGRS),mock eventing service image)
@@ -686,7 +706,7 @@ push-promptguard-image:
 
 # Pull images at REGISTRY/VERSION with --platform=$(ARCH)
 .PHONY: pull-all-images
-pull-all-images: pull-request-mgr-image pull-agent-service-image pull-integration-dispatcher-image pull-mcp-snow-image pull-mock-eventing-image pull-mock-servicenow-image pull-promptguard-image pull-zammad-bootstrap-image
+pull-all-images: pull-request-mgr-image pull-agent-service-image pull-integration-dispatcher-image pull-mcp-snow-image pull-mcp-zammad-image pull-mock-eventing-image pull-mock-servicenow-image pull-promptguard-image pull-zammad-bootstrap-image
 	@echo "All images pulled successfully!"
 
 .PHONY: pull-request-mgr-image
@@ -704,6 +724,10 @@ pull-integration-dispatcher-image:
 .PHONY: pull-mcp-snow-image
 pull-mcp-snow-image:
 	$(call pull_image,$(MCP_SNOW_IMG),snow MCP image)
+
+.PHONY: pull-mcp-zammad-image
+pull-mcp-zammad-image:
+	$(call pull_image,$(MCP_ZAMMAD_IMG),Zammad MCP image)
 
 .PHONY: pull-mock-eventing-image
 pull-mock-eventing-image:
@@ -723,7 +747,7 @@ pull-promptguard-image:
 
 # Retag images from REGISTRY/VERSION to NEW_REGISTRY/NEW_VERSION (both NEW_* must be set)
 .PHONY: retag-all-images
-retag-all-images: retag-request-mgr-image retag-agent-service-image retag-integration-dispatcher-image retag-mcp-snow-image retag-mock-eventing-image retag-mock-servicenow-image retag-promptguard-image retag-zammad-bootstrap-image
+retag-all-images: retag-request-mgr-image retag-agent-service-image retag-integration-dispatcher-image retag-mcp-snow-image retag-mcp-zammad-image retag-mock-eventing-image retag-mock-servicenow-image retag-promptguard-image retag-zammad-bootstrap-image
 	@echo "All images retagged to $(NEW_REGISTRY)/*:$(NEW_VERSION)"
 
 .PHONY: retag-request-mgr-image
@@ -741,6 +765,10 @@ retag-integration-dispatcher-image: pull-integration-dispatcher-image
 .PHONY: retag-mcp-snow-image
 retag-mcp-snow-image: pull-mcp-snow-image
 	$(call retag_image,self-service-agent-snow-mcp,snow MCP image)
+
+.PHONY: retag-mcp-zammad-image
+retag-mcp-zammad-image: pull-mcp-zammad-image
+	$(call retag_image,self-service-agent-zammad-mcp,Zammad MCP image)
 
 .PHONY: retag-mock-eventing-image
 retag-mock-eventing-image: pull-mock-eventing-image
@@ -782,7 +810,7 @@ check-logging:
 
 # Per-directory mypy linting (project-specific configurations)
 .PHONY: lint-mypy-per-directory
-lint-mypy-per-directory: lint-shared-models lint-shared-clients lint-agent-service lint-request-manager lint-integration-dispatcher lint-mcp-snow lint-mock-eventing lint-tracing-config lint-evaluations lint-servicenow-bootstrap lint-mock-employee-data lint-mock-servicenow
+lint-mypy-per-directory: lint-shared-models lint-shared-clients lint-agent-service lint-request-manager lint-integration-dispatcher lint-mcp-snow lint-mcp-zammad lint-mock-eventing lint-tracing-config lint-evaluations lint-servicenow-bootstrap lint-mock-employee-data lint-mock-servicenow
 	@echo "✅ All mypy linting completed"
 
 # Common function for mypy linting
@@ -819,6 +847,10 @@ lint-integration-dispatcher:
 .PHONY: lint-mcp-snow
 lint-mcp-snow:
 	$(call lint_mypy,mcp-servers/snow)
+
+.PHONY: lint-mcp-zammad
+lint-mcp-zammad:
+	$(call lint_mypy,mcp-servers/zammad)
 
 .PHONY: lint-mock-eventing
 lint-mock-eventing:
@@ -877,7 +909,7 @@ uninstall: helm-uninstall
 
 # Install dependencies (local dev)
 .PHONY: deps-all
-deps-all: deps-shared-models deps-shared-clients deps-tracing-config deps deps-request-manager deps-agent-service deps-integration-dispatcher deps-mcp-snow deps-mock-eventing deps-mock-employee-data deps-mock-servicenow deps-promptguard deps-evaluations deps-servicenow-bootstrap
+deps-all: deps-shared-models deps-shared-clients deps-tracing-config deps deps-request-manager deps-agent-service deps-integration-dispatcher deps-mcp-snow deps-mcp-zammad deps-mock-eventing deps-mock-employee-data deps-mock-servicenow deps-promptguard deps-evaluations deps-servicenow-bootstrap
 	@echo "All dependencies installed successfully!"
 
 .PHONY: deps-shared-models
@@ -906,7 +938,7 @@ reinstall:
 	@echo "All dependencies reinstalled with latest code!"
 
 .PHONY: reinstall-all
-reinstall-all: reinstall-shared-models reinstall-shared-clients reinstall reinstall-request-manager reinstall-agent-service reinstall-integration-dispatcher reinstall-mcp-snow reinstall-mock-employee-data reinstall-mock-servicenow reinstall-promptguard reinstall-servicenow-bootstrap
+reinstall-all: reinstall-shared-models reinstall-shared-clients reinstall reinstall-request-manager reinstall-agent-service reinstall-integration-dispatcher reinstall-mcp-snow reinstall-mcp-zammad reinstall-mock-employee-data reinstall-mock-servicenow reinstall-promptguard reinstall-servicenow-bootstrap
 	@echo "All project dependencies reinstalled successfully!"
 
 
@@ -933,6 +965,12 @@ reinstall-mcp-snow:
 	@echo "Force reinstalling snow MCP dependencies..."
 	cd mcp-servers/snow && uv sync --reinstall
 	@echo "Snow MCP dependencies reinstalled successfully!"
+
+.PHONY: reinstall-mcp-zammad
+reinstall-mcp-zammad:
+	@echo "Force reinstalling Zammad MCP dependencies..."
+	cd mcp-servers/zammad && uv sync --reinstall
+	@echo "Zammad MCP dependencies reinstalled successfully!"
 
 .PHONY: reinstall-shared-models
 reinstall-shared-models:
@@ -999,6 +1037,12 @@ deps-mcp-snow:
 	cd mcp-servers/snow && uv sync
 	@echo "Snow MCP dependencies installed successfully!"
 
+.PHONY: deps-mcp-zammad
+deps-mcp-zammad:
+	@echo "Installing Zammad MCP dependencies..."
+	cd mcp-servers/zammad && uv sync
+	@echo "Zammad MCP dependencies installed successfully!"
+
 .PHONY: deps-mock-eventing
 deps-mock-eventing:
 	@echo "Installing mock eventing service dependencies..."
@@ -1048,7 +1092,7 @@ deps-servicenow-bootstrap:
 
 # Test code
 .PHONY: test-all
-test-all: test-shared-models test-shared-clients test-request-manager test-agent-service test-integration-dispatcher test-mcp-snow test-servicenow-bootstrap test-mock-employee-data test-mock-servicenow
+test-all: test-shared-models test-shared-clients test-request-manager test-agent-service test-integration-dispatcher test-mcp-snow test-mcp-zammad test-servicenow-bootstrap test-mock-employee-data test-mock-servicenow
 	@echo "All tests completed successfully!"
 
 # Lockfile management
@@ -1056,7 +1100,7 @@ test-all: test-shared-models test-shared-clients test-request-manager test-agent
 MAKE_SAME := $(MAKE) -f $(firstword $(MAKEFILE_LIST))
 # All directories that have uv.lock (for check-lockfiles and update-lockfiles).
 # Export of requirements.txt only runs for dirs also in REQUIREMENTS_DIRS (see update_lockfile).
-LOCKFILE_DIRS := shared-models shared-clients agent-service request-manager integration-dispatcher mcp-servers/snow mock-eventing-service mock-employee-data promptguard-service scripts/servicenow-bootstrap zammad-bootstrap
+LOCKFILE_DIRS := shared-models shared-clients agent-service request-manager integration-dispatcher mcp-servers/mcp-common mcp-servers/snow mcp-servers/zammad mock-eventing-service mock-employee-data promptguard-service scripts/servicenow-bootstrap zammad-bootstrap
 
 define check_lockfile
 	@echo "📦 Checking $(1)..."
@@ -1128,7 +1172,7 @@ update-lockfiles: check-uv-version
 	@echo "🎉 All lockfiles updated successfully!"
 
 # Individual service lockfile targets
-.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-snow check-lockfile-mock-eventing check-lockfile-mock-employee-data check-lockfile-mock-servicenow check-lockfile-promptguard check-lockfile-servicenow-bootstrap check-lockfile-zammad-bootstrap
+.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-common check-lockfile-mcp-snow check-lockfile-mcp-zammad check-lockfile-mock-eventing check-lockfile-mock-employee-data check-lockfile-mock-servicenow check-lockfile-promptguard check-lockfile-servicenow-bootstrap check-lockfile-zammad-bootstrap
 check-lockfile-root:
 	@echo "📦 Checking root project..."
 	@if uv lock --check; then \
@@ -1152,8 +1196,14 @@ check-lockfile-request-manager:
 check-lockfile-integration-dispatcher:
 	$(call check_lockfile,integration-dispatcher)
 
+check-lockfile-mcp-common:
+	$(call check_lockfile,mcp-servers/mcp-common)
+
 check-lockfile-mcp-snow:
 	$(call check_lockfile,mcp-servers/snow)
+
+check-lockfile-mcp-zammad:
+	$(call check_lockfile,mcp-servers/zammad)
 
 check-lockfile-mock-eventing:
 	$(call check_lockfile,mock-eventing-service)
@@ -1174,7 +1224,7 @@ check-lockfile-zammad-bootstrap:
 	$(call check_lockfile,zammad-bootstrap)
 
 
-.PHONY: update-lockfile-shared-models update-lockfile-shared-clients update-lockfile-agent-service update-lockfile-request-manager update-lockfile-integration-dispatcher update-lockfile-mcp-snow update-lockfile-mock-eventing update-lockfile-mock-employee-data update-lockfile-mock-servicenow update-lockfile-promptguard update-lockfile-servicenow-bootstrap update-lockfile-zammad-bootstrap
+.PHONY: update-lockfile-shared-models update-lockfile-shared-clients update-lockfile-agent-service update-lockfile-request-manager update-lockfile-integration-dispatcher update-lockfile-mcp-common update-lockfile-mcp-snow update-lockfile-mcp-zammad update-lockfile-mock-eventing update-lockfile-mock-employee-data update-lockfile-mock-servicenow update-lockfile-promptguard update-lockfile-servicenow-bootstrap update-lockfile-zammad-bootstrap
 update-lockfile-shared-models:
 	$(call update_lockfile,shared-models)
 
@@ -1190,8 +1240,14 @@ update-lockfile-request-manager:
 update-lockfile-integration-dispatcher:
 	$(call update_lockfile,integration-dispatcher)
 
+update-lockfile-mcp-common:
+	$(call update_lockfile,mcp-servers/mcp-common)
+
 update-lockfile-mcp-snow:
 	$(call update_lockfile,mcp-servers/snow)
+
+update-lockfile-mcp-zammad:
+	$(call update_lockfile,mcp-servers/zammad)
 
 update-lockfile-mock-eventing:
 	$(call update_lockfile,mock-eventing-service)
@@ -1233,7 +1289,7 @@ _export-one-dir:
 # CI uses: astral-sh/setup-uv@v5 with version: "0.8.9"
 # To install locally: curl -LsSf https://astral.sh/uv/0.8.9/install.sh | sh
 # Or update: uv self update (may install newer version - check with make check-uv-version)
-REQUIREMENTS_DIRS := agent-service integration-dispatcher promptguard-service request-manager mock-eventing-service mock-service-now mcp-servers/snow shared-models shared-clients mock-employee-data zammad-bootstrap
+REQUIREMENTS_DIRS := agent-service integration-dispatcher promptguard-service request-manager mock-eventing-service mock-service-now mcp-servers/snow mcp-servers/zammad shared-models shared-clients mock-employee-data zammad-bootstrap
 # UV_VERSION: uv version for CI validation and container builds (default: 0.8.9, can be overridden)
 UV_VERSION ?= 0.8.9
 EXTRACT_TORCH_HASH_SCRIPT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))scripts/extract_torch_hash.py)
@@ -1349,6 +1405,12 @@ test-integration-dispatcher:
 .PHONY: test-mcp-snow
 test-mcp-snow:
 	$(call run_pytest,snow MCP,mcp-servers/snow)
+
+.PHONY: test-mcp-zammad
+test-mcp-zammad:
+	@echo "Running Zammad MCP tests..."
+	cd mcp-servers/zammad && uv run python -m pytest tests/
+	@echo "Zammad MCP tests completed successfully!"
 
 .PHONY: test-servicenow-bootstrap
 test-servicenow-bootstrap:
@@ -1627,7 +1689,8 @@ helm-install-ticketing: namespace helm-depend
 	@echo "Step 1/4: Creating placeholder secret and installing our chart..."
 	@ZAMMAD_URL="http://zammad-nginx.$(NAMESPACE).svc.cluster.local:8080"; \
 	kubectl create secret generic $(ZAMMAD_CREDENTIALS_SECRET) \
-		--from-literal=zammad-url="$$ZAMMAD_URL/api/v1" \
+		--from-literal=zammad-url="$$ZAMMAD_URL" \
+		--from-literal=zammad-api-url="$$ZAMMAD_URL/api/v1" \
 		--from-literal=zammad-http-token="" \
 		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
 	$(MAKE) _helm-install-ticketing-single ZAMMAD_URL="$$ZAMMAD_URL"
@@ -1645,7 +1708,8 @@ helm-install-ticketing: namespace helm-depend
 	if [ -n "$$ZAMMAD_TOKEN" ]; then \
 		echo "✅ Token created"; \
 		kubectl create secret generic $(ZAMMAD_CREDENTIALS_SECRET) \
-			--from-literal=zammad-url="$$ZAMMAD_URL/api/v1" \
+			--from-literal=zammad-url="$$ZAMMAD_URL" \
+			--from-literal=zammad-api-url="$$ZAMMAD_URL/api/v1" \
 			--from-literal=zammad-http-token="$$ZAMMAD_TOKEN" \
 			-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
 		echo "Restarting Zammad MCP and request manager ..."; \
@@ -1664,12 +1728,8 @@ _helm-install-ticketing-single:
 	@$(call helm_install_common,with ticketing config - Zammad MCP,\
 		-f helm/values-test.yaml \
 		-f helm/values-ticketing.yaml \
-		--set zammad.url=$(ZAMMAD_URL) \
 		--set mcp-servers.mcp-servers.zammad-mcp.enabled=true \
-		--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_URL.name=$(ZAMMAD_CREDENTIALS_SECRET) \
-		--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_URL.key=zammad-url \
-		--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_HTTP_TOKEN.name=$(ZAMMAD_CREDENTIALS_SECRET) \
-		--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_HTTP_TOKEN.key=zammad-http-token \
+		$(helm_ticketing_args) \
 		$(PROMPT_OVERRIDES),\
 		true)
 	@$(MAKE) print-urls
@@ -2202,7 +2262,8 @@ zammad-bootstrap-token: namespace zammad-trigger-autowizard
 		exit 1; \
 	fi; \
 	kubectl create secret generic $(ZAMMAD_CREDENTIALS_SECRET) \
-		--from-literal=zammad-url="$$ZAMMAD_URL/api/v1" \
+		--from-literal=zammad-url="$$ZAMMAD_URL" \
+		--from-literal=zammad-api-url="$$ZAMMAD_URL/api/v1" \
 		--from-literal=zammad-http-token="$$ZAMMAD_TOKEN" \
 		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
 	echo "Restarting Zammad MCP..."; \
@@ -2221,7 +2282,8 @@ zammad-set-token: namespace
 	@ZAMMAD_URL="http://zammad-nginx.$(NAMESPACE).svc.cluster.local:8080"; \
 	echo "Updating Zammad credentials secret with token..."; \
 	kubectl create secret generic $(ZAMMAD_CREDENTIALS_SECRET) \
-		--from-literal=zammad-url="$$ZAMMAD_URL/api/v1" \
+		--from-literal=zammad-url="$$ZAMMAD_URL" \
+		--from-literal=zammad-api-url="$$ZAMMAD_URL/api/v1" \
 		--from-literal=zammad-http-token="$(ZAMMAD_TOKEN)" \
 		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
 	echo "Restarting Zammad MCP deployment..."; \
