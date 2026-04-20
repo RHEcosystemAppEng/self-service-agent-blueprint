@@ -1,6 +1,7 @@
 """Tests for Basher MCP helpers (ticket auth, user search)."""
 
 import json
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -23,7 +24,7 @@ def test_assert_ticket_customer_embedded_email_matches(mock_basher: Mock) -> Non
 def test_assert_ticket_customer_customer_id_uses_user_search(
     mock_basher: Mock,
 ) -> None:
-    def _side_effect(name: str, params: dict) -> str:
+    def _side_effect(name: str, params: dict[str, Any]) -> str:
         if name == "zammad_get_ticket":
             return json.dumps({"customer_id": 9})
         if name == "zammad_search_users":

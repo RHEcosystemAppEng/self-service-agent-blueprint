@@ -16,7 +16,10 @@ from zammad_mcp.settings import ZAMMAD_MCP_SETTINGS
 
 logger = configure_logging("zammad-mcp-basher")
 
-_executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="zammad-basher-mcp")
+_executor = ThreadPoolExecutor(
+    max_workers=ZAMMAD_MCP_SETTINGS.basher_mcp_max_workers,
+    thread_name_prefix="zammad-basher-mcp",
+)
 
 
 def _format_tool_result(result: CallToolResult) -> str:

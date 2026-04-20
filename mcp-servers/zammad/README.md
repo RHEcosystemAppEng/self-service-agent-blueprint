@@ -26,6 +26,7 @@ Example: `alice@company.com-42`
 |----------|---------|
 | `ZAMMAD_URL` | Zammad web origin for REST (no `/api/v1` in the value; paths are added in code). Helm secret key **`zammad-url`**. |
 | `ZAMMAD_BASHER_MCP_URL` | Basher MCP URL. Defaults to **`http://127.0.0.1:8001/mcp`** (sidecar on the same pod); set only if you use another host or path. |
+| `ZAMMAD_BASHER_MCP_MAX_WORKERS` | Size of the thread pool used for synchronous Basher MCP calls (default **`8`**; must be an integer, clamped to **`1`**–**`128`**). |
 | `ZAMMAD_HTTP_TOKEN` | Zammad API token on this pod (secret key **`zammad-http-token`**). |
 | `ZAMMAD_MCP_TIMEOUT_SECONDS` | Timeout (seconds) for Basher MCP calls and Zammad REST `GET /users/{id}` (default **`120`**; invalid value raises **`ValueError`**; values below **`1`** are clamped to **`1`**). |
 | `ZAMMAD_AGENT_MANAGED_TAG` | Tag for `mark_as_agent_managed_laptop_refresh` (default `agent-managed-laptop-refresh`). |

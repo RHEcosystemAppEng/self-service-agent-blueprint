@@ -38,6 +38,7 @@ class ZammadMcpSettings:
     zammad_rest_base_url: str
     zammad_http_token: str
     basher_mcp_url: str
+    basher_mcp_max_workers: int
     mcp_timeout_seconds: float
     mcp_transport: str
     mcp_listen_host: str
@@ -82,6 +83,15 @@ def load_zammad_mcp_settings() -> ZammadMcpSettings:
             f"Invalid ZAMMAD_MCP_TIMEOUT_SECONDS: {to_raw!r} (expected a number)."
         ) from e
 
+    workers_raw = (os.getenv("ZAMMAD_BASHER_MCP_MAX_WORKERS", "8") or "8").strip()
+    try:
+        basher_mcp_max_workers = int(workers_raw)
+    except ValueError as e:
+        raise ValueError(
+            f"Invalid ZAMMAD_BASHER_MCP_MAX_WORKERS: {workers_raw!r} (expected an integer)."
+        ) from e
+    basher_mcp_max_workers = max(1, min(basher_mcp_max_workers, 128))
+
     return ZammadMcpSettings(
         agent_managed_tag=_str_env(
             "ZAMMAD_AGENT_MANAGED_TAG", "agent-managed-laptop-refresh"
@@ -108,6 +118,7 @@ def load_zammad_mcp_settings() -> ZammadMcpSettings:
         zammad_rest_base_url=zammad_url.rstrip("/"),
         zammad_http_token=zammad_http_token,
         basher_mcp_url=basher_mcp_url,
+        basher_mcp_max_workers=basher_mcp_max_workers,
         mcp_timeout_seconds=mcp_timeout_seconds,
         mcp_transport=mcp_transport,
         mcp_listen_host=mcp_listen_host,

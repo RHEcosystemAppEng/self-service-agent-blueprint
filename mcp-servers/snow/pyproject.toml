@@ -69,6 +69,11 @@ module = [
 ]
 follow_imports = "skip"
 
+# FastMCP decorators use ``AnyFunction`` (``Callable[..., Any]``); mypy strict treats that as an untyped decorator.
+[[tool.mypy.overrides]]
+module = "snow.server"
+disallow_untyped_decorators = false
+
 [tool.uv.sources]
 mcp-common = { path = "../mcp-common" }
 self-service-agent-shared-models = { path = "../../shared-models" }

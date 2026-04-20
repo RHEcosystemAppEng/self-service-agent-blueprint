@@ -81,7 +81,7 @@ mcp = FastMCP(
 )
 
 
-@mcp.custom_route("/health", methods=["GET"])  # type: ignore
+@mcp.custom_route("/health", methods=["GET"])
 async def health(request: Any) -> JSONResponse:
     return JSONResponse({"status": "OK", "service": SERVICE_NAME})
 
@@ -101,7 +101,7 @@ def _authorize_ticket(ctx: Context[Any, Any]) -> tuple[str, int, int]:
 
 @mcp.tool()
 @_handle_tool_errors
-@trace_mcp_tool()  # type: ignore[untyped-decorator]
+@trace_mcp_tool()
 def mark_as_agent_managed_laptop_refresh(ctx: Context[Any, Any]) -> str:
     """Tag this ticket for agent-managed laptop refresh."""
     _, ticket_id, _ = _authorize_ticket(ctx)
@@ -123,7 +123,7 @@ def mark_as_agent_managed_laptop_refresh(ctx: Context[Any, Any]) -> str:
 
 @mcp.tool()
 @_handle_tool_errors
-@trace_mcp_tool()  # type: ignore[untyped-decorator]
+@trace_mcp_tool()
 def close(ctx: Context[Any, Any]) -> str:
     """Close the ticket."""
     _, ticket_id, _ = _authorize_ticket(ctx)
@@ -134,7 +134,7 @@ def close(ctx: Context[Any, Any]) -> str:
 
 @mcp.tool()
 @_handle_tool_errors
-@trace_mcp_tool()  # type: ignore[untyped-decorator]
+@trace_mcp_tool()
 def escalate_for_human_review(ctx: Context[Any, Any]) -> str:
     """Escalate this ticket to the human escalation queue."""
     _, ticket_id, _ = _authorize_ticket(ctx)
@@ -155,7 +155,7 @@ def escalate_for_human_review(ctx: Context[Any, Any]) -> str:
 
 @mcp.tool()
 @_handle_tool_errors
-@trace_mcp_tool()  # type: ignore[untyped-decorator]
+@trace_mcp_tool()
 def send_to_manager_review(ctx: Context[Any, Any]) -> str:
     """Assign this ticket to the customer's manager for approval."""
     _, ticket_id, cust_uid = _authorize_ticket(ctx)
@@ -183,7 +183,7 @@ def send_to_manager_review(ctx: Context[Any, Any]) -> str:
 
 @mcp.tool()
 @_handle_tool_errors
-@trace_mcp_tool()  # type: ignore[untyped-decorator]
+@trace_mcp_tool()
 def route_to_human_managed_queue(ctx: Context[Any, Any]) -> str:
     """Route this ticket to the human-managed queue."""
     _, ticket_id, _ = _authorize_ticket(ctx)

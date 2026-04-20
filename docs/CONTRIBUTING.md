@@ -104,8 +104,6 @@ Ensure you have the required tools installed:
    make test-all
    ```
 
-   `test-all` includes the Zammad MCP package; install its deps first 
-
 ### Local Development with Kind Cluster
 
 For local Kubernetes development without OpenShift, you can run a local Kind cluster with a container registry:

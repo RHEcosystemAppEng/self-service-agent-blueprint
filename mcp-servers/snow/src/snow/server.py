@@ -7,7 +7,7 @@ ServiceNow laptop refresh tickets.
 import os
 import re
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Literal
+from typing import Any, AsyncGenerator, Literal, cast
 
 from mcp.server.fastmcp import Context, FastMCP
 from mcp_common.headers import header_first
@@ -83,7 +83,10 @@ async def lifespan(app: FastMCP) -> AsyncGenerator[None, None]:
         logger.info("Shutting down ServiceNow MCP server")
 
 
-MCP_TRANSPORT: Literal["stdio", "sse", "streamable-http"] = os.environ.get("MCP_TRANSPORT", "sse")  # type: ignore[assignment]
+MCP_TRANSPORT: Literal["stdio", "sse", "streamable-http"] = cast(
+    Literal["stdio", "sse", "streamable-http"],
+    os.environ.get("MCP_TRANSPORT", "sse") or "sse",
+)
 MCP_PORT = int(
     os.environ.get("SELF_SERVICE_AGENT_SNOW_SERVER_SERVICE_PORT_HTTP", "8001")
 )
@@ -96,14 +99,14 @@ mcp = FastMCP(
 )
 
 
-@mcp.custom_route("/health", methods=["GET"])  # type: ignore
+@mcp.custom_route("/health", methods=["GET"])
 async def health(request: Any) -> JSONResponse:
     """Health check endpoint."""
     return JSONResponse({"status": "OK"})
 
 
 @mcp.tool()
-@trace_mcp_tool()  # type: ignore[misc]
+@trace_mcp_tool()
 def open_laptop_refresh_ticket(
     employee_name: str,
     business_justification: str,
@@ -218,7 +221,7 @@ def open_laptop_refresh_ticket(
 
 
 @mcp.tool()
-@trace_mcp_tool()  # type: ignore[misc]
+@trace_mcp_tool()
 def get_employee_laptop_info(
     ctx: Context[Any, Any],
     dummy_parameter: str = "",
