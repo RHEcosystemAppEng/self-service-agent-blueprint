@@ -275,7 +275,7 @@ mcp-servers:
       deploymentMode: deployment
       image:
         repository: quay.io/rh-ai-quickstart/self-service-agent-zammad-mcp
-        tag: "0.0.12"
+        tag: "0.0.13"
       port: 8000
       targetPort: 8000
       transport: streamable-http
