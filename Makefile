@@ -1408,9 +1408,7 @@ test-mcp-snow:
 
 .PHONY: test-mcp-zammad
 test-mcp-zammad:
-	@echo "Running Zammad MCP tests..."
-	cd mcp-servers/zammad && uv run python -m pytest tests/
-	@echo "Zammad MCP tests completed successfully!"
+	$(call run_pytest,zammad MCP,mcp-servers/zammad)
 
 .PHONY: test-servicenow-bootstrap
 test-servicenow-bootstrap:
