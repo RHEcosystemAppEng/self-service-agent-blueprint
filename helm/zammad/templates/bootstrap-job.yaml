@@ -20,6 +20,9 @@ spec:
         app.kubernetes.io/component: zammad-bootstrap
     spec:
       restartPolicy: OnFailure
+      {{- if .Values.bootstrap.createToken }}
+      serviceAccountName: {{ .Release.Name }}-zammad-bootstrap
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         seccompProfile:
@@ -39,7 +42,7 @@ spec:
           command: ["python3", "/app/bootstrap.py"]
           env:
             - name: ZAMMAD_BASE_URL
-              value: "http://zammad-nginx:8080"
+              value: "http://{{ default .Release.Name .Values.zammad.fullnameOverride }}-nginx:8080"
             - name: ZAMMAD_AUTOWIZARD_TOKEN
               value: {{ .Values.bootstrap.autowizardToken | quote }}
             - name: ZAMMAD_ADMIN_EMAIL
@@ -52,3 +55,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-admin-credentials
                   key: password
+            {{- if .Values.bootstrap.createToken }}
+            - name: ZAMMAD_CREATE_TOKEN
+              value: "true"
+            - name: ZAMMAD_CREDENTIALS_SECRET
+              value: {{ .Values.bootstrap.credentialsSecret | quote }}
+            - name: ZAMMAD_MCP_DEPLOYMENT
+              value: {{ .Values.bootstrap.mcpDeployment | quote }}
+            - name: ZAMMAD_REQUEST_MANAGER_DEPLOYMENT
+              value: {{ .Values.bootstrap.requestManagerDeployment | quote }}
+            {{- end }}

@@ -15,7 +15,7 @@ metadata:
 spec:
   to:
     kind: Service
-    name: {{ .Release.Name }}-nginx
+    name: {{ default .Release.Name .Values.zammad.fullnameOverride }}-nginx
     weight: 100
   port:
     targetPort: http

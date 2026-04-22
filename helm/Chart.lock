@@ -11,5 +11,8 @@ dependencies:
 - name: mcp-servers
   repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
   version: 0.5.17
-digest: sha256:1be9ba4029a08eb4043123dcabe288a0f9b25ea55fd8e0a16c740e1797dc95eb
-generated: "2026-04-14T17:00:43.570051-04:00"
+- name: ticketingZammad
+  repository: file://./zammad
+  version: 0.1.0
+digest: sha256:94c6930f6e999095f2f6e1bd03f3d7e85b5a69abd1cd3c0051a8618e48c249e8
+generated: "2026-04-22T17:53:32.70222144-04:00"

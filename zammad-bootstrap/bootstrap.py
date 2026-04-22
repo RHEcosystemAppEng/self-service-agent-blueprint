@@ -10,6 +10,8 @@ Required env vars:
   ZAMMAD_ADMIN_PASSWORD matching password
 """
 
+import base64
+import datetime
 import json
 import os
 import sys
@@ -300,6 +302,96 @@ def get_or_create_user(
 
 
 # ---------------------------------------------------------------------------
+# Token creation + Kubernetes secret/deployment update
+# ---------------------------------------------------------------------------
+
+_KUBE_TOKEN = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+_KUBE_CA = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+_KUBE_NS = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+_KUBE_API = "https://kubernetes.default.svc"
+
+
+def create_mcp_token_and_update_k8s():
+    """Create Zammad MCP agent API token, patch k8s secret, trigger deployment restarts."""
+    credentials_secret = os.environ["ZAMMAD_CREDENTIALS_SECRET"]
+    mcp_deployment = os.environ.get("ZAMMAD_MCP_DEPLOYMENT", "")
+    request_manager_deployment = os.environ.get("ZAMMAD_REQUEST_MANAGER_DEPLOYMENT", "")
+    zammad_url = os.environ["ZAMMAD_BASE_URL"]
+
+    with open(_KUBE_NS) as f:
+        namespace = f.read().strip()
+
+    print("\n[Token] Creating MCP agent API token...")
+    r = requests.post(
+        f"{API_URL}/user_access_token",
+        auth=(ADMIN_EMAIL, ADMIN_PASSWORD),
+        json={"name": "mcp-agent", "permission": ["admin", "ticket.agent"]},
+        timeout=10,
+    )
+    if not r.ok:
+        print(f"  ERROR: {r.status_code} {r.text[:200]}", file=sys.stderr)
+        sys.exit(1)
+    token = r.json().get("token")
+    if not token:
+        print("  ERROR: no token in response", file=sys.stderr)
+        sys.exit(1)
+    print("  MCP token created.")
+
+    with open(_KUBE_TOKEN) as f:
+        kube_token = f.read().strip()
+    ks = requests.Session()
+    ks.headers["Authorization"] = f"Bearer {kube_token}"
+    ks.verify = _KUBE_CA
+
+    def _b64(s):
+        return base64.b64encode(s.encode()).decode()
+
+    print(f"  Patching secret {credentials_secret} in namespace {namespace}...")
+    resp = ks.patch(
+        f"{_KUBE_API}/api/v1/namespaces/{namespace}/secrets/{credentials_secret}",
+        json={
+            "data": {
+                "zammad-url": _b64(zammad_url),
+                "zammad-api-url": _b64(f"{zammad_url}/api/v1"),
+                "zammad-http-token": _b64(token),
+            }
+        },
+        headers={"Content-Type": "application/strategic-merge-patch+json"},
+    )
+    if not resp.ok:
+        print(
+            f"  ERROR patching secret: {resp.status_code} {resp.text[:200]}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    print("  Secret updated.")
+
+    now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    restart_patch = {
+        "spec": {
+            "template": {
+                "metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": now}}
+            }
+        }
+    }
+    for dep in filter(None, [mcp_deployment, request_manager_deployment]):
+        print(f"  Restarting deployment {dep}...")
+        resp = ks.patch(
+            f"{_KUBE_API}/apis/apps/v1/namespaces/{namespace}/deployments/{dep}",
+            json=restart_patch,
+            headers={"Content-Type": "application/strategic-merge-patch+json"},
+        )
+        if resp.ok:
+            print(f"  Deployment {dep} restart triggered.")
+        else:
+            print(
+                f"  WARNING: could not restart {dep}: {resp.status_code}",
+                file=sys.stderr,
+            )
+    print("[Token] Done.")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -416,6 +508,9 @@ def main():
         )
 
     print("\nZammad bootstrap complete.")
+
+    if os.environ.get("ZAMMAD_CREATE_TOKEN") == "true":
+        create_mcp_token_and_update_k8s()
 
 
 if __name__ == "__main__":

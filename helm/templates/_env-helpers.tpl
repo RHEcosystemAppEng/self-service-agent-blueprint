@@ -474,7 +474,7 @@ Generate all environment variables for Request Manager
 {{- include "self-service-agent.commonEnvVars" . }}
 {{- include "self-service-agent.requestManagerEnvVars" . }}
 {{/* Zammad credentials for ticket tracking (only when ticketing channel is enabled) */}}
-{{- if .Values.zammad.enabled }}
+{{- if .Values.ticketingZammad.enabled }}
 - name: ZAMMAD_URL
   valueFrom:
     secretKeyRef:

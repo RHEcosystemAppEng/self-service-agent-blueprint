@@ -318,16 +318,10 @@ mcp-servers:
         # Fallback owner for send_to_manager_review when customer has no manager_email (bootstrap agents below).
         ZAMMAD_MANAGER_EMAIL: "manager1@example.com"
 
-# Zammad ticketing channel (optional)
-zammad:
+# Zammad ticketing channel (optional). Deploys Zammad as a subchart and injects credentials into pods.
+# Configured by values-ticketing.yaml.
+ticketingZammad:
   enabled: false
-  url: "https://zammad.example.com"
-  webhookSecret: ""
-  allowedGroups: []
-  aiAgentUserId: null
-  mcp:
-    enabled: false
-    uri: "http://mcp-zammad:8000/mcp"
 
 # Enable/disable the llm-service dependency
 llm-service:
