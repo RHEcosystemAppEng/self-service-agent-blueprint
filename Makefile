@@ -215,8 +215,7 @@ helm_generic_args = \
 	$(if $(findstring jaeger,$(OTEL_EXPORTER_OTLP_ENDPOINT)),--set-string llama-stack.secrets.OTEL_METRICS_EXPORTER=none,) \
 	$(if $(findstring jaeger,$(OTEL_EXPORTER_OTLP_ENDPOINT)),--set-string llama-stack.secrets.OTEL_LOGS_EXPORTER=none,) \
 	$(if $(findstring jaeger,$(OTEL_EXPORTER_OTLP_ENDPOINT)),--set-string llama-stack.secrets.OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,) \
-	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set mcp-servers.mcp-servers.self-service-agent-snow.env.OTEL_EXPORTER_OTLP_ENDPOINT="$(OTEL_EXPORTER_OTLP_ENDPOINT)") \
-	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set mcp-servers.mcp-servers.zammad-mcp.env.OTEL_EXPORTER_OTLP_ENDPOINT="$(OTEL_EXPORTER_OTLP_ENDPOINT)")
+	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set mcp-servers.mcp-servers.self-service-agent-snow.env.OTEL_EXPORTER_OTLP_ENDPOINT="$(OTEL_EXPORTER_OTLP_ENDPOINT)")
 
 helm_replica_count_args = \
 	$(if $(REPLICA_COUNT),--set llamastack.postInitScaling.enabled=true,) \
@@ -257,7 +256,8 @@ helm_ticketing_args = \
 	--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_URL.name=$(ZAMMAD_CREDENTIALS_SECRET) \
 	--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_URL.key=zammad-url \
 	--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_HTTP_TOKEN.name=$(ZAMMAD_CREDENTIALS_SECRET) \
-	--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_HTTP_TOKEN.key=zammad-http-token
+	--set mcp-servers.mcp-servers.zammad-mcp.envSecrets.ZAMMAD_HTTP_TOKEN.key=zammad-http-token \
+	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set mcp-servers.mcp-servers.zammad-mcp.env.OTEL_EXPORTER_OTLP_ENDPOINT="$(OTEL_EXPORTER_OTLP_ENDPOINT)")
 
 # Version target
 .PHONY: version
