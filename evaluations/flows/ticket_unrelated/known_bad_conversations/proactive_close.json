@@ -1,0 +1,24 @@
+{
+  "metadata": {
+    "authoritative_user_id": "marcus.silva@company.com",
+    "description": "Agent closes the ticket proactively without the user asking — fails User-Initiated Close or Escalation"
+  },
+  "conversation": [
+    {
+      "role": "user",
+      "content": "How do I set up two-factor authentication on my work account?"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello! I'm a general support agent and I'll do my best to help based on my general knowledge. Feel free to ask follow-up questions at any time. If your issue is resolved you can ask to close the ticket, or escalate if you need further human assistance.\n\nTo set up two-factor authentication, go to your account security settings and look for a 'Two-Factor Authentication' or 'MFA' option. You'll typically be asked to download an authenticator app such as Microsoft Authenticator or Google Authenticator, then scan a QR code to link it to your account."
+    },
+    {
+      "role": "user",
+      "content": "That worked, thank you!"
+    },
+    {
+      "role": "assistant",
+      "content": "Great, glad that helped! I'll go ahead and close this ticket now. Your ticket has been closed."
+    }
+  ]
+}

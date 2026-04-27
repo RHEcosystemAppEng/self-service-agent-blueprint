@@ -1,0 +1,147 @@
+# State Machine Configuration for General Support Ticket Agent
+# Each state defines its behavior, prompts, and transition conditions
+
+# Global settings
+settings:
+  initial_state: "waiting_for_interaction"
+  terminator_env_var: "AGENT_MESSAGE_TERMINATOR"
+  agent_name: "ticket-general-support"
+  terminal_state: "end"
+  empty_response_retry_count: 5
+
+# State structure definition - completely configurable
+state_schema:
+  # Business logic fields
+  business_fields:
+    ticket_action:
+      type: "string"
+      description: "Terminal ticket action: escalated, closed, or complete"
+      default: null
+
+# State definitions
+states:
+  # Initial waiting state
+  waiting_for_interaction:
+    type: "waiting"
+    transitions:
+      user_input: "answer_general_question"
+
+  # Initial state: greet the user and answer their opening question
+  answer_general_question:
+    type: "llm_processor"
+    temperature: 0.7
+    use_conversation_history: true
+    allowed_tools: [""]
+    prompt: |
+      You are a helpful IT support assistant. The user has submitted a ticket with the following message: "{last_user_message}"
+
+      CRITICAL: Do NOT share your internal thinking. Speak directly and professionally.
+
+      Begin your response with a brief introduction that covers all of the following:
+      - You are a general support agent and will do your best to help based on your general knowledge
+      - The user can ask any follow-up questions at any time
+      - If their issue is resolved they can ask to close the ticket, or if they need further human assistance they can ask to escalate
+
+      Immediately after the introduction, answer their question or address their request as best you can. If you can fully resolve their issue, do so. If you cannot fully resolve it, provide what help you can and clearly explain what you are and are not able to assist with.
+    transitions:
+      success: "waiting_for_follow_up"
+
+  # Follow-up state: answer without repeating the introduction
+  answer_follow_up:
+    type: "llm_processor"
+    temperature: 0.7
+    use_conversation_history: true
+    allowed_tools: [""]
+    prompt: |
+      You are a helpful IT support assistant continuing a support conversation. The user said: "{last_user_message}"
+
+      CRITICAL: Do NOT share your internal thinking. Speak directly and professionally. Do NOT repeat your introduction.
+
+      Answer their question or address their request as best you can.
+    transitions:
+      success: "waiting_for_follow_up"
+
+  # Waiting state: wait for the user's follow-up response
+  waiting_for_follow_up:
+    type: "waiting"
+    transitions:
+      user_input: "classify_follow_up_intent"
+
+  # Classify the user's follow-up intent
+  classify_follow_up_intent:
+    type: "intent_classifier"
+    temperature: 0.2
+    allowed_tools: [""]
+    failure_transition: "waiting_for_follow_up"
+    intent_prompt: |
+      Analyze the user's message and determine their intent. The user said: "{user_input}"
+
+      Classify their intent as one of the following:
+      1. ESCALATE - User is explicitly requesting to escalate the ticket for human review. They must be making a clear request, not just asking whether they should escalate or mentioning escalation in passing.
+      2. CLOSE - User is explicitly requesting to close the ticket (resolved, done, no thanks, cancel, never mind, etc.)
+      3. QUESTION - User has a follow-up question, needs more help, or is asking whether they should escalate/close rather than actually requesting it.
+
+      Respond with only the classification: ESCALATE, CLOSE, or QUESTION
+    intent_actions:
+      ESCALATE:
+        data_storage:
+          ticket_action: "escalated"
+        next_state: "escalate_ticket"
+      CLOSE:
+        data_storage:
+          ticket_action: "closed"
+        next_state: "close_ticket"
+      QUESTION:
+        next_state: "answer_follow_up"
+
+  # State: Escalate ticket in Zammad then end
+  escalate_ticket:
+    type: "llm_processor"
+    temperature: 0.1
+    allowed_tools: ["route_to_human_managed_queue"]
+    failure_transition: "end"
+    prompt: |
+      Call the route_to_human_managed_queue tool, then reply with ONLY this exact text and nothing else:
+      Your ticket has been escalated for human review. ticket_escalated
+    response_analysis:
+      conditions:
+        - name: "ticket_escalated"
+          trigger_phrases: ["ticket_escalated"]
+          actions:
+            - type: "transition"
+              target: "end"
+      default_transition: "end"
+
+  # State: Close ticket in Zammad then end
+  close_ticket:
+    type: "llm_processor"
+    temperature: 0.1
+    allowed_tools: ["close"]
+    failure_transition: "end"
+    prompt: |
+      Call the close tool, then reply with ONLY this exact text and nothing else:
+      Your ticket has been closed. ticket_closed
+    response_analysis:
+      conditions:
+        - name: "ticket_closed"
+          trigger_phrases: ["ticket_closed"]
+          actions:
+            - type: "transition"
+              target: "end"
+      default_transition: "end"
+
+  # End state
+  end:
+    type: "terminal"
+    reset_behavior:
+      reset_state: "waiting_for_interaction"
+      clear_data:
+        # System fields
+        - "messages"
+        - "current_state"
+        # Business logic fields
+        - "ticket_action"
+        # Internal state tracking
+        - "_last_waiting_node"
+        - "_last_processed_human_count"
+        - "_consumed_this_invoke"

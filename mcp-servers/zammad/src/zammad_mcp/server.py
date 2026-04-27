@@ -152,6 +152,30 @@ def mark_as_agent_managed_laptop_refresh(
 @mcp.tool()
 @_handle_tool_errors
 @trace_mcp_tool()
+def mark_as_general_agent_managed(
+    ctx: Context[Any, Any], dummy_parameter: str = ""
+) -> str:
+    """Tag this ticket for agent-managed general support."""
+    _, ticket_id, _ = _authorize_ticket(ctx)
+    tag = zammad_mcp_settings.ZAMMAD_MCP_SETTINGS.general_agent_managed_tag
+    call_basher_tool("zammad_add_ticket_tag", {"ticket_id": ticket_id, "tag": tag})
+
+    owner = zammad_mcp_settings.ZAMMAD_MCP_SETTINGS.general_specialist_owner
+    if owner:
+        get_user_id_by_email(owner)
+        call_basher_tool(
+            "zammad_update_ticket",
+            {"ticket_id": ticket_id, "owner": owner},
+        )
+    parts = [f"Ticket {ticket_id} tagged as {tag!r}"]
+    if owner:
+        parts.append(f"owner set to {owner!r}")
+    return ", ".join(parts) + "."
+
+
+@mcp.tool()
+@_handle_tool_errors
+@trace_mcp_tool()
 def close(ctx: Context[Any, Any], dummy_parameter: str = "") -> str:
     """Close the ticket."""
     _, ticket_id, _ = _authorize_ticket(ctx)

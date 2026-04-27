@@ -1,0 +1,17 @@
+{
+    "metadata": {
+        "authoritative_user_id": "carlos.rodriguez@company.com",
+        "description": "User asks an IT question but needs specialist help and escalates",
+        "use_first_message_as_initial": true
+    },
+    "conversation": [
+        {
+            "role": "user",
+            "content": "My VPN keeps disconnecting every few minutes"
+        },
+        {
+            "role": "user",
+            "content": "Please escalate this to a network specialist"
+        }
+    ]
+}

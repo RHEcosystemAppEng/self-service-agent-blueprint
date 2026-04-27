@@ -213,6 +213,7 @@ helm/tmpcharts*
 evaluations/.deepeval/*
 evaluations/results/deep_eval_results/*.json
 evaluations/results/ticket_laptop_refresh/*.json
+evaluations/results/ticket_unrelated/*.json
 
 # Os specific files
 .DS_Store

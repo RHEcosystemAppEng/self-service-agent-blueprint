@@ -8,34 +8,42 @@ DEFAULT_RESET_CONVERSATION: bool = False
 DEFAULT_SKIP_INITIAL_MESSAGE: bool = True
 DEFAULT_INITIAL_MESSAGE: str = "requesting a laptop refresh"
 DEFAULT_TICKET_TITLE: str = "non laptop refresh request"
-DEFAULT_MAX_TURNS: int = 1  # One user message → one agent response → done
-KNOWLEDGE_BASE_DIRS: List[str] = ["laptop-refresh"]
-INCLUDE_SNOW_DATA: bool = True
+DEFAULT_MAX_TURNS: int = 10
+KNOWLEDGE_BASE_DIRS: List[str] = []
+INCLUDE_SNOW_DATA: bool = False
 
-CHATBOT_ROLE: str = """You are an IT Support Agent specializing in hardware replacement (laptop refresh).
-You only handle laptop refresh requests. For any other topic you politely inform the user
-you cannot help and that their ticket has been escalated for human review."""
+CHATBOT_ROLE: str = """You are a General IT Support Agent that handles support tickets on any topic.
 
-_USER_DESCRIPTION = (
-    "An employee who has submitted a ticket on an unrelated topic (not laptop refresh). "
-    "Their messages are brief and direct, as typical ticket comments. "
-    "The employee asks their unrelated question. Once the agent responds that it cannot help "
-    "and that the ticket has been escalated, the employee does not reply — the conversation ends."
-)
+Your responsibilities:
+1. Greet the user and let them know you are a general support agent that can answer questions based on general knowledge
+2. Try to answer the user's question or address their request as helpfully as possible
+3. Let the user know they can ask follow-up questions at any time
+4. Inform the user they can close the ticket if their issue is resolved, or escalate to a human agent if they need further assistance
+5. When the user asks to close the ticket, confirm the ticket has been closed — the conversation ends here. No further responses from the user are expected after this message
+6. When the user asks to escalate, confirm the ticket has been escalated for human review — the conversation ends here. No further respeonse are expected from the user after this message
+7. Maintain a professional, helpful tone throughout"""
 
 _SCENARIOS = [
     (
-        "An employee has submitted a support ticket asking about something completely unrelated "
-        "to laptop refresh — for example a password reset, a software installation request, "
-        "a question about office supplies, or a general IT question. "
-        "The employee sends a single message with their unrelated request. "
-        "The agent responds that it cannot help with that topic and that the ticket has been "
-        "escalated for human review. "
-        "After receiving that response the employee does NOT reply — the conversation is over.",
-        "The agent has explicitly stated it cannot help with the request AND has confirmed the "
-        "ticket has been escalated for human review. The conversation is complete and requires "
-        "no further user response.",
-        _USER_DESCRIPTION,
+        "An employee has submitted a support ticket asking a general IT support question unrelated to laptop hardware. "
+        "The employee opens the conversation by directly stating their specific IT question or issue in a short, direct comment — no generic greetings. "
+        "The agent attempts to answer their question. "
+        "The employe DOES NOT ask for the ticket to be escalated"
+        "The employee asks up to four follow-up questions and then asks that the ticket be closed "
+        "STOP: the employee sends no further messages after asking to close — the conversation is complete.",
+        "The agent has confirmed the ticket is closed with the message 'Your ticket has been closed'.",
+        "An employee responding to comments on their IT support ticket. Their messages are brief and direct.",
+    ),
+    (
+        "An employee has submitted a support ticket asking a general IT support question unrelated to laptop hardware. "
+        "The employee opens the conversation by directly stating their specific IT question or issue in a short, direct comment — no generic greetings. "
+        "The agent attempts to answer their question. "
+        "The employe DOES NOT ask for the ticket to be closed"
+        "The employee may ask one or two brief follow-up questions. "
+        "The employee decides they need further human assistance and sends a single message asking to escalate the ticket. "
+        "STOP: the employee sends no further messages after asking to escalate — the conversation is complete.",
+        "The agent has confirmed the ticket escalation with the message 'Your ticket has been escalated for human review'.",
+        "An employee responding to comments on their IT support ticket. Their messages are brief and direct.",
     ),
 ]
 

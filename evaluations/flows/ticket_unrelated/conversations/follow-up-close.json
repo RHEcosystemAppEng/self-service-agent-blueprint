@@ -1,0 +1,21 @@
+{
+    "metadata": {
+        "authoritative_user_id": "oliver.smith@company.com",
+        "description": "User asks an IT question, asks a follow-up, then closes the ticket",
+        "use_first_message_as_initial": true
+    },
+    "conversation": [
+        {
+            "role": "user",
+            "content": "I can't access a shared drive, I'm getting an authentication error"
+        },
+        {
+            "role": "user",
+            "content": "What if I don't have admin rights to change those settings?"
+        },
+        {
+            "role": "user",
+            "content": "OK thanks, please close the ticket"
+        }
+    ]
+}

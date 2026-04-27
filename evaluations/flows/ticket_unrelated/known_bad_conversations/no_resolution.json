@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "authoritative_user_id": "liam.chen@company.com",
+    "description": "Conversation ends without the ticket being closed or escalated — fails Ticket Resolution"
+  },
+  "conversation": [
+    {
+      "role": "user",
+      "content": "My VPN keeps disconnecting every few minutes, how do I fix it?"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello! I'm a general support agent and I'll do my best to help based on my general knowledge. Feel free to ask follow-up questions at any time. If your issue is resolved you can ask to close the ticket, or escalate if you need further human assistance.\n\nFrequent VPN disconnections are often caused by an unstable internet connection, an outdated VPN client, or a misconfigured idle timeout setting. Try restarting your VPN client and checking for updates. If the issue persists, ensure your internet connection is stable before reconnecting."
+    },
+    {
+      "role": "user",
+      "content": "I tried restarting the client but it still keeps dropping."
+    },
+    {
+      "role": "assistant",
+      "content": "In that case, try checking your firewall settings to ensure the VPN traffic is not being blocked. You may also want to try connecting to a different VPN server if your client supports it. Let me know if that helps."
+    },
+    {
+      "role": "user",
+      "content": "That did not work."
+    }
+  ]
+}

@@ -122,6 +122,26 @@ def _zammad_get_user_id_by_email(base_url: str, token: str, email: str) -> int |
     return None
 
 
+def _zammad_get_ticket_owner(
+    base_url: str, token: str, ticket_id: int
+) -> tuple[str | None, int | None]:
+    """Return (owner_email, owner_id) for the ticket's current assigned owner."""
+    try:
+        url = f"{_zammad_api_base(base_url)}/tickets/{ticket_id}"
+        response = httpx.get(url, headers=_zammad_headers(token), timeout=10)
+        response.raise_for_status()
+        owner_id = response.json().get("owner_id")
+        if not owner_id:
+            return None, None
+        user_url = f"{_zammad_api_base(base_url)}/users/{owner_id}"
+        user_response = httpx.get(user_url, headers=_zammad_headers(token), timeout=10)
+        user_response.raise_for_status()
+        user_data = user_response.json()
+        return user_data.get("email") or None, owner_id
+    except Exception:
+        return None, None
+
+
 def _zammad_add_article(
     base_url: str,
     token: str,
@@ -170,9 +190,6 @@ def _zammad_delete_ticket(base_url: str, token: str, ticket_id: int) -> None:
 # ---------------------------------------------------------------------------
 
 
-AGENT_EMAIL = "agent.laptop-specialist@example.com"
-
-
 async def _chat_loop_with_status(
     chat_client: CLIChatClient,
     *,
@@ -180,7 +197,6 @@ async def _chat_loop_with_status(
     ticket_id: int | None,
     ticket_number: str | None,
     customer_email: str | None,
-    agent_user_id: int | None,
     zammad_base_url: str | None,
     zammad_token: str | None,
     state_map: dict[int, str],
@@ -209,14 +225,21 @@ async def _chat_loop_with_status(
 
     def add_agent_article(message: str) -> None:
         if ticket_id and zammad_base_url and zammad_token:
+            owner_email, owner_id = _zammad_get_ticket_owner(
+                zammad_base_url, zammad_token, ticket_id
+            )
+            print(
+                f"[article] ticket={ticket_id} owner={owner_email!r} id={owner_id}",
+                file=sys.stderr,
+            )
             _zammad_add_article(
                 zammad_base_url,
                 zammad_token,
                 ticket_id,
                 body=message,
-                from_email=AGENT_EMAIL,
+                from_email=owner_email or "",
                 sender="Agent",
-                origin_by_id=agent_user_id,
+                origin_by_id=owner_id,
             )
 
     def emit_status() -> None:
@@ -331,14 +354,10 @@ async def main() -> None:
     ticket_id: int | None = None
     ticket_number: str | None = None
     state_map: dict[int, str] = {}
-    agent_user_id: int | None = None
 
     if zammad_base_url and zammad_token and base_user_id:
         try:
             state_map = _zammad_get_state_map(zammad_base_url, zammad_token)
-            agent_user_id = _zammad_get_user_id_by_email(
-                zammad_base_url, zammad_token, AGENT_EMAIL
-            )
             ticket_id, ticket_number = _zammad_create_ticket(
                 zammad_base_url, zammad_token, base_user_id, title=args.ticket_title
             )
@@ -372,7 +391,6 @@ async def main() -> None:
             ticket_id=ticket_id,
             ticket_number=ticket_number,
             customer_email=base_user_id,
-            agent_user_id=agent_user_id,
             zammad_base_url=zammad_base_url,
             zammad_token=zammad_token,
             state_map=state_map,

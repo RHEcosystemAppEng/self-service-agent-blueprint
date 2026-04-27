@@ -1,0 +1,21 @@
+{
+    "metadata": {
+        "authoritative_user_id": "ahmed.hassan@company.com",
+        "description": "User asks a question, asks a follow-up, then escalates for further human assistance",
+        "use_first_message_as_initial": true
+    },
+    "conversation": [
+        {
+            "role": "user",
+            "content": "My work email stopped syncing on my phone this morning"
+        },
+        {
+            "role": "user",
+            "content": "I've already tried removing and re-adding the account but it still isn't working"
+        },
+        {
+            "role": "user",
+            "content": "Please escalate this ticket, I need someone to take a proper look"
+        }
+    ]
+}

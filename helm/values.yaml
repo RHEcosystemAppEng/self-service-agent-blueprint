@@ -315,6 +315,7 @@ mcp-servers:
         ZAMMAD_GROUP_HUMAN_MANAGED: "human_managed_tickets"
         ZAMMAD_GROUP_ESCALATED_LAPTOP: "escalated_laptop_refresh_tickets"
         ZAMMAD_LAPTOP_SPECIALIST_OWNER: "agent.laptop-specialist@example.com"
+        ZAMMAD_SPECIALIST_OWNER: "agent.general@example.com"
         ZAMMAD_USER_MANAGER_FIELD: "manager_email"
         # Fallback owner for send_to_manager_review when customer has no manager_email (bootstrap agents below).
         ZAMMAD_MANAGER_EMAIL: "manager1@example.com"

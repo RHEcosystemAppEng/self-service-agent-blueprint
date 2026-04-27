@@ -1,0 +1,24 @@
+{
+  "metadata": {
+    "authoritative_user_id": "sophie.dubois@company.com",
+    "description": "Agent immediately escalates without attempting to answer the user's question — fails Helpfulness"
+  },
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I'm having trouble accessing a shared drive, can you help?"
+    },
+    {
+      "role": "assistant",
+      "content": "I'm a general support agent and I'm not able to assist with shared drive access issues."
+    },
+    {
+      "role": "user",
+      "content": "I've tried all the steps you mentioned, and I'm still getting the 'Authentication failed' error, can I please ask to close the ticket now?"
+    },
+    {
+      "role": "assistant",
+      "content": "Your ticket has been closed."
+    }
+  ]
+}

@@ -35,6 +35,8 @@ class ZammadMcpSettings:
     user_manager_field: str
     default_manager_email: str
     laptop_specialist_owner: str
+    general_agent_managed_tag: str
+    general_specialist_owner: str
     zammad_rest_base_url: str
     zammad_http_token: str
     basher_mcp_url: str
@@ -114,6 +116,13 @@ def load_zammad_mcp_settings() -> ZammadMcpSettings:
         laptop_specialist_owner=_group_env(
             "ZAMMAD_LAPTOP_SPECIALIST_OWNER",
             "agent.laptop-specialist@example.com",
+        ),
+        general_agent_managed_tag=_str_env(
+            "ZAMMAD_GENERAL_AGENT_MANAGED_TAG", "agent-managed-general-support"
+        ),
+        general_specialist_owner=_group_env(
+            "ZAMMAD_SPECIALIST_OWNER",
+            "agent.general@example.com",
         ),
         zammad_rest_base_url=zammad_url.rstrip("/"),
         zammad_http_token=zammad_http_token,

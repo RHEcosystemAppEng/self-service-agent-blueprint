@@ -1,0 +1,17 @@
+{
+    "metadata": {
+        "authoritative_user_id": "maria.garcia@company.com",
+        "description": "User asks a single IT question, gets a helpful answer, and closes the ticket",
+        "use_first_message_as_initial": true
+    },
+    "conversation": [
+        {
+            "role": "user",
+            "content": "How do I set up two-factor authentication on my work account?"
+        },
+        {
+            "role": "user",
+            "content": "That worked, please close the ticket"
+        }
+    ]
+}

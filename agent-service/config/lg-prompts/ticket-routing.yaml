@@ -63,6 +63,11 @@ states:
         - name: "other_request"
           trigger_phrases: ["OTHER"]
           actions:
+            - type: "set_field"
+              field_name: "routing_decision"
+              value: "ticket-general-support"
+            - type: "add_message"
+              message: "{last_user_message}"
             - type: "transition"
               target: "handle_other_request"
       default_transition: "handle_other_request"
@@ -86,21 +91,24 @@ states:
               target: "end"
       default_transition: "end"
 
-  # State 3b: Handle Other/Unclear Requests — route to human-managed queue in Zammad
+  # State 3b: Handle Other/Unclear Requests — tag and assign to general support agent
   handle_other_request:
     type: "llm_processor"
     temperature: 0.1
-    allowed_tools: ["route_to_human_managed_queue"]
+    allowed_tools: ["mark_as_general_agent_managed"]
     failure_transition: "end"
     prompt: |
-      This ticket has been classified as a non-laptop-refresh request.
-      You MUST immediately call the route_to_human_managed_queue tool. It requires no arguments.
-      Do not ask for more information. Do not explain. Just call the tool.
-      If the tool call succeeds, reply ONLY with: Your ticket has been escalated for human review
-      If the tool call fails, reply ONLY with: We were unable to escalate your ticket for human review due to a temporary issue. Please try again later.
-
-    transitions:
-      success: "end"
+      This ticket has been classified as a general support request.
+      Call the mark_as_general_agent_managed tool to tag this ticket in Zammad as general-agent-managed.
+      After the tool call succeeds, output exactly: GENERAL_SUPPORT_TAGGED
+    response_analysis:
+      conditions:
+        - name: "tagged"
+          trigger_phrases: ["GENERAL_SUPPORT_TAGGED"]
+          actions:
+            - type: "transition"
+              target: "end"
+      default_transition: "end"
 
   # End state
   end:

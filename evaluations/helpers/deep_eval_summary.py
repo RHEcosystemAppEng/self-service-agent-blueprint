@@ -96,8 +96,17 @@ def print_final_summary(
                         rate:.1f}%)"
                 )
 
-    # Status indicator
-    if successful_evaluations == total_files:
+    # Status indicator — check both LLM completion and metric pass rate
+    any_metric_failures = any(
+        not all(m.get("success", False) for m in result.get("metrics", []))
+        for result in all_results
+    )
+    llm_failures = bool(failed_evaluations)
+    if (
+        successful_evaluations == total_files
+        and not any_metric_failures
+        and not llm_failures
+    ):
         print("   • Status: ✅ ALL EVALUATIONS PASSED")
     elif successful_evaluations > 0:
         print("   • Status: ⚠️  PARTIAL SUCCESS")

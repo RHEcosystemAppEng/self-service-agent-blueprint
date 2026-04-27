@@ -448,6 +448,14 @@ def main():
         group_ids={str(users_group_id): ["full"]},
     )
     get_or_create_user(
+        "agent.general",
+        "General",
+        "Agent",
+        "agent.general@example.com",
+        role_ids=agent_role_ids,
+        group_ids={str(users_group_id): ["full"]},
+    )
+    get_or_create_user(
         "ticket_handler1",
         "Ticket",
         "Handler1",
