@@ -18,6 +18,8 @@ import sys
 import time
 
 import requests
+from kubernetes import client as k8s_client
+from kubernetes import config as k8s_config
 from mock_employee_data.data import MOCK_EMPLOYEE_DATA
 
 BASE_URL = os.environ["ZAMMAD_BASE_URL"].rstrip("/")
@@ -305,10 +307,7 @@ def get_or_create_user(
 # Token creation + Kubernetes secret/deployment update
 # ---------------------------------------------------------------------------
 
-_KUBE_TOKEN = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-_KUBE_CA = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 _KUBE_NS = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
-_KUBE_API = "https://kubernetes.default.svc"
 
 
 def create_mcp_token_and_update_k8s():
@@ -337,32 +336,28 @@ def create_mcp_token_and_update_k8s():
         sys.exit(1)
     print("  MCP token created.")
 
-    with open(_KUBE_TOKEN) as f:
-        kube_token = f.read().strip()
-    ks = requests.Session()
-    ks.headers["Authorization"] = f"Bearer {kube_token}"
-    ks.verify = _KUBE_CA
+    k8s_config.load_incluster_config()
+    core_v1 = k8s_client.CoreV1Api()
+    apps_v1 = k8s_client.AppsV1Api()
 
     def _b64(s):
         return base64.b64encode(s.encode()).decode()
 
     print(f"  Patching secret {credentials_secret} in namespace {namespace}...")
-    resp = ks.patch(
-        f"{_KUBE_API}/api/v1/namespaces/{namespace}/secrets/{credentials_secret}",
-        json={
-            "data": {
-                "zammad-url": _b64(zammad_url),
-                "zammad-api-url": _b64(f"{zammad_url}/api/v1"),
-                "zammad-http-token": _b64(token),
-            }
-        },
-        headers={"Content-Type": "application/strategic-merge-patch+json"},
-    )
-    if not resp.ok:
-        print(
-            f"  ERROR patching secret: {resp.status_code} {resp.text[:200]}",
-            file=sys.stderr,
+    try:
+        core_v1.patch_namespaced_secret(
+            name=credentials_secret,
+            namespace=namespace,
+            body={
+                "data": {
+                    "zammad-url": _b64(zammad_url),
+                    "zammad-api-url": _b64(f"{zammad_url}/api/v1"),
+                    "zammad-http-token": _b64(token),
+                }
+            },
         )
+    except k8s_client.ApiException as e:
+        print(f"  ERROR patching secret: {e.status} {e.reason}", file=sys.stderr)
         sys.exit(1)
     print("  Secret updated.")
 
@@ -376,16 +371,16 @@ def create_mcp_token_and_update_k8s():
     }
     for dep in filter(None, [mcp_deployment, request_manager_deployment]):
         print(f"  Restarting deployment {dep}...")
-        resp = ks.patch(
-            f"{_KUBE_API}/apis/apps/v1/namespaces/{namespace}/deployments/{dep}",
-            json=restart_patch,
-            headers={"Content-Type": "application/strategic-merge-patch+json"},
-        )
-        if resp.ok:
+        try:
+            apps_v1.patch_namespaced_deployment(
+                name=dep,
+                namespace=namespace,
+                body=restart_patch,
+            )
             print(f"  Deployment {dep} restart triggered.")
-        else:
+        except k8s_client.ApiException as e:
             print(
-                f"  WARNING: could not restart {dep}: {resp.status_code}",
+                f"  WARNING: could not restart {dep}: {e.status}",
                 file=sys.stderr,
             )
     print("[Token] Done.")
