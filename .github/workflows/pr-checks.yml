@@ -49,6 +49,9 @@ jobs:
       - name: Check requirements.txt files are in sync with lockfiles
         run: make check-requirements
 
+      - name: Check release manifest matches Makefile
+        run: make check-release-manifest
+
       - name: Install the project
         run: make deps-all
 

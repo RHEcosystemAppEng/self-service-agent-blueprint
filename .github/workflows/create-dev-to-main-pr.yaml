@@ -139,13 +139,11 @@ jobs:
           # Use the target commit that was already determined
           DEV_REF="${{ steps.check_commits.outputs.target_commit }}"
 
-          # Extract BASE_VERSION from Makefile in dev
+          # Align Makefile BASE_VERSION with every path/scripts/bump-release.manifest.json (Chart, Helm tags, Zammad bootstrap)
+          python3 scripts/bump_release.py --verify --git-ref "$DEV_REF"
+
           DEV_MAKEFILE_VERSION=$(git show "$DEV_REF:Makefile" | grep '^BASE_VERSION' | head -1 | sed 's/BASE_VERSION.*= *//')
 
-          # Extract appVersion from helm/Chart.yaml in dev
-          DEV_HELM_VERSION=$(git show "$DEV_REF:helm/Chart.yaml" | grep '^appVersion:' | sed 's/appVersion: *//')
-
-          # Extract BASE_VERSION from Makefile in main (fallback to VERSION if not found)
           MAIN_MAKEFILE_VERSION=$(git show origin/main:Makefile | grep '^BASE_VERSION' | head -1 | sed 's/BASE_VERSION.*= *//')
           MAIN_VERSION_VAR="BASE_VERSION"
           if [ -z "$MAIN_MAKEFILE_VERSION" ]; then
@@ -153,67 +151,12 @@ jobs:
             MAIN_VERSION_VAR="VERSION"
           fi
 
-          # Extract appVersion from helm/Chart.yaml in main
           MAIN_HELM_VERSION=$(git show origin/main:helm/Chart.yaml | grep '^appVersion:' | sed 's/appVersion: *//')
 
-          echo "Dev branch versions:"
-          echo "  Makefile BASE_VERSION: $DEV_MAKEFILE_VERSION"
-          echo "  Helm appVersion:  $DEV_HELM_VERSION"
+          echo "Dev Makefile BASE_VERSION: $DEV_MAKEFILE_VERSION"
+          echo "Main Makefile $MAIN_VERSION_VAR: $MAIN_MAKEFILE_VERSION"
+          echo "Main Helm appVersion (FYI): $MAIN_HELM_VERSION"
           echo ""
-          echo "Main branch versions:"
-          echo "  Makefile $MAIN_VERSION_VAR: $MAIN_MAKEFILE_VERSION"
-          echo "  Helm appVersion:  $MAIN_HELM_VERSION"
-          echo ""
-
-          # Check 1: Dev versions must match each other
-          if [ "$DEV_MAKEFILE_VERSION" != "$DEV_HELM_VERSION" ]; then
-            echo "::error::Version mismatch in dev branch!"
-            echo ""
-            echo "❌ Makefile BASE_VERSION ($DEV_MAKEFILE_VERSION) does not match Helm appVersion ($DEV_HELM_VERSION)"
-            echo ""
-            echo "All version values must match before promoting to main."
-            echo ""
-            echo "To fix:"
-            echo "  1. Update Makefile BASE_VERSION to match helm/Chart.yaml appVersion, OR"
-            echo "  2. Update helm/Chart.yaml appVersion to match Makefile BASE_VERSION"
-            echo "  3. Update helm/values.yaml image.tag to match (if set)"
-            echo "  4. Update helm/values.yaml MCP server image.tag to match (if set)"
-            echo "  5. Commit and push the change to dev"
-            exit 1
-          fi
-
-          # Check 1a: Extract and validate image.tag values from helm/values.yaml
-          DEV_IMAGE_TAG=$(git show "$DEV_REF:helm/values.yaml" | grep -A 15 '^image:' | grep '  tag:' | head -1 | sed 's/.*tag: *"\?\([^"]*\)"\?.*/\1/')
-          DEV_MCP_TAG=$(git show "$DEV_REF:helm/values.yaml" | grep -B 5 'self-service-agent-snow-mcp' | grep 'tag:' | sed 's/.*tag: *"\?\([^"]*\)"\?.*/\1/')
-
-          echo "Dev branch helm/values.yaml tags:"
-          echo "  image.tag:     $DEV_IMAGE_TAG"
-          echo "  MCP server tag: $DEV_MCP_TAG"
-          echo ""
-
-          # Check if image.tag is set and matches Makefile BASE_VERSION
-          if [ -n "$DEV_IMAGE_TAG" ] && [ "$DEV_IMAGE_TAG" != "$DEV_MAKEFILE_VERSION" ]; then
-            echo "::error::Image tag mismatch in dev branch!"
-            echo ""
-            echo "❌ helm/values.yaml image.tag ($DEV_IMAGE_TAG) does not match Makefile BASE_VERSION ($DEV_MAKEFILE_VERSION)"
-            echo ""
-            echo "To fix:"
-            echo "  1. Update helm/values.yaml image.tag to match Makefile BASE_VERSION ($DEV_MAKEFILE_VERSION)"
-            echo "  2. Commit and push the change to dev"
-            exit 1
-          fi
-
-          # Check if MCP server tag is set and matches Makefile BASE_VERSION
-          if [ -n "$DEV_MCP_TAG" ] && [ "$DEV_MCP_TAG" != "$DEV_MAKEFILE_VERSION" ]; then
-            echo "::error::MCP server image tag mismatch in dev branch!"
-            echo ""
-            echo "❌ helm/values.yaml MCP server tag ($DEV_MCP_TAG) does not match Makefile BASE_VERSION ($DEV_MAKEFILE_VERSION)"
-            echo ""
-            echo "To fix:"
-            echo "  1. Update helm/values.yaml mcp-servers.mcp-servers.self-service-agent-snow.image.tag to match Makefile BASE_VERSION ($DEV_MAKEFILE_VERSION)"
-            echo "  2. Commit and push the change to dev"
-            exit 1
-          fi
 
           # Function to compare semantic versions
           compare_versions() {
@@ -269,13 +212,8 @@ jobs:
             echo ""
             echo "Dev version must be greater than main version for promotion."
             echo ""
-            echo "To fix, increment the version in dev branch:"
-            echo "  1. Update BASE_VERSION in Makefile"
-            echo "  2. Update appVersion in helm/Chart.yaml"
-            echo "  3. Update image.tag in helm/values.yaml (if set)"
-            echo "  4. Update MCP server image.tag in helm/values.yaml (if set)"
-            echo "  5. Ensure all version values match"
-            echo "  6. Commit and push to dev"
+            echo "To fix: ./scripts/bump-release.sh <new-version>   # must be > $MAIN_MAKEFILE_VERSION"
+            echo "See scripts/bump-release.manifest.json for files updated. Commit and push to dev."
             exit 1
           fi
 

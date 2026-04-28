@@ -1,6 +1,6 @@
 # Default values for the zammad wrapper chart.
 # Zammad subchart values go under the "zammad" key.
-# Override with helm/values-zammad-deploy.yaml.
+# Override via helm/values-ticketing.yaml (when deployed as a subchart of the main chart).
 
 zammad: {}
 
@@ -9,8 +9,17 @@ externalRoute:
   enabled: false
 
 bootstrap:
-  image: "quay.io/rh-ai-quickstart/self-service-agent-zammad-bootstrap:latest"
-  # Must match autoWizard.config Users[0] and Token in helm/values-zammad-deploy.yaml
+  # imageTag ↔ Makefile BASE_VERSION / scripts/bump-release.sh. Ticketing overrides via helm-install-ticketing overlay.
+  imageRegistry: quay.io/rh-ai-quickstart
+  imageRepository: self-service-agent-zammad-bootstrap
+  imageTag: "0.0.13"
+  # Must match autoWizard Users[0] / Token in helm/values-ticketing.yaml (ticketingZammad.zammad.autoWizard).
   adminEmail: "admin@zammad.local"
   adminPassword: "ZammadR0cks!"
   autowizardToken: "ssa-zammad-autowizard-9f3a2b1c"
+  # Token creation: when true, bootstrap creates MCP agent API token and updates the k8s secret.
+  # Requires RBAC (bootstrap-rbac.yaml) and the credentials secret to exist before the hook runs.
+  createToken: false
+  credentialsSecret: ""
+  mcpDeployment: ""
+  requestManagerDeployment: ""

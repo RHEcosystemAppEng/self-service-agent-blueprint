@@ -17,7 +17,8 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "0.0.13"
+  # Anchor: bump once here; subchart defaults (e.g. mcp-servers Snow) alias this tag.
+  tag: &releaseImageTag "0.0.13"
 
 # Test Integration Configuration
 testIntegrationEnabled: false
@@ -249,7 +250,7 @@ mcp-servers:
       deploymentMode: deployment  # Use standard Deployment (no Toolhive)
       image:
         repository: quay.io/rh-ai-quickstart/self-service-agent-snow-mcp
-        tag: "0.0.13"
+        tag: *releaseImageTag
       port: 8000
       targetPort: 8000
       transport: streamable-http
@@ -275,7 +276,7 @@ mcp-servers:
       deploymentMode: deployment
       image:
         repository: quay.io/rh-ai-quickstart/self-service-agent-zammad-mcp
-        tag: "0.0.13"
+        tag: *releaseImageTag
       port: 8000
       targetPort: 8000
       transport: streamable-http
@@ -318,16 +319,10 @@ mcp-servers:
         # Fallback owner for send_to_manager_review when customer has no manager_email (bootstrap agents below).
         ZAMMAD_MANAGER_EMAIL: "manager1@example.com"
 
-# Zammad ticketing channel (optional)
-zammad:
+# Zammad ticketing channel (optional). Deploys Zammad as a subchart and injects credentials into pods.
+# Configured by values-ticketing.yaml.
+ticketingZammad:
   enabled: false
-  url: "https://zammad.example.com"
-  webhookSecret: ""
-  allowedGroups: []
-  aiAgentUserId: null
-  mcp:
-    enabled: false
-    uri: "http://mcp-zammad:8000/mcp"
 
 # Enable/disable the llm-service dependency
 llm-service:

@@ -1,0 +1,11 @@
+{
+  "replacements": [
+    { "rule": "makefile_base_version", "paths": ["Makefile"] },
+    { "rule": "chart_app_version", "paths": ["helm/Chart.yaml"] },
+    { "rule": "release_image_tag_anchor", "paths": ["helm/values.yaml"] },
+    {
+      "rule": "bootstrap_image_tag",
+      "paths": ["helm/zammad/values.yaml"]
+    }
+  ]
+}

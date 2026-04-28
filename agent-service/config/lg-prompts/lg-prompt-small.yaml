@@ -294,6 +294,8 @@ states:
 
       The user was asked if they want to proceed with reviewing laptop options. They responded: "{user_input}"
 
+      IMPORTANT: Classify based on the user's overall intent, not individual words in isolation. If the response expresses a desire to continue with or see laptop options, classify as YES.
+
       Classify their response as one of the following:
       1. RETURN_TO_ROUTER - User wants to return to the routing agent or stop laptop refresh process (e.g., "return to router", "go back", "stop", "cancel laptop refresh")
       2. YES - User wants to proceed (yes, sure, okay, proceed, continue, etc.)

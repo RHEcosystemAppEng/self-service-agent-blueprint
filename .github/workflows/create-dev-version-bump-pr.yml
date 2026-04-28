@@ -54,14 +54,10 @@ jobs:
 
           echo "Updating version from $CURRENT_VERSION to $NEW_VERSION"
 
-          # Update Makefile
-          sed -i "s/BASE_VERSION := $CURRENT_VERSION/BASE_VERSION := $NEW_VERSION/" Makefile
+          chmod +x scripts/bump-release.sh scripts/bump_release.py
+          ./scripts/bump-release.sh "$NEW_VERSION"
 
-          # Update helm/Chart.yaml
-          sed -i "s/appVersion: $CURRENT_VERSION/appVersion: $NEW_VERSION/" helm/Chart.yaml
-
-          # Update helm/values.yaml (both image.tag locations)
-          sed -i "s/tag: \"$CURRENT_VERSION\"/tag: \"$NEW_VERSION\"/" helm/values.yaml
+          make check-release-manifest
 
           echo "Version updates complete"
 
@@ -98,8 +94,8 @@ jobs:
           # Create and checkout new branch
           git checkout -b "$BRANCH_NAME"
 
-          # Stage and commit changes
-          git add Makefile helm/Chart.yaml helm/values.yaml
+          # Stage manifest paths (same set bump_release.py updates)
+          python3 scripts/bump_release.py --print-manifest-paths --null | xargs -0 git add --
           git commit -m "chore: increment dev version to $NEW_VERSION"
 
           # Push branch
@@ -144,9 +140,12 @@ jobs:
             echo ""
             echo "## Files Updated"
             echo ""
+            echo "Same scope as \`./scripts/bump-release.sh\` / \`scripts/bump-release.manifest.json\`:"
+            echo ""
             echo "- **Makefile**: \`BASE_VERSION\`"
             echo "- **helm/Chart.yaml**: \`appVersion\`"
-            echo "- **helm/values.yaml**: \`image.tag\` (2 locations)"
+            echo "- **helm/values.yaml**: \`image.tag\` anchor (\`&releaseImageTag\`) and MCP tags that alias it"
+            echo "- **helm/zammad/values.yaml**: \`bootstrap.imageTag\`"
             echo ""
             echo "---"
             echo ""

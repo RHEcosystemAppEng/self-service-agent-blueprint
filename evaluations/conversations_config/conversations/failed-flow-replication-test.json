@@ -1,0 +1,28 @@
+{
+    "metadata": {
+        "authoritative_user_id": "maria.garcia@company.com",
+        "description": "Failed flow Replication Test"
+    },
+    "conversation": [
+        {
+            "role": "user",
+            "content": "refresh my laptop"
+        },
+        {
+            "role": "user",
+            "content": "what's my name?"
+        },
+        {
+            "role": "user",
+            "content": "no, i want to see my laptop options"
+        },
+        {
+            "role": "user",
+            "content": "I'll go with the MacBook Air M2"
+        },
+        {
+            "role": "user",
+            "content": "Yes, please create the ticket"
+        }
+    ]
+}

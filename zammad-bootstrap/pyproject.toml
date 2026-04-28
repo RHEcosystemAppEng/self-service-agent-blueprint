@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Zammad bootstrap job: creates group, custom attribute, and users"
 requires-python = ">=3.12"
 dependencies = [
+    "kubernetes>=31.0.0",
     "requests>=2.31.0",
     "mock-employee-data",
 ]
