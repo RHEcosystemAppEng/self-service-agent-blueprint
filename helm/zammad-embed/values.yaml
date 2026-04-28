@@ -5,4 +5,10 @@ enabled: false
 publicUrl: ""
 chatId: 1  # Zammad chat channel ID (Admin → Channels → Chat)
 
+# Split-screen demo portal (index.html): hero + credentials + Zammad iframe (chat-embed.html for widget snippet).
+demoPortal:
+  productName: "IT Self-Service"
+  heroTitle: "Sign in to Zammad"
+  heroSubtitle: "Use the demo accounts below with the live Zammad UI."
+
 image: nginxinc/nginx-unprivileged:alpine
