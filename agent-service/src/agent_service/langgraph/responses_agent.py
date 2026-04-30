@@ -2,6 +2,7 @@ import asyncio
 import os
 from typing import Any, Dict, Optional
 
+import httpx
 import yaml
 from agent_service.utils import create_async_llamastack_client
 from opentelemetry.propagate import inject
@@ -11,6 +12,15 @@ from tracing_config.auto_tracing import tracingIsActive
 from .util import load_config_from_path, resolve_agent_service_path
 
 logger = configure_logging("agent-service")
+
+USE_NEMO_GUARDRAILS = os.getenv("USE_NEMO_GUARDRAILS", "").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+NEMO_GUARDRAILS_URL = os.getenv(
+    "NEMO_GUARDRAILS_URL", "http://nemo-guardrails/v1/guardrail/checks"
+)
 
 
 class Agent:
@@ -443,6 +453,61 @@ class Agent:
         # All shields passed
         return True, None
 
+    async def _check_nemo_guardrails(
+        self, text: str, role: str = "user"
+    ) -> tuple[bool, Optional[str]]:
+        """Call NeMo Guardrails /v1/guardrail/checks endpoint for input or output."""
+        if self.model is None:
+            self.model = await self._get_model_for_agent()
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(
+                    NEMO_GUARDRAILS_URL,
+                    json={
+                        "model": self.model,
+                        "messages": [{"role": role, "content": text}],
+                    },
+                )
+                response.raise_for_status()
+                data = response.json()
+                status = data.get("status")
+                if status == "blocked":
+                    logger.warning(
+                        "Message blocked by NeMo Guardrails",
+                        role=role,
+                        rails_status=data.get("rails_status"),
+                        agent_name=self.agent_name,
+                    )
+                    message = (
+                        "I'm sorry, I wasn't able to generate an appropriate response. Please try rephrasing your request."
+                        if role == "assistant"
+                        else "I apologize, but I cannot process that request due to safety concerns."
+                    )
+                    return False, message
+                return True, None
+        except Exception as e:
+            logger.error(
+                "Error calling NeMo Guardrails checks endpoint",
+                url=NEMO_GUARDRAILS_URL,
+                role=role,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
+
+    async def check_input_shield(self, text: str) -> tuple[bool, Optional[str]]:
+        """Check raw user message via NeMo Guardrails if enabled, otherwise no-op."""
+        if not USE_NEMO_GUARDRAILS:
+            return True, None
+        return await self._check_nemo_guardrails(text, role="user")
+
+    async def check_output_shield(self, text: str) -> tuple[bool, Optional[str]]:
+        """Check agent response via NeMo Guardrails if enabled, otherwise no-op."""
+        if not USE_NEMO_GUARDRAILS:
+            return True, None
+        return await self._check_nemo_guardrails(text, role="assistant")
+
     async def create_response_with_retry(
         self,
         messages: list[Any],
@@ -659,9 +724,14 @@ class Agent:
             current_state_name: Optional name of the current state from the state machine YAML
         """
         try:
-            # INPUT SHIELD: Check user input before processing
-            if self.input_shields and messages and len(messages) > 0:
-                # Check only the last message (most recent user input)
+            # INPUT SHIELD: Check user input before processing.
+            # Skipped when USE_NEMO_GUARDRAILS — raw message check already ran in session_manager.
+            if (
+                self.input_shields
+                and not USE_NEMO_GUARDRAILS
+                and messages
+                and len(messages) > 0
+            ):
                 is_safe, error_message = await self._run_moderation_shields(
                     messages, self.input_shields, "input"
                 )

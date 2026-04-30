@@ -1,0 +1,18 @@
+{{- if .Values.jailbreakDetect.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: nemoguard-jailbreakdetect
+  labels:
+    app: nemoguard-jailbreakdetect
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    app: nemoguard-jailbreakdetect
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+  type: ClusterIP
+{{- end }}

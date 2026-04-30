@@ -304,6 +304,11 @@ Generate Agent Service specific environment variables
 - name: SAFETY_URL
   value: {{ $safetyUrl | quote }}
 {{- end }}
+{{/* NeMo Guardrails Configuration */}}
+{{- if and (hasKey .Values "nemoGuardrails") .Values.nemoGuardrails.enabled }}
+- name: USE_NEMO_GUARDRAILS
+  value: "true"
+{{- end }}
 {{/* Fault Injection Configuration (for testing) */}}
 {{- if hasKey .Values.requestManagement.agentService "faultInjection" }}
 - name: FAULT_INJECTION_ENABLED

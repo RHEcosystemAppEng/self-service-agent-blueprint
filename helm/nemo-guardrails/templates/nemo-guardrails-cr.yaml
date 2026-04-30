@@ -1,0 +1,15 @@
+apiVersion: trustyai.opendatahub.io/v1alpha1
+kind: NemoGuardrails
+metadata:
+  name: {{ .Values.nemoGuardrails.crName }}
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  nemoConfigs:
+    - name: nemo-config
+      configMaps:
+        - nemo-config
+  env:
+    - name: OPENAI_API_KEY
+      value: {{ .Values.llm.apiToken | quote }}

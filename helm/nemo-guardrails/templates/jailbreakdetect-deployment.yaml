@@ -1,0 +1,71 @@
+{{- if .Values.jailbreakDetect.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nemoguard-jailbreakdetect
+  labels:
+    app: nemoguard-jailbreakdetect
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nemoguard-jailbreakdetect
+  template:
+    metadata:
+      labels:
+        app: nemoguard-jailbreakdetect
+    spec:
+      imagePullSecrets:
+        - name: ngc-pull-secret
+      containers:
+        - name: jailbreakdetect
+          image: {{ .Values.jailbreakDetect.image }}
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+          env:
+            - name: NGC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ngc-api-key-secret
+                  key: NGC_API_KEY
+            - name: HF_HOME
+              value: /opt/nim/.cache/huggingface
+          resources:
+            {{- toYaml .Values.jailbreakDetect.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /v1/health/ready
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /v1/health/live
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - name: nim-cache
+              mountPath: /opt/nim/.cache
+            - name: nim-workspace
+              mountPath: /opt/nim/workspace
+      volumes:
+        - name: nim-cache
+          persistentVolumeClaim:
+            claimName: nemoguard-jailbreakdetect-cache
+        - name: nim-workspace
+          emptyDir: {}
+      tolerations:
+        - key: {{ .Values.jailbreakDetect.gpuToleration | quote }}
+          effect: NoSchedule
+          operator: Exists
+{{- end }}

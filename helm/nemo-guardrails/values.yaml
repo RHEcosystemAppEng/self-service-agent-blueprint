@@ -1,0 +1,30 @@
+ngcApiKey: ""
+
+llm:
+  # In-cluster LLM predictor hostname, e.g. $(LLM)-predictor
+  serviceHostname: ""
+  servicePort: 8080
+  # Model identifier string, e.g. ibm-granite/granite-3.1-8b-instruct
+  modelId: ""
+  # If set, use this URL directly instead of serviceHostname:servicePort
+  url: ""
+  # API token for authenticating calls to the LLM (LLM_API_TOKEN)
+  apiToken: "fake"
+
+jailbreakDetect:
+  enabled: false
+  image: nvcr.io/nim/nvidia/nemoguard-jailbreak-detect:1.10.1
+  gpuToleration: g5-gpu
+  cacheSize: 10Gi
+  resources:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+      nvidia.com/gpu: "1"
+    limits:
+      cpu: "4"
+      memory: 16Gi
+      nvidia.com/gpu: "1"
+
+nemoGuardrails:
+  crName: nemo-guardrails

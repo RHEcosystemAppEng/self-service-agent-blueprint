@@ -1,0 +1,15 @@
+{{- if .Values.jailbreakDetect.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nemoguard-jailbreakdetect-cache
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.jailbreakDetect.cacheSize }}
+{{- end }}

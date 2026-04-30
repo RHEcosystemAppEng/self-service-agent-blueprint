@@ -1,0 +1,5 @@
+apiVersion: v2
+name: nemo-guardrails
+description: NemoGuard JailbreakDetect NIM + NeMo Guardrails Service (TrustyAI-managed)
+type: application
+version: 0.1.0

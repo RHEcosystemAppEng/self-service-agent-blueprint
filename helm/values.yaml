@@ -111,6 +111,12 @@ llamastack:
 # openaiBasePath: "/v1/openai/v1"    # Base path for OpenAI-compatible API (default: "/v1/openai/v1")
 # timeout: 120                        # Request timeout in seconds (default: 120)
 
+# NeMo Guardrails Configuration
+# Set enabled: true to activate raw message safety checks via the NeMo Guardrails /v1/guardrail/checks endpoint.
+# Requires NeMo Guardrails to be deployed first: make deploy-nemo-guardrails
+nemoGuardrails:
+  enabled: false
+
 # Safety/Shield Configuration (Llama Guard)
 safety:
   # Model name for safety checks (e.g., llama-guard-3-8b)

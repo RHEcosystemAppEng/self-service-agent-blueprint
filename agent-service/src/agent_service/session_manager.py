@@ -236,6 +236,22 @@ class ResponsesSessionManager(BaseSessionManager):
                 logger.error("Conversation session not initialized")
                 return "Error: Conversation session not initialized"
 
+            # Raw message input shield: runs before the state machine sees the message
+            if self.current_agent_name and self.agent_manager:
+                agent = self.agent_manager.get_agent(self.current_agent_name)
+                if agent:
+                    is_safe, error_message = await agent.check_input_shield(text)
+                    if not is_safe:
+                        logger.info(
+                            "Input blocked by raw message shield",
+                            agent_name=self.current_agent_name,
+                            user_id=self.user_id,
+                        )
+                        return (
+                            error_message
+                            or "I apologize, but I cannot process that request due to safety concerns."
+                        )
+
             response = await self.conversation_session.send_message(
                 text,
                 token_context=token_context,
@@ -251,6 +267,24 @@ class ResponsesSessionManager(BaseSessionManager):
             )
 
             processed_response = await self._handle_routing(processed_response, text)
+
+            # Raw response output shield: runs before the response is returned to the user
+            if self.current_agent_name and self.agent_manager:
+                agent = self.agent_manager.get_agent(self.current_agent_name)
+                if agent:
+                    is_safe, error_message = await agent.check_output_shield(
+                        processed_response
+                    )
+                    if not is_safe:
+                        logger.info(
+                            "Output blocked by raw response shield",
+                            agent_name=self.current_agent_name,
+                            user_id=self.user_id,
+                        )
+                        return (
+                            error_message
+                            or "I apologize, but I cannot provide that response due to safety concerns."
+                        )
 
             logger.info(
                 "Responses message processed successfully",

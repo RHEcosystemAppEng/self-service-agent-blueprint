@@ -102,6 +102,7 @@ MAIN_CHART_NAME := self-service-agent
 HELM_EXPORT_DIR ?= ansible/helm-export
 TOLERATIONS_TEMPLATE=[{"key":"$(1)","effect":"NoSchedule","operator":"Exists"}]
 INGRESS_PREFIX := ssa
+NEMO_GUARDRAILS_CHART ?= helm/nemo-guardrails
 
 # Slack Configuration - only when ENABLE_SLACK set to true
 ifeq ($(ENABLE_SLACK),true)
@@ -2230,3 +2231,63 @@ servicenow-bootstrap-create-evaluation-users:
 	@echo "Creating evaluation users..."
 	@cd scripts/servicenow-bootstrap && uv run python -m servicenow_bootstrap.create_evaluation_users
 	@echo "Evaluation users creation completed successfully!"
+
+# NeMo Guardrails deployment targets
+.PHONY: deploy-nemo-guardrails
+deploy-nemo-guardrails: namespace
+	@echo "Deploying NeMo Guardrails..."
+	@if ! oc get crd nemoguardrails.trustyai.opendatahub.io &>/dev/null; then \
+		echo "❌ NemoGuardrails CRD not found. Ensure RHOAI 3.3+ is installed with the TrustyAI operator enabled."; \
+		exit 1; \
+	fi
+	$(if $(filter true,$(JAILBREAK_DETECT)),$(if $(NGC_API_KEY),,$(error NGC_API_KEY is required when jailbreakDetect is enabled)),)
+	$(eval NEMO_ALREADY_DEPLOYED := $(shell oc get deployment nemo-guardrails -n $(NAMESPACE) &>/dev/null && echo yes || echo no))
+	@helm upgrade --install nemo-guardrails $(NEMO_GUARDRAILS_CHART) \
+		-n $(NAMESPACE) \
+		$(if $(NGC_API_KEY),--set ngcApiKey=$(NGC_API_KEY),) \
+		--set llm.url=http://llamastack:8321/v1 \
+		--set llm.modelId=$(LLM_ID) \
+		$(if $(filter true,$(JAILBREAK_DETECT)),--set jailbreakDetect.enabled=true,) \
+		$(if $(SAFETY_TOLERATION),--set jailbreakDetect.gpuToleration=$(SAFETY_TOLERATION),)
+	@if [ "$(NEMO_ALREADY_DEPLOYED)" = "yes" ]; then \
+		echo "Restarting NeMo Guardrails deployment to pick up configmap changes..."; \
+		oc rollout restart deployment/nemo-guardrails -n $(NAMESPACE); \
+		oc rollout status deployment/nemo-guardrails -n $(NAMESPACE) --timeout=3m || \
+			(echo "❌ NeMo Guardrails rollout did not complete" && exit 1); \
+	fi
+	@if [ "$(JAILBREAK_DETECT)" = "true" ]; then \
+		echo "Waiting for NemoGuard JailbreakDetect to be ready (pulls model from NGC on first start)..."; \
+		oc rollout status deployment/nemoguard-jailbreakdetect -n $(NAMESPACE) --timeout=15m || \
+			(echo "❌ NemoGuard JailbreakDetect not ready. Check: oc logs -n $(NAMESPACE) deployment/nemoguard-jailbreakdetect" && exit 1); \
+	fi
+	@echo "Waiting for NemoGuardrails CR to be ready..."
+	@oc wait nemoguardrails/nemo-guardrails -n $(NAMESPACE) \
+		--for=condition=Ready --timeout=5m 2>/dev/null || \
+		echo "  (NemoGuardrails CR ready check skipped — verify manually with: oc get nemoguardrails -n $(NAMESPACE))"
+	@echo "Enabling NeMo Guardrails raw message checks in agent-service..."
+	@oc set env deployment/self-service-agent-agent-service \
+		USE_NEMO_GUARDRAILS=true \
+		-n $(NAMESPACE)
+	@oc rollout restart deployment/self-service-agent-agent-service -n $(NAMESPACE)
+	@oc rollout status deployment/self-service-agent-agent-service -n $(NAMESPACE) --timeout=5m
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "NeMo Guardrails deployed and enabled successfully"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+
+.PHONY: undeploy-nemo-guardrails
+undeploy-nemo-guardrails:
+	@echo "Removing NeMo Guardrails..."
+	@echo "Disabling NeMo Guardrails raw message checks in agent-service..."
+	@oc set env deployment/self-service-agent-agent-service \
+		USE_NEMO_GUARDRAILS- \
+		-n $(NAMESPACE) 2>/dev/null || true
+	@oc rollout restart deployment/self-service-agent-agent-service -n $(NAMESPACE) 2>/dev/null || true
+	@oc rollout status deployment/self-service-agent-agent-service -n $(NAMESPACE) --timeout=5m 2>/dev/null || true
+	@helm uninstall nemo-guardrails -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true
+	@if oc get pvc nemoguard-jailbreakdetect-cache -n $(NAMESPACE) &>/dev/null; then \
+		echo "  Deleting NIM model cache PVC..."; \
+		oc delete pvc nemoguard-jailbreakdetect-cache -n $(NAMESPACE) --wait=true; \
+	fi || true
+	@echo "NeMo Guardrails undeployed."
