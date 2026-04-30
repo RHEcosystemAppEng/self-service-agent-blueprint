@@ -1,18 +1,17 @@
 enabled: false
 
-# publicUrl: Zammad base URL for the chat widget script src.
+# publicUrl: Zammad base URL (links, chat script src on the demo site).
 # If not set, auto-detected from the ssa-zammad OpenShift Route via Helm lookup.
 publicUrl: ""
 
-# URL path for the embed app on the same host as Zammad.
-# Demo portal: https://<ssa-zammad host><pathPrefix>/
+# URL path for this demo site on the same host as Zammad (e.g. https://<host><pathPrefix>/).
 # GitOps / helm template without cluster: set zammadRouteHost to the Zammad Route hostname.
 pathPrefix: "/demo-portal"
 zammadRouteHost: ""
 
 chatId: 1  # Zammad chat channel ID (Admin → Channels → Chat)
 
-# Demo portal content for index.html.
+# index.html copy and demo accounts (persona grid + modal tables).
 demoPortal:
   productName: "IT Self-Service"
   heroTitle: "Sign in to Zammad"

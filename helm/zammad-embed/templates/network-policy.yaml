@@ -1,6 +1,6 @@
 {{- if .Values.enabled }}
 ---
-# Allow ingress from OpenShift router to embed nginx (for ssa-zammad-embed Route)
+# Allow ingress from OpenShift router to demo-site nginx (Route ssa-zammad-embed)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

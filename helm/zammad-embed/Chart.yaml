@@ -1,5 +1,5 @@
 apiVersion: v2
 name: zammad-embed
-description: Zammad chat widget embed page (nginx serving the embed snippet)
+description: Same-host Zammad demo site (nginx) — demo login portal and chat widget snippet page
 type: application
 version: 0.1.0
