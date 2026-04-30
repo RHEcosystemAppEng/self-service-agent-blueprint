@@ -1,14 +1,14 @@
 {{- if .Values.enabled }}
 {{- $zammadUrl := .Values.publicUrl | default "" | trimSuffix "/" }}
 {{- if not $zammadUrl }}
-{{-   $host := include "zammad-embed.zammadHost" . | trim }}
+{{-   $host := include "zammad-demo-site.zammadHost" . | trim }}
 {{-   if $host }}
 {{-     $zammadUrl = printf "https://%s" $host }}
 {{-   else }}
 {{-     $zammadUrl = "https://YOUR-ZAMMAD-URL" }}
 {{-   end }}
 {{- end }}
-{{- $pp := include "zammad-embed.normalizePathPrefix" .Values.pathPrefix }}
+{{- $pp := include "zammad-demo-site.normalizePathPrefix" .Values.pathPrefix }}
 {{- $ppSlash := printf "%s/" (trimSuffix "/" $pp) }}
 ---
 apiVersion: v1
@@ -19,12 +19,12 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/component: zammad-embed
+    app.kubernetes.io/component: zammad-demo-site
 data:
   index.html: |
-{{ include "zammad-embed.demoPortalIndex" (dict "zammadUrl" $zammadUrl "Values" .Values "Release" .Release) | nindent 4 }}
+{{ include "zammad-demo-site.demoSiteIndex" (dict "zammadUrl" $zammadUrl "Values" .Values "Release" .Release) | nindent 4 }}
   chat-embed.html: |
-{{ include "zammad-embed.chatEmbedPage" (dict "zammadUrl" $zammadUrl "Values" .Values) | nindent 4 }}
+{{ include "zammad-demo-site.chatSnippetPage" (dict "zammadUrl" $zammadUrl "Values" .Values) | nindent 4 }}
   default.conf: |
     server {
         listen 8080;

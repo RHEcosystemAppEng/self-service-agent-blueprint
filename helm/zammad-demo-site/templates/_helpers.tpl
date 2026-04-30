@@ -1,9 +1,9 @@
-{{- define "zammad-embed.normalizePathPrefix" -}}
+{{- define "zammad-demo-site.normalizePathPrefix" -}}
 {{- $p := . | default "/demo-portal" | trimSuffix "/" | trimPrefix "/" -}}
 {{- printf "/%s" $p -}}
 {{- end -}}
 
-{{- define "zammad-embed.zammadHost" -}}
+{{- define "zammad-demo-site.zammadHost" -}}
 {{- $h := .Values.zammadRouteHost | default "" | trim -}}
 {{- if $h -}}
 {{- $h -}}

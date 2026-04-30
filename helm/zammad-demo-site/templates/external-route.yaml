@@ -1,20 +1,19 @@
 {{- if .Values.enabled }}
-{{- $host := include "zammad-embed.zammadHost" . | trim }}
+{{- $host := include "zammad-demo-site.zammadHost" . | trim }}
 {{- if not $host }}
-{{- fail "zammad-embed (demo site): no host for Route (lookup ssa-zammad failed). Set zammadRouteHost in values, or install after the Zammad Route exists." }}
+{{- fail "zammad-demo-site: set zammadRouteHost or ensure Route ssa-zammad exists (host lookup failed)." }}
 {{- end }}
-{{- $pp := include "zammad-embed.normalizePathPrefix" .Values.pathPrefix }}
+{{- $pp := include "zammad-demo-site.normalizePathPrefix" .Values.pathPrefix }}
 ---
-# Same-host demo site (static nginx) from the Zammad host under pathPrefix.
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: ssa-zammad-embed
+  name: ssa-zammad-demo-site
   namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/component: zammad-embed
+    app.kubernetes.io/component: zammad-demo-site
 spec:
   host: {{ $host | quote }}
   path: {{ $pp | quote }}

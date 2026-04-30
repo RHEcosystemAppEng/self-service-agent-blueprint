@@ -8,18 +8,18 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/component: zammad-embed
+    app.kubernetes.io/component: zammad-demo-site
 spec:
   replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/instance: {{ .Release.Name }}
-      app.kubernetes.io/component: zammad-embed
+      app.kubernetes.io/component: zammad-demo-site
   template:
     metadata:
       labels:
         app.kubernetes.io/instance: {{ .Release.Name }}
-        app.kubernetes.io/component: zammad-embed
+        app.kubernetes.io/component: zammad-demo-site
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
@@ -36,7 +36,7 @@ spec:
           containerPort: 8080
           protocol: TCP
         volumeMounts:
-        - name: embed-content
+        - name: demo-site-html
           mountPath: /usr/share/nginx/html
           readOnly: true
         - name: nginx-default-conf
@@ -56,7 +56,7 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
       volumes:
-      - name: embed-content
+      - name: demo-site-html
         configMap:
           name: {{ .Release.Name }}
       - name: nginx-default-conf

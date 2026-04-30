@@ -1,30 +1,31 @@
-{{- define "zammad-embed.demoPortalIndex" -}}
+{{- define "zammad-demo-site.demoSiteIndex" -}}
 {{- $u := .zammadUrl -}}
 {{- $product := "IT Self-Service" -}}
 {{- $hero := "Sign in to Zammad" -}}
 {{- $sub := "Use the demo accounts below with the live Zammad UI." -}}
-{{- if .Values.demoPortal -}}
-{{-   $product = default $product .Values.demoPortal.productName -}}
-{{-   $hero = default $hero .Values.demoPortal.heroTitle -}}
-{{-   $sub = default $sub .Values.demoPortal.heroSubtitle -}}
+{{- if .Values.demoSite -}}
+{{-   $product = default $product .Values.demoSite.productName -}}
+{{-   $hero = default $hero .Values.demoSite.heroTitle -}}
+{{-   $sub = default $sub .Values.demoSite.heroSubtitle -}}
 {{- end -}}
-{{- $categories := .Values.demoPortal.categories | default list -}}
+{{- $categories := .Values.demoSite.categories | default list -}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ $product }} - Zammad demo login</title>
+  <title>{{ $product }} - Zammad demo site</title>
   <style>
     :root {
       --accent: #047857;
       --accent-hover: #059669;
       --text-muted: #64748b;
       --border: #e2e8f0;
+      --hairline: #f1f5f9;
       --radius: 12px;
     }
     * { box-sizing: border-box; }
-    html { font-size: clamp(16px, 1.15vw + 14px, 21px); }
+    html { font-size: clamp(15px, 0.35vw + 14px, 17px); }
     html, body { height: 100%; margin: 0; }
     body {
       font-family: ui-sans-serif, system-ui, sans-serif;
@@ -44,12 +45,21 @@
     }
     @media (min-width: 960px) {
       .dashboard-split {
-        grid-template-columns: minmax(14rem, 20vw) minmax(0, 2.5fr);
+        grid-template-columns: minmax(17rem, 28vw) minmax(0, 2.5fr);
         gap: 1.5rem;
-        align-items: start;
+        align-items: center;
+        min-height: calc(100svh - 5rem);
       }
-      .dashboard-hero { position: sticky; top: 0.75rem; }
-      .page-header { text-align: left; }
+      .dashboard-hero {
+        justify-self: center;
+        width: 100%;
+        max-width: 22rem;
+      }
+      .dashboard-accounts {
+        justify-self: center;
+        width: 100%;
+        max-width: min(52rem, 100%);
+      }
       .footer-links { text-align: left; }
     }
     .page-header { text-align: center; }
@@ -59,11 +69,11 @@
       gap: 0.5rem;
       margin-bottom: 0.5rem;
       font-weight: 600;
-      font-size: 1.12rem;
+      font-size: 1rem;
     }
     .page-header .brand span.icon {
-      width: 2.75rem;
-      height: 2.75rem;
+      width: 2.4rem;
+      height: 2.4rem;
       border-radius: 12px;
       background: linear-gradient(135deg, #dc2626, #b91c1c);
       display: inline-flex;
@@ -71,34 +81,38 @@
       justify-content: center;
       color: #fff;
     }
-    .page-header h1 { font-size: 1.65rem; margin: 0 0 0.35rem; font-weight: 650; }
-    .page-header .lead { margin: 0 auto; color: var(--text-muted); max-width: 42ch; font-size: 1.02rem; }
+    .page-header h1 { font-size: 1.35rem; margin: 0 0 0.35rem; font-weight: 650; line-height: 1.25; }
+    .page-header .lead { margin: 0 auto; color: var(--text-muted); max-width: 38ch; font-size: 0.9375rem; line-height: 1.45; }
+    a.btn-hero-open,
+    a.btn-modal-open-zammad {
+      padding: 0.55rem 1rem;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #fff !important;
+      background: var(--accent);
+      border-radius: 10px;
+      text-decoration: none;
+    }
+    a.btn-hero-open:hover,
+    a.btn-modal-open-zammad:hover { background: var(--accent-hover); }
     a.btn-hero-open {
       display: flex;
       align-items: center;
       justify-content: center;
       margin: 0.75rem auto 0;
-      padding: 0.72rem 1.35rem;
-      font-size: 1.06rem;
-      font-weight: 700;
-      color: #fff !important;
-      background: var(--accent);
-      border-radius: 12px;
-      text-decoration: none;
       width: 100%;
     }
-    a.btn-hero-open:hover { background: var(--accent-hover); }
     .card {
       background: #fafafa;
       border-radius: var(--radius);
       border: 1px solid var(--border);
-      padding: 1.1rem 1.2rem;
+      padding: 1rem 1.1rem;
       margin-bottom: 0.65rem;
     }
-    .card .hint { margin: 0 0 0.5rem; font-size: 0.96rem; color: var(--text-muted); }
-    .card > h2 { margin: 0 0 0.35rem; font-size: 1.22rem; }
+    .card .hint { margin: 0 0 0.5rem; font-size: 0.875rem; color: var(--text-muted); }
+    .card > h2 { margin: 0 0 0.35rem; font-size: 1.1rem; }
     .persona-demo-label {
-      font-size: 0.82rem;
+      font-size: 0.75rem;
       font-weight: 600;
       letter-spacing: 0.06em;
       color: var(--text-muted);
@@ -117,19 +131,19 @@
       gap: 0.45rem;
       padding: 0.5rem;
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: var(--radius);
       background: #fff;
       min-width: 0;
     }
     .persona-group-heading {
-      font-size: 0.8rem;
+      font-size: 0.72rem;
       font-weight: 700;
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--text-muted);
       margin: 0;
       padding-bottom: 0.35rem;
-      border-bottom: 1px solid #f1f5f9;
+      border-bottom: 1px solid var(--hairline);
     }
     .persona-group-tiles {
       display: flex;
@@ -152,56 +166,73 @@
     .persona:hover { border-color: var(--accent); background: #f0f7ff; }
     .persona.is-busy { opacity: 0.75; pointer-events: none; }
     .persona .circle {
-      width: 2.85rem;
-      height: 2.85rem;
+      width: 2.45rem;
+      height: 2.45rem;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.38rem;
+      font-size: 1.15rem;
       margin-bottom: 0.25rem;
     }
-    .persona .name { font-size: 0.88rem; font-weight: 600; color: #334155; }
-    .persona .role { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.1rem; }
+    .persona .name { font-size: 0.8125rem; font-weight: 600; color: #334155; }
+    .persona .role { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.1rem; }
     section.block { margin-bottom: 1.25rem; scroll-margin-top: 0.5rem; }
-    section.block h3 { font-size: 1.1rem; margin: 0 0 0.5rem; color: #1e293b; }
+    section.block h3 { font-size: 1rem; margin: 0 0 0.5rem; color: #1e293b; }
     .table-wrap { overflow-x: auto; margin: 0; }
     table.accounts {
       width: 100%;
+      table-layout: fixed;
       border-collapse: collapse;
-      font-size: 0.94rem;
-      min-width: 30rem;
+      font-size: 0.8125rem;
+      min-width: 28rem;
     }
+    table.accounts col:nth-child(1) { width: 20%; }
+    table.accounts col:nth-child(2) { width: 38%; }
+    table.accounts col:nth-child(3) { width: 22%; }
+    table.accounts col:nth-child(4) { width: 20%; }
     table.accounts th, table.accounts td {
       text-align: left;
-      padding: 0.5rem 0.55rem 0.5rem 0;
-      border-bottom: 1px solid #f1f5f9;
+      padding: 0.5rem 0.4rem;
+      border-bottom: 1px solid var(--hairline);
       vertical-align: middle;
     }
     table.accounts thead th {
       color: var(--text-muted);
       font-weight: 600;
-      font-size: 0.8rem;
+      font-size: 0.7rem;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      border-bottom: 2px solid #e2e8f0;
+      border-bottom: 2px solid var(--border);
     }
-    table.accounts td.actions { padding-left: 0.35rem; }
+    table.accounts thead th:last-child {
+      text-align: center;
+    }
+    table.accounts td.actions {
+      text-align: center;
+      justify-content: center;
+    }
     table.accounts td.actions .btn { white-space: nowrap; }
     code.cred {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.91rem;
+      font-size: 0.8rem;
       word-break: break-all;
     }
     .actions { display: flex; flex-wrap: wrap; gap: 0.35rem; }
     button.btn, a.btn {
-      font-size: 0.91rem;
-      padding: 0.4rem 0.62rem;
+      font-size: 0.8125rem;
+      padding: 0.35rem 0.55rem;
       border-radius: 6px;
       border: 1px solid var(--border);
       background: #fff;
       cursor: pointer;
       color: #334155;
+      font-family: inherit;
+    }
+    button.modal-close,
+    button.btn-view-all,
+    nav.categories button.category-chip {
+      cursor: pointer;
       font-family: inherit;
     }
     button.btn.primary, a.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -210,7 +241,7 @@
     table.accounts td.actions button.btn.is-copied {
       background: #ecfdf5;
       border-color: #34d399;
-      color: #047857;
+      color: var(--accent);
       font-weight: 600;
     }
     .toast {
@@ -220,9 +251,9 @@
       transform: translateX(-50%) translateY(120%);
       background: #0f172a;
       color: #f8fafc;
-      padding: 0.58rem 1.05rem;
+      padding: 0.5rem 0.9rem;
       border-radius: 10px;
-      font-size: 0.95rem;
+      font-size: 0.875rem;
       opacity: 0;
       transition: transform 0.2s, opacity 0.2s;
       z-index: 300;
@@ -230,23 +261,25 @@
     }
     .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
     body.modal-open { overflow: hidden; }
-    .modal-open-actions { margin-bottom: 0.5rem; }
     button.btn-view-all {
       width: 100%;
-      padding: 0.55rem 0.95rem;
+      margin-bottom: 0.5rem;
+      padding: 0.45rem 0.85rem;
       border-radius: 10px;
-      font-size: 0.98rem;
+      font-size: 0.875rem;
       font-weight: 600;
       background: #fff;
       border: 1px solid #cbd5e1;
       color: #475569;
-      cursor: pointer;
-      font-family: inherit;
     }
-    button.btn-view-all:hover { border-color: var(--accent); color: var(--accent); }
+    button.btn-view-all:hover,
+    nav.categories button.category-chip:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
     nav.categories { display: flex; flex-wrap: wrap; gap: 0.45rem; }
     nav.categories button.category-chip {
-      font-size: 0.76rem;
+      font-size: 0.68rem;
       font-weight: 600;
       letter-spacing: 0.05em;
       text-transform: uppercase;
@@ -255,10 +288,7 @@
       border-radius: 999px;
       border: 1px solid var(--border);
       background: #fff;
-      cursor: pointer;
-      font-family: inherit;
     }
-    nav.categories button.category-chip:hover { border-color: var(--accent); color: var(--accent); }
     .modal-overlay {
       position: fixed;
       inset: 0;
@@ -283,32 +313,41 @@
       border: 1px solid var(--border);
       box-shadow: 0 16px 40px rgba(15, 23, 42, 0.2);
     }
+    .modal-header,
+    .modal-footer {
+      flex-shrink: 0;
+      padding: 0.85rem 1rem;
+    }
     .modal-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.85rem 1rem;
       border-bottom: 1px solid var(--border);
     }
-    .modal-header h2 { margin: 0; font-size: 1.14rem; font-weight: 650; }
+    .modal-header h2 { margin: 0; font-size: 1.05rem; font-weight: 650; }
     button.modal-close {
       border: none;
       background: #f1f5f9;
-      width: 2.35rem;
-      height: 2.35rem;
+      width: 2.1rem;
+      height: 2.1rem;
       border-radius: 8px;
-      font-size: 1.35rem;
-      cursor: pointer;
+      font-size: 1.2rem;
       color: #475569;
-      font-family: inherit;
     }
     .modal-nav {
-      padding: 0.5rem 0.85rem;
+      flex-shrink: 0;
+      padding: 0.65rem 0.85rem;
       border-bottom: 1px solid var(--border);
       background: #f8fafc;
       overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
-    .modal-nav .categories { margin: 0; flex-wrap: nowrap; min-width: min-content; }
+    .modal-nav .categories {
+      margin: 0;
+      flex-wrap: nowrap;
+      min-width: min-content;
+      align-items: center;
+    }
     .modal-body {
       flex: 1;
       min-height: 0;
@@ -316,33 +355,24 @@
       padding: 0.85rem 1rem 1.1rem;
     }
     .modal-footer {
-      padding: 0.85rem 1rem;
       border-top: 1px solid var(--border);
       background: #f8fafc;
       text-align: center;
     }
-    .modal-footer-hint { margin: 0 0 0.5rem; font-size: 0.86rem; color: #64748b; }
+    .modal-footer-hint { margin: 0 0 0.5rem; font-size: 0.8rem; color: var(--text-muted); }
     a.btn-modal-open-zammad {
       display: inline-flex;
       justify-content: center;
       width: 100%;
       max-width: 18rem;
       margin: 0 auto;
-      padding: 0.65rem 1.1rem;
-      font-size: 1.06rem;
-      font-weight: 700;
-      border-radius: 10px;
-      text-decoration: none;
-      background: var(--accent);
-      color: #fff !important;
     }
-    a.btn-modal-open-zammad:hover { background: var(--accent-hover); }
-    .footer-links { font-size: 0.93rem; color: var(--text-muted); margin-top: 0.75rem; text-align: center; }
+    .footer-links { font-size: 0.875rem; color: var(--text-muted); margin-top: 0.75rem; text-align: center; }
     .footer-links a { color: var(--accent); }
   </style>
 </head>
 <body>
-  <div class="page page-dashboard">
+  <div class="page">
     <div class="dashboard-split">
       <aside class="dashboard-hero">
         <header class="page-header">
@@ -357,11 +387,9 @@
         <div class="card">
           <h2>Demo accounts</h2>
           <p class="hint">Tap a persona to sign in.</p>
-          <div class="modal-open-actions">
-            <button type="button" class="btn-view-all" id="btn-open-accounts-modal">View all accounts &amp; passwords</button>
-          </div>
+          <button type="button" class="btn-view-all" id="btn-open-accounts-modal">View all accounts &amp; passwords</button>
           <p class="persona-demo-label">Persona quick pick</p>
-          <div class="persona-grid" id="persona-grid">
+          <div class="persona-grid">
 {{- range $categories }}
 {{- $c := . }}
 {{- $show := false }}
@@ -389,7 +417,7 @@
     </div>
 
     <p class="footer-links">
-      <a href="chat-embed.html">Chat widget embed snippet</a>
+      <a href="chat-embed.html">Chat widget snippet page</a>
       ·
       <a href="{{ $u }}/" target="_blank" rel="noopener">Zammad home</a>
     </p>
@@ -408,11 +436,12 @@
 {{- end }}
         </nav>
       </div>
-      <div class="modal-body" id="accounts-modal-body">
+      <div class="modal-body">
 {{- range $categories }}
         <section class="block" id="{{ .id }}">
           <h3>{{ .sectionTitle }}</h3>
           <div class="table-wrap"><table class="accounts">
+            <colgroup><col><col><col><col></colgroup>
             <thead><tr><th>Role</th><th>Email</th><th>Password</th><th>Copy</th></tr></thead>
             <tbody>
 {{- range .rows }}
@@ -463,37 +492,33 @@
       return Promise.resolve();
     }
 
-    function zammadApiOrigin() {
-      try { return new URL(ZAMMAD_BASE + '/').origin; } catch (e) { return ''; }
-    }
-
     function sameOriginAsZammad() {
-      var o = zammadApiOrigin();
-      return !!o && o === window.location.origin;
+      try {
+        return new URL(ZAMMAD_BASE + '/').origin === window.location.origin;
+      } catch (e) {
+        return false;
+      }
     }
 
     function signInToZammad(username, password) {
       var base = ZAMMAD_BASE + '/';
+      var json = { 'Content-Type': 'application/json', Accept: 'application/json' };
       var signshow = new URL('api/v1/signshow', base);
       var signin = new URL('api/v1/signin', base);
       return fetch(signshow.toString(), {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        headers: json,
         body: '{}'
       }).then(function(res) {
         var csrf = res.headers.get('csrf-token') || res.headers.get('CSRF-TOKEN');
         if (!csrf) {
-          throw new Error('Could not read CSRF token. Is the demo served on the same host as Zammad?');
+          throw new Error('Could not read CSRF token. Is this demo site served on the same host as Zammad?');
         }
         return fetch(signin.toString(), {
           method: 'POST',
           credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'X-CSRF-Token': csrf
-          },
+          headers: Object.assign({ 'X-CSRF-Token': csrf }, json),
           body: JSON.stringify({ username: username, password: password })
         });
       }).then(function(res) {
@@ -511,7 +536,11 @@
     }
 
     var modal = document.getElementById('accounts-modal');
-    var modalBody = document.getElementById('accounts-modal-body');
+
+    function scrollAccountsBlock(id) {
+      var el = id && document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 
     function flashCopyButton(btn, kind) {
       btn.classList.remove('is-copied');
@@ -532,12 +561,7 @@
       modal.setAttribute('aria-hidden', 'false');
       document.body.classList.add('modal-open');
       if (!scrollToId) return;
-      setTimeout(function() {
-        var el = document.getElementById(scrollToId);
-        if (el && modalBody) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, 0);
+      setTimeout(function() { scrollAccountsBlock(scrollToId); }, 0);
     }
 
     function closeAccountsModal() {
@@ -547,16 +571,24 @@
       document.body.classList.remove('modal-open');
     }
 
-    function clickRoot(ev) {
-      return ev.target instanceof Element ? ev.target : ev.target.parentElement;
+    function handleCredCopy(ev, root, sel, attr, kind, ok, err) {
+      var btn = root.closest(sel);
+      if (!btn) return false;
+      ev.preventDefault();
+      copyText(btn.getAttribute(attr) || '').then(function() {
+        flashCopyButton(btn, kind);
+        showToast(ok);
+      }).catch(function() { showToast(err); });
+      return true;
     }
 
     document.addEventListener('click', function(ev) {
-      var root = clickRoot(ev);
+      var t = ev.target;
+      var root = t && t.nodeType === 1 ? t : t.parentElement;
       if (!root || !root.closest) return;
 
       if (root.closest('#btn-open-accounts-modal')) {
-        openAccountsModal(null);
+        openAccountsModal();
         return;
       }
       if (root.closest('#btn-close-accounts-modal')) {
@@ -566,31 +598,12 @@
 
       var chip = root.closest('.js-modal-scroll');
       if (chip) {
-        var tid = chip.getAttribute('data-target');
-        var sec = tid ? document.getElementById(tid) : null;
-        if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        scrollAccountsBlock(chip.getAttribute('data-target'));
         return;
       }
 
-      var ce = root.closest('.js-copy-email');
-      if (ce) {
-        ev.preventDefault();
-        copyText(ce.getAttribute('data-email') || '').then(function() {
-          flashCopyButton(ce, 'email');
-          showToast('Email copied');
-        }).catch(function() { showToast('Could not copy email'); });
-        return;
-      }
-
-      var cp = root.closest('.js-copy-password');
-      if (cp) {
-        ev.preventDefault();
-        copyText(cp.getAttribute('data-password') || '').then(function() {
-          flashCopyButton(cp, 'password');
-          showToast('Password copied');
-        }).catch(function() { showToast('Could not copy password'); });
-        return;
-      }
+      if (handleCredCopy(ev, root, '.js-copy-email', 'data-email', 'email', 'Email copied', 'Could not copy email')) return;
+      if (handleCredCopy(ev, root, '.js-copy-password', 'data-password', 'password', 'Password copied', 'Could not copy password')) return;
 
       var personaBtn = root.closest('.js-persona-signin');
       if (personaBtn) {
@@ -598,22 +611,21 @@
         var password = personaBtn.getAttribute('data-password') || '';
         var sectionId = personaBtn.getAttribute('data-section') || '';
         if (!sameOriginAsZammad()) {
-          openAccountsModal(sectionId || null);
-          showToast('One-click sign-in requires the demo portal to be served from the Zammad host.');
+          openAccountsModal(sectionId);
+          showToast('One-click sign-in requires this demo site to be served on the same host as Zammad.');
           return;
         }
         personaBtn.classList.add('is-busy');
         personaBtn.setAttribute('aria-busy', 'true');
         signInToZammad(email, password).then(function() {
-          personaBtn.classList.remove('is-busy');
-          personaBtn.removeAttribute('aria-busy');
           window.open(ZAMMAD_BASE + '/#/', '_blank', 'noopener,noreferrer');
           showToast('Opened Zammad in a new tab.');
         }).catch(function(err) {
+          openAccountsModal(sectionId);
+          showToast((err && err.message) ? err.message : 'Sign-in failed. Use View all accounts to copy credentials.');
+        }).finally(function() {
           personaBtn.classList.remove('is-busy');
           personaBtn.removeAttribute('aria-busy');
-          openAccountsModal(sectionId || null);
-          showToast((err && err.message) ? err.message : 'Sign-in failed. Use View all accounts to copy credentials.');
         });
       }
     });

@@ -1,6 +1,5 @@
 {{- if .Values.enabled }}
 ---
-# Allow ingress from OpenShift router to demo-site nginx (Route ssa-zammad-embed)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -9,12 +8,12 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/component: zammad-embed
+    app.kubernetes.io/component: zammad-demo-site
 spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/instance: {{ .Release.Name }}
-      app.kubernetes.io/component: zammad-embed
+      app.kubernetes.io/component: zammad-demo-site
   policyTypes:
   - Ingress
   ingress:

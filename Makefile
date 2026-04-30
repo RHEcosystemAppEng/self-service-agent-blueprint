@@ -1749,7 +1749,7 @@ helm-install-ticketing: namespace helm-depend
 		kubectl rollout status deploy/$$dep -n $(NAMESPACE) --timeout=10m; \
 	done
 	@if [ "$(ZAMMAD_DEMO_SITE_ENABLED)" = "true" ]; then \
-		echo "Installing same-host Zammad demo site (Helm release zammad-embed)..."; \
+		echo "Installing same-host Zammad demo site (Helm release zammad-demo-site)..."; \
 		ZAMMAD_FQDN="$(ZAMMAD_FQDN)"; \
 		if [ -z "$$ZAMMAD_FQDN" ]; then \
 			APPS_DOMAIN=$$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}' 2>/dev/null); \
@@ -1758,8 +1758,10 @@ helm-install-ticketing: namespace helm-depend
 		DEMO_SITE_HELM_ARGS="--set enabled=true"; \
 		[ -n "$$ZAMMAD_FQDN" ] && DEMO_SITE_HELM_ARGS="$$DEMO_SITE_HELM_ARGS --set publicUrl=https://$$ZAMMAD_FQDN"; \
 		DEMO_SITE_HELM_ARGS="$$DEMO_SITE_HELM_ARGS --set pathPrefix=/$(ZAMMAD_DEMO_SITE_PATH)"; \
-		helm upgrade --install zammad-embed helm/zammad-embed/ -n $(NAMESPACE) $$DEMO_SITE_HELM_ARGS; \
+		helm uninstall zammad-embed -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true; \
+		helm upgrade --install zammad-demo-site helm/zammad-demo-site/ -n $(NAMESPACE) $$DEMO_SITE_HELM_ARGS; \
 	else \
+		helm uninstall zammad-demo-site -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true; \
 		helm uninstall zammad-embed -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true; \
 	fi
 	@$(MAKE) print-urls
@@ -1775,13 +1777,14 @@ _helm-install-ticketing-print-checklist:
 	@echo ""
 	@echo "  1. Zammad URLs:"
 	@ZAMMAD_ROUTE=$$(oc get route ssa-zammad -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null); \
-	ZAMMAD_DEMO_SITE_INSTALLED=$$(oc get route ssa-zammad-embed -n $(NAMESPACE) -o name 2>/dev/null); \
+	ZAMMAD_DEMO_SITE_INSTALLED=$$(oc get route ssa-zammad-demo-site -n $(NAMESPACE) -o name 2>/dev/null); \
+	if [ -z "$$ZAMMAD_DEMO_SITE_INSTALLED" ]; then ZAMMAD_DEMO_SITE_INSTALLED=$$(oc get route ssa-zammad-embed -n $(NAMESPACE) -o name 2>/dev/null); fi; \
 	if [ -z "$$ZAMMAD_ROUTE" ]; then ZAMMAD_ROUTE=$$(oc get route -n $(NAMESPACE) -l app.kubernetes.io/instance=zammad -o jsonpath='{.items[0].spec.host}' 2>/dev/null); fi; \
 	if [ -n "$$ZAMMAD_ROUTE" ]; then \
 		echo "     Web UI: https://$$ZAMMAD_ROUTE"; \
 		echo "     API:    https://$$ZAMMAD_ROUTE/api/v1"; \
 		if [ -n "$$ZAMMAD_DEMO_SITE_INSTALLED" ]; then \
-			echo "     Demo site (same host): https://$$ZAMMAD_ROUTE/$(ZAMMAD_DEMO_SITE_PATH)/ — chat embed page: /$(ZAMMAD_DEMO_SITE_PATH)/chat-embed.html"; \
+			echo "     Demo site (same host): https://$$ZAMMAD_ROUTE/$(ZAMMAD_DEMO_SITE_PATH)/ — chat snippet page: /$(ZAMMAD_DEMO_SITE_PATH)/chat-embed.html"; \
 		else \
 			echo "     Demo site: not installed — ZAMMAD_DEMO_SITE_ENABLED was not true. Re-run with ZAMMAD_DEMO_SITE_ENABLED=true (default) or omit it."; \
 		fi; \
@@ -1791,7 +1794,8 @@ _helm-install-ticketing-print-checklist:
 		echo "     API:    http://localhost:8080/api/v1"; \
 	fi
 	@echo ""
-	@ZAMMAD_DEMO_SITE_INSTALLED=$$(oc get route ssa-zammad-embed -n $(NAMESPACE) -o name 2>/dev/null); \
+	@ZAMMAD_DEMO_SITE_INSTALLED=$$(oc get route ssa-zammad-demo-site -n $(NAMESPACE) -o name 2>/dev/null); \
+	if [ -z "$$ZAMMAD_DEMO_SITE_INSTALLED" ]; then ZAMMAD_DEMO_SITE_INSTALLED=$$(oc get route ssa-zammad-embed -n $(NAMESPACE) -o name 2>/dev/null); fi; \
 	if [ -n "$$ZAMMAD_DEMO_SITE_INSTALLED" ]; then \
 		echo "  2. Demo site: login at /$(ZAMMAD_DEMO_SITE_PATH)/; chat widget snippet + preview at /$(ZAMMAD_DEMO_SITE_PATH)/chat-embed.html on the Web UI host. Admin → Channels → Chat (agents must be available for the widget)."; \
 		echo ""; \
@@ -1990,6 +1994,7 @@ helm-uninstall:
 	@echo "Step 4: Final cleanup of namespace $(NAMESPACE)..."
 	@$(MAKE) helm-cleanup-jobs
 	@$(MAKE) undeploy-email-server
+	@helm uninstall zammad-demo-site -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true
 	@helm uninstall zammad-embed -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true
 	@kubectl delete jobs -n $(NAMESPACE) -l app.kubernetes.io/component=zammad-bootstrap --ignore-not-found --wait=false 2>/dev/null || true
 	@sleep 5
@@ -2173,11 +2178,7 @@ undeploy-email-server:
 	@kubectl delete -f test-email-server/test-email-server-greenmail.yaml -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true
 	@echo "✅ Test email server removed successfully!"
 
-# Optional same-host Zammad demo site (Helm release zammad-embed): Route ssa-zammad-embed + nginx at
-# /$(ZAMMAD_DEMO_SITE_PATH)/ (demo login) and /$(ZAMMAD_DEMO_SITE_PATH)/chat-embed.html (chat widget snippet + preview).
-# ZAMMAD_DEMO_SITE_ENABLED=true (default) installs; any other value skips install and runs helm uninstall zammad-embed.
 ZAMMAD_DEMO_SITE_ENABLED ?= true
-# URL path segment for the demo site (must match helm --set pathPrefix=/$(ZAMMAD_DEMO_SITE_PATH)).
 ZAMMAD_DEMO_SITE_PATH ?= demo-portal
 
 # ServiceNow PDI wake-up
