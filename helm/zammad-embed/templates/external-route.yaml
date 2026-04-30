@@ -5,7 +5,7 @@
 {{- end }}
 {{- $pp := include "zammad-embed.normalizePathPrefix" .Values.pathPrefix }}
 ---
-# Same host as ssa-zammad; path routes to embed nginx (same origin as Zammad UI).
+# Serve the demo portal from the Zammad host under pathPrefix.
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:

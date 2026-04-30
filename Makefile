@@ -2173,7 +2173,8 @@ undeploy-email-server:
 	@kubectl delete -f test-email-server/test-email-server-greenmail.yaml -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true
 	@echo "✅ Test email server removed successfully!"
 
-# Optional helm/zammad-embed (Route ssa-zammad-embed: same host as ssa-zammad, path /$(ZAMMAD_EMBED_PATH)/). Literal true installs; anything else skips install and runs helm uninstall so a prior embed is removed.
+# Optional demo portal served from the Zammad host at /$(ZAMMAD_EMBED_PATH)/.
+# Set ZAMMAD_EMBED_ENABLED=true to install it; any other value removes it.
 ZAMMAD_EMBED_ENABLED ?= false
 # URL path segment for the demo portal (must match helm --set pathPrefix=/$(ZAMMAD_EMBED_PATH)).
 ZAMMAD_EMBED_PATH ?= demo-portal

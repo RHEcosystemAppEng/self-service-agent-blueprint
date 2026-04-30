@@ -13,7 +13,7 @@ metadata:
   annotations:
     haproxy.router.openshift.io/timeout: "300s"
 spec:
-  # Explicit / so a sibling Route (ssa-zammad-embed) can claim a more specific path on the same host.
+  # Keep the main Zammad route at / so /demo-portal can route to zammad-embed.
   path: /
   to:
     kind: Service

@@ -12,7 +12,7 @@ zammadRouteHost: ""
 
 chatId: 1  # Zammad chat channel ID (Admin → Channels → Chat)
 
-# Split-screen demo portal (index.html). Table and persona grid read from categories.
+# Demo portal content for index.html.
 demoPortal:
   productName: "IT Self-Service"
   heroTitle: "Sign in to Zammad"

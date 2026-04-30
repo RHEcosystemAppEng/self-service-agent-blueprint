@@ -599,7 +599,7 @@
         var sectionId = personaBtn.getAttribute('data-section') || '';
         if (!sameOriginAsZammad()) {
           openAccountsModal(sectionId || null);
-          showToast('One-click sign-in needs this page on the same host as Zammad (e.g. …/demo-portal/). Use copy below or deploy path-based Routes.');
+          showToast('One-click sign-in requires the demo portal to be served from the Zammad host.');
           return;
         }
         personaBtn.classList.add('is-busy');
