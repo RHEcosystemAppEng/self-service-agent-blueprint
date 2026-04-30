@@ -361,7 +361,29 @@
             <button type="button" class="btn-view-all" id="btn-open-accounts-modal">View all accounts &amp; passwords</button>
           </div>
           <p class="persona-demo-label">Persona quick pick</p>
-          <div class="persona-grid" id="persona-grid"></div>
+          <div class="persona-grid" id="persona-grid">
+{{- range $categories }}
+{{- $c := . }}
+{{- $show := false }}
+{{- range $c.rows }}{{- if .persona }}{{- $show = true }}{{- end }}{{- end }}
+{{- if $show }}
+            <div class="persona-group">
+              <div class="persona-group-heading">{{ $c.navLabel }}</div>
+              <div class="persona-group-tiles">
+{{- range $c.rows }}
+{{- if .persona }}
+                <button type="button" class="persona js-persona-signin" data-email="{{ .email }}" data-password="{{ .password }}" data-section="{{ $c.id }}" aria-label="{{ .persona.shortName }} - {{ .persona.roleShort }} - {{ .email }}">
+                  <span class="circle" style="background: {{ .persona.bg }}">{{ .persona.icon }}</span>
+                  <span class="name">{{ .persona.shortName }}</span>
+                  <span class="role">{{ .persona.roleShort }}</span>
+                </button>
+{{- end }}
+{{- end }}
+              </div>
+            </div>
+{{- end }}
+{{- end }}
+          </div>
         </div>
       </section>
     </div>
@@ -418,34 +440,6 @@
   <script>
   (function() {
     var ZAMMAD_BASE = {{ $u | trimSuffix "/" | quote }};
-    var CATEGORIES = [
-{{- range $ci, $c := $categories }}
-{{- if $ci }},{{ end }}
-      {
-        id: {{ $c.id | quote }},
-        navLabel: {{ $c.navLabel | quote }},
-        sectionTitle: {{ $c.sectionTitle | quote }},
-        rows: [
-{{- range $ri, $r := $c.rows }}
-          {{- if $ri }},{{ end }}
-          {
-            role: {{ $r.role | quote }},
-            email: {{ $r.email | quote }},
-            password: {{ $r.password | quote }}
-{{- if $r.persona }},
-            persona: {
-              icon: {{ $r.persona.icon | quote }},
-              bg: {{ $r.persona.bg | quote }},
-              shortName: {{ $r.persona.shortName | quote }},
-              roleShort: {{ $r.persona.roleShort | quote }}
-            }
-{{- end }}
-          }
-{{- end }}
-        ]
-      }
-{{- end }}
-    ];
 
     function showToast(msg) {
       var el = document.getElementById('toast');
@@ -553,42 +547,76 @@
       document.body.classList.remove('modal-open');
     }
 
-    function buildPersonaLayout(cats) {
-      var out = [];
-      cats.forEach(function(c) {
-        out.push({ kind: 'heading', label: c.navLabel });
-        (c.rows || []).forEach(function(r) {
-          if (!r.persona) return;
-          out.push({
-            kind: 'persona',
-            icon: r.persona.icon,
-            bg: r.persona.bg,
-            name: r.persona.shortName,
-            role: r.persona.roleShort,
-            email: r.email,
-            password: r.password,
-            anchor: '#' + c.id
-          });
-        });
-      });
-      return out;
+    function clickRoot(ev) {
+      return ev.target instanceof Element ? ev.target : ev.target.parentElement;
     }
 
-    var personaLayout = buildPersonaLayout(CATEGORIES);
+    document.addEventListener('click', function(ev) {
+      var root = clickRoot(ev);
+      if (!root || !root.closest) return;
 
-    var btnOpen = document.getElementById('btn-open-accounts-modal');
-    if (btnOpen) btnOpen.addEventListener('click', function() { openAccountsModal(null); });
+      if (root.closest('#btn-open-accounts-modal')) {
+        openAccountsModal(null);
+        return;
+      }
+      if (root.closest('#btn-close-accounts-modal')) {
+        closeAccountsModal();
+        return;
+      }
 
-    document.querySelectorAll('.js-modal-scroll').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var id = btn.getAttribute('data-target');
-        var el = id ? document.getElementById(id) : null;
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
+      var chip = root.closest('.js-modal-scroll');
+      if (chip) {
+        var tid = chip.getAttribute('data-target');
+        var sec = tid ? document.getElementById(tid) : null;
+        if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+
+      var ce = root.closest('.js-copy-email');
+      if (ce) {
+        ev.preventDefault();
+        copyText(ce.getAttribute('data-email') || '').then(function() {
+          flashCopyButton(ce, 'email');
+          showToast('Email copied');
+        }).catch(function() { showToast('Could not copy email'); });
+        return;
+      }
+
+      var cp = root.closest('.js-copy-password');
+      if (cp) {
+        ev.preventDefault();
+        copyText(cp.getAttribute('data-password') || '').then(function() {
+          flashCopyButton(cp, 'password');
+          showToast('Password copied');
+        }).catch(function() { showToast('Could not copy password'); });
+        return;
+      }
+
+      var personaBtn = root.closest('.js-persona-signin');
+      if (personaBtn) {
+        var email = personaBtn.getAttribute('data-email') || '';
+        var password = personaBtn.getAttribute('data-password') || '';
+        var sectionId = personaBtn.getAttribute('data-section') || '';
+        if (!sameOriginAsZammad()) {
+          openAccountsModal(sectionId || null);
+          showToast('One-click sign-in needs this page on the same host as Zammad (e.g. …/demo-portal/). Use copy below or deploy path-based Routes.');
+          return;
+        }
+        personaBtn.classList.add('is-busy');
+        personaBtn.setAttribute('aria-busy', 'true');
+        signInToZammad(email, password).then(function() {
+          personaBtn.classList.remove('is-busy');
+          personaBtn.removeAttribute('aria-busy');
+          window.open(ZAMMAD_BASE + '/#/', '_blank', 'noopener,noreferrer');
+          showToast('Opened Zammad in a new tab.');
+        }).catch(function(err) {
+          personaBtn.classList.remove('is-busy');
+          personaBtn.removeAttribute('aria-busy');
+          openAccountsModal(sectionId || null);
+          showToast((err && err.message) ? err.message : 'Sign-in failed. Use View all accounts to copy credentials.');
+        });
+      }
     });
-
-    var btnClose = document.getElementById('btn-close-accounts-modal');
-    if (btnClose) btnClose.addEventListener('click', closeAccountsModal);
 
     if (modal) {
       modal.addEventListener('click', function(e) {
@@ -601,85 +629,6 @@
         closeAccountsModal();
       }
     });
-
-    document.querySelectorAll('.js-copy-email').forEach(function(btn) {
-      btn.addEventListener('click', function(ev) {
-        ev.stopPropagation();
-        var v = btn.getAttribute('data-email') || '';
-        copyText(v).then(function() {
-          flashCopyButton(btn, 'email');
-          showToast('Email copied');
-        }).catch(function() { showToast('Could not copy email'); });
-      });
-    });
-    document.querySelectorAll('.js-copy-password').forEach(function(btn) {
-      btn.addEventListener('click', function(ev) {
-        ev.stopPropagation();
-        var v = btn.getAttribute('data-password') || '';
-        copyText(v).then(function() {
-          flashCopyButton(btn, 'password');
-          showToast('Password copied');
-        }).catch(function() { showToast('Could not copy password'); });
-      });
-    });
-
-    var grid = document.getElementById('persona-grid');
-    if (grid) {
-      var ix = 0;
-      while (ix < personaLayout.length) {
-        var headRow = personaLayout[ix];
-        if (headRow.kind !== 'heading') {
-          ix++;
-          continue;
-        }
-        var group = document.createElement('div');
-        group.className = 'persona-group';
-        var hd = document.createElement('div');
-        hd.className = 'persona-group-heading';
-        hd.textContent = headRow.label;
-        var tiles = document.createElement('div');
-        tiles.className = 'persona-group-tiles';
-        group.appendChild(hd);
-        group.appendChild(tiles);
-        ix++;
-        while (ix < personaLayout.length && personaLayout[ix].kind === 'persona') {
-          var p = personaLayout[ix];
-          var div = document.createElement('button');
-          div.type = 'button';
-          div.className = 'persona';
-          div.setAttribute('aria-label', p.name + ' - ' + p.role + ' - ' + p.email);
-          div.innerHTML = '<span class="circle" style="background:' + p.bg + '">' + p.icon + '</span>' +
-            '<span class="name">' + p.name + '</span><span class="role">' + p.role + '</span>';
-          (function(btnEl, persona) {
-            btnEl.addEventListener('click', function() {
-              if (!sameOriginAsZammad()) {
-                var aid = (persona.anchor || '').replace(/^#/, '');
-                openAccountsModal(aid || null);
-                showToast('One-click sign-in needs this page on the same host as Zammad (e.g. …/demo-portal/). Use copy below or deploy path-based Routes.');
-                return;
-              }
-              btnEl.classList.add('is-busy');
-              btnEl.setAttribute('aria-busy', 'true');
-              signInToZammad(persona.email, persona.password).then(function() {
-                btnEl.classList.remove('is-busy');
-                btnEl.removeAttribute('aria-busy');
-                window.open(ZAMMAD_BASE + '/#/', '_blank', 'noopener,noreferrer');
-                showToast('Opened Zammad in a new tab.');
-              }).catch(function(err) {
-                btnEl.classList.remove('is-busy');
-                btnEl.removeAttribute('aria-busy');
-                var aid2 = (persona.anchor || '').replace(/^#/, '');
-                openAccountsModal(aid2 || null);
-                showToast((err && err.message) ? err.message : 'Sign-in failed. Use View all accounts to copy credentials.');
-              });
-            });
-          })(div, p);
-          tiles.appendChild(div);
-          ix++;
-        }
-        grid.appendChild(group);
-      }
-    }
   })();
   </script>
 </body>
