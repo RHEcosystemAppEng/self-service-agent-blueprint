@@ -1,6 +1,11 @@
 {{- if .Values.enabled }}
+{{- $host := include "zammad-embed.zammadHost" . | trim }}
+{{- if not $host }}
+{{- fail "zammad-embed: no host for Route (lookup ssa-zammad failed). Set zammadRouteHost in values, or install after the Zammad Route exists." }}
+{{- end }}
+{{- $pp := include "zammad-embed.normalizePathPrefix" .Values.pathPrefix }}
 ---
-# OpenShift Route for Zammad chat widget embed page (snippet + live preview)
+# Same host as ssa-zammad; path routes to embed nginx (same origin as Zammad UI).
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
@@ -11,6 +16,8 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/component: zammad-embed
 spec:
+  host: {{ $host | quote }}
+  path: {{ $pp | quote }}
   to:
     kind: Service
     name: {{ .Release.Name }}

@@ -1,13 +1,15 @@
 {{- if .Values.enabled }}
 {{- $zammadUrl := .Values.publicUrl | default "" | trimSuffix "/" }}
 {{- if not $zammadUrl }}
-{{-   $route := lookup "route.openshift.io/v1" "Route" .Release.Namespace "ssa-zammad" }}
-{{-   if $route }}
-{{-     $zammadUrl = printf "https://%s" $route.spec.host }}
+{{-   $host := include "zammad-embed.zammadHost" . | trim }}
+{{-   if $host }}
+{{-     $zammadUrl = printf "https://%s" $host }}
 {{-   else }}
 {{-     $zammadUrl = "https://YOUR-ZAMMAD-URL" }}
 {{-   end }}
 {{- end }}
+{{- $pp := include "zammad-embed.normalizePathPrefix" .Values.pathPrefix }}
+{{- $ppSlash := printf "%s/" (trimSuffix "/" $pp) }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -23,4 +25,16 @@ data:
 {{ include "zammad-embed.demoPortalIndex" (dict "zammadUrl" $zammadUrl "Values" .Values "Release" .Release) | nindent 4 }}
   chat-embed.html: |
 {{ include "zammad-embed.chatEmbedPage" (dict "zammadUrl" $zammadUrl "Values" .Values) | nindent 4 }}
+  default.conf: |
+    server {
+        listen 8080;
+        server_name _;
+        location = {{ $pp }} {
+            return 301 {{ $ppSlash }};
+        }
+        location {{ $ppSlash }} {
+            alias /usr/share/nginx/html/;
+            index index.html;
+        }
+    }
 {{- end }}

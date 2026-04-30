@@ -1757,6 +1757,7 @@ helm-install-ticketing: namespace helm-depend
 		fi; \
 		EMBED_ARGS="--set enabled=true"; \
 		[ -n "$$ZAMMAD_FQDN" ] && EMBED_ARGS="$$EMBED_ARGS --set publicUrl=https://$$ZAMMAD_FQDN"; \
+		EMBED_ARGS="$$EMBED_ARGS --set pathPrefix=/$(ZAMMAD_EMBED_PATH)"; \
 		helm upgrade --install zammad-embed helm/zammad-embed/ -n $(NAMESPACE) $$EMBED_ARGS; \
 	else \
 		helm uninstall zammad-embed -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true; \
@@ -1774,15 +1775,15 @@ _helm-install-ticketing-print-checklist:
 	@echo ""
 	@echo "  1. Zammad URLs:"
 	@ZAMMAD_ROUTE=$$(oc get route ssa-zammad -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null); \
-	ZAMMAD_EMBED_ROUTE=$$(oc get route ssa-zammad-embed -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null); \
+	ZAMMAD_EMBED_INSTALLED=$$(oc get route ssa-zammad-embed -n $(NAMESPACE) -o name 2>/dev/null); \
 	if [ -z "$$ZAMMAD_ROUTE" ]; then ZAMMAD_ROUTE=$$(oc get route -n $(NAMESPACE) -l app.kubernetes.io/instance=zammad -o jsonpath='{.items[0].spec.host}' 2>/dev/null); fi; \
 	if [ -n "$$ZAMMAD_ROUTE" ]; then \
 		echo "     Web UI: https://$$ZAMMAD_ROUTE"; \
 		echo "     API:    https://$$ZAMMAD_ROUTE/api/v1"; \
-		if [ -n "$$ZAMMAD_EMBED_ROUTE" ]; then \
-			echo "     Embed:  https://$$ZAMMAD_EMBED_ROUTE (split-screen demo login + Zammad iframe; /chat-embed.html = chat widget)"; \
+		if [ -n "$$ZAMMAD_EMBED_INSTALLED" ]; then \
+			echo "     Demo portal (same host): https://$$ZAMMAD_ROUTE/$(ZAMMAD_EMBED_PATH)/ — chat widget: /$(ZAMMAD_EMBED_PATH)/chat-embed.html"; \
 		else \
-			echo "     Embed:  (not installed) Optional — re-run: make helm-install-ticketing NAMESPACE=$(NAMESPACE) ZAMMAD_EMBED_ENABLED=true"; \
+			echo "     Demo portal: (not installed) Optional — re-run: make helm-install-ticketing NAMESPACE=$(NAMESPACE) ZAMMAD_EMBED_ENABLED=true"; \
 		fi; \
 	else \
 		echo "     Port-forward: kubectl port-forward -n $(NAMESPACE) svc/zammad-nginx 8080:8080"; \
@@ -1790,9 +1791,9 @@ _helm-install-ticketing-print-checklist:
 		echo "     API:    http://localhost:8080/api/v1"; \
 	fi
 	@echo ""
-	@ZAMMAD_EMBED_ROUTE=$$(oc get route ssa-zammad-embed -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null); \
-	if [ -n "$$ZAMMAD_EMBED_ROUTE" ]; then \
-		echo "  2. Demo portal: open Embed URL for persona logins; chat widget page: /chat-embed.html. Admin → Channels → Chat (agents must be available for the widget)."; \
+	@ZAMMAD_EMBED_INSTALLED=$$(oc get route ssa-zammad-embed -n $(NAMESPACE) -o name 2>/dev/null); \
+	if [ -n "$$ZAMMAD_EMBED_INSTALLED" ]; then \
+		echo "  2. Demo portal lives under path /$(ZAMMAD_EMBED_PATH)/ on the Web UI host; chat snippet page: /$(ZAMMAD_EMBED_PATH)/chat-embed.html. Admin → Channels → Chat (agents must be available for the widget)."; \
 		echo ""; \
 	fi
 	@echo "  Admin login defaults: ZAMMAD_ADMIN_EMAIL / ZAMMAD_ADMIN_PASSWORD (see Makefile; must match autoWizard in helm/values-ticketing.yaml)."
@@ -2172,8 +2173,10 @@ undeploy-email-server:
 	@kubectl delete -f test-email-server/test-email-server-greenmail.yaml -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true
 	@echo "✅ Test email server removed successfully!"
 
-# Optional helm/zammad-embed (ssa-zammad-embed Route: demo login portal + chat-embed.html). Literal true installs; anything else skips install and runs helm uninstall so a prior embed is removed.
+# Optional helm/zammad-embed (Route ssa-zammad-embed: same host as ssa-zammad, path /$(ZAMMAD_EMBED_PATH)/). Literal true installs; anything else skips install and runs helm uninstall so a prior embed is removed.
 ZAMMAD_EMBED_ENABLED ?= false
+# URL path segment for the demo portal (must match helm --set pathPrefix=/$(ZAMMAD_EMBED_PATH)).
+ZAMMAD_EMBED_PATH ?= demo-portal
 
 # ServiceNow PDI wake-up
 .PHONY: servicenow-wake-install

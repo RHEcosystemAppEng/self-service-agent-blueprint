@@ -13,6 +13,8 @@ metadata:
   annotations:
     haproxy.router.openshift.io/timeout: "300s"
 spec:
+  # Explicit / so a sibling Route (ssa-zammad-embed) can claim a more specific path on the same host.
+  path: /
   to:
     kind: Service
     name: {{ default .Release.Name .Values.zammad.fullnameOverride }}-nginx

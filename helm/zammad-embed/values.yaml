@@ -3,12 +3,124 @@ enabled: false
 # publicUrl: Zammad base URL for the chat widget script src.
 # If not set, auto-detected from the ssa-zammad OpenShift Route via Helm lookup.
 publicUrl: ""
+
+# URL path for the embed app on the same host as Zammad.
+# Demo portal: https://<ssa-zammad host><pathPrefix>/
+# GitOps / helm template without cluster: set zammadRouteHost to the Zammad Route hostname.
+pathPrefix: "/demo-portal"
+zammadRouteHost: ""
+
 chatId: 1  # Zammad chat channel ID (Admin → Channels → Chat)
 
-# Split-screen demo portal (index.html): hero + credentials + Zammad iframe (chat-embed.html for widget snippet).
+# Split-screen demo portal (index.html). Table and persona grid read from categories.
 demoPortal:
   productName: "IT Self-Service"
   heroTitle: "Sign in to Zammad"
   heroSubtitle: "Use the demo accounts below with the live Zammad UI."
+  categories:
+    - id: cat-admin
+      navLabel: Admin
+      sectionTitle: Admin
+      rows:
+        - role: Administrator
+          email: admin@zammad.local
+          password: "ZammadR0cks!"
+          persona:
+            icon: "🛡️"
+            bg: "#dbeafe"
+            shortName: Admin
+            roleShort: Full admin
+    - id: cat-users
+      navLabel: End users
+      sectionTitle: End users (customers)
+      rows:
+        - role: Customer
+          email: alice.johnson@company.com
+          password: "ChangeMe123!"
+          persona:
+            icon: "👤"
+            bg: "#dcfce7"
+            shortName: Alice
+            roleShort: Customer
+        - role: Customer
+          email: john.doe@company.com
+          password: "ChangeMe123!"
+          persona:
+            icon: "👤"
+            bg: "#e0e7ff"
+            shortName: John
+            roleShort: Customer
+    - id: cat-managers
+      navLabel: Managers
+      sectionTitle: Managers
+      rows:
+        - role: Manager agent
+          email: manager1@example.com
+          password: "ChangeMe123!"
+          persona:
+            icon: "💼"
+            bg: "#fce7f3"
+            shortName: Manager 1
+            roleShort: Manager agent
+        - role: Manager agent
+          email: manager2@example.com
+          password: "ChangeMe123!"
+          persona:
+            icon: "💼"
+            bg: "#fbcfe8"
+            shortName: Manager 2
+            roleShort: Manager agent
+    - id: cat-general
+      navLabel: General handler
+      sectionTitle: General ticket handlers
+      rows:
+        - role: Agent
+          email: ticket_handler1@example.com
+          password: "ChangeMe123!"
+          persona:
+            icon: "🎫"
+            bg: "#fef3c7"
+            shortName: Handler 1
+            roleShort: General queue
+        - role: Agent
+          email: ticket_handler2@example.com
+          password: "ChangeMe123!"
+          persona:
+            icon: "🎫"
+            bg: "#fde68a"
+            shortName: Handler 2
+            roleShort: General queue
+    - id: cat-escalated
+      navLabel: Escalated handler
+      sectionTitle: Escalated laptop refresh handlers
+      rows:
+        - role: Agent
+          email: escalated_laptop_refresh_handler1@example.com
+          password: "ChangeMe123!"
+          persona:
+            icon: "⚡"
+            bg: "#ffedd5"
+            shortName: Escalated 1
+            roleShort: Laptop refresh
+        - role: Agent
+          email: escalated_laptop_refresh_handler2@example.com
+          password: "ChangeMe123!"
+          persona:
+            icon: "⚡"
+            bg: "#fed7aa"
+            shortName: Escalated 2
+            roleShort: Laptop refresh
+    - id: cat-specialist
+      navLabel: Laptop specialist
+      sectionTitle: Laptop specialist
+      rows:
+        - role: Agent
+          email: agent.laptop-specialist@example.com
+          password: "ChangeMe123!"
+          persona:
+            icon: "💻"
+            bg: "#ccfbf1"
+            shortName: Specialist
+            roleShort: Laptop agent
 
 image: nginxinc/nginx-unprivileged:alpine
