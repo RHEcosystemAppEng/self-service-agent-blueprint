@@ -500,16 +500,43 @@
       }
     }
 
+    function browserFingerprint() {
+      var key = 'zammad-demo-fp';
+      try {
+        var s = sessionStorage.getItem(key);
+        if (s && s.length <= 160) return s;
+        s = '';
+        if (window.crypto && crypto.getRandomValues) {
+          var buf = new Uint8Array(16);
+          crypto.getRandomValues(buf);
+          for (var i = 0; i < buf.length; i++) {
+            s += (buf[i] < 16 ? '0' : '') + buf[i].toString(16);
+          }
+        } else {
+          for (var j = 0; j < 32; j++) s += Math.floor(Math.random() * 16).toString(16);
+        }
+        sessionStorage.setItem(key, s);
+        return s;
+      } catch (e) {
+        return 'fp' + String(Date.now()) + String(Math.random()).slice(2, 18);
+      }
+    }
+
     function signInToZammad(username, password) {
       var base = ZAMMAD_BASE + '/';
-      var json = { 'Content-Type': 'application/json', Accept: 'application/json' };
+      var fp = browserFingerprint();
+      var json = {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-Browser-Fingerprint': fp
+      };
       var signshow = new URL('api/v1/signshow', base);
       var signin = new URL('api/v1/signin', base);
       return fetch(signshow.toString(), {
         method: 'POST',
         credentials: 'include',
         headers: json,
-        body: '{}'
+        body: JSON.stringify({ fingerprint: fp })
       }).then(function(res) {
         var csrf = res.headers.get('csrf-token') || res.headers.get('CSRF-TOKEN');
         if (!csrf) {
@@ -519,7 +546,7 @@
           method: 'POST',
           credentials: 'include',
           headers: Object.assign({ 'X-CSRF-Token': csrf }, json),
-          body: JSON.stringify({ username: username, password: password })
+          body: JSON.stringify({ username: username, password: password, fingerprint: fp })
         });
       }).then(function(res) {
         if (res.status === 201) return;

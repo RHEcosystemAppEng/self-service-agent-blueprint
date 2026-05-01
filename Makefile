@@ -1784,7 +1784,7 @@ _helm-install-ticketing-print-checklist:
 		echo "     Web UI: https://$$ZAMMAD_ROUTE"; \
 		echo "     API:    https://$$ZAMMAD_ROUTE/api/v1"; \
 		if [ -n "$$ZAMMAD_DEMO_SITE_INSTALLED" ]; then \
-			echo "     Demo site (same host): https://$$ZAMMAD_ROUTE/$(ZAMMAD_DEMO_SITE_PATH)/ — chat snippet page: /$(ZAMMAD_DEMO_SITE_PATH)/chat-embed.html"; \
+			echo "     Demo site (same host): https://$$ZAMMAD_ROUTE/$(ZAMMAD_DEMO_SITE_PATH)/ — chat-embed: /$(ZAMMAD_DEMO_SITE_PATH)/chat-embed.html (widget needs agents online for chat; Admin → Channels → Chat)."; \
 		else \
 			echo "     Demo site: not installed — ZAMMAD_DEMO_SITE_ENABLED was not true. Re-run with ZAMMAD_DEMO_SITE_ENABLED=true (default) or omit it."; \
 		fi; \
@@ -1794,12 +1794,6 @@ _helm-install-ticketing-print-checklist:
 		echo "     API:    http://localhost:8080/api/v1"; \
 	fi
 	@echo ""
-	@ZAMMAD_DEMO_SITE_INSTALLED=$$(oc get route ssa-zammad-demo-site -n $(NAMESPACE) -o name 2>/dev/null); \
-	if [ -z "$$ZAMMAD_DEMO_SITE_INSTALLED" ]; then ZAMMAD_DEMO_SITE_INSTALLED=$$(oc get route ssa-zammad-embed -n $(NAMESPACE) -o name 2>/dev/null); fi; \
-	if [ -n "$$ZAMMAD_DEMO_SITE_INSTALLED" ]; then \
-		echo "  2. Demo site: login at /$(ZAMMAD_DEMO_SITE_PATH)/; chat widget snippet + preview at /$(ZAMMAD_DEMO_SITE_PATH)/chat-embed.html on the Web UI host. Admin → Channels → Chat (agents must be available for the widget)."; \
-		echo ""; \
-	fi
 	@echo "  Admin login defaults: ZAMMAD_ADMIN_EMAIL / ZAMMAD_ADMIN_PASSWORD (see Makefile; must match autoWizard in helm/values-ticketing.yaml)."
 	@echo "  More: README.md, docs/HELM_EXPORT_ANSIBLE.md"
 	@echo ""
