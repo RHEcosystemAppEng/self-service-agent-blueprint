@@ -56,6 +56,10 @@ spec:
               value: {{ .Values.llamastack.timeout | quote }}
             {{- end }}
             {{- end }}
+            {{- if and (hasKey .Values "knowledgeBases") .Values.knowledgeBases.configMaps }}
+            - name: EXTRA_KB_PATH
+              value: /mnt/knowledge-bases
+            {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -67,6 +71,14 @@ spec:
           {{- if and (hasKey .Values "requestManagement") (hasKey .Values.requestManagement "initJob") .Values.requestManagement.initJob.resources }}
           resources:
             {{- toYaml .Values.requestManagement.initJob.resources | nindent 12 }}
+          {{- end }}
+          {{- if and (hasKey .Values "knowledgeBases") .Values.knowledgeBases.configMaps }}
+          volumeMounts:
+            {{- range .Values.knowledgeBases.configMaps }}
+            - name: kb-cm-{{ .kbName | default .name | lower | replace "_" "-" | replace "." "-" }}
+              mountPath: /mnt/knowledge-bases/{{ .kbName | default .name }}
+              readOnly: true
+            {{- end }}
           {{- end }}
           command:
             - /bin/bash
@@ -93,3 +105,11 @@ spec:
               
               # If we get here, the script succeeded (set -e will exit on failure)
               echo "Initialization job completed successfully"
+      {{- if and (hasKey .Values "knowledgeBases") .Values.knowledgeBases.configMaps }}
+      volumes:
+        {{- range .Values.knowledgeBases.configMaps }}
+        - name: kb-cm-{{ .kbName | default .name | lower | replace "_" "-" | replace "." "-" }}
+          configMap:
+            name: {{ .name }}
+        {{- end }}
+      {{- end }}

@@ -23,8 +23,12 @@ class KnowledgeBaseManager:
         else:
             logger.debug("Already connected to LlamaStack client")
 
-    def register_knowledge_bases(self) -> bool:
+    def register_knowledge_bases(self, extra_path: Optional[Path] = None) -> bool:
         """Register all knowledge bases by processing directories in knowledge_bases path.
+
+        Args:
+            extra_path: Optional additional directory to scan for knowledge bases
+                        (e.g. a ConfigMap mount). Each subdirectory is treated as a KB.
 
         Returns:
             bool: True if all knowledge bases were registered successfully, False otherwise.
@@ -34,33 +38,35 @@ class KnowledgeBaseManager:
 
         logger.debug("Registering knowledge bases via LlamaStack OpenAI-compatible API")
 
-        if not self._knowledge_bases_path.exists():
-            logger.warning(
-                "Knowledge bases path does not exist",
-                path=str(self._knowledge_bases_path),
-            )
-            return True  # No knowledge bases to register is not a failure
-
         success = True
-        # Process each directory in knowledge_bases
-        for kb_dir in self._knowledge_bases_path.iterdir():
-            if kb_dir.is_dir():
-                # Register via LlamaStack OpenAI-compatible API
-                result = self.register_knowledge_base(kb_dir)
 
-                # Log results
-                kb_name = kb_dir.name
-                if result:
-                    logger.info(
-                        "Successfully registered knowledge base via LlamaStack",
-                        kb_name=kb_name,
-                    )
-                else:
-                    logger.error(
-                        "Failed to register knowledge base via LlamaStack",
-                        kb_name=kb_name,
-                    )
-                    success = False
+        paths_to_scan = [self._knowledge_bases_path]
+        if extra_path is not None:
+            paths_to_scan.append(extra_path)
+
+        for scan_path in paths_to_scan:
+            if not scan_path.exists():
+                logger.warning(
+                    "Knowledge bases path does not exist",
+                    path=str(scan_path),
+                )
+                continue  # No knowledge bases in this path is not a failure
+
+            for kb_dir in scan_path.iterdir():
+                if kb_dir.is_dir():
+                    result = self.register_knowledge_base(kb_dir)
+                    kb_name = kb_dir.name
+                    if result:
+                        logger.info(
+                            "Successfully registered knowledge base via LlamaStack",
+                            kb_name=kb_name,
+                        )
+                    else:
+                        logger.error(
+                            "Failed to register knowledge base via LlamaStack",
+                            kb_name=kb_name,
+                        )
+                        success = False
 
         return success
 

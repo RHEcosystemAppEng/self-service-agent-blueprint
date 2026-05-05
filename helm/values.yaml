@@ -91,6 +91,18 @@ affinity: {}
 
 llama_stack_url: http://llamastack:8321
 
+# Knowledge Base Configuration
+knowledgeBases:
+  # Optional: seed additional knowledge bases from pre-existing ConfigMaps.
+  # Each ConfigMap's files are registered as a separate knowledge base.
+  # This is additive — built-in KBs from the agent-service image are always registered.
+  #
+  # Example:
+  #   configMaps:
+  #     - name: my-kb-configmap   # Name of the ConfigMap in the same namespace
+  #       kbName: my-custom-kb    # KB name to register under (defaults to ConfigMap name)
+  configMaps: []
+
 # LlamaStack Client Configuration
 # These settings configure both the native LlamaStack client and OpenAI-compatible client
 # By default, clients use Kubernetes auto-injected service discovery environment variables
