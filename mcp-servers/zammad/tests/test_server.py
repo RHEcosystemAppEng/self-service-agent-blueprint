@@ -155,8 +155,12 @@ def test_close_ticket(
     result = close(ctx)
 
     names = [c[0][0] for c in mock_basher.call_args_list]
-    assert names == ["zammad_update_ticket"]
+    assert names == ["zammad_add_ticket_tag", "zammad_update_ticket"]
     assert mock_basher.call_args_list[0][0][1] == {
+        "ticket_id": 100,
+        "tag": "closed-by-ai-agent",
+    }
+    assert mock_basher.call_args_list[1][0][1] == {
         "ticket_id": 100,
         "state": "closed",
     }
