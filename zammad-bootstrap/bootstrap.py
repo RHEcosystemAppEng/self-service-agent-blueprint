@@ -975,12 +975,111 @@ def _integration_trigger_condition(sender_id: int) -> tuple[dict, list[str]]:
     return condition, notes
 
 
+# ---------------------------------------------------------------------------
+# Agent overviews
+# ---------------------------------------------------------------------------
+
+DEFAULT_ADMIN_ROLE_ID = 1
+
+
+def _overview_tag_value(*tags: str) -> str:
+    return ",".join(tags)
+
+
+def get_or_create_overview(name: str, body: dict) -> None:
+    overviews = _get_record_list("overviews")
+    existing = _find_by_name(overviews, name)
+    if existing:
+        oid = existing["id"]
+        api("PUT", f"overviews/{oid}", json=body)
+        print(f"  Updated overview '{name}' (id={oid}).")
+    else:
+        result = api("POST", "overviews", json=body)
+        oid = result.get("id", "?") if isinstance(result, dict) else "?"
+        print(f"  Created overview '{name}' (id={oid}).")
+
+
+def ensure_agent_overviews() -> None:
+    tag_laptop = (
+        os.environ.get(
+            "ZAMMAD_AGENT_MANAGED_TAG", "agent-managed-laptop-refresh"
+        ).strip()
+        or "agent-managed-laptop-refresh"
+    )
+    tag_general = (
+        os.environ.get(
+            "ZAMMAD_GENERAL_AGENT_MANAGED_TAG", "agent-managed-general-support"
+        ).strip()
+        or "agent-managed-general-support"
+    )
+    tag_escalate = (
+        os.environ.get("ZAMMAD_TAG_ESCALATE_HUMAN", "escalated-human-review").strip()
+        or "escalated-human-review"
+    )
+    tag_manager = (
+        os.environ.get("ZAMMAD_TAG_MANAGER_REVIEW", "pending-manager-review").strip()
+        or "pending-manager-review"
+    )
+    tag_closed_ai = (
+        os.environ.get("ZAMMAD_TAG_CLOSED_BY_AI", "closed-by-ai-agent").strip()
+        or "closed-by-ai-agent"
+    )
+
+    _default_view = {
+        "d": ["title", "customer", "state", "owner", "created_at"],
+        "s": ["title", "state", "created_at"],
+        "m": ["title"],
+    }
+    _default_order = {"by": "created_at", "direction": "DESC"}
+
+    def _overview(name: str, tag_value: str) -> None:
+        body = {
+            "name": name,
+            "active": True,
+            "role_ids": [DEFAULT_ADMIN_ROLE_ID],
+            "user_ids": [],
+            "condition": {
+                "ticket.tags": {
+                    "operator": "contains all",
+                    "value": tag_value,
+                }
+            },
+            "order": _default_order,
+            "view": _default_view,
+            "out_of_office": False,
+            "shared_organization": False,
+        }
+        get_or_create_overview(name, body)
+
+    _overview("AI LR agent — All Tickets", _overview_tag_value(tag_laptop))
+    _overview(
+        "AI LR agent — Closed by Agent", _overview_tag_value(tag_laptop, tag_closed_ai)
+    )
+    _overview(
+        "AI LR agent — Escalated to Human",
+        _overview_tag_value(tag_laptop, tag_escalate),
+    )
+    _overview(
+        "AI LR agent — Pending Manager Review",
+        _overview_tag_value(tag_laptop, tag_manager),
+    )
+    _overview("AI Gen agent — All Tickets", _overview_tag_value(tag_general))
+    _overview(
+        "AI Gen agent — Closed by Agent",
+        _overview_tag_value(tag_general, tag_closed_ai),
+    )
+    _overview(
+        "AI Gen agent — Escalated to Human",
+        _overview_tag_value(tag_general, tag_escalate),
+    )
+
+
 def ensure_integration_webhook_and_trigger():
     """Create or update Zammad Webhook + Trigger for integration-dispatcher POST /zammad/webhook."""
     endpoint = os.environ.get("ZAMMAD_INTEGRATION_WEBHOOK_URL", "").strip()
     if not endpoint:
         print(
-            "\n[6/6] Skipping Zammad→blueprint webhook bootstrap "
+            "\n[6/7] Skipping Zammad→blueprint webhook bootstrap"
             "(unset ZAMMAD_INTEGRATION_WEBHOOK_URL — configure manually per docs §5.2)."
         )
         return
@@ -989,7 +1088,7 @@ def ensure_integration_webhook_and_trigger():
     sender_id, sender_src = _resolve_customer_sender_id()
 
     print(
-        "\n[6/6] Ensuring Zammad Webhook + Trigger (customer articles → integration-dispatcher)..."
+        "\n[6/7] Ensuring Zammad Webhook + Trigger (customer articles → integration-dispatcher)..."
     )
     print(f"  Trigger article.sender_id={sender_id} ({sender_src}).")
     webhooks = _get_record_list("webhooks")
@@ -1197,6 +1296,9 @@ def main():
         )
 
     ensure_integration_webhook_and_trigger()
+
+    print("\n[7/7] Ensuring admin overviews for AI agent statistics...")
+    ensure_agent_overviews()
 
     print("\nZammad bootstrap complete.")
 

@@ -212,7 +212,11 @@ def mark_as_general_agent_managed(
 def close(ctx: Context[Any, Any], dummy_parameter: str = "") -> str:
     """Close the ticket."""
     _, ticket_id, _ = _authorize_ticket(ctx)
-    state = zammad_mcp_settings.ZAMMAD_MCP_SETTINGS.state_closed
+    s = zammad_mcp_settings.ZAMMAD_MCP_SETTINGS
+    state = s.state_closed
+    call_basher_tool(
+        "zammad_add_ticket_tag", {"ticket_id": ticket_id, "tag": s.tag_closed_by_ai}
+    )
     call_basher_tool(
         "zammad_update_ticket",
         {"ticket_id": ticket_id, "state": state.strip()},

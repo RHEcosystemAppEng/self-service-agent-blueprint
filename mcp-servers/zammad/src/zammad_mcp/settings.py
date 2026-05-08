@@ -45,6 +45,7 @@ class ZammadMcpSettings:
     mcp_transport: str
     mcp_listen_host: str
     mcp_listen_port: int
+    tag_closed_by_ai: str
 
 
 def load_zammad_mcp_settings() -> ZammadMcpSettings:
@@ -124,6 +125,7 @@ def load_zammad_mcp_settings() -> ZammadMcpSettings:
             "ZAMMAD_SPECIALIST_OWNER",
             "agent.general@example.com",
         ),
+        tag_closed_by_ai=_str_env("ZAMMAD_TAG_CLOSED_BY_AI", "closed-by-ai-agent"),
         zammad_rest_base_url=zammad_url.rstrip("/"),
         zammad_http_token=zammad_http_token,
         basher_mcp_url=basher_mcp_url,
