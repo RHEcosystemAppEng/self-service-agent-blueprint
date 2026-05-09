@@ -7,13 +7,22 @@ from typing import Any, Dict, Optional
 
 from shared_models import (
     BaseSessionManager,
-    SessionCreate,
     SessionResponse,
+    SessionScope,
     configure_logging,
     create_cloudevent_response,
-    get_or_create_zammad_ticket_session,
+    create_per_user_session_direct,
+    find_active_per_user_sessions,
+    parse_ticket_id_from_metadata,
     resolve_canonical_user_id,
+    resolve_channel_behavior,
+    resolve_ticket_scoped_session,
+    should_filter_sessions_by_integration_type,
+    touch_active_session,
+    validate_explicit_session_pin,
 )
+from shared_models.channel_behavior import ChannelBehaviorValidationError
+from shared_models.channel_behavior_session import SessionPinScopeMismatchError
 from shared_models.cloudevent_utils import CloudEventHandler
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -65,44 +74,31 @@ async def _handle_session_create_or_get_event(
             user_id, integration_type=integration_type, db=db
         )
 
-        if integration_type == IntegrationType.ZAMMAD:
+        try:
+            channel_policy = await resolve_channel_behavior(integration_type, db)
+        except ChannelBehaviorValidationError as e:
+            return await create_cloudevent_response(
+                status="error",
+                message=f"Invalid channel behavior configuration: {e}",
+                details={"event_id": event_id},
+            )
+
+        if channel_policy.session_scope == SessionScope.PER_TICKET:
             md = session_request.get("integration_metadata") or {}
-            tid_raw = md.get("ticket_id")
-            if tid_raw is None:
-                logger.error(
-                    "Zammad session event missing ticket_id in integration_metadata",
-                    event_id=event_id,
-                )
+            tid_int = parse_ticket_id_from_metadata(md)
+            if tid_int is None:
                 return await create_cloudevent_response(
                     status="error",
-                    message="Zammad requires ticket_id in integration_metadata",
-                    details={"event_id": event_id},
-                )
-            try:
-                tid_int = int(tid_raw)
-            except (TypeError, ValueError):
-                logger.error(
-                    "Invalid ticket_id for Zammad session event",
-                    event_id=event_id,
-                    ticket_id=tid_raw,
-                )
-                return await create_cloudevent_response(
-                    status="error",
-                    message="Invalid ticket_id for Zammad session event",
-                    details={"event_id": event_id},
-                )
-            if tid_int < 1:
-                return await create_cloudevent_response(
-                    status="error",
-                    message="ticket_id must be positive",
+                    message="ticket_id is required for ticket-scoped channel sessions",
                     details={"event_id": event_id},
                 )
             expires_at = datetime.now(timezone.utc) + timedelta(
                 hours=int(os.getenv("SESSION_TIMEOUT_HOURS", "336"))
             )
             try:
-                z_sess = await get_or_create_zammad_ticket_session(
+                ticket_sess = await resolve_ticket_scoped_session(
                     db,
+                    integration_type=integration_type,
                     canonical_user_id=canonical_user_id,
                     ticket_id=tid_int,
                     channel_id=session_request.get("channel_id"),
@@ -117,21 +113,55 @@ async def _handle_session_create_or_get_event(
                     message=str(ve),
                     details={"event_id": event_id},
                 )
-            await _publish_session_ready_event(z_sess, correlation_id, event_id)
+            await _publish_session_ready_event(ticket_sess, correlation_id, event_id)
             return await create_cloudevent_response(
                 status="success",
-                message="Zammad ticket session resolved",
+                message="Ticket-scoped session resolved",
                 details={
-                    "session_id": z_sess.session_id,
+                    "session_id": ticket_sess.session_id,
                     "event_id": event_id,
                 },
             )
 
-        # Check for existing active session first (fast path)
-        session_manager = BaseSessionManager(db)
-        existing_session = await session_manager.get_active_session(
-            canonical_user_id, integration_type
+        md = session_request.get("integration_metadata") or {}
+        provided_session_id = md.get("session_id")
+        if provided_session_id:
+            try:
+                pinned = await validate_explicit_session_pin(
+                    db,
+                    canonical_user_id=canonical_user_id,
+                    provided_session_id=str(provided_session_id),
+                    inbound_integration_type=integration_type,
+                    inbound_policy=channel_policy,
+                )
+                pinned_response = await touch_active_session(db, pinned)
+                await _publish_session_ready_event(
+                    pinned_response, correlation_id, event_id
+                )
+                return await create_cloudevent_response(
+                    status="success",
+                    message="Reusing provided session from metadata",
+                    details={
+                        "session_id": pinned_response.session_id,
+                        "event_id": event_id,
+                    },
+                )
+            except (SessionPinScopeMismatchError, ChannelBehaviorValidationError) as e:
+                return await create_cloudevent_response(
+                    status="error",
+                    message=str(e),
+                    details={"event_id": event_id},
+                )
+
+        filter_by_type = should_filter_sessions_by_integration_type(channel_policy)
+        candidates = await find_active_per_user_sessions(
+            db,
+            canonical_user_id=canonical_user_id,
+            integration_type=integration_type,
+            filter_by_integration_type=filter_by_type,
+            limit=5,
         )
+        existing_session = candidates[0] if candidates else None
 
         if existing_session:
             logger.info(
@@ -154,20 +184,21 @@ async def _handle_session_create_or_get_event(
                 },
             )
 
-        # Create new session
-        session_data = SessionCreate(
-            user_id=canonical_user_id,
-            integration_type=integration_type,
-            channel_id=session_request.get("channel_id"),
-            thread_id=session_request.get("thread_id"),
-            external_session_id=session_request.get("external_session_id"),
-            explicit_session_id=None,
-            integration_metadata=session_request.get("integration_metadata", {}),
-            user_context=session_request.get("user_context", {}),
+        expires_at = datetime.now(timezone.utc) + timedelta(
+            hours=int(os.getenv("SESSION_TIMEOUT_HOURS", "336"))
         )
 
         try:
-            new_session = await session_manager.create_session(session_data)
+            new_session = await create_per_user_session_direct(
+                db,
+                canonical_user_id=canonical_user_id,
+                integration_type=integration_type,
+                channel_id=session_request.get("channel_id"),
+                thread_id=session_request.get("thread_id"),
+                client_metadata=session_request.get("integration_metadata"),
+                user_context=session_request.get("user_context", {}),
+                expires_at=expires_at,
+            )
             logger.info(
                 "Created new session via event",
                 session_id=new_session.session_id,
@@ -193,10 +224,14 @@ async def _handle_session_create_or_get_event(
                 event_id=event_id,
                 error=str(e),
             )
-            # Try one more time to get existing session (might have been created by another pod)
-            existing_session = await session_manager.get_active_session(
-                canonical_user_id, integration_type
+            retry_candidates = await find_active_per_user_sessions(
+                db,
+                canonical_user_id=canonical_user_id,
+                integration_type=integration_type,
+                filter_by_integration_type=filter_by_type,
+                limit=1,
             )
+            existing_session = retry_candidates[0] if retry_candidates else None
             if existing_session:
                 logger.info(
                     "Found existing session after creation failure",

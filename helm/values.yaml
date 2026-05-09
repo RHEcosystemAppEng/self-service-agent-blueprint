@@ -29,9 +29,10 @@ testIntegrationEnabled: false
 
 # Database Configuration
 database:
-  # Expected migration version that services should wait for
-  expectedMigrationVersion: "002"
-  
+  # Override only if services must wait for a version other than the chart default
+  # (helm/templates/_env-helpers.tpl → EXPECTED_MIGRATION_VERSION, default "003").
+  # expectedMigrationVersion: "003"
+
   # Database connection URL - leave empty to use default pgvector service
   # Format: postgresql://username:password@host:port/database
   url: ""  # Uses default: postgresql://postgres:rag_password@self-service-agent-pgvector:5432/postgres
@@ -495,6 +496,15 @@ requestManagement:
       # When "true", uses eventing with atomic claiming to prevent race conditions
       # Falls back to direct DB access if events fail or timeout
       useSessionEventing: "true"
+    # Partial channel behavior policy over CHANNEL_REGISTRY (request-manager only).
+    # See docs/CHANNEL_BEHAVIOR.md — prefer registry edits for product defaults.
+    channelBehavior:
+      allowDbOverride: false
+      overrides: {}
+      # Example — isolate Slack from the web unified session pool:
+      # overrides:
+      #   SLACK:
+      #     session_isolated_by_integration_type: true
     # External Access Configuration
     externalAccess:
       enabled: false  # Set to true to create external access via OpenShift Route
@@ -565,10 +575,8 @@ requestManagement:
   
   # Agent Configuration
   agent:
-    # First agent for most channels (Slack, web, email, …); see zammadDefaultAgentId for Zammad.
+    # Global router and default entry when channel_behavior.entry_agent_id is null.
     defaultAgentId: "routing-agent"
-    # First agent for IntegrationType.ZAMMAD sessions (never falls back to defaultAgentId).
-    zammadDefaultAgentId: "ticket-review-agent"
     # Agent response timeout in seconds
     timeout: 180
     # Always refresh agent mapping from LlamaStack on each request

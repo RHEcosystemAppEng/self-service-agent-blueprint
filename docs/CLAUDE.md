@@ -195,6 +195,7 @@ make helm-install-test NAMESPACE=dev
 - **`guides/SAFETY_SHIELDS_GUIDE.md`**: Safety shields and content moderation configuration
 - **`guides/PERFORMANCE_SCALING_GUIDE.md`**: Performance characteristics, scaling strategies, and optimization approaches
 - **`docs/ARCHITECTURE_DIAGRAMS.md`**: System architecture and flow diagrams
+- **`docs/CHANNEL_BEHAVIOR.md`**: Per-integration session policy, delivery binding, registry, adding channels
 - **`guides/AUTHENTICATION_GUIDE.md`**: Enhanced security and authentication setup with production readiness warnings
 - **`guides/SLACK_SETUP.md`**: Slack app configuration guide
 

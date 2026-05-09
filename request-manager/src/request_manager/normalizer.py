@@ -154,9 +154,11 @@ class RequestNormalizer:
     ) -> NormalizedRequest:
         """Normalize Zammad ticketing request.
 
-        Does not pin ``target_agent_id``: first agent comes from ``ZAMMAD_DEFAULT_AGENT_ID``
-        on the session row (Helm: ``agent.zammadDefaultAgentId``, typically
-        ``ticket-review-agent``), which classifies laptop vs general before specialists.
+        Does not pin ``target_agent_id``: first agent comes from channel behavior policy
+        on the session row (``integration_metadata._channel_behavior`` from
+        CHANNEL_REGISTRY for ZAMMAD, typically ``ticket-review-agent``), which classifies
+        laptop vs general
+        before specialists.
         New tickets and follow-ups both reach the request manager; webhook may add
         ticket-type filters / metadata later.
         """
@@ -167,7 +169,6 @@ class RequestNormalizer:
             "article_id": request.article_id,
             "group_id": request.group_id,
             "zammad_delivery_id": request.zammad_delivery_id,
-            "platform": "zammad",
         }
         if request.owner_id is not None:
             integration_context["owner_id"] = request.owner_id

@@ -10,10 +10,20 @@ from fastapi import HTTPException, status
 from shared_models import (
     CloudEventSender,
     SessionResponse,
+    SessionScope,
+    channel_uses_ticket_user_id_suffix,
     configure_logging,
+    find_active_per_user_sessions,
     get_enum_value,
-    get_or_create_zammad_ticket_session,
+    parse_ticket_id,
+    resolve_channel_behavior,
+    resolve_ticket_scoped_session,
+    should_filter_sessions_by_integration_type,
+    touch_active_session,
+    validate_explicit_session_pin,
 )
+from shared_models.channel_behavior import ChannelBehaviorValidationError
+from shared_models.channel_behavior_session import SessionPinScopeMismatchError
 from shared_models.models import IntegrationType, NormalizedRequest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,16 +35,6 @@ logger = configure_logging("request-manager")
 # Global registry for response futures (event-driven approach)
 _response_futures_registry: dict[str, Any] = {}
 _session_futures_registry: dict[str, Any] = {}
-
-
-def _should_filter_sessions_by_integration_type() -> bool:
-    """Check if sessions should be filtered by integration type.
-
-    Returns:
-        True if sessions should be separated by integration type (legacy behavior)
-        False if a single session should be maintained across all integration types (default)
-    """
-    return os.getenv("SESSION_PER_INTEGRATION_TYPE", "false").lower() == "true"
 
 
 def _get_session_timeout_hours() -> int:
@@ -123,7 +123,7 @@ async def create_or_get_session_shared(
     """
     # Resolve user_id to canonical user_id if it's an email address
     from shared_models import SessionResponse, resolve_canonical_user_id
-    from shared_models.models import RequestSession, SessionStatus
+    from shared_models.models import RequestSession
     from sqlalchemy import select
 
     canonical_user_id = await resolve_canonical_user_id(
@@ -135,25 +135,34 @@ async def create_or_get_session_shared(
     session_timeout_hours = _get_session_timeout_hours()
     expires_at = datetime.now(timezone.utc) + timedelta(hours=session_timeout_hours)
 
-    # Zammad: one stable session per ticket per user (not one session per user like other channels).
     req_integration = getattr(request, "integration_type", None)
-    if (
-        req_integration is not None
-        and get_enum_value(req_integration) == IntegrationType.ZAMMAD.value
-    ):
-        tid_raw = getattr(request, "ticket_id", None)
-        if tid_raw is None:
-            md_early = getattr(request, "metadata", {}) or {}
-            tid_raw = md_early.get("ticket_id")
-        parsed_ticket_id: Optional[int] = None
-        if tid_raw is not None:
-            try:
-                parsed_ticket_id = int(tid_raw)
-            except (TypeError, ValueError):
-                parsed_ticket_id = None
-        if parsed_ticket_id is not None and parsed_ticket_id >= 1:
-            z_sess = await get_or_create_zammad_ticket_session(
+    if req_integration is None:
+        req_integration = IntegrationType.WEB
+
+    try:
+        channel_policy = await resolve_channel_behavior(req_integration, db)
+    except ChannelBehaviorValidationError as e:
+        logger.error(
+            "Channel behavior policy validation failed",
+            integration_type=get_enum_value(req_integration),
+            error=str(e),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid channel behavior configuration: {e}",
+        ) from e
+
+    if channel_policy.session_scope == SessionScope.PER_TICKET:
+        parsed_ticket_id = parse_ticket_id(request)
+        if parsed_ticket_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ticket_id is required for ticket-scoped channel sessions",
+            )
+        try:
+            ticket_sess = await resolve_ticket_scoped_session(
                 db,
+                integration_type=req_integration,
                 canonical_user_id=canonical_user_id,
                 ticket_id=parsed_ticket_id,
                 channel_id=getattr(request, "channel_id", None),
@@ -162,7 +171,12 @@ async def create_or_get_session_shared(
                 user_context={},
                 expires_at=expires_at,
             )
-            return z_sess
+        except ChannelBehaviorValidationError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),
+            ) from e
+        return ticket_sess
 
     # Check if a session_id was provided in metadata (e.g., from X-Session-ID header in email reply, or thread metadata)
     # This allows integrations to provide a session_id to continue an existing session
@@ -176,94 +190,59 @@ async def create_or_get_session_shared(
             provided_session_id=provided_session_id,
             canonical_user_id=canonical_user_id,
         )
-        # Verify the provided session_id exists and belongs to this user
-        stmt = select(RequestSession).where(
-            RequestSession.session_id == provided_session_id,
-            RequestSession.user_id == canonical_user_id,
-            RequestSession.status == SessionStatus.ACTIVE.value,
-        )
-        result = await db.execute(stmt)
-        provided_session = result.scalar_one_or_none()
-
-        if provided_session:
-            # Check if session is expired
-            now = datetime.now(timezone.utc)
-            if provided_session.expires_at is None or provided_session.expires_at > now:
-                # Valid session found - update activity timestamp and return it
-                provided_session.last_request_at = datetime.now(timezone.utc)  # type: ignore[assignment]
-                await db.commit()
-                logger.info(
-                    "Reusing provided session from metadata",
-                    session_id=provided_session_id,
-                    canonical_user_id=canonical_user_id,
-                )
-                return SessionResponse.model_validate(provided_session)
-            else:
-                logger.warning(
-                    "Provided session_id is expired, will create new session",
-                    session_id=provided_session_id,
-                    canonical_user_id=canonical_user_id,
-                )
-        else:
-            logger.warning(
-                "Provided session_id not found or doesn't belong to user, will create new session",
-                provided_session_id=provided_session_id,
+        try:
+            provided_session = await validate_explicit_session_pin(
+                db,
+                canonical_user_id=canonical_user_id,
+                provided_session_id=str(provided_session_id),
+                inbound_integration_type=req_integration,
+                inbound_policy=channel_policy,
+            )
+            logger.info(
+                "Reusing provided session from metadata",
+                session_id=provided_session_id,
                 canonical_user_id=canonical_user_id,
             )
+            return await touch_active_session(db, provided_session)
+        except SessionPinScopeMismatchError as e:
+            logger.warning(
+                "Explicit session pin rejected",
+                session_id=provided_session_id,
+                canonical_user_id=canonical_user_id,
+                error=str(e),
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),
+            ) from e
+        except ChannelBehaviorValidationError as e:
+            logger.warning(
+                "Explicit session pin failed",
+                session_id=provided_session_id,
+                error=str(e),
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),
+            ) from e
 
-    # Check if we should filter by integration type
-    filter_by_integration_type = _should_filter_sessions_by_integration_type()
-
-    # Get current time for expiration checks
-    now = datetime.now(timezone.utc)
-
-    # Try to find existing active session (not expired)
-    # Use SELECT FOR UPDATE to lock rows and prevent concurrent session creation
-    where_conditions = [
-        RequestSession.user_id == canonical_user_id,
-        RequestSession.status == SessionStatus.ACTIVE.value,
-        # Filter out expired sessions
-        ((RequestSession.expires_at.is_(None)) | (RequestSession.expires_at > now)),
-    ]
-
-    # Optionally filter by integration type based on env var
-    if filter_by_integration_type:
-        where_conditions.append(
-            RequestSession.integration_type == request.integration_type
-        )
-    elif (
-        req_integration is not None
-        and get_enum_value(req_integration) != IntegrationType.ZAMMAD.value
-    ):
-        # Unified-session mode (SESSION_PER_INTEGRATION_TYPE=false): do not attach CLI/WEB/etc.
-        # traffic to Zammad ticket sessions—otherwise generic RM calls reuse ``zammad-{id}`` rows
-        # and pollute portal tickets. Explicit ``metadata.session_id`` still pins to a ticket above.
-        where_conditions.append(
-            RequestSession.integration_type != IntegrationType.ZAMMAD
-        )
-
-    # Use SELECT FOR UPDATE SKIP LOCKED to prevent race conditions
-    # SKIP LOCKED allows other transactions to proceed if row is locked
-    stmt = (
-        select(RequestSession)
-        .where(*where_conditions)
-        .order_by(RequestSession.last_request_at.desc())
-        .with_for_update(skip_locked=True)
+    filter_by_integration_type = should_filter_sessions_by_integration_type(
+        channel_policy
     )
 
-    result = await db.execute(stmt)
-    existing_sessions = result.scalars().all()
+    existing_sessions = await find_active_per_user_sessions(
+        db,
+        canonical_user_id=canonical_user_id,
+        integration_type=req_integration,
+        filter_by_integration_type=filter_by_integration_type,
+        for_update=True,
+    )
 
-    # Debug logging for session lookup
     logger.debug(
         "Session lookup results",
         canonical_user_id=canonical_user_id,
         original_user_id=request.user_id,
-        integration_type=(
-            request.integration_type.value
-            if hasattr(request.integration_type, "value")
-            else str(request.integration_type)
-        ),
+        integration_type=get_enum_value(req_integration),
         filter_by_integration_type=filter_by_integration_type,
         found_sessions_count=len(existing_sessions),
     )
@@ -309,37 +288,33 @@ async def create_or_get_session_shared(
                 deactivated_count=deactivated_count,
             )
 
-        # Update activity timestamp
-        existing_session.last_request_at = datetime.now(timezone.utc)  # type: ignore[assignment]
-        await db.commit()
+        touched = await touch_active_session(db, existing_session)
         logger.info(
             "Reusing existing session",
-            session_id=existing_session.session_id,
-            current_agent_id=existing_session.current_agent_id,
+            session_id=touched.session_id,
+            current_agent_id=touched.current_agent_id,
             user_id=canonical_user_id,
             original_user_id=request.user_id,
             integration_type=(
-                existing_session.integration_type.value
-                if hasattr(existing_session.integration_type, "value")
-                else str(existing_session.integration_type)
+                touched.integration_type.value
+                if hasattr(touched.integration_type, "value")
+                else str(touched.integration_type)
             ),
             filter_by_integration_type=filter_by_integration_type,
         )
-        return SessionResponse.model_validate(existing_session)
+        return touched
 
     # Create new session via event (with fallback to direct DB access)
     # This uses eventing for race condition prevention while maintaining resilience
     import uuid
 
-    from shared_models import BaseSessionManager, SessionCreate
+    from shared_models import (
+        BaseSessionManager,
+        SessionCreate,
+        prepare_new_session_metadata,
+    )
 
-    # Get integration_type from request, with fallback to None if not available
-    request_integration_type = getattr(request, "integration_type", None)
-
-    # SessionCreate requires integration_type, so we need to handle None case
-    if request_integration_type is None:
-        # Default to WEB if not specified (IntegrationType: module import)
-        request_integration_type = IntegrationType.WEB
+    request_integration_type = req_integration
 
     # Try eventing-based session creation first
     use_eventing = os.getenv("USE_SESSION_EVENTING", "true").lower() == "true"
@@ -436,6 +411,12 @@ async def create_or_get_session_shared(
         user_id=canonical_user_id,
     )
 
+    _, merged_metadata, _entry_agent = await prepare_new_session_metadata(
+        db,
+        request_integration_type,
+        getattr(request, "metadata", None),
+    )
+
     session_manager = BaseSessionManager(db)
     session_data = SessionCreate(
         user_id=canonical_user_id,
@@ -444,7 +425,7 @@ async def create_or_get_session_shared(
         thread_id=getattr(request, "thread_id", None),
         external_session_id=None,
         explicit_session_id=None,
-        integration_metadata=request.metadata or {},
+        integration_metadata=merged_metadata,
         user_context={},
     )
 
@@ -874,12 +855,10 @@ class UnifiedRequestProcessor:
                         canonical_user_id=normalized_request.user_id,
                     )
 
-            # Zammad MCP requires AUTHORITATIVE_USER_ID = {email}-{internal_ticket_id}.
-            # UUID→email replacement above leaves bare email; append ticket id from webhook context.
-            if (
-                get_enum_value(normalized_request.integration_type)
-                == IntegrationType.ZAMMAD.value
-            ):
+            # PER_TICKET channels with ticket_user_id_suffix: MCP expects
+            # AUTHORITATIVE_USER_ID = {email}-{internal_ticket_id}. UUID→email replacement
+            # above leaves bare email; append ticket_id from integration_context.
+            if channel_uses_ticket_user_id_suffix(normalized_request.integration_type):
                 ctx = normalized_request.integration_context or {}
                 tid = ctx.get("ticket_id")
                 if tid is not None:
@@ -893,9 +872,12 @@ class UnifiedRequestProcessor:
                         )
                         normalized_request.user_id = f"{base}-{tid_str}"
                         logger.info(
-                            "Zammad: user_id set to email-ticket form for MCP",
+                            "PER_TICKET ingress: user_id set to email-ticket form for MCP",
                             user_id=normalized_request.user_id,
                             ticket_id=tid_str,
+                            integration_type=get_enum_value(
+                                normalized_request.integration_type
+                            ),
                         )
         except Exception as e:
             logger.warning(

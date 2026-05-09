@@ -20,6 +20,8 @@ This guide covers all aspects of integrating with the Self-Service Agent system,
 
 The Self-Service Agent system provides a comprehensive integration layer that supports multiple communication channels and deployment modes. The system uses an **Integration Defaults** approach with **User Overrides** to provide smart defaults for all users while allowing customization when needed.
 
+**Channel behavior (session scope, entry agent, return-to-router, delivery binding):** See [Channel behavior](../docs/CHANNEL_BEHAVIOR.md) for policy semantics and adding a channel.
+
 ### Key Features
 
 - **Multi-Integration Support**: Slack, Web, CLI, Tool, Email, SMS, Webhook integrations

@@ -24,7 +24,7 @@ async def test_zammad_ticket_dispatches_zammad_only() -> None:
         session_id="zammad-42",
         user_id="alice@example.com-42",
         content="Hello from the agent",
-        integration_context={"platform": "zammad", "ticket_id": 42},
+        integration_context={"delivery_binding": "TICKET_THREAD", "ticket_id": 42},
     )
     with (
         patch.object(dispatcher, "_get_user_integration_configs", new=get_cfgs),
@@ -56,7 +56,7 @@ async def test_slack_session_excludes_zammad_even_if_configured() -> None:
         session_id="sess-1",
         user_id="user-1",
         content="Hi",
-        integration_context={"platform": "slack", "channel_id": "C1"},
+        integration_context={"delivery_binding": "STANDARD", "channel_id": "C1"},
     )
     with (
         patch.object(dispatcher, "_get_user_integration_configs", new=get_cfgs),

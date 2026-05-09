@@ -15,6 +15,7 @@ The quickstart consists of reusable **core platform components** and **use-case-
 **Key Capabilities:**
 - **Normalization:** Transforms diverse inputs (Slack messages, HTTP calls, CLI commands) into standardized internal format containing user message, identifier, integration type, and session context
 - **Session Management:** Maintains conversational state across interactions by persisting sessions in PostgreSQL with conversation history, user metadata, and routing information
+- **Channel behavior:** Per-integration policy for session scope (`PER_USER` / `PER_TICKET`), entry agent, return-to-router, and delivery binding — see [Channel behavior](../docs/CHANNEL_BEHAVIOR.md)
 
 **Documentation:** See `request-manager/README.md` for detailed implementation
 

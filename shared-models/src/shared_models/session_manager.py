@@ -5,12 +5,20 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Union
 
-from shared_models import configure_logging
-from shared_models.models import IntegrationType, RequestSession, SessionStatus
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .channel_behavior import (
+    CHANNEL_BEHAVIOR_SNAPSHOT_KEY,
+    build_integration_metadata_with_policy,
+    effective_entry_agent_id,
+    policy_from_integration_metadata,
+    resolve_channel_behavior,
+    resolve_channel_behavior_sync,
+)
+from .logging import configure_logging
+from .models import IntegrationType, RequestSession, SessionStatus
 from .session_schemas import SessionCreate, SessionResponse
 from .utils import get_enum_value
 
@@ -18,21 +26,13 @@ logger = configure_logging("shared-models")
 
 
 def initial_current_agent_id_for_integration(integration_type: Any) -> str:
-    """First agent id persisted on a new RequestSession (integration-specific defaults).
+    """First agent id for a new session (channel behavior policy; sync, no DB).
 
     Request Manager and agent-service align via this value on the session row.
+    Prefer resolve_channel_behavior() when a DB session is available.
     """
-    import os
-
-    normalized = get_enum_value(integration_type)
-    if normalized == IntegrationType.ZAMMAD.value:
-        zammad_first = os.getenv("ZAMMAD_DEFAULT_AGENT_ID", "").strip()
-        if zammad_first:
-            return zammad_first
-        # Zammad never falls back to DEFAULT_AGENT_ID (routing-agent).
-        return "ticket-review-agent"
-    default = os.getenv("DEFAULT_AGENT_ID", "routing-agent").strip()
-    return default or "routing-agent"
+    policy = resolve_channel_behavior_sync(integration_type)
+    return effective_entry_agent_id(policy)
 
 
 class BaseSessionManager:
@@ -56,8 +56,8 @@ class BaseSessionManager:
 
         Handles unique constraint violations by retrying with exponential backoff.
         The partial unique index on (user_id, integration_type) where status='ACTIVE'
-        prevents multiple active sessions per user/integration for most integrations;
-        ZAMMAD is excluded so multiple active ticket-scoped sessions per user are allowed.
+        applies only when the session snapshot session_scope is not PER_TICKET, so
+        multiple active ticket-scoped sessions per user+integration are allowed.
 
         Args:
             session_data: Session creation data
@@ -79,6 +79,25 @@ class BaseSessionManager:
             session_id_value = explicit if explicit else str(uuid.uuid4())
 
             try:
+                policy = policy_from_integration_metadata(
+                    session_data.integration_metadata
+                )
+                if policy is None:
+                    meta_in = session_data.integration_metadata or {}
+                    if CHANNEL_BEHAVIOR_SNAPSHOT_KEY in meta_in:
+                        logger.warning(
+                            "invalid _channel_behavior on create; re-resolving policy",
+                            integration_type=get_enum_value(
+                                session_data.integration_type
+                            ),
+                        )
+                    policy = await resolve_channel_behavior(
+                        session_data.integration_type, self.db_session
+                    )
+                integration_metadata = build_integration_metadata_with_policy(
+                    session_data.integration_metadata, policy
+                )
+
                 session = RequestSession(
                     session_id=session_id_value,
                     user_id=session_data.user_id,
@@ -86,11 +105,9 @@ class BaseSessionManager:
                     channel_id=session_data.channel_id,
                     thread_id=session_data.thread_id,
                     external_session_id=session_data.external_session_id,
-                    integration_metadata=session_data.integration_metadata,
+                    integration_metadata=integration_metadata,
                     user_context=session_data.user_context,
-                    current_agent_id=initial_current_agent_id_for_integration(
-                        session_data.integration_type
-                    ),
+                    current_agent_id=effective_entry_agent_id(policy),
                     status=SessionStatus.ACTIVE.value,
                     version=0,  # Initial version for optimistic locking
                 )
@@ -114,7 +131,7 @@ class BaseSessionManager:
                 await self.db_session.rollback()
 
                 error_str = str(e).lower()
-                # Concurrent create with same explicit session_id (e.g. zammad-{ticket_id})
+                # Concurrent create with same explicit session_id (e.g. {type}-{ticket_id})
                 if "uq_request_sessions_session_id" in error_str or (
                     "unique" in error_str
                     and "session_id" in error_str
@@ -330,9 +347,15 @@ class BaseSessionManager:
         await self.db_session.commit()
 
 
-async def get_or_create_zammad_ticket_session(
+def ticket_session_id(integration_type: IntegrationType, ticket_id: int) -> str:
+    """Stable session id for PER_TICKET scope (e.g. ``zammad-42`` for IntegrationType.ZAMMAD)."""
+    return f"{get_enum_value(integration_type).lower()}-{ticket_id}"
+
+
+async def get_or_create_ticket_session(
     db_session: AsyncSession,
     *,
+    integration_type: IntegrationType,
     canonical_user_id: str,
     ticket_id: int,
     channel_id: Optional[str],
@@ -341,11 +364,12 @@ async def get_or_create_zammad_ticket_session(
     user_context: Dict[str, Any],
     expires_at: datetime,
 ) -> SessionResponse:
-    """Resolve or create the per-ticket Zammad session (stable id ``zammad-{ticket_id}``).
+    """Resolve or create a per-ticket session (stable id ``{type}-{ticket_id}``).
 
-    Multiple active ZAMMAD sessions per user are allowed (migration 002 partial unique index).
+    Multiple active sessions per user are allowed for ticket-scoped types
+    (migration 002 partial unique index).
     """
-    stable_sid = f"zammad-{ticket_id}"
+    stable_sid = ticket_session_id(integration_type, ticket_id)
     stmt = select(RequestSession).where(RequestSession.session_id == stable_sid)
     result = await db_session.execute(stmt)
     existing = result.scalar_one_or_none()
@@ -353,7 +377,7 @@ async def get_or_create_zammad_ticket_session(
     if existing is not None:
         if str(existing.user_id) != str(canonical_user_id):
             logger.error(
-                "Zammad ticket session owned by another user",
+                "Ticket session owned by another user",
                 session_id=stable_sid,
                 expected_user_id=canonical_user_id,
                 actual_user_id=str(existing.user_id),
@@ -380,15 +404,20 @@ async def get_or_create_zammad_ticket_session(
             raise RuntimeError(f"Session {stable_sid} missing after touch")
         return SessionResponse.model_validate(updated)
 
+    policy = await resolve_channel_behavior(integration_type, db_session)
+    merged_metadata = build_integration_metadata_with_policy(
+        integration_metadata, policy
+    )
+
     manager = BaseSessionManager(db_session)
     session_data = SessionCreate(
         user_id=canonical_user_id,
-        integration_type=IntegrationType.ZAMMAD,
+        integration_type=integration_type,
         explicit_session_id=stable_sid,
         channel_id=channel_id,
         thread_id=thread_id,
         external_session_id=None,
-        integration_metadata=integration_metadata,
+        integration_metadata=merged_metadata,
         user_context=user_context,
     )
     created = await manager.create_session(session_data)

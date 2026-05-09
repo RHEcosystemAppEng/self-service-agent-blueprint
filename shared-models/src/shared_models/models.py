@@ -27,6 +27,22 @@ from sqlalchemy.orm import relationship
 
 from .base import Base, TimestampMixin
 
+# Stored as VARCHAR in Postgres (migration 003); validated via IntegrationType + registry.
+INTEGRATION_TYPE_FIELD_LENGTH = 32
+
+
+def _integration_type_column(**kwargs: Any) -> Column[Any]:
+    return Column(
+        SQLEnum(
+            IntegrationType,
+            values_callable=lambda obj: [member.value for member in obj],
+            native_enum=False,
+            length=INTEGRATION_TYPE_FIELD_LENGTH,
+        ),
+        **kwargs,
+    )
+
+
 # Export Base for use in other modules
 __all__ = [
     "Base",
@@ -152,9 +168,7 @@ class RequestSession(Base, TimestampMixin):  # type: ignore[misc]
         nullable=False,
         index=True,
     )
-    integration_type: Column[IntegrationType] = Column(
-        SQLEnum(IntegrationType), nullable=False
-    )
+    integration_type: Column[IntegrationType] = _integration_type_column(nullable=False)
     status: Column[SessionStatus] = Column(
         SQLEnum(SessionStatus), default=SessionStatus.ACTIVE.value, nullable=False
     )
@@ -300,9 +314,7 @@ class UserIntegrationConfig(Base, TimestampMixin):  # type: ignore[misc]
         nullable=False,
         index=True,
     )
-    integration_type: Column[IntegrationType] = Column(
-        SQLEnum(IntegrationType), nullable=False
-    )
+    integration_type: Column[IntegrationType] = _integration_type_column(nullable=False)
     enabled = Column(Boolean, default=True, nullable=False)
 
     # Integration-specific configuration
@@ -334,8 +346,8 @@ class IntegrationDefaultConfig(Base, TimestampMixin):  # type: ignore[misc]
     __tablename__ = "integration_default_configs"
 
     id = Column(Integer, primary_key=True)
-    integration_type: Column[IntegrationType] = Column(
-        SQLEnum(IntegrationType), nullable=False, unique=True
+    integration_type: Column[IntegrationType] = _integration_type_column(
+        nullable=False, unique=True
     )
     enabled = Column(Boolean, default=True, nullable=False)
 
@@ -374,9 +386,7 @@ class DeliveryLog(Base, TimestampMixin):  # type: ignore[misc]
         ForeignKey("user_integration_configs.id", ondelete="CASCADE"),
         nullable=True,  # Allow null for smart defaults (lazy approach)
     )
-    integration_type: Column[IntegrationType] = Column(
-        SQLEnum(IntegrationType), nullable=False
-    )
+    integration_type: Column[IntegrationType] = _integration_type_column(nullable=False)
 
     # Message content
     subject = Column(Text)
@@ -483,9 +493,7 @@ class IntegrationCredential(Base, TimestampMixin):  # type: ignore[misc]
     __tablename__ = "integration_credentials"
 
     id = Column(Integer, primary_key=True)
-    integration_type: Column[IntegrationType] = Column(
-        SQLEnum(IntegrationType), nullable=False
-    )
+    integration_type: Column[IntegrationType] = _integration_type_column(nullable=False)
     credential_name = Column(
         String(100), nullable=False
     )  # e.g., "slack_bot_token", "smtp_password"
@@ -520,9 +528,7 @@ class UserIntegrationMapping(Base, TimestampMixin):  # type: ignore[misc]
     user_email = Column(
         String(255), nullable=False, index=True
     )  # For search/backward compatibility
-    integration_type: Column[IntegrationType] = Column(
-        SQLEnum(IntegrationType), nullable=False
-    )
+    integration_type: Column[IntegrationType] = _integration_type_column(nullable=False)
     integration_user_id = Column(String(255), nullable=False)  # e.g., Slack user ID
 
     # Validation metadata

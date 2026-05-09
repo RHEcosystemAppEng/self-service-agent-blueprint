@@ -4,8 +4,9 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from shared_models import configure_logging
+from shared_models import configure_logging, is_ticket_delivery_eligible
 from shared_models.models import IntegrationDefaultConfig, IntegrationType
+from shared_models.utils import get_enum_value, json_value_as_dict
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
 from sqlalchemy import select
@@ -496,6 +497,14 @@ class IntegrationDefaultsService:
         # Check current health status
         health_status = await self._check_integration_health()
 
+        existing_configs: Dict[str, Dict[str, Any]] = {}
+        existing_result = await db.execute(select(IntegrationDefaultConfig))
+        for row in existing_result.scalars().all():
+            if row.config:
+                existing_configs[get_enum_value(row.integration_type)] = (
+                    json_value_as_dict(row.config)
+                )
+
         # Prepare upsert values for all defaults
         upsert_values = []
         for integration_type, config in self.default_integrations.items():
@@ -519,6 +528,15 @@ class IntegrationDefaultsService:
                 # Use health check result only
                 enabled = health_check_passed
 
+            # Delivery keys from code; preserve existing config.channel_behavior (SQL/ops).
+            merged_config = dict(config["config"])
+            merged_config.pop("channel_behavior", None)
+            existing_cb = existing_configs.get(integration_type, {}).get(
+                "channel_behavior"
+            )
+            if isinstance(existing_cb, dict):
+                merged_config["channel_behavior"] = existing_cb
+
             upsert_values.append(
                 {
                     "integration_type": IntegrationType(integration_type),
@@ -526,7 +544,7 @@ class IntegrationDefaultsService:
                     "priority": config["priority"],
                     "retry_count": config["retry_count"],
                     "retry_delay_seconds": config["retry_delay_seconds"],
-                    "config": config["config"],
+                    "config": merged_config,
                     "created_by": "system",
                 }
             )
@@ -802,13 +820,11 @@ class IntegrationDefaultsService:
                     )
                     config["enabled"] = False
 
-            # Zammad: only for ticket responses that carry Zammad integration_context
-            if default_config.integration_type == IntegrationType.ZAMMAD:
-                if (
-                    not context
-                    or context.get("platform") != "zammad"
-                    or context.get("ticket_id") in (None, "", 0)
-                ):
+            # Ticket delivery backends: only when delivery_binding is TICKET_THREAD.
+            if is_ticket_delivery_eligible(default_config.integration_type):
+                binding = (context or {}).get("delivery_binding")
+                ticket_ok = context and context.get("ticket_id") not in (None, "", 0)
+                if not context or not ticket_ok or binding != "TICKET_THREAD":
                     config["enabled"] = False
 
             # Only include enabled integrations

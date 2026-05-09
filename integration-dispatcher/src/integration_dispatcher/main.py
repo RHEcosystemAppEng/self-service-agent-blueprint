@@ -17,6 +17,7 @@ from shared_models import (
     create_cloudevent_response,
     create_health_check_endpoint,
     create_shared_lifespan,
+    filter_configs_for_delivery_binding,
     get_database_manager,
     get_db_session_dependency,
     get_enum_value,
@@ -139,6 +140,8 @@ class IntegrationDispatcher:
                 context["platform"] = ic.get("platform")
             if ic.get("ticket_id") is not None:
                 context["ticket_id"] = ic.get("ticket_id")
+            if ic.get("delivery_binding") is not None:
+                context["delivery_binding"] = ic.get("delivery_binding")
 
         # Get smart defaults for all enabled integrations (no database persistence)
         smart_defaults = await integration_defaults_service.get_smart_defaults(
@@ -220,52 +223,35 @@ class IntegrationDispatcher:
             )
             return []
 
-        # Zammad is ticket-scoped: two-way isolation with Slack/Email/Webhook/etc.
-        # - Zammad ticket session → deliver only to ZAMMAD (post on that ticket).
-        # - Any other session → never ZAMMAD (do not append ticket articles from
-        #   Slack/DM/email threads even if a user has a ZAMMAD row in config DB).
+        # Ticket-thread vs standard delivery (from session policy snapshot on forward path).
         ic = request.integration_context or {}
-        is_zammad_ticket = ic.get("platform") == "zammad"
+        binding = ic.get("delivery_binding")
+        is_ticket_thread = binding == "TICKET_THREAD"
         types_before = [get_enum_value(c.integration_type) for c in configs]
 
-        if is_zammad_ticket:
-            configs = [
-                c for c in configs if c.integration_type == IntegrationType.ZAMMAD
-            ]
-            logger.info(
-                "Zammad ticket delivery: restricted to ZAMMAD integration only",
-                request_id=request.request_id,
-                session_id=request.session_id,
-                integration_types_before=types_before,
-                integration_types_after=[
-                    get_enum_value(c.integration_type) for c in configs
-                ],
-            )
-        else:
-            configs = [
-                c for c in configs if c.integration_type != IntegrationType.ZAMMAD
-            ]
-            logger.info(
-                "Non-Zammad session: excluding ZAMMAD from delivery",
-                request_id=request.request_id,
-                session_id=request.session_id,
-                integration_types_before=types_before,
-                integration_types_after=[
-                    get_enum_value(c.integration_type) for c in configs
-                ],
-            )
+        configs = filter_configs_for_delivery_binding(configs, binding)
+        logger.info(
+            "Filtered integrations by delivery_binding",
+            request_id=request.request_id,
+            session_id=request.session_id,
+            delivery_binding=binding or "STANDARD",
+            integration_types_before=types_before,
+            integration_types_after=[
+                get_enum_value(c.integration_type) for c in configs
+            ],
+        )
 
         if not configs:
-            if is_zammad_ticket:
+            if is_ticket_thread:
                 logger.info(
-                    "No ZAMMAD integration available after Zammad-ticket filter",
+                    "No ticket integration available after ticket-thread filter",
                     user_id=request.user_id,
                     request_id=request.request_id,
                     session_id=request.session_id,
                 )
             else:
                 logger.info(
-                    "No integrations left after excluding ZAMMAD for non-ticket session",
+                    "No integrations left after excluding ticket integration",
                     user_id=request.user_id,
                     request_id=request.request_id,
                     session_id=request.session_id,
