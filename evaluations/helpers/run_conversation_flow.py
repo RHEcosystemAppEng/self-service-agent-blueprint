@@ -23,6 +23,7 @@ class ConversationFlowTester:
         skip_initial_message: bool = False,
         message_timeout: int = 60,
         ticket_title: Optional[str] = None,
+        include_conversation_metadata: bool = False,
     ) -> None:
         """
         Initialize the ConversationFlowTester.
@@ -37,6 +38,7 @@ class ConversationFlowTester:
             message_timeout: Timeout in seconds for individual message send/response operations (default: 60)
             ticket_title: Passed to ticket-responses-request-mgr.py as ``--ticket-title`` when set
                 (Zammad subject). Should match the evaluation flow (laptop vs unrelated).
+            include_conversation_metadata: If True, pass --include-conversation_metadata to emit TICKET_STATUS lines after each agent response.
         """
         self.test_script = test_script
         self.reset_conversation = reset_conversation
@@ -44,6 +46,7 @@ class ConversationFlowTester:
         self.skip_initial_message = skip_initial_message
         self.message_timeout = message_timeout
         self.ticket_title = ticket_title
+        self.include_conversation_metadata = include_conversation_metadata
         self.conversation_history: list[Any] = []
         self.total_app_tokens = {"input": 0, "output": 0, "total": 0, "calls": 0}
 
@@ -52,7 +55,7 @@ class ConversationFlowTester:
         questions: list[str],
         authoritative_user_id: str,
         initial_message: Optional[str] = None,
-    ) -> List[Dict[str, str]]:
+    ) -> List[Dict[str, Any]]:
         """
         Run a conversation flow with the given questions.
 
@@ -80,6 +83,7 @@ class ConversationFlowTester:
             skip_initial_message=self.skip_initial_message,
             message_timeout=self.message_timeout,
             ticket_title=self.ticket_title,
+            include_conversation_metadata=self.include_conversation_metadata,
         )
 
         try:
@@ -102,7 +106,16 @@ class ConversationFlowTester:
                 # Add user message
                 conversation.append({"role": "user", "content": question})
                 # Add assistant response
-                conversation.append({"role": "assistant", "content": response})
+                assistant_turn: Dict[str, Any] = {
+                    "role": "assistant",
+                    "content": response,
+                }
+                actual_conversation_metadata = client.get_last_conversation_metadata()
+                if actual_conversation_metadata:
+                    assistant_turn["actual_conversation_metadata"] = (
+                        actual_conversation_metadata
+                    )
+                conversation.append(assistant_turn)
 
                 # Keep the old format for conversation_history if needed
                 self.conversation_history.append({"role": "user", "content": question})
@@ -233,6 +246,15 @@ class ConversationFlowTester:
                 results = self.run_flow(
                     questions, authoritative_user_id, initial_message=initial_message
                 )
+
+                # Carry over expected_conversation_metadata from input to result user turns
+                input_user_turns = [t for t in turns if t.get("role") == "user"]
+                result_user_turns = [t for t in results if t.get("role") == "user"]
+                for input_turn, result_turn in zip(input_user_turns, result_user_turns):
+                    if "expected_conversation_metadata" in input_turn:
+                        result_turn["expected_conversation_metadata"] = input_turn[
+                            "expected_conversation_metadata"
+                        ]
 
                 # Format results in the new conversation format with metadata
                 formatted_results = {

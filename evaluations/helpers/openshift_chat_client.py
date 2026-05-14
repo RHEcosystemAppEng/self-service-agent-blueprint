@@ -2,6 +2,7 @@
 
 import logging
 import os
+import select
 import subprocess
 import time
 from typing import Dict, List, Optional
@@ -24,6 +25,7 @@ class OpenShiftChatClient:
         skip_initial_message: bool = False,
         message_timeout: int = 60,
         ticket_title: Optional[str] = None,
+        include_conversation_metadata: bool = False,
     ):
         """
         Initialize the OpenShift chat client.
@@ -39,6 +41,7 @@ class OpenShiftChatClient:
                                   the caller to send the first message. Only used when reset_conversation is True.
             message_timeout: Timeout in seconds for individual message send/response operations (default: 60)
             ticket_title: Optional title to pass as --ticket-title to the test script.
+            include_conversation_metadata: If True, pass --include-conversation_metadata to the test script to emit TICKET_STATUS lines after each agent response.
         """
         self.deployment_name = deployment_name
         self.test_script = test_script
@@ -48,6 +51,8 @@ class OpenShiftChatClient:
         self.skip_initial_message = skip_initial_message
         self.message_timeout = message_timeout
         self.ticket_title = ticket_title
+        self.include_conversation_metadata = include_conversation_metadata
+        self.last_conversation_metadata: Optional[Dict[str, str]] = None
         self.process: Optional[subprocess.Popen[str]] = None
         self.session_active = False
         self.session_output: list[str] = []  # Capture all output for token parsing
@@ -94,6 +99,8 @@ class OpenShiftChatClient:
             if self.ticket_title:
                 escaped_title = self.ticket_title.replace("'", "'\\''")
                 script_cmd += f" --ticket-title '{escaped_title}'"
+            if self.include_conversation_metadata:
+                script_cmd += " --include-conversation_metadata"
             cmd = [
                 "oc",
                 "exec",
@@ -198,12 +205,17 @@ class OpenShiftChatClient:
         if timeout is None:
             timeout = self.message_timeout
 
+        self.last_conversation_metadata = None
+
         try:
             if self.process.stdin is not None:
                 self.process.stdin.write(message + "\n")
                 self.process.stdin.flush()
 
             response = self._read_full_agent_message(timeout)
+
+            if self.include_conversation_metadata:
+                self._read_conversation_metadata()
 
             logger.debug(f"Sent: {message}")
             logger.debug(
@@ -316,6 +328,64 @@ class OpenShiftChatClient:
 
         return result
 
+    def _read_conversation_metadata(self) -> None:
+        """Read and parse the conversation metadata of the TICKET_STATUS line from stdout after agent response.
+
+        Uses select() with a timeout to avoid blocking if no TICKET_STATUS
+        line is emitted (e.g. for **tokens** messages or other non-standard responses).
+        """
+        if not self.process or not self.process.stdout:
+            return
+        if self.process.poll() is not None:
+            logger.debug("Process terminated while reading conversation metadata")
+            return
+        try:
+            ready, _, _ = select.select([self.process.stdout], [], [], 5.0)
+            if not ready:
+                return
+            line = self.process.stdout.readline()
+            if not line:
+                return
+            s = line.strip()
+            if s.startswith("TICKET_STATUS:"):
+                self.last_conversation_metadata = self._parse_conversation_metadata(s)
+        except Exception as e:
+            logger.debug(f"Read error capturing conversation metadata: {e}")
+
+    def _parse_conversation_metadata(self, line: str) -> Optional[Dict[str, str]]:
+        """
+        Parse conversation metadata output from ticket-responses-request-mgr.py.
+
+        Looks for lines in format:
+        TICKET_STATUS:{number}:{state}:owner={owner}:group={group}
+
+        Args:
+            line: Output line to parse for conversation metadata information
+
+        Returns:
+            Dictionary with state, owner, and group if parsed successfully,
+            None if parsing fails.
+        """
+        if not line.startswith("TICKET_STATUS:"):
+            return None
+        try:
+            parts = line.split(":")
+            if len(parts) < 3:
+                return None
+            result: Dict[str, str] = {
+                "state": parts[2],
+            }
+            for part in parts[3:]:
+                if part.startswith("owner="):
+                    result["owner"] = part[6:]
+                elif part.startswith("group="):
+                    result["group"] = part[6:]
+            logger.debug(f"Successfully parsed conversation metadata: {result}")
+            return result
+        except (ValueError, IndexError) as e:
+            logger.warning(f"Failed to parse conversation metadata '{line}': {e}")
+            return None
+
     def _parse_token_output(self, line: str) -> None:
         """
         Parse token summary output from chat-lg-state.py.
@@ -367,6 +437,16 @@ class OpenShiftChatClient:
             Dictionary with input, output, total, and calls counts
         """
         return self.app_tokens.copy()
+
+    def get_last_conversation_metadata(self) -> Optional[Dict[str, str]]:
+        """
+        Get the conversation metadata read from the last agent response.
+
+        Returns:
+            Dictionary with state, owner, and group,
+            or None if no conversation metadata was read.
+        """
+        return self.last_conversation_metadata
 
     def close_session(self) -> None:
         """

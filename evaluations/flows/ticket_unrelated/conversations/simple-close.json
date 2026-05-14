@@ -7,11 +7,21 @@
     "conversation": [
         {
             "role": "user",
-            "content": "How do I set up two-factor authentication on my work account?"
+            "content": "How do I set up two-factor authentication on my work account?",
+            "expected_conversation_metadata": {
+                "state": "open",
+                "owner": "agent.general",
+                "group": "Users"
+            }
         },
         {
             "role": "user",
-            "content": "That worked, please close the ticket"
+            "content": "That worked, please close the ticket",
+            "expected_conversation_metadata": {
+                "state": "closed",
+                "owner": "agent.general",
+                "group": "Users"
+            }
         }
     ]
 }

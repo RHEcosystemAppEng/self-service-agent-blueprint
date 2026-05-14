@@ -5,6 +5,7 @@ from typing import Any, List, Optional
 from deepeval.metrics import ConversationalGEval
 from deepeval.models import DeepEvalBaseLLM
 from deepeval.test_case import TurnParams
+from helpers.conversation_metadata_eval import ConversationMetadataEval
 
 
 def get_metrics(
@@ -69,6 +70,10 @@ def get_metrics(
                 "  - Tool call failures or stack traces visible in the response",
                 "PASS if the agent responds normally even if it cannot fully resolve the user's issue.",
             ],
+        ),
+        ConversationMetadataEval(
+            name="Correct conversation metadata",
+            threshold=1.0,
         ),
     ]
 

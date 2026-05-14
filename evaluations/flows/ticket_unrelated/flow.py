@@ -9,6 +9,7 @@ DEFAULT_SKIP_INITIAL_MESSAGE: bool = True
 # Neutral wording — avoid "refresh" in the title or routing may classify LAPTOP_REFRESH from the title alone.
 DEFAULT_INITIAL_MESSAGE: str = "General IT assistance"
 DEFAULT_TICKET_TITLE: str = "General workplace IT issue"
+DEFAULT_INCLUDE_CONVERSATION_METADATA: bool = True
 DEFAULT_MAX_TURNS: int = 10
 KNOWLEDGE_BASE_DIRS: List[str] = []
 INCLUDE_SNOW_DATA: bool = False
