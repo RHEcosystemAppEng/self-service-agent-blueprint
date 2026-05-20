@@ -7,12 +7,12 @@ dependencies:
   version: 0.5.6
 - name: llama-stack
   repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
-  version: 0.7.4
+  version: 0.7.0
 - name: mcp-servers
   repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
   version: 0.5.17
 - name: ticketingZammad
   repository: file://./zammad
   version: 0.1.0
-digest: sha256:719f5c9287f5b8abd77b5e4b6b645added37c0f009a829057bcb18d9ca32733a
-generated: "2026-05-04T15:30:41.624154252+03:00"
+digest: sha256:94c6930f6e999095f2f6e1bd03f3d7e85b5a69abd1cd3c0051a8618e48c249e8
+generated: "2026-04-22T17:53:32.70222144-04:00"

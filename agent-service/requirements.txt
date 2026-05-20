@@ -403,9 +403,9 @@ langsmith==0.6.6 \
     --hash=sha256:64ba70e7b795cff3c498fe6f2586314da1cc855471a5e5b6a357950324af3874 \
     --hash=sha256:fe655e73b198cd00d0ecd00a26046eaf1f78cd0b2f0d94d1e5591f3143c5f592
     # via langchain-core
-llama-stack-client==0.6.0 \
-    --hash=sha256:3290aac36dcafbd1bc0baaf995522e2037f57056672b5a1516af112a4210f3ea \
-    --hash=sha256:7e514a6ffd92f237aceb062dadc4db44e24a3cd9c4ea35e25173d1e0739beb8e
+llama-stack-client==0.5.0 \
+    --hash=sha256:5e7272c7fb58cd169985191c42af78dc6c4d212b7050949b063788bfb9e7ed36 \
+    --hash=sha256:e005ae9d975cda30b3b86261057f228d700107e263e12b796b920cd1fb9ba968
     # via self-service-agent-service
 mako==1.3.10 \
     --hash=sha256:99579a6f39583fa7e5630a28c3c1f440e4e97a414b80372649c0ce338da2ea28 \
