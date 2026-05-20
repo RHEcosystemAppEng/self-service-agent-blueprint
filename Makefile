@@ -1529,10 +1529,18 @@ namespace:
 .PHONY: helm-depend
 helm-depend:
 	@needs_update=; \
+	for pair in $$(awk '/^- name:/{n=$$3} /^  version:/{if(n){v=$$2; gsub(/"/,"",v); print n"-"v".tgz"; n=""}}' helm/zammad/Chart.lock 2>/dev/null); do \
+		if [ ! -f "helm/zammad/charts/$$pair" ]; then \
+			echo "Updating Zammad sub-chart dependencies"; \
+			(cd helm/zammad && helm dependency update); \
+			needs_update=1; \
+			break; \
+		fi; \
+	done; \
+	if grep -q 'file://' helm/Chart.lock 2>/dev/null; then needs_update=1; fi; \
 	for pair in $$(awk '/^- name:/{n=$$3} /^  version:/{if(n){v=$$2; gsub(/"/,"",v); print n"-"v".tgz"; n=""}}' helm/Chart.lock 2>/dev/null); do \
 		if [ ! -f "helm/charts/$$pair" ]; then needs_update=1; break; fi; \
 	done; \
-	if grep -q 'file://' helm/Chart.lock 2>/dev/null; then needs_update=1; fi; \
 	if [ -z "$$needs_update" ] && [ -n "$$(awk '/^- name:/{n=$$3} /^  version:/{if(n){print; n=""}}' helm/Chart.lock 2>/dev/null)" ]; then \
 		echo "Helm dependencies present (Chart.lock), skipping update"; \
 	else \
