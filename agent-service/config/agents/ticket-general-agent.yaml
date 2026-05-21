@@ -5,10 +5,10 @@ lg_state_machine_config: "config/lg-prompts/ticket-general-lg-prompt-small.yaml"
 sampling_params:
   strategy:
     type: "top_p"
-    temperature: 0.7
+    temperature: 0.3
     top_p: 0.95
 mcp_servers:
   - name: "zammad"
     uri: "http://mcp-zammad-mcp:8000/mcp"
     require_approval: "never"
-knowledge_bases: []
+knowledge_bases: ["general-support"]

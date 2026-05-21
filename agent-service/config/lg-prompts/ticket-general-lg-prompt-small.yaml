@@ -29,9 +29,9 @@ states:
   # Initial state: greet the user and answer their opening question
   answer_general_question:
     type: "llm_processor"
-    temperature: 0.7
+    temperature: 0.3
     use_conversation_history: true
-    allowed_tools: [""]
+    uses_mcp_tools: "No"
     prompt: |
       You are a helpful IT support assistant. The user has submitted a ticket with the following message: "{last_user_message}"
 
@@ -49,9 +49,9 @@ states:
   # Follow-up state: answer without repeating the introduction
   answer_follow_up:
     type: "llm_processor"
-    temperature: 0.7
+    temperature: 0.3
     use_conversation_history: true
-    allowed_tools: [""]
+    uses_mcp_tools: "No"
     prompt: |
       You are a helpful IT support assistant continuing a support conversation. The user said: "{last_user_message}"
 
@@ -71,7 +71,7 @@ states:
   classify_follow_up_intent:
     type: "intent_classifier"
     temperature: 0.2
-    allowed_tools: [""]
+    uses_mcp_tools: "No"
     failure_transition: "waiting_for_follow_up"
     intent_prompt: |
       Analyze the user's message and determine their intent. The user said: "{user_input}"
