@@ -1564,6 +1564,11 @@ define helm_install_common
 		--from-literal=servicenow-api-key="$${SERVICENOW_API_KEY:-}" \
 		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
 
+	@echo "Creating additional knowledge base ConfigMaps..."
+	@kubectl create configmap kb-general-support \
+		--from-file=./additional-knowledge-bases/general-support/ \
+		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+
 	@echo "Cleaning up any existing jobs..."
 	@kubectl delete job -l app.kubernetes.io/instance=$(MAIN_CHART_NAME) -n $(NAMESPACE) --ignore-not-found || true
 	@echo "Installing $(MAIN_CHART_NAME) helm chart $(1)"
