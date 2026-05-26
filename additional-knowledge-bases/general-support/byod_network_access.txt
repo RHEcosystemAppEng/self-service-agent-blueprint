@@ -1,0 +1,71 @@
+Bring Your Own Device (BYOD) Network Access Policy
+
+Purpose:
+To establish guidelines for employees connecting personal devices (phones, tablets, laptops) to corporate resources while maintaining data security and employee privacy.
+
+	1	Scope: This policy applies to all employees, contractors, and consultants who wish to use personally owned devices for work purposes, including smartphones, tablets, and laptops.
+	2	Eligible Devices
+		- Smartphones: iOS 16+ or Android 13+.
+		- Tablets: iPadOS 16+ or Android 13+.
+		- Laptops: Windows 11, macOS 13+, or ChromeOS 116+.
+		- Devices running unsupported or end-of-life operating systems are not permitted.
+		- Rooted, jailbroken, or otherwise modified devices are prohibited.
+	3	Enrollment Requirements
+		- Device must meet minimum OS version (see section 2).
+		- Device must have a screen lock enabled (PIN, biometric, or password with 6+ characters).
+		- Full disk encryption must be active (enabled by default on modern iOS/Android; BitLocker or FileVault for laptops).
+		- Employee must install the company Mobile Device Management (MDM) profile.
+		- Employee must read and accept the BYOD Acceptable Use Agreement.
+	4	How To: Enroll a Personal Device
+		- Step 1: Connect to GUEST-NETWORK Wi-Fi (no corporate access yet).
+		- Step 2: Open a browser and navigate to https://byod.company.com.
+		- Step 3: Log in with your corporate credentials.
+		- Step 4: Select your device type (phone, tablet, or laptop).
+		- Step 5: Follow the on-screen prompts to install the MDM profile/agent.
+		- Step 6: The MDM agent will verify your device meets requirements (OS version, encryption, screen lock).
+		- Step 7: Once verified, you will receive access to the CORP-BYOD Wi-Fi network and corporate apps.
+		- Enrollment typically completes within 5 minutes. If verification fails, the portal will indicate which requirements are not met.
+	5	What MDM Can and Cannot Access
+		- MDM CAN: enforce screen lock policy, require encryption, remotely wipe corporate data (container only), verify OS version, push corporate apps, revoke access.
+		- MDM CANNOT: read personal emails, view photos or personal files, track browsing history, access personal apps, see personal call/text logs.
+		- Corporate data is isolated in a secure container separate from personal data.
+	6	Network Access Levels
+		- GUEST-NETWORK: internet-only, no access to internal resources. No enrollment required.
+		- CORP-BYOD: access to corporate email, calendar, intranet, and approved cloud apps. Requires MDM enrollment.
+		- CORP-SECURE (certificate-based): full corporate network. Reserved for company-issued devices only; BYOD devices cannot join this network.
+	7	Acceptable Use
+		- BYOD devices may access corporate email, calendar, messaging, intranet, and approved SaaS applications.
+		- Storing corporate data outside the managed container (e.g., personal cloud storage, screenshots of confidential material) is prohibited.
+		- Sharing the device with family members or others does not grant them access to corporate resources (container requires separate authentication).
+	8	Security Requirements (Ongoing)
+		- Keep the operating system and apps updated; devices more than 30 days behind on security patches will have access suspended.
+		- Do not disable MDM, encryption, or screen lock after enrollment.
+		- Report a lost or stolen device to IT Helpdesk immediately — IT will remotely wipe the corporate container only.
+		- If malware is suspected on your device, disconnect from corporate networks and contact IT.
+	9	How To: Report a Lost or Stolen Device
+		- Step 1: Call IT Helpdesk at +1-800-555-HELP (4357) or submit an urgent request at https://helpdesk.company.com.
+		- Step 2: IT will remotely wipe the corporate container (personal data is not affected).
+		- Step 3: Change your corporate password immediately (see password_reset.txt).
+		- Step 4: Once you have a replacement device, re-enroll following section 4.
+	10	How To: Remove BYOD Enrollment (Offboarding)
+		- Step 1: Navigate to https://byod.company.com and log in.
+		- Step 2: Select your device and click "Unenroll."
+		- Step 3: The corporate container and MDM profile will be removed from your device.
+		- Step 4: Personal data, apps, and settings are not affected.
+		- Employees leaving the company will have their devices automatically unenrolled and the corporate container wiped on their last day.
+	11	Troubleshooting: Cannot Connect to CORP-BYOD After Enrollment
+		- Verify MDM profile is still installed (Settings > Device Management or equivalent).
+		- Confirm your device OS is up to date and not more than 30 days behind on patches.
+		- Forget the CORP-BYOD network and reconnect.
+		- Restart the device.
+		- If access is still denied, your enrollment may have been revoked — re-enroll via section 4 or contact IT Helpdesk.
+	12	Troubleshooting: MDM Enrollment Fails
+		- Ensure your device meets minimum OS requirements (section 2).
+		- Verify screen lock and encryption are enabled before attempting enrollment.
+		- Check that you are connected to GUEST-NETWORK (not mobile data) during enrollment.
+		- Clear browser cache and retry.
+		- If the device is rooted/jailbroken, it cannot be enrolled.
+		- Contact IT Helpdesk if the issue persists.
+
+Effective Date: January 15th, 2025
+Approved by: IT Governance Committee

@@ -1,0 +1,79 @@
+Corporate Printer Use Policy
+
+Purpose:
+To establish guidelines for secure and responsible use of corporate printing resources.
+
+	1	Scope: This policy applies to all employees, contractors, and consultants using company-managed printers, copiers, and multifunction devices.
+	2	Authentication and Access
+		- All printers require badge tap or PIN authentication before releasing print jobs (pull printing).
+		- Access is role-based: standard users can print and copy; administrators can manage settings.
+		- Access logs are maintained for audit and security purposes.
+	3	Printing Defaults
+		- Default: black-and-white, double-sided (duplex).
+		- Color printing requires department code authorization.
+		- Monthly quota: 500 pages per employee. Exceptions require manager approval.
+		- Uncollected print jobs are automatically deleted after 4 hours.
+	4	Secure Printing
+		- Documents are held in queue until the user authenticates at the device.
+		- Sensitive documents (HR, financial, legal) must use "Confidential Print" requiring PIN at the printer.
+		- Encrypted communication (TLS/SSL) is used between devices and printers.
+		- DLP controls may block printing of restricted or personally identifiable information.
+	5	Remote and Mobile Printing
+		- Remote printing requires an active VPN connection.
+		- Mobile printing is supported via the approved corporate printing app (available in Software Center).
+		- Personal devices must be enrolled in MDM before printing is permitted.
+	6	Physical Security
+		- Confidential printouts left uncollected are shredded at end of business day.
+		- Secure shredding bins are located adjacent to all printers.
+		- Tampering with printer hardware or configurations is prohibited.
+	7	Prohibited Actions
+		- Printing personal documents on corporate printers.
+		- Leaving confidential documents unattended on output trays.
+		- Connecting unauthorized printers to the corporate network.
+		- Disabling security features, bypassing authentication, or sharing PINs.
+	8	Reporting Issues
+		- Printer malfunctions: submit via IT self-service portal or contact IT Helpdesk.
+		- Security concerns (unauthorized documents found, suspected breach): report to security@company.com immediately.
+		- Supply issues (paper, toner): notify facilities management via service portal.
+	9	How To: Print a Document
+		- Step 1: Send your document to print from any application (File > Print).
+		- Step 2: Walk to any networked corporate printer.
+		- Step 3: Tap your badge or enter your PIN on the printer panel.
+		- Step 4: Your queued jobs will appear on screen. Select the job(s) to release.
+		- Step 5: Collect your printout and confirm all pages are accounted for.
+	10	How To: Use Confidential Print
+		- Step 1: In the print dialog, select "Confidential Print" or "Secure Print" from the job type dropdown.
+		- Step 2: Enter a 4-6 digit PIN when prompted and click Print.
+		- Step 3: At the printer, tap your badge or log in, then navigate to "Confidential Jobs" or "Secure Print."
+		- Step 4: Enter the same PIN you set in step 2.
+		- Step 5: Select the document to release and collect immediately.
+	11	How To: Set Up Remote/Mobile Printing
+		- Step 1: Connect to the corporate VPN.
+		- Step 2: Open the corporate printing app (download from Software Center if not installed).
+		- Step 3: Log in with your corporate credentials.
+		- Step 4: Select "Add Printer" and choose from the list of available corporate printers.
+		- Step 5: Send your print job. The document will queue until you authenticate at the printer on-site, or select "Print Now" if you have a delegate collecting.
+	12	How To: Request Color Printing Authorization
+		- Step 1: Submit a request via the IT self-service portal under "Printer Services > Color Access."
+		- Step 2: Provide your department code and business justification.
+		- Step 3: Your manager will receive an approval request.
+		- Step 4: Once approved, color printing is enabled for your account within 1 business day.
+	13	How To: Request a Quota Increase
+		- Step 1: Submit a request via the IT self-service portal under "Printer Services > Quota Increase."
+		- Step 2: Provide business justification and estimated additional pages needed.
+		- Step 3: Your manager will receive an approval request.
+		- Step 4: Once approved, the quota adjustment takes effect immediately.
+	14	Troubleshooting: Print Job Not Releasing
+		- Verify you are authenticating at a networked corporate printer (not a personal or guest device).
+		- Confirm your badge/PIN is correct; try re-tapping or re-entering.
+		- Check that the print job has not expired (jobs are deleted after 4 hours).
+		- If the printer panel shows an error, note the error code and report via IT self-service portal.
+		- Try a different printer to determine if the issue is device-specific.
+	15	Troubleshooting: DLP Block on Print Job
+		- DLP blocks occur when a document contains restricted content (e.g., personal identifiers, classified data).
+		- Review the document and remove or redact restricted content, then retry.
+		- If you believe the block is a false positive, submit a request via IT self-service portal under "Printer Services > DLP Exception" with the document name and business justification.
+		- Exceptions are reviewed by the security team within 4 business hours.
+
+Effective Date: January 15th, 2025
+Approved by: IT Governance Committee

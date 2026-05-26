@@ -1,0 +1,74 @@
+Multi-Factor Authentication (MFA) Policy
+
+Purpose:
+To ensure secure access to corporate systems by requiring multi-factor authentication for all users, reducing the risk of unauthorized access from compromised credentials.
+
+	1	Scope: This policy applies to all employees, contractors, and consultants accessing corporate systems, including email, cloud services, VPN, and administrative portals.
+	2	What Is MFA
+		- MFA requires two or more verification factors to access an account: something you know (password), something you have (phone, security key), or something you are (biometric).
+		- MFA is mandatory for all corporate accounts. It cannot be disabled by individual users.
+	3	Where MFA Is Required
+		- Microsoft 365 (email, Teams, SharePoint, OneDrive).
+		- Google Workspace (if applicable).
+		- VPN remote access.
+		- IT administrative portals (elevated MFA requirements apply — see section 8).
+		- Any application using corporate Single Sign-On (SSO).
+		- Self-service password reset verification.
+	4	Approved MFA Methods (Ranked by Security)
+		- Security key (YubiKey or equivalent FIDO2 device) — strongest, phishing-resistant.
+		- Microsoft Authenticator or Google Authenticator with number matching.
+		- Authenticator app with one-time passcode (TOTP).
+		- Biometric verification (fingerprint, face recognition) on enrolled devices.
+		- SMS or voice call code — weakest, used only as a fallback.
+		- Email-based codes are NOT approved for MFA.
+	5	How To: Set Up MFA for the First Time
+		- Step 1: Log in to https://mysignins.microsoft.com/security-info (or https://myaccount.google.com/security for Google Workspace).
+		- Step 2: Click "Add sign-in method."
+		- Step 3: Select your preferred method (authenticator app recommended).
+		- Step 4 (Authenticator App): Download Microsoft Authenticator or Google Authenticator from your device's app store.
+		- Step 5: Scan the QR code displayed on screen with the authenticator app.
+		- Step 6: Enter the verification code shown in the app to confirm setup.
+		- Step 7: Register a backup method (e.g., phone number for SMS) in case your primary method is unavailable.
+	6	How To: Set Up a Security Key (FIDO2)
+		- Step 1: Obtain an approved security key from IT (available via IT self-service portal under "Hardware Requests > Security Key").
+		- Step 2: Navigate to https://mysignins.microsoft.com/security-info and click "Add sign-in method."
+		- Step 3: Select "Security key" and choose USB or NFC depending on your key type.
+		- Step 4: Insert the key (USB) or tap it (NFC) when prompted.
+		- Step 5: Create a PIN for the key when prompted.
+		- Step 6: Touch the key's sensor to complete registration.
+	7	How MFA Works Day-to-Day
+		- On trusted devices: MFA is prompted once, then remembered for 14 days (unless a high-risk sign-in is detected).
+		- On new or untrusted devices: MFA is prompted every time.
+		- High-risk sign-ins (unusual location, unfamiliar device, impossible travel): MFA is always re-prompted regardless of trust status.
+		- If you approve an MFA prompt you did not initiate, change your password immediately and report to security@company.com.
+	8	Administrative Accounts
+		- Users with admin access to Microsoft 365, Azure, or other management portals must use phishing-resistant MFA (security key or authenticator with number matching).
+		- SMS-based MFA is not permitted for admin accounts.
+	9	Troubleshooting: MFA Prompt Not Arriving
+		- Authenticator app: ensure notifications are enabled for the app in device settings. Open the app manually to check for pending prompts.
+		- SMS code: verify your registered phone number is correct at https://mysignins.microsoft.com/security-info. Check for carrier signal issues.
+		- Ensure device clock is synchronized (TOTP codes are time-sensitive; auto-set time zone is recommended).
+		- Try your backup MFA method if primary is unavailable.
+		- Contact IT Helpdesk if no methods are working.
+	10	Troubleshooting: Locked Out Due to MFA
+		- If you have lost access to all registered MFA methods (lost phone, broken security key):
+		- Step 1: Contact IT Helpdesk at +1-800-555-HELP (4357).
+		- Step 2: Verify your identity by providing employee ID, manager's name, and department.
+		- Step 3: IT will perform a temporary MFA reset.
+		- Step 4: You will be required to re-register MFA methods immediately upon next login.
+		- To avoid future lockouts, always maintain at least two registered MFA methods.
+	11	Troubleshooting: Suspicious MFA Prompt (Not Initiated by You)
+		- Do NOT approve the prompt.
+		- This may indicate someone has your password and is attempting access.
+		- Step 1: Deny or ignore the prompt.
+		- Step 2: Change your password immediately (see password_reset.txt).
+		- Step 3: Report to security@company.com with the time and details.
+		- Step 4: Review recent sign-in activity at https://mysignins.microsoft.com.
+	12	Lost or Replaced Phone
+		- Step 1: Log in from a trusted device or use your backup MFA method.
+		- Step 2: Go to https://mysignins.microsoft.com/security-info.
+		- Step 3: Remove the old device and register the new one following section 5.
+		- If you cannot log in at all, follow the lockout procedure in section 10.
+
+Effective Date: January 15th, 2025
+Approved by: IT Governance Committee

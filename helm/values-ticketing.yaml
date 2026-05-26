@@ -95,6 +95,11 @@ ticketingZammad:
           openshift:
             adaptSecurityContext: force
 
+knowledgeBases:
+  configMaps:
+    - name: kb-general-support
+      kbName: general-support
+
 requestManagement:
   agentService:
     promptOverrides:

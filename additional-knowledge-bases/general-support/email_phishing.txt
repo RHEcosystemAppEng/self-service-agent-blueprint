@@ -1,0 +1,61 @@
+Corporate Email Phishing Detection and Reporting
+
+Purpose:
+To help employees identify, avoid, and report phishing emails targeting corporate accounts.
+
+	1	Scope: This policy applies to all employees, contractors, and consultants using company-issued email accounts (Microsoft 365 / Outlook).
+	2	Common Signs of a Phishing Email
+		- Sender address does not match the display name (e.g., "IT Support" but from random-string@external-domain.com).
+		- Urgent or threatening language ("Your account will be suspended in 24 hours").
+		- Unexpected attachments, especially .zip, .exe, .docm, or password-protected files.
+		- Links that do not match the displayed text (hover to check the actual URL before clicking).
+		- Requests for credentials, personal information, or payment outside of normal processes.
+		- Generic greetings ("Dear User") instead of your name.
+		- Poor grammar, misspellings, or unusual formatting inconsistent with the claimed sender.
+		- "Reply-to" address differs from the "From" address.
+	3	What To Do If You Suspect a Phishing Email
+		- Do NOT click any links or open any attachments.
+		- Do NOT reply to the email or forward it to colleagues.
+		- Step 1: Click the "Report Phishing" button in Outlook (located in the ribbon or right-click menu).
+		- Step 2: If the "Report Phishing" button is unavailable, forward the email as an attachment to phishing@company.com.
+		- Step 3: Delete the email from your inbox after reporting.
+		- The security team reviews all submissions and will notify you if further action is needed.
+	4	What To Do If You Clicked a Phishing Link or Entered Credentials
+		- Step 1: Immediately reset your password at https://accounts.google.com/signin/recovery or https://passwordreset.company.com.
+		- Step 2: Report the incident to security@company.com with the subject line "Phishing - Credentials Compromised."
+		- Step 3: Note the time you clicked and any information you entered.
+		- Step 4: Do NOT delete the email — security will need it for investigation.
+		- Step 5: The security team will assess your account for unauthorized access and may temporarily lock it as a precaution.
+		- Step 6: Enable or verify 2-Step Verification on your account if not already active.
+	5	What To Do If You Opened a Suspicious Attachment
+		- Step 1: Disconnect from Wi-Fi or unplug the ethernet cable immediately.
+		- Step 2: Do NOT restart or shut down the computer (this may destroy forensic evidence).
+		- Step 3: Call the IT Helpdesk at +1-800-555-HELP (4357) and report what was opened.
+		- Step 4: IT will remotely assess and may quarantine your device.
+		- Step 5: Do not use the device until cleared by IT.
+	6	Common Phishing Scenarios in Corporate Environments
+		- Fake password reset emails impersonating IT or Google/Microsoft.
+		- Invoices or purchase orders from unknown vendors requesting immediate payment.
+		- "Shared document" notifications with links to credential harvesting pages.
+		- Messages impersonating executives requesting urgent wire transfers or gift card purchases (CEO fraud / business email compromise).
+		- Calendar invites from unknown senders containing malicious links.
+		- Fake delivery notifications (FedEx, UPS, DHL) with tracking links.
+	7	How To Verify a Suspicious Email
+		- Hover over links to inspect the actual URL — legitimate company links use company.com domains.
+		- Check the sender's full email address (click or expand the "From" field), not just the display name.
+		- Contact the supposed sender through a separate channel (phone, Teams, or a new email) to confirm they sent it.
+		- If the email claims to be from IT or security, verify by calling the IT Helpdesk directly.
+		- Never use contact information provided in the suspicious email itself.
+	8	Phishing Simulation Program
+		- The company conducts periodic phishing simulations to test awareness.
+		- If you click a simulated phish, you will be redirected to a training page — this is not a penalty.
+		- Repeated failures on simulations may require completion of additional security awareness training.
+		- Reporting a simulation correctly counts positively toward department security metrics.
+	9	Reporting Channels Summary
+		- Report Phishing button in Outlook: preferred method for suspected phishing emails.
+		- phishing@company.com: forward as attachment if the button is unavailable.
+		- security@company.com: for compromised credentials, opened attachments, or active security incidents.
+		- IT Helpdesk (+1-800-555-HELP): for urgent situations requiring immediate device isolation.
+
+Effective Date: January 15th, 2025
+Approved by: IT Governance Committee
