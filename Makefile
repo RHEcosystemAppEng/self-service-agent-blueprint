@@ -1564,11 +1564,6 @@ define helm_install_common
 		--from-literal=servicenow-api-key="$${SERVICENOW_API_KEY:-}" \
 		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
 
-	@echo "Creating additional knowledge base ConfigMaps..."
-	@kubectl create configmap kb-general-support \
-		--from-file=./additional-knowledge-bases/general-support/ \
-		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
-
 	@echo "Cleaning up any existing jobs..."
 	@kubectl delete job -l app.kubernetes.io/instance=$(MAIN_CHART_NAME) -n $(NAMESPACE) --ignore-not-found || true
 	@echo "Installing $(MAIN_CHART_NAME) helm chart $(1)"
@@ -1700,7 +1695,11 @@ helm-install-demo: namespace helm-depend deploy-email-server
 # and restarts dependent deployments — no separate token step required.
 .PHONY: helm-install-ticketing
 helm-install-ticketing: namespace helm-depend
-	@echo "Step 1/2: Installing main chart with Zammad subchart..."
+	@echo "Step 1/3: Creating additional knowledge base ConfigMaps..."
+	@kubectl create configmap kb-general-support \
+		--from-file=./additional-knowledge-bases/general-support/ \
+		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+	@echo "Step 2/3: Installing main chart with Zammad subchart..."
 	@# Create initial credentials secret with empty token so main chart resources can start.
 	@kubectl create secret generic $(ZAMMAD_CREDENTIALS_SECRET) \
 		--from-literal=zammad-url="$(ZAMMAD_URL)" \
@@ -1773,7 +1772,7 @@ helm-install-ticketing: namespace helm-depend
 		helm uninstall zammad-demo-site -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true; \
 	fi
 	@$(MAKE) print-urls
-	@echo "Step 2/2: Printing checklist..."
+	@echo "Step 3/3: Printing checklist..."
 	@$(MAKE) _helm-install-ticketing-print-checklist NAMESPACE=$(NAMESPACE)
 
 .PHONY: _helm-install-ticketing-print-checklist
