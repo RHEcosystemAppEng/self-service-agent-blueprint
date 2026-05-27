@@ -59,6 +59,8 @@ spec:
               value: {{ .Release.Name | quote }}
             - name: ZAMMAD_INIT_JOB_WAIT_TIMEOUT_SEC
               value: {{ .Values.bootstrap.waitForZammadInitJobTimeoutSec | default 3600 | quote }}
+            - name: ZAMMAD_POST_USER_CREATE_SETTLE_SEC
+              value: {{ .Values.bootstrap.postUserCreateSettleSec | default 0 | quote }}
             {{- if .Values.bootstrap.createToken }}
             - name: ZAMMAD_CREATE_TOKEN
               value: "true"

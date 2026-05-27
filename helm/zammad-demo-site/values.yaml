@@ -103,17 +103,5 @@ demoSite:
             bg: "#fed7aa"
             shortName: Escalated 2
             roleShort: Laptop refresh
-    - id: cat-specialist
-      navLabel: Laptop specialist
-      sectionTitle: Laptop specialist
-      rows:
-        - role: Agent
-          email: agent.laptop-specialist@example.com
-          password: "ChangeMe123!"
-          persona:
-            icon: "💻"
-            bg: "#ccfbf1"
-            shortName: Specialist
-            roleShort: Laptop agent
 
 image: nginxinc/nginx-unprivileged:alpine
