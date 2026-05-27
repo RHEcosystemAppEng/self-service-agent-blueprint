@@ -19,6 +19,14 @@ inputs:
     description: Number of replicas for scalable services (request-manager, agent, etc.). Mock eventing stays at 1 for FIFO; production uses Kafka.
     required: false
     default: "1"
+  helm_target:
+    description: "Makefile target for helm install (e.g. helm-install-test, helm-install-ticketing)"
+    required: false
+    default: "helm-install-test"
+  extra_helm_args:
+    description: "Additional Helm arguments passed via EXTRA_HELM_ARGS"
+    required: false
+    default: "--set requestManagement.networkPolicies.platform=kind --set requestManagement.requestManager.externalAccess.enabled=false --set requestManagement.integrationDispatcher.externalAccess.enabled=false"
   use_pip_install:
     description: "Use pip install from requirements.txt instead of uv sync (default: false)"
     required: false
@@ -61,5 +69,5 @@ runs:
       shell: bash
 
     - name: Helm Install (using local registry)
-      run: make helm-install-test NAMESPACE=${{inputs.namespace}} REGISTRY=localhost:5001 LLM=${{inputs.llm}} LLM_ID=${{inputs.llm_id}} LLM_URL=${{inputs.llm_url}} LLM_API_TOKEN=$LLM_API_TOKEN REPLICA_COUNT=${{inputs.replica_count}} EXTRA_HELM_ARGS="--set requestManagement.networkPolicies.platform=kind --set requestManagement.requestManager.externalAccess.enabled=false --set requestManagement.integrationDispatcher.externalAccess.enabled=false"
+      run: make ${{inputs.helm_target}} NAMESPACE=${{inputs.namespace}} REGISTRY=localhost:5001 LLM=${{inputs.llm}} LLM_ID=${{inputs.llm_id}} LLM_URL=${{inputs.llm_url}} LLM_API_TOKEN=$LLM_API_TOKEN REPLICA_COUNT=${{inputs.replica_count}} EXTRA_HELM_ARGS="${{inputs.extra_helm_args}}"
       shell: bash
