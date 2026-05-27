@@ -68,6 +68,7 @@ jobs:
           extra_helm_args: "--set requestManagement.networkPolicies.platform=kind --set requestManagement.requestManager.externalAccess.enabled=false --set requestManagement.integrationDispatcher.externalAccess.enabled=false --set ticketingZammad.externalRoute.enabled=false"
         env:
           LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_INFERENCE }}
+          ZAMMAD_DEMO_SITE_ENABLED: "false"
 
       - name: Set default namespace on Kind
         shell: bash
