@@ -53,6 +53,8 @@ states:
       CRITICAL: Do NOT include [knowledge_search(...)] or [file_search(...)] in your response text.
 
       CRITICAL: Do NOT share your internal thinking. Speak directly and professionally.
+
+      When calling a tool, use the built-in function calling mechanism. Do not write the tool call as JSON text in your response.
     transitions:
       success: "waiting_for_follow_up"
 
@@ -84,6 +86,8 @@ states:
       CRITICAL: Do NOT share your internal thinking. Speak directly and professionally. Do NOT repeat your introduction.
 
       Answer the user using only what the file search tool returned.
+
+      When calling a tool, use the built-in function calling mechanism. Do not write the tool call as JSON text in your response.
     transitions:
       success: "waiting_for_follow_up"
 
