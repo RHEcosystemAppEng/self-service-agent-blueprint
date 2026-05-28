@@ -379,7 +379,7 @@
           <div class="brand"><span class="icon" aria-hidden="true">⌂</span> {{ $product }}</div>
           <h1>{{ $hero }}</h1>
           <p class="lead">{{ $sub }}</p>
-          <a class="btn-hero-open" href="{{ $u }}/" target="_blank" rel="noopener">Open Zammad</a>
+          <a class="btn-hero-open" href="{{ $u }}/" target="zammad-demo-window">Open Zammad</a>
         </header>
       </aside>
 
@@ -419,7 +419,7 @@
     <p class="footer-links">
       <a href="chat-snippet.html">Chat widget snippet page</a>
       ·
-      <a href="{{ $u }}/" target="_blank" rel="noopener">Zammad home</a>
+      <a href="{{ $u }}/" target="zammad-demo-window">Zammad home</a>
     </p>
   </div>
 
@@ -459,7 +459,7 @@
       </div>
       <div class="modal-footer">
         <p class="modal-footer-hint">Copy credentials above, or use persona quick pick on the main page for same-host sign-in.</p>
-        <a class="btn-modal-open-zammad" href="{{ $u }}/" target="_blank" rel="noopener">Open Zammad</a>
+        <a class="btn-modal-open-zammad" href="{{ $u }}/" target="zammad-demo-window">Open Zammad</a>
       </div>
     </div>
   </div>
@@ -645,8 +645,13 @@
         personaBtn.classList.add('is-busy');
         personaBtn.setAttribute('aria-busy', 'true');
         signInToZammad(email, password).then(function() {
-          window.open(ZAMMAD_BASE + '/#/', '_blank', 'noopener,noreferrer');
-          showToast('Opened Zammad in a new tab.');
+          var demoWin = window.open('', 'zammad-demo-window');
+          if (demoWin) {
+            demoWin.location.href = ZAMMAD_BASE + '/';
+          } else {
+            window.open(ZAMMAD_BASE + '/', 'zammad-demo-window');
+          }
+          showToast('Signed in. Zammad is open in the demo window.');
         }).catch(function(err) {
           openAccountsModal(sectionId);
           showToast((err && err.message) ? err.message : 'Sign-in failed. Use View all accounts to copy credentials.');
