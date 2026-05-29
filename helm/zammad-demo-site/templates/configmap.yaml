@@ -26,6 +26,8 @@ data:
 {{ include "zammad-demo-site.demoSiteIndex" (dict "zammadUrl" $zammadUrl "Values" .Values "Release" .Release) | nindent 4 }}
   chat-snippet.html: |
 {{ include "zammad-demo-site.chatSnippetPage" (dict "zammadUrl" $zammadUrl "Values" .Values) | nindent 4 }}
+  zammad-shell.html: |
+{{ include "zammad-demo-site.zammadShell" (dict "zammadUrl" $zammadUrl) | nindent 4 }}
   default.conf: |
     server {
         listen 8080;

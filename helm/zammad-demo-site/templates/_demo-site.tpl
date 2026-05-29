@@ -369,6 +369,37 @@
     }
     .footer-links { font-size: 0.875rem; color: var(--text-muted); margin-top: 0.75rem; text-align: center; }
     .footer-links a { color: var(--accent); }
+    .session-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 400;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      padding: 0.65rem 1rem;
+      background: #fef3c7;
+      border-bottom: 1px solid #f59e0b;
+      color: #78350f;
+      font-size: 0.875rem;
+      text-align: center;
+    }
+    .session-banner.is-visible { display: flex; }
+    .session-banner button {
+      font-family: inherit;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      padding: 0.3rem 0.65rem;
+      border-radius: 6px;
+      border: 1px solid #d97706;
+      background: #fff;
+      color: #92400e;
+      cursor: pointer;
+    }
+    body.has-session-banner .page { padding-top: 3rem; }
   </style>
 </head>
 <body>
@@ -379,7 +410,7 @@
           <div class="brand"><span class="icon" aria-hidden="true">⌂</span> {{ $product }}</div>
           <h1>{{ $hero }}</h1>
           <p class="lead">{{ $sub }}</p>
-          <a class="btn-hero-open" href="{{ $u }}/" target="zammad-demo-window">Open Zammad</a>
+          <a class="btn-hero-open js-open-zammad" href="zammad-shell.html" target="zammad-demo-window">Open Zammad</a>
         </header>
       </aside>
 
@@ -419,7 +450,7 @@
     <p class="footer-links">
       <a href="chat-snippet.html">Chat widget snippet page</a>
       ·
-      <a href="{{ $u }}/" target="zammad-demo-window">Zammad home</a>
+      <a href="zammad-shell.html" class="js-open-zammad" target="zammad-demo-window">Zammad home</a>
     </p>
   </div>
 
@@ -459,9 +490,15 @@
       </div>
       <div class="modal-footer">
         <p class="modal-footer-hint">Copy credentials above, or use persona quick pick on the main page for same-host sign-in.</p>
-        <a class="btn-modal-open-zammad" href="{{ $u }}/" target="zammad-demo-window">Open Zammad</a>
+        <a class="btn-modal-open-zammad js-open-zammad" href="zammad-shell.html" target="zammad-demo-window">Open Zammad</a>
       </div>
     </div>
+  </div>
+
+  <div class="session-banner" id="session-banner" role="alert" aria-live="assertive">
+    <span id="session-banner-text"></span>
+    <button type="button" id="session-banner-open">Open Zammad</button>
+    <button type="button" id="session-banner-dismiss" aria-label="Dismiss">Dismiss</button>
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -469,6 +506,12 @@
   <script>
   (function() {
     var ZAMMAD_BASE = {{ $u | trimSuffix "/" | quote }};
+    var HUB_CHANNEL = 'zammad-demo-hub';
+    var SESSION_KEY = 'zammad-demo-last-user';
+    var SHELL_URL = (function() {
+      var p = window.location.pathname.replace(/[^/]*$/, '');
+      return p + 'zammad-shell.html';
+    })();
 
     function showToast(msg) {
       var el = document.getElementById('toast');
@@ -562,6 +605,94 @@
       });
     }
 
+    var hub = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(HUB_CHANNEL) : null;
+
+    function rememberSignedInUser(email) {
+      try { sessionStorage.setItem(SESSION_KEY, email); } catch (e) { /* ignore */ }
+    }
+
+    function lastSignedInUser() {
+      try { return sessionStorage.getItem(SESSION_KEY) || ''; } catch (e) { return ''; }
+    }
+
+    function openZammadShell(email) {
+      if (email) rememberSignedInUser(email);
+      if (email && hub) hub.postMessage({ action: 'login_changed', email: email });
+
+      return new Promise(function(resolve) {
+        function finish(opened) {
+          resolve({ opened: opened });
+        }
+
+        if (!hub) {
+          var demoWin = window.open('', 'zammad-demo-window');
+          if (demoWin) {
+            demoWin.location.href = SHELL_URL;
+            demoWin.focus();
+          } else {
+            window.open(SHELL_URL, 'zammad-demo-window');
+          }
+          finish(true);
+          return;
+        }
+
+        var shellHandled = false;
+        function onHubReply(ev) {
+          if (ev.data && ev.data.action === 'pong') shellHandled = true;
+        }
+        hub.addEventListener('message', onHubReply);
+        hub.postMessage({ action: 'ping' });
+        setTimeout(function() {
+          hub.removeEventListener('message', onHubReply);
+          if (!shellHandled) {
+            var demoWin = window.open(SHELL_URL, 'zammad-demo-window');
+            if (demoWin) demoWin.focus();
+            finish(true);
+          } else {
+            finish(false);
+          }
+        }, 150);
+      });
+    }
+
+    function showSessionBanner(email) {
+      var banner = document.getElementById('session-banner');
+      var text = document.getElementById('session-banner-text');
+      if (!banner || !text || !email) return;
+      var localUser = lastSignedInUser();
+      if (localUser && localUser === email) return;
+      text.textContent = 'Another demo user (' + email + ') signed in elsewhere. Zammad now uses that session.';
+      banner.classList.add('is-visible');
+      document.body.classList.add('has-session-banner');
+    }
+
+    function hideSessionBanner() {
+      var banner = document.getElementById('session-banner');
+      if (!banner) return;
+      banner.classList.remove('is-visible');
+      document.body.classList.remove('has-session-banner');
+    }
+
+    if (hub) {
+      hub.onmessage = function(ev) {
+        var data = ev.data;
+        if (!data || !data.action) return;
+        if (data.action === 'login_changed' && data.email) {
+          showSessionBanner(data.email);
+        }
+      };
+    }
+
+    var bannerOpen = document.getElementById('session-banner-open');
+    if (bannerOpen) {
+      bannerOpen.addEventListener('click', function() {
+        openZammadShell('');
+        hideSessionBanner();
+      });
+    }
+    var bannerDismiss = document.getElementById('session-banner-dismiss');
+    if (bannerDismiss) bannerDismiss.addEventListener('click', hideSessionBanner);
+
     var modal = document.getElementById('accounts-modal');
 
     function scrollAccountsBlock(id) {
@@ -632,6 +763,12 @@
       if (handleCredCopy(ev, root, '.js-copy-email', 'data-email', 'email', 'Email copied', 'Could not copy email')) return;
       if (handleCredCopy(ev, root, '.js-copy-password', 'data-password', 'password', 'Password copied', 'Could not copy password')) return;
 
+      if (root.closest('.js-open-zammad')) {
+        ev.preventDefault();
+        openZammadShell('');
+        return;
+      }
+
       var personaBtn = root.closest('.js-persona-signin');
       if (personaBtn) {
         var email = personaBtn.getAttribute('data-email') || '';
@@ -645,13 +782,13 @@
         personaBtn.classList.add('is-busy');
         personaBtn.setAttribute('aria-busy', 'true');
         signInToZammad(email, password).then(function() {
-          var demoWin = window.open('', 'zammad-demo-window');
-          if (demoWin) {
-            demoWin.location.href = ZAMMAD_BASE + '/';
+          return openZammadShell(email);
+        }).then(function(result) {
+          if (result && result.opened) {
+            showToast('Signed in. Zammad is open in the demo window.');
           } else {
-            window.open(ZAMMAD_BASE + '/', 'zammad-demo-window');
+            showToast('Signed in. Zammad was refreshed in your other browser window.');
           }
-          showToast('Signed in. Zammad is open in the demo window.');
         }).catch(function(err) {
           openAccountsModal(sectionId);
           showToast((err && err.message) ? err.message : 'Sign-in failed. Use View all accounts to copy credentials.');
@@ -673,6 +810,48 @@
         closeAccountsModal();
       }
     });
+  })();
+  </script>
+</body>
+</html>
+{{- end }}
+
+{{- define "zammad-demo-site.zammadShell" -}}
+{{- $u := .zammadUrl -}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zammad</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #fff; }
+    iframe { display: block; width: 100%; height: 100%; border: none; }
+  </style>
+</head>
+<body>
+  <iframe id="zammad-frame" title="Zammad" src="{{ $u }}/"></iframe>
+  <script>
+  (function() {
+    var ZAMMAD_BASE = {{ $u | trimSuffix "/" | quote }};
+    var HUB_CHANNEL = 'zammad-demo-hub';
+    var frame = document.getElementById('zammad-frame');
+    var hub = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(HUB_CHANNEL) : null;
+
+    function reloadZammad() {
+      if (!frame) return;
+      frame.src = ZAMMAD_BASE + '/';
+      window.focus();
+    }
+
+    if (hub) {
+      hub.onmessage = function(ev) {
+        var data = ev.data;
+        if (!data || !data.action) return;
+        if (data.action === 'login_changed') reloadZammad();
+        if (data.action === 'ping') hub.postMessage({ action: 'pong' });
+      };
+    }
   })();
   </script>
 </body>
