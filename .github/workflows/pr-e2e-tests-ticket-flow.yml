@@ -1,0 +1,120 @@
+name: Pull Request - Ticket Flow E2E Tests
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'  # Run daily at 2 AM UTC
+
+# Cancel any previous runs of this workflow for the same PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  # uv version must match Makefile UV_VERSION (currently 0.8.9)
+  # Update this when UV_VERSION in Makefile changes
+  UV_VERSION: "0.8.9"
+  PYTHON_VERSION: "3.12"
+  # Namespace for e2e tests (used by kind action, kubectl, and make targets)
+  E2E_NAMESPACE: "test"
+
+jobs:
+  e2e-tests-ticket-flow:
+    name: Run ticket flow e2e tests (uv sync with evals)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate LLM_API_TOKEN_EVAL secret
+        shell: bash
+        env:
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL }}
+        run: |
+          if [ -z "${LLM_API_TOKEN}" ]; then
+            echo "LLM_API_TOKEN_EVAL secret is missing or empty. Set it in repository or organization secrets."
+            exit 1
+          fi
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Prepare Runner
+        uses: ./.github/actions/prepare-runner
+        with:
+          swap-storage: 'false'
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Local Dependencies
+        shell: bash
+        run: |
+          make oc
+          echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
+
+      - name: Initialize cluster and deploy application (ticketing mode)
+        uses: ./.github/actions/kind
+        with:
+          namespace: ${{ env.E2E_NAMESPACE }}
+          replica_count: "2"
+          llm: ${{ vars.LLM_INFERENCE }}
+          llm_id: ${{ vars.LLM_ID_INFERENCE }}
+          llm_url: ${{ vars.LLM_URL_INFERENCE }}
+          helm_target: "helm-install-ticketing"
+          extra_helm_args: "--set requestManagement.networkPolicies.platform=kind --set requestManagement.requestManager.externalAccess.enabled=false --set requestManagement.integrationDispatcher.externalAccess.enabled=false --set ticketingZammad.externalRoute.enabled=false"
+        env:
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_INFERENCE }}
+          ZAMMAD_DEMO_SITE_ENABLED: "false"
+
+      - name: Set default namespace on Kind
+        shell: bash
+        run: |
+          kubectl config set-context --current --namespace=${{ env.E2E_NAMESPACE }}
+
+      - name: Install evaluations dependencies
+        shell: bash
+        run: |
+          make sync-evaluations
+
+      - name: Run ticket laptop refresh flow evaluation
+        if: always()
+        shell: bash
+        run: |
+          make test-short-ticket-laptop-refresh
+        env:
+          LLM_URL: ${{ vars.LLM_URL_EVAL }}
+          LLM_API_TOKEN: ${{ secrets.LLM_API_TOKEN_EVAL }}
+
+      - name: Inspect Cluster - Self-Service Agent
+        if: failure()
+        uses: ./.github/actions/inspect
+        with:
+          artifactPrefix: self-service-agent-ticket-flow
+
+      - name: Create evaluations tarball
+        if: always()
+        shell: bash
+        run: |
+          if [ -d "evaluations/results" ]; then
+            tar -czf evaluations-results-ticket-flow-${{ github.run_id }}.tar.gz -C evaluations results/
+            echo "Tarball created successfully from evaluations/results/"
+            ls -lh evaluations-results-ticket-flow-${{ github.run_id }}.tar.gz
+          else
+            echo "evaluations/results directory not found, creating empty marker"
+            mkdir -p evaluations/results
+            echo "No evaluation results were generated" > evaluations/results/README.txt
+            tar -czf evaluations-results-ticket-flow-${{ github.run_id }}.tar.gz -C evaluations results/
+          fi
+
+      - name: Upload evaluations artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluations-results-ticket-flow-${{ github.run_id }}
+          path: evaluations-results-ticket-flow-${{ github.run_id }}.tar.gz
+          retention-days: 30
+          if-no-files-found: warn
