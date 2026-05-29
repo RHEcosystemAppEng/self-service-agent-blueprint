@@ -387,6 +387,7 @@ help:
 	@echo "  test-servicenow-bootstrap          - Run tests for ServiceNow automation scripts"
 	@echo "  test-mock-employee-data            - Run tests for mock employee data"
 	@echo "  test-mock-servicenow               - Run tests for mock ServiceNow"
+	@echo "  test-zammad-ui-conversation        - Run Playwright UI test for Zammad laptop-refresh conversation (requires ZAMMAD_URL)"
 	@echo "  test-short-resp-integration-request-mgr - Run short responses integration tests with Request Manager"
 	@echo "  test-short-ticket-laptop-refresh   - Run short responses integration tests for ticket-laptop-refresh flow"
 	@echo "  test-long-resp-integration-request-mgr - Run long responses integration tests with Request Manager"
@@ -1377,6 +1378,20 @@ test-mock-employee-data:
 .PHONY: test-mock-servicenow
 test-mock-servicenow:
 	$(call run_pytest,mock servicenow,mock-service-now)
+
+.PHONY: deps-zammad-ui-tests
+deps-zammad-ui-tests:
+	@echo "Installing Zammad UI test dependencies..."
+	cd evaluations/flows/ticket_laptop_refresh/ui_test && uv sync --group dev
+	cd evaluations/flows/ticket_laptop_refresh/ui_test && uv run playwright install chromium
+
+.PHONY: test-zammad-ui-conversation
+test-zammad-ui-conversation: deps-zammad-ui-tests
+	@if [ -z "$(ZAMMAD_URL)" ]; then \
+		echo "Error: ZAMMAD_URL is required"; \
+		exit 1; \
+	fi
+	cd evaluations/flows/ticket_laptop_refresh/ui_test && uv run pytest test_ui_conversation.py -v $(ARGS)
 
 .PHONY: sync-evaluations
 sync-evaluations:
