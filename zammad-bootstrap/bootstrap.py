@@ -1209,15 +1209,15 @@ def main():
     }
     get_or_create_user(
         "agent.laptop-specialist",
-        "Laptop",
-        "Specialist",
+        "Laptop Refresh AI",
+        "Agent",
         "agent.laptop-specialist@example.com",
         role_ids=agent_role_ids,
         group_ids=specialist_group_ids,
     )
     get_or_create_user(
         "agent.general",
-        "General",
+        "General AI",
         "Agent",
         "agent.general@example.com",
         role_ids=agent_role_ids,
