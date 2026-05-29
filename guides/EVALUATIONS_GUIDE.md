@@ -672,7 +672,7 @@ make test-long-resp-integration-request-mgr
 
 The target for the longer integration was used throughout the development of the quickstart to identify if any regressions had been introduced by changes, and to iteratively improve the agent prompts.
 
-The target for the short integration run was used in CI to validate the basic operation of the self service agent for every PR.
+The target for the longer integration run was used in CI to validate the basic operation of the self service agent for every PR.
 
 ## 3. Creating Predefined Conversations
 
