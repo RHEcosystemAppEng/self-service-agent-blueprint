@@ -58,7 +58,10 @@ Your responsibilities:
 Note: Providing clear, factual information about potential rejection or additional approvals is sufficient. You do not need to be overly cautionary or repeatedly emphasize warnings. Always confirm with the user before creating tickets."""
 
 
-def _convert_to_turns(conversation_data: List[Dict[str, str]]) -> List[Turn]:
+def _convert_to_turns(
+    conversation_data: List[Dict[str, Any]],
+    include_conversation_metadata: bool = False,
+) -> List[Turn]:
     """
     Convert conversation data from role/content format to DeepEval Turn objects.
 
@@ -66,9 +69,15 @@ def _convert_to_turns(conversation_data: List[Dict[str, str]]) -> List[Turn]:
     'role' and 'content' keys into DeepEval Turn objects that can be used for
     conversational evaluation. Empty content is automatically filtered out.
 
+    When include_conversation_metadata is True, conversation metadata
+    (expected/actual) is stored in Turn.additional_metadata so custom
+    metrics can access it without polluting turn content.
+
     Args:
         conversation_data: List of dictionaries with 'role' and 'content' keys
                           representing the conversation turns
+        include_conversation_metadata: If True, store conversation metadata in
+                          Turn.additional_metadata for custom metric evaluation.
 
     Returns:
         List[Turn]: List of DeepEval Turn objects ready for evaluation
@@ -86,7 +95,16 @@ def _convert_to_turns(conversation_data: List[Dict[str, str]]) -> List[Turn]:
         if role not in ["user", "assistant"]:
             role = "user"  # Default to user if role is invalid
 
-        turns.append(Turn(role=role, content=content))  # type: ignore[arg-type]
+        # Store conversation metadata in Turn.additional_metadata
+        # so custom metrics can access it without polluting content.
+        metadata = None
+        if include_conversation_metadata:
+            if role == "user" and "expected_conversation_metadata" in turn_data:
+                metadata = turn_data["expected_conversation_metadata"]
+            elif role == "assistant" and "actual_conversation_metadata" in turn_data:
+                metadata = turn_data["actual_conversation_metadata"]
+
+        turns.append(Turn(role=role, content=content, additional_metadata=metadata))
 
     return turns
 
@@ -102,6 +120,7 @@ def _evaluate_conversations(
     metrics: Optional[List[Any]] = None,
     chatbot_role: Optional[str] = None,
     default_context_dir: Optional[str] = None,
+    include_conversation_metadata: bool = False,
 ) -> int:
     """
     Main evaluation function that processes conversation files and generates assessment reports.
@@ -127,6 +146,7 @@ def _evaluate_conversations(
         metrics: Pre-loaded metrics list. If None, uses default get_metrics() with a new model.
         chatbot_role: Override for the chatbot role description. If None, uses the default role.
         default_context_dir: Override for the default context directory. If None, uses the standard path.
+        include_conversation_metadata: Whether to store in Turn.additional_metadata for custom metric evaluation.
 
     Returns:
         int: Exit code (0 for success, 1 for failure) indicating evaluation outcome
@@ -218,7 +238,7 @@ def _evaluate_conversations(
             )
 
             # Convert to turns
-            turns = _convert_to_turns(conversation_data)
+            turns = _convert_to_turns(conversation_data, include_conversation_metadata)
 
             if len(turns) < 2:
                 logger.warning(
@@ -627,6 +647,9 @@ if __name__ == "__main__":
         )
         flow_chatbot_role = getattr(flow_module, "CHATBOT_ROLE", None)
         flow_context_dir = str(flow_paths.context_dir)
+        flow_include_metadata = getattr(
+            flow_module, "DEFAULT_INCLUDE_CONVERSATION_METADATA", False
+        )
 
         print(f"Running flow '{flow_name}': {results_dir} -> {output_dir}")
         exit_code = _evaluate_conversations(
@@ -640,6 +663,7 @@ if __name__ == "__main__":
             metrics=flow_metrics,
             chatbot_role=flow_chatbot_role,
             default_context_dir=flow_context_dir,
+            include_conversation_metadata=flow_include_metadata,
         )
         overall_exit_code = max(overall_exit_code, exit_code)
 

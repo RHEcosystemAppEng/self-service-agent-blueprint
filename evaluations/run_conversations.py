@@ -70,6 +70,9 @@ if __name__ == "__main__":
         flow_initial_message = getattr(flow_module, "DEFAULT_INITIAL_MESSAGE", None)
         flow_skip_initial = getattr(flow_module, "DEFAULT_SKIP_INITIAL_MESSAGE", False)
         flow_ticket_title = getattr(flow_module, "DEFAULT_TICKET_TITLE", None)
+        flow_include_conversation_metadata = getattr(
+            flow_module, "DEFAULT_INCLUDE_CONVERSATION_METADATA", False
+        )
     else:
         # Default mode: existing behavior
         conversations_dir = "conversations_config/conversations"
@@ -79,6 +82,7 @@ if __name__ == "__main__":
         flow_initial_message = None
         flow_skip_initial = False
         flow_ticket_title = None
+        flow_include_conversation_metadata = False
 
     tester = ConversationFlowTester(
         test_script=test_script,
@@ -87,5 +91,6 @@ if __name__ == "__main__":
         skip_initial_message=flow_skip_initial,
         message_timeout=args.message_timeout,
         ticket_title=flow_ticket_title,
+        include_conversation_metadata=flow_include_conversation_metadata,
     )
     tester.run_flows(conversations_dir, output_dir)

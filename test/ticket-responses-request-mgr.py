@@ -57,15 +57,6 @@ DEFAULT_TICKET_TITLE = "Laptop refresh help request"
 # RM polling: limit 1 / latest session slice used by snapshot + agent_reply poll.
 _RM_CONVERSATIONS_KW = {"limit": 1, "offset": 0, "include_messages": True}
 
-_ZAMMAD_STATE_MAP = {
-    "new": "new",
-    "open": "being processed by agent",
-    "pending reminder": "escalated",
-    "pending close": "escalated",
-    "closed": "closed",
-    "merged": "closed",
-}
-
 
 def _customer_password_effective(cli_password: str | None) -> str:
     """HTTP Basic password for customer ``POST /ticket_articles`` (bootstrap default when unset/blank)."""
@@ -123,10 +114,10 @@ def _zammad_create_ticket(
     return data["id"], str(data["number"])
 
 
-def _zammad_get_ticket_status(
+def _zammad_get_conversation_metadata(
     base_url: str, token: str, ticket_id: int, state_map: dict[int, str]
 ) -> tuple[str, str, str]:
-    """Return (state, owner, group) for the ticket."""
+    """Return the metadata of (state, owner, group) for the ticket."""
     url = f"{_api_v1(base_url)}/tickets/{ticket_id}?expand=true"
     try:
         response = httpx.get(
@@ -136,7 +127,7 @@ def _zammad_get_ticket_status(
         data = response.json()
         state_id = data.get("state_id")
         state_name = state_map.get(state_id, str(state_id))
-        state = _ZAMMAD_STATE_MAP.get(state_name.lower(), state_name)
+        state = state_name
         owner = data.get("owner", {})
         if isinstance(owner, dict):
             owner_name = owner.get("fullname") or owner.get("login") or "unassigned"
@@ -346,11 +337,11 @@ async def _rm_tokens_cli_style(cli: CLIChatClient, *, rm_session_id: str) -> Non
 
 
 # ---------------------------------------------------------------------------
-# Chat loop with ticket status
+# Chat loop with ticket conversation metadata
 # ---------------------------------------------------------------------------
 
 
-async def _chat_loop_with_status(
+async def _chat_loop_with_conversation_metadata(
     rm_client: CLIChatClient,
     send_to_agent: Callable[[str], Awaitable[str]],
     *,
@@ -360,7 +351,7 @@ async def _chat_loop_with_status(
     zammad_base_url: str,
     zammad_token: str,
     state_map: dict[int, str],
-    show_ticket_status: bool,
+    include_conversation_metadata: bool,
     test_mode: bool,
 ) -> None:
     """
@@ -371,9 +362,14 @@ async def _chat_loop_with_status(
     It is printed to stdout so callers can strip it before saving conversations.
     """
 
-    def emit_status() -> None:
-        if show_ticket_status and ticket_id and zammad_base_url and zammad_token:
-            state, owner, group = _zammad_get_ticket_status(
+    def emit_conversation_metadata() -> None:
+        if (
+            include_conversation_metadata
+            and ticket_id
+            and zammad_base_url
+            and zammad_token
+        ):
+            state, owner, group = _zammad_get_conversation_metadata(
                 zammad_base_url, zammad_token, ticket_id, state_map
             )
             print(f"TICKET_STATUS:{ticket_number}:{state}:owner={owner}:group={group}")
@@ -414,7 +410,7 @@ async def _chat_loop_with_status(
                 agent_response = await send_to_agent(message)
                 print(f"agent: {agent_response}")
                 print(AGENT_MESSAGE_TERMINATOR)
-                emit_status()
+                emit_conversation_metadata()
         except (EOFError, KeyboardInterrupt):
             pass
     else:
@@ -431,7 +427,7 @@ async def _chat_loop_with_status(
                         continue
                     agent_response = await send_to_agent(message)
                     print(f"agent: {agent_response}")
-                    emit_status()
+                    emit_conversation_metadata()
             except KeyboardInterrupt:
                 break
 
@@ -461,12 +457,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help=f"Title for the created Zammad ticket (default: '{DEFAULT_TICKET_TITLE}')",
     )
     parser.add_argument(
-        "--delete-ticket-on-close",
+        "--delete-ticket-on-exit",
         action="store_true",
         help="Delete the Zammad ticket when the session ends",
     )
     parser.add_argument(
-        "--show-ticket-status",
+        "--include-conversation_metadata",
         action="store_true",
         help="Emit a TICKET_STATUS line after each agent response",
     )
@@ -616,7 +612,7 @@ async def main() -> None:
     print("Using LangGraph state machine for conversation management")
 
     try:
-        await _chat_loop_with_status(
+        await _chat_loop_with_conversation_metadata(
             rm,
             send_to_agent,
             initial_message=initial_message,
@@ -625,12 +621,12 @@ async def main() -> None:
             zammad_base_url=zammad_base_url,
             zammad_token=zammad_token,
             state_map=state_map,
-            show_ticket_status=args.show_ticket_status,
+            include_conversation_metadata=args.include_conversation_metadata,
             test_mode=not sys.stdin.isatty(),
         )
     finally:
         if (
-            args.delete_ticket_on_close
+            args.delete_ticket_on_exit
             and ticket_id
             and zammad_base_url
             and zammad_token

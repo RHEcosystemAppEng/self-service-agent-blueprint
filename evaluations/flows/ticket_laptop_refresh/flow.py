@@ -9,6 +9,7 @@ DEFAULT_SKIP_INITIAL_MESSAGE: bool = True
 DEFAULT_INITIAL_MESSAGE: str = "requesting a laptop refresh"
 # Explicit subject for Zammad ticket creation (same default as test/ticket-responses-request-mgr.py).
 DEFAULT_TICKET_TITLE: str = "Laptop refresh help request"
+DEFAULT_INCLUDE_CONVERSATION_METADATA: bool = True
 KNOWLEDGE_BASE_DIRS: List[str] = ["laptop-refresh"]
 INCLUDE_SNOW_DATA: bool = True
 

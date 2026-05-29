@@ -7,19 +7,39 @@
     "conversation": [
         {
             "role": "user",
-            "content": "I would like to refresh laptop"
+            "content": "I would like to refresh laptop",
+            "expected_conversation_metadata": {
+                "state": "open",
+                "owner": "agent.laptop-specialist",
+                "group": "Users"
+            }
         },
         {
             "role": "user",
-            "content": "actually can you help me reset my password? I'm locked out"
+            "content": "actually can you help me reset my password? I'm locked out",
+            "expected_conversation_metadata": {
+                "state": "open",
+                "owner": "agent.laptop-specialist",
+                "group": "Users"
+            }
         },
         {
             "role": "user",
-            "content": "ok what about my external monitor, it stopped working yesterday"
+            "content": "ok what about my external monitor, it stopped working yesterday",
+            "expected_conversation_metadata": {
+                "state": "open",
+                "owner": "agent.laptop-specialist",
+                "group": "Users"
+            }
         },
         {
             "role": "user",
-            "content": "close the ticket"
+            "content": "close the ticket",
+            "expected_conversation_metadata": {
+                "state": "closed",
+                "owner": "agent.laptop-specialist",
+                "group": "Users"
+            }
         }
     ]
 }

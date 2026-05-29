@@ -11,6 +11,7 @@ from typing import Any, List, Optional
 from deepeval.metrics import ConversationalGEval
 from deepeval.models import DeepEvalBaseLLM
 from deepeval.test_case import ConversationalTestCase, TurnParams
+from helpers.conversation_metadata_eval import ConversationMetadataEval
 from helpers.load_conversation_context import load_default_context
 
 # Context directory for this flow (populated at eval time by copy_flow_context).
@@ -343,6 +344,10 @@ def get_metrics(
                 "FAIL this metric ONLY if: the ticket is explicitly sent to the manager WITHOUT the agent having asked for confirmation first, or before the user responds.",
                 "IMPORTANT: Do NOT require the agent to confirm the ticket was sent. Do NOT fail this metric because the ticket was never sent. Do NOT consider whether the laptop selection was valid or invalid.",
             ],
+        ),
+        ConversationMetadataEval(
+            name="Correct conversation metadata",
+            threshold=1.0,
         ),
     ]
 

@@ -1,0 +1,44 @@
+{
+  "metadata": {
+    "authoritative_user_id": "sophie.dubois@company.com",
+    "description": "Actual conversation metadata does not match expected — fails with conversation metadata group and owner"
+  },
+  "conversation": [
+    {
+      "role": "user",
+      "content": "My printer is not working",
+      "expected_conversation_metadata": {
+        "state": "open",
+        "owner": "agent.general",
+        "group": "Users"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "Hello! I'm a general support agent. Let me help you with your printer issue. Have you tried restarting the printer?",
+      "actual_conversation_metadata": {
+        "state": "open",
+        "owner": "agent.general",
+        "group": "Users"
+      }
+    },
+    {
+      "role": "user",
+      "content": "Yes I tried, please close the ticket",
+      "expected_conversation_metadata": {
+        "state": "closed",
+        "owner": "agent.general",
+        "group": "Users"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "Your ticket has been closed. ticket_closed",
+      "actual_conversation_metadata": {
+        "state": "closed",
+        "owner": "-",
+        "group": "human_managed_tickets"
+      }
+    }
+  ]
+}
