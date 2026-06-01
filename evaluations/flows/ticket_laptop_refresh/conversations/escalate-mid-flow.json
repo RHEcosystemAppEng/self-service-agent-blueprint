@@ -7,15 +7,30 @@
     "conversation": [
         {
             "role": "user",
-            "content": "I would like to refresh my laptop"
+            "content": "I would like to refresh my laptop",
+            "expected_conversation_metadata": {
+                "state": "open",
+                "owner": "agent.laptop-specialist",
+                "group": "Users"
+            }
         },
         {
             "role": "user",
-            "content": "yes, show me the laptop options"
+            "content": "yes, show me the laptop options",
+            "expected_conversation_metadata": {
+                "state": "open",
+                "owner": "agent.laptop-specialist",
+                "group": "Users"
+            }
         },
         {
             "role": "user",
-            "content": "please escalate this ticket, I want a human to handle it"
+            "content": "please escalate this ticket, I want a human to handle it",
+            "expected_conversation_metadata": {
+                "state": "open",
+                "owner": "-",
+                "group": "escalated_laptop_refresh_tickets"
+            }
         }
     ]
 }

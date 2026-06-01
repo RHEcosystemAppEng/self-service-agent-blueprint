@@ -1,13 +1,13 @@
 {
     "metadata": {
-        "authoritative_user_id": "ahmed.hassan@company.com",
-        "description": "User asks a question, asks a follow-up, then escalates for further human assistance",
+        "authoritative_user_id": "yuki.tanaka@company.com",
+        "description": "User reports a slow laptop, then decides to explore replacing it and asks for escalation to a human.",
         "use_first_message_as_initial": true
     },
     "conversation": [
         {
             "role": "user",
-            "content": "My work email stopped syncing on my phone this morning",
+            "content": "My laptop works very slow this morning",
             "expected_conversation_metadata": {
                 "state": "open",
                 "owner": "agent.general",
@@ -16,7 +16,7 @@
         },
         {
             "role": "user",
-            "content": "I've already tried removing and re-adding the account but it still isn't working",
+            "content": "actually can you help me refresh my laptop? It's really slow and I think it's time for a new one",
             "expected_conversation_metadata": {
                 "state": "open",
                 "owner": "agent.general",
@@ -25,7 +25,7 @@
         },
         {
             "role": "user",
-            "content": "Please escalate this ticket, I need someone to take a proper look",
+            "content": "I would like to explore options for replacing my laptop. Please escalate this ticket, I need someone to take a proper look",
             "expected_conversation_metadata": {
                 "state": "open",
                 "owner": "-",

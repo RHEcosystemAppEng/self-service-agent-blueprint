@@ -5,6 +5,7 @@ from typing import Any, List, Optional
 from deepeval.metrics import ConversationalGEval
 from deepeval.models import DeepEvalBaseLLM
 from deepeval.test_case import TurnParams
+from helpers.conversation_metadata_eval import ConversationMetadataEval
 
 
 def get_metrics(
@@ -22,11 +23,12 @@ def get_metrics(
             evaluation_steps=[
                 "IMPORTANT: Zammad ticket channel — the ticket already exists; omitting 'return to routing agent' in favor of directing unrelated issues to a new ticket is CORRECT.",
                 "Evaluate whether the agent makes a genuine attempt to help the user with their IT question before any escalation or closure.",
-                "The agent is a general support agent with no specialist tools — it answers based on general IT knowledge.",
-                "PASS if the agent engages with the user's question and provides relevant information or guidance at any point in the conversation.",
+                "The agent is a general support agent that answers ONLY from its knowledge base — it does NOT use general IT knowledge.",
+                "PASS if the agent engages with the user's question and provides relevant information or guidance from its knowledge base at any point in the conversation.",
+                "PASS if the agent honestly tells the user it does not have information on the topic in its knowledge base and suggests contacting IT support directly — this is a helpful and correct response when the topic is not covered.",
                 "PASS if the agent escalates or closes the ticket in response to an explicit user request, even if no further troubleshooting is offered at that point — the agent has already fulfilled its helpfulness obligation.",
                 "FAIL if the agent escalates or closes the ticket on its very first response without making any attempt to engage with the user's question.",
-                "FAIL if the agent refuses to answer or ignores the user's question entirely.",
+                "FAIL if the agent refuses to answer or ignores the user's question entirely without explaining why.",
             ],
         ),
         ConversationalGEval(
@@ -69,6 +71,10 @@ def get_metrics(
                 "  - Tool call failures or stack traces visible in the response",
                 "PASS if the agent responds normally even if it cannot fully resolve the user's issue.",
             ],
+        ),
+        ConversationMetadataEval(
+            name="Correct conversation metadata",
+            threshold=1.0,
         ),
     ]
 

@@ -7,11 +7,21 @@
     "conversation": [
         {
             "role": "user",
-            "content": "My VPN keeps disconnecting every few minutes"
+            "content": "My VPN keeps disconnecting every few minutes",
+            "expected_conversation_metadata": {
+                "state": "open",
+                "owner": "agent.general",
+                "group": "Users"
+            }
         },
         {
             "role": "user",
-            "content": "Please escalate this to a network specialist"
+            "content": "Please escalate this to a network specialist",
+            "expected_conversation_metadata": {
+                "state": "open",
+                "owner": "-",
+                "group": "human_managed_tickets"
+            }
         }
     ]
 }

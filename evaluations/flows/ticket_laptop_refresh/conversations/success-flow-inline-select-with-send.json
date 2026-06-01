@@ -7,19 +7,39 @@
     "conversation": [
         {
             "role": "user",
-            "content": "I would like to refresh my laptop"
+            "content": "I would like to refresh my laptop",
+            "expected_conversation_metadata": {
+                "state": "open",
+                "owner": "agent.laptop-specialist",
+                "group": "Users"
+            }
         },
         {
             "role": "user",
-            "content": "yes, show me the available options"
+            "content": "yes, show me the available options",
+            "expected_conversation_metadata": {
+                "state": "open",
+                "owner": "agent.laptop-specialist",
+                "group": "Users"
+            }
         },
         {
             "role": "user",
-            "content": "I'll take option 1, please send it to my manager for approval"
+            "content": "I'll take option 1, please send it to my manager for approval",
+            "expected_conversation_metadata": {
+                "state": "open",
+                "owner": "agent.laptop-specialist",
+                "group": "Users"
+            }
         },
         {
             "role": "user",
-            "content": "yes"
+            "content": "yes",
+            "expected_conversation_metadata": {
+                "state": "open",
+                "owner": "manager1",
+                "group": "Users"
+            }
         }
     ]
 }

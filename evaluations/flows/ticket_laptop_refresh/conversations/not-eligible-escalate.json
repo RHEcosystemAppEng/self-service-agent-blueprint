@@ -7,11 +7,21 @@
     "conversation": [
         {
             "role": "user",
-            "content": "I would like to refresh my laptop"
+            "content": "I would like to refresh my laptop",
+            "expected_conversation_metadata": {
+                "state": "open",
+                "owner": "agent.laptop-specialist",
+                "group": "Users"
+            }
         },
         {
             "role": "user",
-            "content": "I'd like to escalate and request an exception"
+            "content": "I'd like to escalate and request an exception",
+            "expected_conversation_metadata": {
+                "state": "open",
+                "owner": "-",
+                "group": "escalated_laptop_refresh_tickets"
+            }
         }
     ]
 }
