@@ -205,7 +205,9 @@ def test_laptop_refresh_conversation(
         time.sleep(5)
         count = _article_count(customer_page)
 
-        print(f"Step {idx + 1}: sent {msg!r}, articles={count}, waiting for agent reply...")
+        print(
+            f"Step {idx + 1}: sent {msg!r}, articles={count}, waiting for agent reply..."
+        )
         _wait_for_agent_reply(customer_page, count, reply_timeout)
 
         expected = expected_metadata[idx]
