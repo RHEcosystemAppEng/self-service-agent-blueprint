@@ -426,16 +426,18 @@ spec:
         - name: LANGFUSE_REDIS_ENABLED
           value: "true"
         - name: REDIS_HOST
-          value: {{ include "self-service-agent.fullname" . }}-redis
+          value: {{ include "self-service-agent.fullname" . }}-langfuse-redis
         - name: REDIS_PORT
           value: "6379"
         - name: REDIS_AUTH
           valueFrom:
             secretKeyRef:
-              name: {{ include "self-service-agent.fullname" . }}-redis-secret
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-redis-secret
               key: password
         - name: REDIS_CONNECTION_STRING
           value: "redis://:$(REDIS_AUTH)@$(REDIS_HOST):$(REDIS_PORT)"
+        - name: NODE_OPTIONS
+          value: "--max-old-space-size=1536"
         ports:
         - name: http
           containerPort: {{ .Values.langfuse.service.port }}

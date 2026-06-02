@@ -1709,7 +1709,7 @@ to do it easily).
 First, deploy with Langfuse enabled:
 
 ```bash
-export LANGFUSE_ENABLED=true
+export ENABLE_LANGFUSE=true
 make helm-uninstall NAMESPACE=$NAMESPACE
 make helm-install-test NAMESPACE=$NAMESPACE
 ```
@@ -1782,7 +1782,7 @@ you can get on conversations after they have run.
 Once you are done, clean up by running:
 
 ```
-export LANGFUSE_ENABLED=false
+export ENABLE_LANGFUSE=false
 make helm-uninstall NAMESPACE=$NAMESPACE
 ```
 
