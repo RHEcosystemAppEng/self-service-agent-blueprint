@@ -1448,17 +1448,11 @@ test-short-ticket-laptop-refresh:
 	uv --directory evaluations run evaluate.py --message-timeout 1800 --timeout=1800 -n 1 --flow ticket_laptop_refresh,ticket_unrelated $(VALIDATE_LAPTOP_DETAILS_FLAG) $(STRUCTURED_OUTPUT_FLAG)
 	@echo "short responses integration test for ticket-laptop-refresh flow completed successfully!"
 
-.PHONY: test-short-ticket-laptop-refresh-scout-deploy
-test-short-ticket-laptop-refresh-scout-deploy:
-	@echo "Running ticket-laptop-refresh evaluation (llama-4-scout-17b-16e-w4a16 deploy, llama-3-3-70b-instruct-w8a8 eval, 10 conversations)..."
+.PHONY: test-long-ticket-laptop-refresh
+test-long-ticket-laptop-refresh:
+	@echo "Running ticket-laptop-refresh evaluation (10 conversations)..."
 	uv --directory evaluations run evaluate.py --message-timeout 1800 --timeout=1800 -n 10 --flow ticket_laptop_refresh,ticket_unrelated $(VALIDATE_LAPTOP_DETAILS_FLAG) $(STRUCTURED_OUTPUT_FLAG)
-	@echo "ticket-laptop-refresh evaluation (llama-4-scout-17b-16e-w4a16 deploy, llama-3-3-70b-instruct-w8a8 eval) completed successfully!"
-
-.PHONY: test-short-ticket-laptop-refresh-70b-deploy
-test-short-ticket-laptop-refresh-70b-deploy:
-	@echo "Running ticket-laptop-refresh evaluation (llama-3-3-70b-instruct-w8a8 deploy, llama-3-3-70b-instruct-w8a8 eval, 10 conversations)..."
-	uv --directory evaluations run evaluate.py --message-timeout 1800 --timeout=1800 -n 10 --flow ticket_laptop_refresh,ticket_unrelated $(VALIDATE_LAPTOP_DETAILS_FLAG) $(STRUCTURED_OUTPUT_FLAG)
-	@echo "ticket-laptop-refresh evaluation (llama-3-3-70b-instruct-w8a8 deploy, llama-3-3-70b-instruct-w8a8 eval) completed successfully!"
+	@echo "ticket-laptop-refresh evaluation completed successfully!"
 
 .PHONY: test-short-resp-integration-request-mgr
 test-short-resp-integration-request-mgr:
