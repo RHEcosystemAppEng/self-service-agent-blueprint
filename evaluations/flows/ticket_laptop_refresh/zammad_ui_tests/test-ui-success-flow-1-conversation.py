@@ -10,11 +10,17 @@ import pytest
 from playwright.sync_api import Browser, Page, expect
 
 
-def _load_conversation_messages() -> list[str]:
+OWNER_ID_TO_DISPLAY: dict[str, str] = {
+    "agent.laptop-specialist": "laptop",
+    "manager1": "manager",
+}
+
+
+def _load_conversation() -> list[dict[str, Any]]:
     flow_file = Path(__file__).resolve().parent.parent / "conversations" / "success-flow-1.json"
     with open(flow_file) as f:
         data = json.load(f)
-    return [msg["content"] for msg in data["conversation"] if msg["role"] == "user"]
+    return [msg for msg in data["conversation"] if msg["role"] == "user"]
 
 
 def _sign_in(page: Page, zammad_url: str, email: str, password: str) -> None:
@@ -46,16 +52,11 @@ def _wait_for_agent_reply(page: Page, count_before: int, timeout_s: int) -> None
     )
 
 
-def _scrape_tags(page: Page) -> set[str]:
-    tags: set[str] = set()
-    heading = page.locator(".sidebar-content >> text=TAGS").first
-    if heading.count() > 0:
-        text = heading.locator("xpath=..").inner_text()
-        for line in text.split("\n"):
-            line = line.strip()
-            if line and line.lower() not in ("tags", "+ add tag", ""):
-                tags.add(line.lower())
-    return tags
+def _scrape_state(page: Page) -> str:
+    el = page.locator(".sidebar-content select[name='state_id'] option:checked")
+    if el.count() > 0:
+        return el.first.inner_text().strip()
+    return ""
 
 
 def _scrape_owner(page: Page) -> str:
@@ -75,22 +76,23 @@ def _scrape_group(page: Page) -> str:
 
 
 def _assert_metadata(step: int, page: Page, expected: dict[str, Any]) -> None:
-    tags = _scrape_tags(page)
+    state = _scrape_state(page)
     owner = _scrape_owner(page)
     group = _scrape_group(page)
 
-    print(f"  Step {step + 1} metadata: tags={tags}, owner={owner!r}, group={group!r}")
+    print(f"  Step {step + 1} metadata: state={state!r}, owner={owner!r}, group={group!r}")
 
-    if "tags" in expected:
-        want = {t.lower() for t in expected["tags"]}
-        assert want.issubset(tags), (
-            f"Step {step + 1}: expected tags {want} ⊆ {tags}"
+    if "state" in expected:
+        assert expected["state"].lower() in state.lower(), (
+            f"Step {step + 1}: expected state to contain "
+            f"{expected['state']!r}, got {state!r}"
         )
 
-    if "owner_contains" in expected:
-        assert expected["owner_contains"].lower() in owner.lower(), (
+    if "owner" in expected:
+        display_name = OWNER_ID_TO_DISPLAY.get(expected["owner"], expected["owner"])
+        assert display_name.lower() in owner.lower(), (
             f"Step {step + 1}: expected owner to contain "
-            f"{expected['owner_contains']!r}, got {owner!r}"
+            f"{display_name!r} (from ID {expected['owner']!r}), got {owner!r}"
         )
 
     if "group" in expected:
@@ -141,23 +143,8 @@ def test_laptop_refresh_conversation(
     customer_page: Page,
     admin_page: Page,
 ) -> None:
-    expected_metadata: list[dict[str, Any] | None] = [
-        {
-            "tags": {"agent-managed-laptop-refresh"},
-            "owner_contains": "laptop specialist",
-            "group": "Users",
-        },
-        None,
-        None,
-        {
-            "tags": {"agent-managed-laptop-refresh", "pending-manager-review"},
-            "group": "Users",
-            "owner_contains": "manager",
-        },
-    ]
-
-    messages = _load_conversation_messages()
-    assert len(messages) >= 4, f"Expected >= 4 messages in flow, got {len(messages)}"
+    turns = _load_conversation()
+    assert len(turns) >= 4, f"Expected >= 4 turns in flow, got {len(turns)}"
 
     customer_page.goto(f"{zammad_url}/#customer_ticket_new")
     customer_page.wait_for_load_state("networkidle")
@@ -167,7 +154,7 @@ def test_laptop_refresh_conversation(
     body = customer_page.locator(".richtext-content[contenteditable='true']")
     expect(body).to_be_visible(timeout=10_000)
     body.click()
-    body.fill(messages[0])
+    body.fill(turns[0]["content"])
 
     customer_page.get_by_role("button", name="Create").click()
 
@@ -188,11 +175,10 @@ def test_laptop_refresh_conversation(
     admin_page.wait_for_load_state("networkidle")
     time.sleep(5)
 
-    if expected_metadata[0] is not None:
-        _assert_metadata(0, admin_page, expected_metadata[0])
+    _assert_metadata(0, admin_page, turns[0]["expected_conversation_metadata"])
 
-    for idx in range(1, len(messages)):
-        msg = messages[idx]
+    for idx in range(1, len(turns)):
+        msg = turns[idx]["content"]
 
         reply_box = customer_page.locator(
             ".article-new .richtext-content[contenteditable='true']"
@@ -210,9 +196,7 @@ def test_laptop_refresh_conversation(
         )
         _wait_for_agent_reply(customer_page, count, reply_timeout)
 
-        expected = expected_metadata[idx]
-        if expected is not None:
-            admin_page.reload()
-            admin_page.wait_for_load_state("networkidle")
-            time.sleep(5)
-            _assert_metadata(idx, admin_page, expected)
+        admin_page.reload()
+        admin_page.wait_for_load_state("networkidle")
+        time.sleep(5)
+        _assert_metadata(idx, admin_page, turns[idx]["expected_conversation_metadata"])
