@@ -1379,19 +1379,13 @@ test-mock-employee-data:
 test-mock-servicenow:
 	$(call run_pytest,mock servicenow,mock-service-now)
 
-.PHONY: deps-zammad-ui-tests
-deps-zammad-ui-tests:
-	@echo "Installing Zammad UI test dependencies..."
-	cd evaluations/flows/ticket_laptop_refresh/ui_test && uv sync --group dev
-	cd evaluations/flows/ticket_laptop_refresh/ui_test && uv run playwright install chromium
-
 .PHONY: test-zammad-ui-conversation
-test-zammad-ui-conversation: deps-zammad-ui-tests
+test-zammad-ui-conversation:
 	@if [ -z "$(ZAMMAD_URL)" ]; then \
 		echo "Error: ZAMMAD_URL is required"; \
 		exit 1; \
 	fi
-	cd evaluations/flows/ticket_laptop_refresh/ui_test && uv run pytest test_ui_conversation.py -v $(ARGS)
+	cd evaluations/flows/ticket_laptop_refresh/zammad_ui_tests && uv sync --group dev && uv run playwright install chromium && uv run python -m pytest test-ui-success-flow-1-conversation.py -v $(ARGS)
 
 .PHONY: sync-evaluations
 sync-evaluations:
