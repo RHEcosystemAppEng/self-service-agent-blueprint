@@ -369,6 +369,27 @@
     }
     .footer-links { font-size: 0.875rem; color: var(--text-muted); margin-top: 0.75rem; text-align: center; }
     .footer-links a { color: var(--accent); }
+    .duplicate-hint {
+      display: none;
+      margin: 0 0 0.75rem;
+      padding: 0.65rem 0.85rem;
+      border-radius: 10px;
+      border: 1px solid #bfdbfe;
+      background: #eff6ff;
+      color: #1e40af;
+      font-size: 0.875rem;
+      line-height: 1.45;
+      text-align: center;
+    }
+    .duplicate-hint.is-visible { display: block; }
+    .duplicate-modal-body { margin: 0; color: var(--text-muted); font-size: 0.9375rem; line-height: 1.5; }
+    .duplicate-modal-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+      margin-top: 1rem;
+    }
   </style>
 </head>
 <body>
@@ -379,11 +400,12 @@
           <div class="brand"><span class="icon" aria-hidden="true">⌂</span> {{ $product }}</div>
           <h1>{{ $hero }}</h1>
           <p class="lead">{{ $sub }}</p>
-          <a class="btn-hero-open" href="{{ $u }}/" target="zammad-demo-window">Open Zammad</a>
+          <a class="btn-hero-open js-open-zammad" href="zammad-shell.html" target="zammad-demo-window">Open Zammad</a>
         </header>
       </aside>
 
       <section class="dashboard-accounts" aria-label="Demo accounts">
+        <div class="duplicate-hint" id="duplicate-hint" role="status"></div>
         <div class="card">
           <h2>Demo accounts</h2>
           <p class="hint">Tap a persona to sign in.</p>
@@ -419,7 +441,7 @@
     <p class="footer-links">
       <a href="chat-snippet.html">Chat widget snippet page</a>
       ·
-      <a href="{{ $u }}/" target="zammad-demo-window">Zammad home</a>
+      <a href="zammad-shell.html" class="js-open-zammad" target="zammad-demo-window">Zammad home</a>
     </p>
   </div>
 
@@ -459,7 +481,23 @@
       </div>
       <div class="modal-footer">
         <p class="modal-footer-hint">Copy credentials above, or use persona quick pick on the main page for same-host sign-in.</p>
-        <a class="btn-modal-open-zammad" href="{{ $u }}/" target="zammad-demo-window">Open Zammad</a>
+        <a class="btn-modal-open-zammad js-open-zammad" href="zammad-shell.html" target="zammad-demo-window">Open Zammad</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="duplicate-window-modal" aria-hidden="true">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="duplicate-window-modal-title">
+      <div class="modal-header">
+        <h2 id="duplicate-window-modal-title">Demo already open elsewhere</h2>
+        <button type="button" class="modal-close" id="btn-close-duplicate-modal" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="duplicate-modal-body" id="duplicate-window-modal-text"></p>
+        <div class="duplicate-modal-actions">
+          <button type="button" class="btn primary" id="btn-duplicate-got-it">Got it</button>
+          <button type="button" class="btn" id="btn-duplicate-sign-in-anyway">Sign in here anyway</button>
+        </div>
       </div>
     </div>
   </div>
@@ -469,6 +507,12 @@
   <script>
   (function() {
     var ZAMMAD_BASE = {{ $u | trimSuffix "/" | quote }};
+    var HUB_CHANNEL = 'zammad-demo-hub';
+    var SESSION_KEY = 'zammad-demo-last-user';
+    var SHELL_URL = (function() {
+      var p = window.location.pathname.replace(/[^/]*$/, '');
+      return p + 'zammad-shell.html';
+    })();
 
     function showToast(msg) {
       var el = document.getElementById('toast');
@@ -562,6 +606,195 @@
       });
     }
 
+    var hub = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(HUB_CHANNEL) : null;
+
+    function rememberSignedInUser(email) {
+      try { localStorage.setItem(SESSION_KEY, email); } catch (e) { /* ignore */ }
+    }
+
+    function lastSignedInUser() {
+      try { return localStorage.getItem(SESSION_KEY) || ''; } catch (e) { return ''; }
+    }
+
+    function remoteWindowMessage() {
+      var user = lastSignedInUser();
+      if (user) {
+        return 'This demo portal is already active in another browser window (currently ' + user + '). Switch to that window to sign in — your browser shares one Zammad session across all windows.';
+      }
+      return 'This demo portal is already active in another browser window. Switch to that window to sign in — your browser shares one Zammad session across all windows.';
+    }
+
+    function isLocalShellWindow(win) {
+      if (!win || win.closed) return false;
+      try {
+        var href = win.location.href || '';
+        if (!href || href === 'about:blank') return false;
+        return href.indexOf('zammad-shell') !== -1 || href.indexOf(ZAMMAD_BASE) !== -1;
+      } catch (e) {
+        return true;
+      }
+    }
+
+    function getLocalShellWindow() {
+      try {
+        var existing = window.open('', 'zammad-demo-window');
+        if (isLocalShellWindow(existing)) return existing;
+        if (existing && !existing.closed) {
+          try {
+            var href = existing.location.href || '';
+            if (href === 'about:blank' || href === '') existing.close();
+          } catch (e) { /* ignore */ }
+        }
+      } catch (e) { /* ignore */ }
+      return null;
+    }
+
+    function probeShell(timeoutMs) {
+      timeoutMs = timeoutMs || 150;
+      return new Promise(function(resolve) {
+        if (!hub) {
+          var local = getLocalShellWindow();
+          resolve({ exists: !!local, local: !!local });
+          return;
+        }
+        var answered = false;
+        function onPong(ev) {
+          if (!ev.data || ev.data.action !== 'pong') return;
+          answered = true;
+          hub.removeEventListener('message', onPong);
+          resolve({ exists: true, local: !!getLocalShellWindow() });
+        }
+        hub.addEventListener('message', onPong);
+        hub.postMessage({ action: 'ping' });
+        setTimeout(function() {
+          hub.removeEventListener('message', onPong);
+          if (!answered) resolve({ exists: false, local: false });
+        }, timeoutMs);
+      });
+    }
+
+    function focusExistingShell() {
+      var existing = getLocalShellWindow();
+      if (existing) {
+        existing.focus();
+        if (hub) hub.postMessage({ action: 'focus' });
+        return true;
+      }
+      if (hub) hub.postMessage({ action: 'focus' });
+      return false;
+    }
+
+    function openZammadShell(email, opts) {
+      opts = opts || {};
+      if (email) rememberSignedInUser(email);
+
+      if (opts.remoteOnly) {
+        if (email && hub) hub.postMessage({ action: 'login_changed', email: email });
+        if (hub) hub.postMessage({ action: 'focus' });
+        return Promise.resolve({ remote: true });
+      }
+
+      if (email && hub) hub.postMessage({ action: 'login_changed', email: email });
+
+      return new Promise(function(resolve) {
+        if (!hub) {
+          var demoWin = getLocalShellWindow();
+          if (demoWin) {
+            demoWin.location.href = SHELL_URL;
+            demoWin.focus();
+          } else {
+            demoWin = window.open(SHELL_URL, 'zammad-demo-window');
+            if (demoWin) demoWin.focus();
+          }
+          resolve({ remote: false });
+          return;
+        }
+
+        var shellHandled = false;
+        var shellFocused = false;
+        function onHubReply(ev) {
+          if (ev.data && ev.data.action !== 'pong') return;
+          shellHandled = true;
+          shellFocused = focusExistingShell();
+        }
+        hub.addEventListener('message', onHubReply);
+        hub.postMessage({ action: 'ping' });
+        setTimeout(function() {
+          hub.removeEventListener('message', onHubReply);
+          if (!shellHandled) {
+            var demoWin = window.open(SHELL_URL, 'zammad-demo-window');
+            if (demoWin) demoWin.focus();
+          }
+          resolve({ remote: shellHandled && !shellFocused });
+        }, 150);
+      });
+    }
+
+    function updateDuplicateHint(state) {
+      var hint = document.getElementById('duplicate-hint');
+      if (!hint || !state || !state.exists || state.local) {
+        if (hint) hint.classList.remove('is-visible');
+        return;
+      }
+      hint.textContent = remoteWindowMessage();
+      hint.classList.add('is-visible');
+    }
+
+    var duplicateModal = document.getElementById('duplicate-window-modal');
+    var duplicateModalPending = null;
+
+    function openDuplicateWindowModal(opts) {
+      opts = opts || {};
+      duplicateModalPending = opts.pending || null;
+      var text = document.getElementById('duplicate-window-modal-text');
+      var signInAnyway = document.getElementById('btn-duplicate-sign-in-anyway');
+      if (text) text.textContent = opts.message || remoteWindowMessage();
+      if (signInAnyway) signInAnyway.style.display = opts.allowSignInAnyway === false ? 'none' : '';
+      if (!duplicateModal) return;
+      duplicateModal.classList.add('is-open');
+      duplicateModal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('modal-open');
+    }
+
+    function closeDuplicateWindowModal() {
+      duplicateModalPending = null;
+      if (!duplicateModal) return;
+      duplicateModal.classList.remove('is-open');
+      duplicateModal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('modal-open');
+    }
+
+    function runPersonaSignIn(email, password, sectionId, personaBtn, remoteOnly) {
+      personaBtn.classList.add('is-busy');
+      personaBtn.setAttribute('aria-busy', 'true');
+      signInToZammad(email, password).then(function() {
+        return openZammadShell(email, { remoteOnly: remoteOnly });
+      }).then(function(result) {
+        showToast(result && result.remote
+          ? ('Signed in as ' + email + '. Switch to your other browser window — Zammad was updated there.')
+          : 'Signed in. Switched to Zammad.');
+      }).catch(function(err) {
+        openAccountsModal(sectionId);
+        showToast((err && err.message) ? err.message : 'Sign-in failed. Use View all accounts to copy credentials.');
+      }).finally(function() {
+        personaBtn.classList.remove('is-busy');
+        personaBtn.removeAttribute('aria-busy');
+      });
+    }
+
+    probeShell().then(updateDuplicateHint);
+
+    document.getElementById('btn-duplicate-got-it').addEventListener('click', closeDuplicateWindowModal);
+    document.getElementById('btn-close-duplicate-modal').addEventListener('click', closeDuplicateWindowModal);
+    document.getElementById('btn-duplicate-sign-in-anyway').addEventListener('click', function() {
+      var pending = duplicateModalPending;
+      closeDuplicateWindowModal();
+      if (pending) runPersonaSignIn(pending.email, pending.password, pending.sectionId, pending.personaBtn, true);
+    });
+    duplicateModal.addEventListener('click', function(e) {
+      if (e.target === duplicateModal) closeDuplicateWindowModal();
+    });
+
     var modal = document.getElementById('accounts-modal');
 
     function scrollAccountsBlock(id) {
@@ -632,6 +865,21 @@
       if (handleCredCopy(ev, root, '.js-copy-email', 'data-email', 'email', 'Email copied', 'Could not copy email')) return;
       if (handleCredCopy(ev, root, '.js-copy-password', 'data-password', 'password', 'Password copied', 'Could not copy password')) return;
 
+      if (root.closest('.js-open-zammad')) {
+        ev.preventDefault();
+        probeShell().then(function(state) {
+          if (state.exists && !state.local) {
+            openDuplicateWindowModal({
+              message: 'Zammad is already open in another browser window. Switch to that window to continue.',
+              allowSignInAnyway: false
+            });
+            return;
+          }
+          openZammadShell('');
+        });
+        return;
+      }
+
       var personaBtn = root.closest('.js-persona-signin');
       if (personaBtn) {
         var email = personaBtn.getAttribute('data-email') || '';
@@ -642,22 +890,15 @@
           showToast('One-click sign-in requires this demo site to be served on the same host as Zammad.');
           return;
         }
-        personaBtn.classList.add('is-busy');
-        personaBtn.setAttribute('aria-busy', 'true');
-        signInToZammad(email, password).then(function() {
-          var demoWin = window.open('', 'zammad-demo-window');
-          if (demoWin) {
-            demoWin.location.href = ZAMMAD_BASE + '/';
-          } else {
-            window.open(ZAMMAD_BASE + '/', 'zammad-demo-window');
+        probeShell().then(function(state) {
+          if (state.exists && !state.local) {
+            openDuplicateWindowModal({
+              pending: { email: email, password: password, sectionId: sectionId, personaBtn: personaBtn },
+              allowSignInAnyway: true
+            });
+            return;
           }
-          showToast('Signed in. Zammad is open in the demo window.');
-        }).catch(function(err) {
-          openAccountsModal(sectionId);
-          showToast((err && err.message) ? err.message : 'Sign-in failed. Use View all accounts to copy credentials.');
-        }).finally(function() {
-          personaBtn.classList.remove('is-busy');
-          personaBtn.removeAttribute('aria-busy');
+          runPersonaSignIn(email, password, sectionId, personaBtn, false);
         });
       }
     });
@@ -669,10 +910,59 @@
     }
 
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape' && modal && modal.classList.contains('is-open')) {
-        closeAccountsModal();
+      if (e.key === 'Escape') {
+        if (duplicateModal && duplicateModal.classList.contains('is-open')) {
+          closeDuplicateWindowModal();
+          return;
+        }
+        if (modal && modal.classList.contains('is-open')) {
+          closeAccountsModal();
+        }
       }
     });
+  })();
+  </script>
+</body>
+</html>
+{{- end }}
+
+{{- define "zammad-demo-site.zammadShell" -}}
+{{- $u := .zammadUrl -}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zammad</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #fff; }
+    iframe { display: block; width: 100%; height: 100%; border: none; }
+  </style>
+</head>
+<body>
+  <iframe id="zammad-frame" title="Zammad" src="{{ $u }}/"></iframe>
+  <script>
+  (function() {
+    var ZAMMAD_BASE = {{ $u | trimSuffix "/" | quote }};
+    var HUB_CHANNEL = 'zammad-demo-hub';
+    var frame = document.getElementById('zammad-frame');
+    var hub = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(HUB_CHANNEL) : null;
+
+    function reloadZammad() {
+      if (!frame) return;
+      frame.src = ZAMMAD_BASE + '/';
+      window.focus();
+    }
+
+    if (hub) {
+      hub.onmessage = function(ev) {
+        var data = ev.data;
+        if (!data || !data.action) return;
+        if (data.action === 'login_changed') reloadZammad();
+        if (data.action === 'focus') window.focus();
+        if (data.action === 'ping') hub.postMessage({ action: 'pong' });
+      };
+    }
   })();
   </script>
 </body>
