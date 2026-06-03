@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "self-service-agent.fullname" . }}-redis-secret
+  name: {{ include "self-service-agent.fullname" . }}-langfuse-redis-secret
   labels:
     {{- include "self-service-agent.labels" . | nindent 4 }}
     app.kubernetes.io/component: redis
@@ -15,7 +15,7 @@ stringData:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "self-service-agent.fullname" . }}-redis
+  name: {{ include "self-service-agent.fullname" . }}-langfuse-redis
   labels:
     {{- include "self-service-agent.labels" . | nindent 4 }}
     app.kubernetes.io/component: redis
@@ -34,12 +34,12 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "self-service-agent.fullname" . }}-redis
+  name: {{ include "self-service-agent.fullname" . }}-langfuse-redis
   labels:
     {{- include "self-service-agent.labels" . | nindent 4 }}
     app.kubernetes.io/component: redis
 spec:
-  serviceName: {{ include "self-service-agent.fullname" . }}-redis
+  serviceName: {{ include "self-service-agent.fullname" . }}-langfuse-redis
   replicas: 1
   selector:
     matchLabels:
@@ -91,7 +91,7 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: {{ include "self-service-agent.fullname" . }}-redis-secret
+              name: {{ include "self-service-agent.fullname" . }}-langfuse-redis-secret
               key: password
         volumeMounts:
         - name: data
