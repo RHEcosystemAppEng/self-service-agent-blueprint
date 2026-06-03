@@ -48,7 +48,7 @@ import os
 import random
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from deepeval.dataset import ConversationalGolden
 from deepeval.simulator import ConversationSimulator
@@ -227,6 +227,7 @@ def _run_worker(
     initial_message: Optional[str] = None,
     skip_initial_message: bool = False,
     ticket_title: Optional[str] = None,
+    include_conversation_metadata: bool = False,
 ) -> dict[str, Any]:
     """
     Worker function to generate conversations in parallel.
@@ -321,7 +322,14 @@ def _run_worker(
             worker_logger.debug(
                 f"[Worker {worker_id}] Response preview: '{response[:200]}...'"
             )
-            return Turn(role="assistant", content=response)
+            actual_conversation_metadata = (
+                worker_client.get_last_conversation_metadata()
+            )
+            return Turn(
+                role="assistant",
+                content=response,
+                additional_metadata=actual_conversation_metadata,
+            )
 
         except Exception as e:
             worker_logger.error(
@@ -366,6 +374,7 @@ def _run_worker(
                 initial_message=initial_message,
                 skip_initial_message=skip_initial_message,
                 ticket_title=ticket_title,
+                include_conversation_metadata=include_conversation_metadata,
             )
 
             # Start session
@@ -497,7 +506,10 @@ def _convert_test_case_to_conversation_format(
                     # If parsing fails, keep original content
                     pass
 
-            conversation_turns.append({"role": turn.role, "content": content})
+            turn_data: Dict[str, Any] = {"role": turn.role, "content": content}
+            if turn.role == "assistant" and turn.additional_metadata:
+                turn_data["actual_conversation_metadata"] = turn.additional_metadata
+            conversation_turns.append(turn_data)
 
     return {
         "metadata": {
@@ -552,6 +564,7 @@ if __name__ == "__main__":
     initial_message: Optional[str] = None
     skip_initial_message: bool = False
     ticket_title: Optional[str] = None
+    include_conversation_metadata: bool = False
 
     if args.flow:
         import sys as _sys
@@ -574,6 +587,9 @@ if __name__ == "__main__":
             flow_module, "DEFAULT_SKIP_INITIAL_MESSAGE", False
         )
         ticket_title = getattr(flow_module, "DEFAULT_TICKET_TITLE", None)
+        include_conversation_metadata = getattr(
+            flow_module, "DEFAULT_INCLUDE_CONVERSATION_METADATA", False
+        )
         flow_max_turns = getattr(flow_module, "DEFAULT_MAX_TURNS", None)
         if flow_max_turns is not None:
             args.max_turns = flow_max_turns
@@ -642,6 +658,7 @@ if __name__ == "__main__":
                 initial_message,
                 skip_initial_message,
                 ticket_title,
+                include_conversation_metadata,
             )
             for i in range(args.concurrency)
         ]

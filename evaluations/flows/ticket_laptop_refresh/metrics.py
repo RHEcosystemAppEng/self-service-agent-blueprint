@@ -11,7 +11,10 @@ from typing import Any, List, Optional
 from deepeval.metrics import ConversationalGEval
 from deepeval.models import DeepEvalBaseLLM
 from deepeval.test_case import ConversationalTestCase, TurnParams
-from helpers.conversation_metadata_eval import ConversationMetadataEval
+from helpers.conversation_metadata_deterministic_eval import (
+    ConversationMetadataDeterministicEval,
+)
+from helpers.conversation_metadata_llm_eval import ConversationMetadataLLMEval
 from helpers.load_conversation_context import load_default_context
 
 # Context directory for this flow (populated at eval time by copy_flow_context).
@@ -345,9 +348,26 @@ def get_metrics(
                 "IMPORTANT: Do NOT require the agent to confirm the ticket was sent. Do NOT fail this metric because the ticket was never sent. Do NOT consider whether the laptop selection was valid or invalid.",
             ],
         ),
-        ConversationMetadataEval(
-            name="Correct conversation metadata",
+        ConversationMetadataDeterministicEval(
+            name="Correct conversation metadata — deterministic (predefined)",
             threshold=1.0,
+        ),
+        ConversationMetadataLLMEval(
+            name="Correct conversation metadata — LLM (generated)",
+            threshold=1.0,
+            model=custom_model,
+            evaluation_steps=[
+                "Check each assistant turn's actual_conversation_metadata against these state machine rules:",
+                "Ticket starts as: state=open, owner=agent.laptop-specialist, group=Users",
+                "While agent is processing the laptop refresh: state=open, owner=agent.laptop-specialist, group=Users",
+                "After ticket is sent to manager for approval: state=open, owner=manager1 or manager2, group=Users. This is a valid final state — the conversation may end here.",
+                "User asks to close the ticket: state=closed, owner=agent.laptop-specialist, group=Users",
+                "User asks to escalate: state=open, owner=-, group=escalated_laptop_refresh_tickets",
+                "A conversation ending after the ticket was sent to manager for approval, or close, or escalate is complete and valid.",
+                "PASS if ALL metadata transitions are correct and consistent with the rules.",
+                "FAIL if ANY metadata transition violates the rules.",
+                "Report which turn(s) and field(s) did not match.",
+            ],
         ),
     ]
 
