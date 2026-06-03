@@ -21,7 +21,7 @@ def mock_config() -> UserIntegrationConfig:
 
 
 @pytest.mark.asyncio
-async def test_skips_when_not_zammad_platform(
+async def test_skips_when_not_ticket_thread_binding(
     handler: ZammadIntegrationHandler,
     mock_config: UserIntegrationConfig,
 ) -> None:
@@ -30,7 +30,7 @@ async def test_skips_when_not_zammad_platform(
         session_id="s1",
         user_id="user@test.com-81",
         content="Hello",
-        integration_context={"platform": "slack"},
+        integration_context={"delivery_binding": "STANDARD"},
     )
     result = await handler.deliver(req, mock_config, {"subject": "", "body": "Hello"})
     assert result.success is True
@@ -48,7 +48,7 @@ async def test_posts_ticket_article_minimal_payload(
         user_id="user@test.com-81",
         content="Visible reply",
         agent_id="ticket-laptop-refresh",
-        integration_context={"platform": "zammad", "ticket_id": 81},
+        integration_context={"delivery_binding": "TICKET_THREAD", "ticket_id": 81},
     )
 
     mock_resp = MagicMock()
@@ -115,7 +115,7 @@ async def test_fails_without_credentials(
         session_id="zammad-81",
         user_id="u1",
         content="Hi",
-        integration_context={"platform": "zammad", "ticket_id": 5},
+        integration_context={"delivery_binding": "TICKET_THREAD", "ticket_id": 5},
     )
     env = {k: v for k, v in os.environ.items() if not k.startswith("ZAMMAD_")}
     with patch.dict(os.environ, env, clear=True):
@@ -135,7 +135,7 @@ async def test_posts_on_behalf_of_owner_email_from_integration_context(
         content="Visible reply",
         agent_id="ticket-laptop-refresh",
         integration_context={
-            "platform": "zammad",
+            "delivery_binding": "TICKET_THREAD",
             "ticket_id": 81,
             "owner_email": "specialist@example.com",
         },
@@ -184,7 +184,7 @@ async def test_posts_on_behalf_of_owner_resolved_from_owner_id(
         content="Visible reply",
         agent_id="ticket-laptop-refresh",
         integration_context={
-            "platform": "zammad",
+            "delivery_binding": "TICKET_THREAD",
             "ticket_id": 81,
             "owner_id": 23,
         },
@@ -244,7 +244,7 @@ async def test_snapshot_owner_email_wins_over_live_ticket_owner(
         content="Visible reply",
         agent_id="ticket-laptop-refresh",
         integration_context={
-            "platform": "zammad",
+            "delivery_binding": "TICKET_THREAD",
             "ticket_id": 81,
             "owner_email": "original@example.com",
         },
@@ -292,7 +292,7 @@ async def test_retries_without_on_behalf_when_forbidden(
         content="Visible reply",
         agent_id="ticket-laptop-refresh",
         integration_context={
-            "platform": "zammad",
+            "delivery_binding": "TICKET_THREAD",
             "ticket_id": 81,
             "owner_email": "specialist@example.com",
         },

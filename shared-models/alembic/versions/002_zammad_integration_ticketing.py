@@ -37,7 +37,8 @@ def upgrade() -> None:
             """
         )
 
-    # 2) Multiple active ZAMMAD sessions per user; widen session_id for ticket-scoped ids
+    # 2) Multiple active ZAMMAD sessions per user (interim); 003 replaces index with
+    #    snapshot session_scope <> PER_TICKET. Widen session_id for ticket-scoped ids.
     op.execute("DROP INDEX IF EXISTS idx_one_active_session_per_user_integration")
     op.execute(
         """

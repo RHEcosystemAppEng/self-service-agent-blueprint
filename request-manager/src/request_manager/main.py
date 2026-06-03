@@ -701,6 +701,10 @@ async def _process_request_adaptive(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Service temporarily unavailable. Please try again.",
             ) from e
+
+        if isinstance(e, HTTPException):
+            raise
+
         err_msg = str(e) or f"{type(e).__name__}: {repr(e)}"
         logger.error(
             "Failed to process request",
@@ -1245,11 +1249,40 @@ async def _forward_response_to_integration_dispatcher(
                 result = await db.execute(stmt)
                 request_log = result.scalar_one_or_none()
 
+                integration_context: dict[str, Any] = {}
                 if request_log and request_log.normalized_request:
-                    integration_context = request_log.normalized_request.get(
-                        "integration_context", {}
+                    integration_context = (
+                        request_log.normalized_request.get("integration_context", {})
+                        or {}
                     )
                     integration_context_for_delivery = dict(integration_context)
+                else:
+                    integration_context_for_delivery = {}
+
+                session_id_for_delivery = event_data.get("session_id")
+                session_meta: dict[str, Any] = {}
+                if session_id_for_delivery:
+                    from shared_models import (
+                        delivery_context_for_forward,
+                        json_value_as_dict,
+                    )
+                    from shared_models.models import RequestSession
+
+                    sess_stmt = select(RequestSession).where(
+                        RequestSession.session_id == session_id_for_delivery
+                    )
+                    sess_result = await db.execute(sess_stmt)
+                    sess_row = sess_result.scalar_one_or_none()
+                    if sess_row:
+                        session_meta = json_value_as_dict(sess_row.integration_metadata)
+                    integration_context_for_delivery.update(
+                        delivery_context_for_forward(
+                            session_id=session_id_for_delivery,
+                            integration_metadata=session_meta,
+                        )
+                    )
+
+                if request_log and request_log.normalized_request:
                     slack_user_id = integration_context.get("slack_user_id")
                     slack_channel = integration_context.get("channel_id")
                     email_from = integration_context.get("email_from")

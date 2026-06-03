@@ -39,6 +39,13 @@ def get_enum_value(enum_obj: Union[Enum, str, Any]) -> str:
     return str(enum_obj)
 
 
+def json_value_as_dict(value: Any) -> dict[str, Any]:
+    """Coerce a SQLAlchemy JSON column instance value to a dict."""
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
 def generate_fallback_user_id(request_id: str | None) -> str:
     """
     Generate a fallback user_id when the original user_id is missing.

@@ -153,7 +153,7 @@ class TestRequestNormalizer:
         assert normalized.target_agent_id is None
         assert normalized.requires_routing is True
         assert normalized.session_id == self.session_id
-        assert normalized.integration_context["platform"] == "zammad"
+        assert "delivery_binding" not in normalized.integration_context
         assert normalized.integration_context["ticket_id"] == 81
         assert normalized.integration_context["article_id"] == 104
         assert normalized.integration_context["group_id"] == 3

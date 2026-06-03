@@ -8,6 +8,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Type, TypeVar, cas
 import psycopg
 import psycopg_pool
 import structlog
+from fastapi import HTTPException
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
@@ -313,7 +314,7 @@ class DatabaseManager:
 
         # Determine expected version from parameter, environment, or default
         if expected_version is None:
-            expected_version = os.getenv("EXPECTED_MIGRATION_VERSION", "002")
+            expected_version = os.getenv("EXPECTED_MIGRATION_VERSION", "003")
 
         start_time = time()
         logger.info(
@@ -869,7 +870,8 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
         try:
             yield session
         except Exception as e:
-            logger.error("Database session error", error=str(e))
+            if not isinstance(e, HTTPException):
+                logger.error("Database session error", error=str(e))
             await session.rollback()
             raise
         finally:
@@ -883,7 +885,8 @@ async def get_db_session_dependency() -> AsyncGenerator[AsyncSession, None]:
         try:
             yield session
         except Exception as e:
-            logger.error("Database session error", error=str(e))
+            if not isinstance(e, HTTPException):
+                logger.error("Database session error", error=str(e))
             await session.rollback()
             raise
         finally:

@@ -16,8 +16,9 @@ HTTP Basic as the ticket customer (integration trigger: ``ticket.customer_id`` =
 
 For generic CLI RM without Zammad, use chat-responses-request-mgr.py instead.
 
-The ``**tokens**`` command is sent to Request Manager only (same as chat-responses-request-mgr.py /
-``CLIChatClient``); it does not create a Zammad article.
+The ``**tokens**`` command reads token counters from the ticket's ``RequestSession`` row
+(``zammad-{ticket_id}``) via ``SessionTokenService`` — not via CLI generic with a session pin
+(channel behavior rejects CLI → ZAMMAD pins). Formatting reuses ``CLIChatClient._handle_tokens_command``.
 """
 
 import argparse
@@ -326,14 +327,38 @@ async def _poll_conversation_for_agent_reply(
     )
 
 
-async def _rm_tokens_cli_style(cli: CLIChatClient, *, rm_session_id: str) -> None:
-    """POST ``**tokens**`` to RM generic (CLI) pinned to this ticket's RM session."""
-    agent_response = await cli.send_message("**tokens**", rm_session_id=rm_session_id)
-    if isinstance(agent_response, dict):
-        response_content = agent_response.get("content", str(agent_response))
+def _token_summary_line(counts: dict[str, int]) -> str:
+    """Same shape as agent-service ``_handle_tokens_command`` TOKEN_SUMMARY response."""
+    return (
+        f"TOKEN_SUMMARY:INPUT:{counts['total_input_tokens']}"
+        f":OUTPUT:{counts['total_output_tokens']}"
+        f":TOTAL:{counts['total_tokens']}"
+        f":CALLS:{counts['llm_call_count']}"
+        f":MAX_SINGLE_INPUT:{counts['max_input_tokens']}"
+        f":MAX_SINGLE_OUTPUT:{counts['max_output_tokens']}"
+        f":MAX_SINGLE_TOTAL:{counts['max_total_tokens']}"
+    )
+
+
+async def _print_ticket_session_tokens(
+    cli: CLIChatClient, *, rm_session_id: str
+) -> None:
+    """Print token stats for the ticket session without cross-channel CLI session pin."""
+    from shared_models import get_database_manager
+    from shared_models.session_token_service import SessionTokenService
+
+    db_manager = get_database_manager()
+    async with db_manager.get_session() as db:
+        token_counts = await SessionTokenService.get_token_counts(db, rm_session_id)
+
+    if token_counts:
+        summary = _token_summary_line(token_counts)
     else:
-        response_content = agent_response
-    cli._handle_tokens_command(response_content)
+        summary = (
+            "TOKEN_SUMMARY:INPUT:0:OUTPUT:0:TOTAL:0:CALLS:0"
+            ":MAX_SINGLE_INPUT:0:MAX_SINGLE_OUTPUT:0:MAX_SINGLE_TOTAL:0"
+        )
+    cli._handle_tokens_command(summary)
 
 
 # ---------------------------------------------------------------------------
@@ -402,7 +427,7 @@ async def _chat_loop_with_conversation_metadata(
                     # Harness (OpenShiftChatClient) waits for `agent:` before accepting the
                     # terminator; token formatting has no agent prefix unless we add this line.
                     print("agent: ")
-                    await _rm_tokens_cli_style(
+                    await _print_ticket_session_tokens(
                         rm_client, rm_session_id=f"zammad-{ticket_id}"
                     )
                     print(AGENT_MESSAGE_TERMINATOR)
@@ -421,7 +446,7 @@ async def _chat_loop_with_conversation_metadata(
                     break
                 if message.strip():
                     if message.lower() == "**tokens**":
-                        await _rm_tokens_cli_style(
+                        await _print_ticket_session_tokens(
                             rm_client, rm_session_id=f"zammad-{ticket_id}"
                         )
                         continue

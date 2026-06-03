@@ -6,9 +6,22 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, cast
 
-from shared_models import BaseSessionManager, configure_logging, get_enum_value
+from shared_models import (
+    CHANNEL_BEHAVIOR_SNAPSHOT_KEY,
+    BaseSessionManager,
+    ChannelBehaviorPolicy,
+    ChannelBehaviorValidationError,
+    configure_logging,
+    effective_entry_agent_id,
+    effective_router_agent_id,
+    get_enum_value,
+    policy_from_integration_metadata,
+    policy_needs_ticket_context,
+    resolve_channel_behavior_sync,
+)
 from shared_models.models import RequestSession, SessionStatus
 from shared_models.user_utils import is_uuid
+from shared_models.utils import json_value_as_dict
 from sqlalchemy import select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,21 +34,8 @@ logging.getLogger("langgraph").setLevel(logging.WARNING)
 
 
 def _default_agent_id_resolved() -> str:
-    """``DEFAULT_AGENT_ID`` — non-Zammad session bootstrap; LangGraph router identity (see ``ROUTING_AGENT_NAME``)."""
+    """``DEFAULT_AGENT_ID`` — LangGraph router identity (see ``ROUTING_AGENT_NAME``)."""
     return os.getenv("DEFAULT_AGENT_ID", "routing-agent").strip() or "routing-agent"
-
-
-def _zammad_default_agent_id_resolved() -> str:
-    """Align with ``shared_models.session_manager.initial_current_agent_id_for_integration`` for ZAMMAD."""
-    z = os.getenv("ZAMMAD_DEFAULT_AGENT_ID", "").strip()
-    return z if z else "ticket-review-agent"
-
-
-def _entry_tier_agent_ids() -> frozenset[str]:
-    """Agent ids that may hand off to specialists (``DEFAULT_AGENT_ID`` ∪ ``ZAMMAD_DEFAULT_AGENT_ID``)."""
-    return frozenset(
-        {_default_agent_id_resolved(), _zammad_default_agent_id_resolved()}
-    )
 
 
 def get_session_token_context(session_id: str | None) -> str:
@@ -86,13 +86,66 @@ class ResponsesSessionManager(BaseSessionManager):
         self.agents: list[Any] = []
         self.request_manager_session_id: str | None = None
         self._integration_context: dict[str, Any] = {}
-        # NormalizedRequest.integration_type for this turn (title is ZAMMAD-only)
+        # NormalizedRequest.integration_type for this turn (ticket title merge when PER_TICKET)
         self._integration_type_str: Optional[str] = None
+        self._channel_policy: Optional[ChannelBehaviorPolicy] = None
 
         self._initialize_conversation_state()
 
-    def _is_zammad_integration(self) -> bool:
-        return (self._integration_type_str or "").upper() == "ZAMMAD"
+    @property
+    def effective_router_id(self) -> str:
+        if self._channel_policy is not None:
+            return effective_router_agent_id(self._channel_policy)
+        return self.ROUTING_AGENT_NAME
+
+    def _entry_tier_ids(self) -> frozenset[str]:
+        if self._channel_policy is None:
+            return frozenset({self.ROUTING_AGENT_NAME})
+        return frozenset(
+            {
+                effective_entry_agent_id(self._channel_policy),
+                self.effective_router_id,
+            }
+        )
+
+    def _allow_auto_return_to_router(self) -> bool:
+        if self._channel_policy is None:
+            return True
+        return self._channel_policy.allow_return_to_router
+
+    def _is_ticket_context_channel(self) -> bool:
+        if self._channel_policy is None:
+            return False
+        return policy_needs_ticket_context(self._channel_policy)
+
+    async def _load_policy_from_request_session(
+        self,
+        session_id: str,
+        inbound_integration_type: Any = None,
+    ) -> None:
+        row = await self.get_session(session_id)
+        if row is None:
+            return
+        row_type = get_enum_value(row.integration_type)
+        if inbound_integration_type is not None:
+            inbound = get_enum_value(inbound_integration_type)
+            if inbound != row_type:
+                logger.warning(
+                    "Request integration_type disagrees with session row",
+                    session_id=session_id,
+                    inbound_integration_type=inbound,
+                    row_integration_type=row_type,
+                )
+        self._integration_type_str = row_type
+        pol = policy_from_integration_metadata(
+            json_value_as_dict(row.integration_metadata)
+        )
+        if pol is None:
+            raise ChannelBehaviorValidationError(
+                f"session {session_id!r} missing "
+                f"{CHANNEL_BEHAVIOR_SNAPSHOT_KEY!r} snapshot"
+            )
+        self._channel_policy = pol
 
     def _initialize_conversation_state(self) -> None:
         """Initialize conversation state for responses mode."""
@@ -148,8 +201,14 @@ class ResponsesSessionManager(BaseSessionManager):
         # Store the request manager session ID for database updates
         if request_manager_session_id:
             self.request_manager_session_id = request_manager_session_id
+            await self._load_policy_from_request_session(
+                request_manager_session_id, integration_type
+            )
+        elif integration_type is not None:
+            self._integration_type_str = get_enum_value(integration_type)
+            self._channel_policy = resolve_channel_behavior_sync(integration_type)
 
-        if self.request_manager_session_id and self._is_zammad_integration():
+        if self.request_manager_session_id and self._is_ticket_context_channel():
             await self._persist_ticket_title_merge()
 
         logger.debug(
@@ -243,9 +302,12 @@ class ResponsesSessionManager(BaseSessionManager):
                     )
 
             if should_reset:
-                if self._is_zammad_integration() and self._is_specialist_session():
+                if (
+                    not self._allow_auto_return_to_router()
+                    and self._is_specialist_session()
+                ):
                     logger.info(
-                        "Zammad: ignoring _should_return_to_routing — staying on specialist",
+                        "Ticket-scoped session: ignoring _should_return_to_routing — staying on specialist",
                         user_id=self.user_id,
                         current_agent=self.current_agent_name,
                     )
@@ -515,6 +577,8 @@ class ResponsesSessionManager(BaseSessionManager):
                 )
                 return False
 
+            await self._load_policy_from_request_session(request_manager_session_id)
+
             # Extract session metadata
             current_agent_id = db_session.current_agent_id
             conversation_thread_id = db_session.conversation_thread_id
@@ -582,9 +646,9 @@ class ResponsesSessionManager(BaseSessionManager):
                         self._is_specialist_session()
                         and session.state_machine.is_terminal_state(current_state)
                     ):
-                        if self._is_zammad_integration():
+                        if not self._allow_auto_return_to_router():
                             logger.info(
-                                "Resumed specialist session is terminal (Zammad) — not resetting to router",
+                                "Resumed specialist session is terminal — not resetting to router (channel policy)",
                                 request_manager_session_id=request_manager_session_id,
                                 current_agent_id=current_agent_id,
                                 current_state=current_state,
@@ -661,7 +725,7 @@ class ResponsesSessionManager(BaseSessionManager):
             )
 
     async def _persist_ticket_title_merge(self) -> None:
-        """Store latest Zammad ticket title on the session for prompts and history."""
+        """Store latest ticket title on the session for prompts and history (PER_TICKET channels)."""
         title = (self._integration_context.get("ticket_title") or "").strip()
         if not title:
             return
@@ -669,7 +733,7 @@ class ResponsesSessionManager(BaseSessionManager):
 
     async def _build_langgraph_state_patch(self) -> dict[str, Any]:
         """Fields merged into LangGraph state for ticket prompts (e.g. ticket title)."""
-        if not self._is_zammad_integration():
+        if not self._is_ticket_context_channel():
             return {}
         patch: dict[str, Any] = {}
         tt = (self._integration_context.get("ticket_title") or "").strip()
@@ -818,7 +882,7 @@ class ResponsesSessionManager(BaseSessionManager):
         """True when the current agent may dispatch to specialists (router or ticket intake)."""
         if not self.current_agent_name:
             return False
-        return self.current_agent_name in _entry_tier_agent_ids()
+        return self.current_agent_name in self._entry_tier_ids()
 
     def _is_specialist_session(self) -> bool:
         """Check if current session is with a leaf specialist (not entry-tier)."""
@@ -937,8 +1001,8 @@ class ResponsesSessionManager(BaseSessionManager):
         logger.debug("Routing detection result", routed_agent=routed_agent)
 
         # Specialist lock: on a leaf specialist, ignore routing_decision that would leave the
-        # current specialist — except non-Zammad may still return to routing-agent when the graph
-        # says so. Zammad ticket sessions never auto-return to router (new ticket for a new track).
+        # current specialist. PER_TICKET channels with allow_return_to_router=false never
+        # auto-return to router (open a new ticket/session to change track).
         if (
             routed_agent
             and self._is_specialist_session()
@@ -946,16 +1010,16 @@ class ResponsesSessionManager(BaseSessionManager):
             and routed_agent != self.current_agent_name
         ):
             allow_return_to_router = (
-                routed_agent == self.ROUTING_AGENT_NAME
-                and not self._is_zammad_integration()
+                routed_agent == self.effective_router_id
+                and self._allow_auto_return_to_router()
             )
             if not allow_return_to_router:
                 logger.info(
                     "Specialist lock: ignoring routing_decision"
                     + (
-                        " (Zammad: no auto return-to-router)"
-                        if self._is_zammad_integration()
-                        and routed_agent == self.ROUTING_AGENT_NAME
+                        " (channel policy: no auto return-to-router)"
+                        if not self._allow_auto_return_to_router()
+                        and routed_agent == self.effective_router_id
                         else "; open a new ticket/session to change specialist track"
                     ),
                     user_id=self.user_id,
@@ -973,11 +1037,11 @@ class ResponsesSessionManager(BaseSessionManager):
                 current_agent=self.current_agent_name,
             )
 
-            # Handle task completion - return to router (not for Zammad ticket specialists)
+            # Handle task completion - return to router when policy allows
             if (
-                routed_agent == self.ROUTING_AGENT_NAME
+                routed_agent == self.effective_router_id
                 and self._is_specialist_session()
-                and not self._is_zammad_integration()
+                and self._allow_auto_return_to_router()
             ):
                 logger.info(
                     "Specialist task complete, returning to routing agent",
@@ -993,7 +1057,7 @@ class ResponsesSessionManager(BaseSessionManager):
 
             # Handle routing to specialist agents
             if (
-                routed_agent != self.ROUTING_AGENT_NAME
+                routed_agent != self.effective_router_id
                 and self._is_entry_tier_session()
             ):
                 logger.info(
@@ -1048,10 +1112,10 @@ class ResponsesSessionManager(BaseSessionManager):
                     )
                     return cleaned_response
                 else:
-                    # Response was only termination markers — normally reset to router; Zammad stays on specialist.
-                    if self._is_zammad_integration():
+                    # Response was only termination markers — reset to router unless policy blocks it.
+                    if not self._allow_auto_return_to_router():
                         logger.info(
-                            "Zammad: response was only termination markers — not resetting to router",
+                            "Channel policy: response was only termination markers — not resetting to router",
                             user_id=self.user_id,
                             current_agent=self.current_agent_name,
                         )
@@ -1236,7 +1300,7 @@ class ResponsesSessionManager(BaseSessionManager):
                         "last_updated": datetime.now(timezone.utc).isoformat(),
                     }
                 )
-                if self._is_zammad_integration():
+                if self._is_ticket_context_channel():
                     tt_merge = (
                         self._integration_context.get("ticket_title") or ""
                     ).strip()

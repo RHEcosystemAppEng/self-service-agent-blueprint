@@ -188,11 +188,11 @@ class ZammadIntegrationHandler(BaseIntegrationHandler):
         template_content: Dict[str, str],
     ) -> IntegrationResult:
         ic = request.integration_context or {}
-        if ic.get("platform") != "zammad":
+        if ic.get("delivery_binding") != "TICKET_THREAD":
             return IntegrationResult(
                 success=True,
                 status=DeliveryStatus.DELIVERED,
-                message="Skipped: not a Zammad ticket delivery",
+                message="Skipped: delivery_binding is not TICKET_THREAD",
                 metadata={"delivery_method": "zammad_skip_non_ticket"},
             )
 
