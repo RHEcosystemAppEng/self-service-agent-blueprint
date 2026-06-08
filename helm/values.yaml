@@ -185,6 +185,10 @@ pgvector:
 # Llama Stack agents configuration with PostgreSQL persistence
 llama-stack:
   replicaCount: 1
+  image: 
+    repository: ogxai/distribution-starter
+    pullPolicy: IfNotPresent
+    tag: "0.5.2"
   initContainers:
     enabled: true
   resources: {}
