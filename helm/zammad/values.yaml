@@ -12,7 +12,7 @@ bootstrap:
   # imageTag ↔ Makefile BASE_VERSION / scripts/bump-release.sh. Ticketing overrides via helm-install-ticketing overlay.
   imageRegistry: quay.io/rh-ai-quickstart
   imageRepository: self-service-agent-zammad-bootstrap
-  imageTag: "0.0.13"
+  imageTag: "0.0.14"
   # Must match autoWizard Users[0] / Token in helm/values-ticketing.yaml (ticketingZammad.zammad.autoWizard).
   adminEmail: "admin@zammad.local"
   adminPassword: "ZammadR0cks!"
