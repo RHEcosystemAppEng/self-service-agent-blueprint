@@ -77,7 +77,6 @@ MCP_SNOW_IMG ?= $(REGISTRY)/self-service-agent-snow-mcp:$(VERSION)
 MCP_ZAMMAD_IMG ?= $(REGISTRY)/self-service-agent-zammad-mcp:$(VERSION)
 MOCK_EVENTING_IMG ?= $(REGISTRY)/self-service-agent-mock-eventing:$(VERSION)
 MOCK_SERVICENOW_IMG ?= $(REGISTRY)/self-service-agent-mock-servicenow:$(VERSION)
-PROMPTGUARD_IMG ?= $(REGISTRY)/self-service-agent-promptguard:$(VERSION)
 ZAMMAD_BOOTSTRAP_IMG ?= $(REGISTRY)/self-service-agent-zammad-bootstrap:$(VERSION)
 
 # For retag-all-images: tag from REGISTRY/VERSION to NEW_REGISTRY/NEW_VERSION (set both when retagging)
@@ -129,9 +128,6 @@ TEST_USERS ?=
 SERVICENOW_DEV_PORTAL_USERNAME ?=
 SERVICENOW_DEV_PORTAL_PASSWORD ?=
 
-# PromptGuard Configuration
-PROMPTGUARD_MODEL ?= llama-prompt-guard-2-86m
-PROMPTGUARD_MODEL_ID ?= meta-llama/Llama-Prompt-Guard-2-86M
 
 # LLM max output tokens (server-side; Responses API does not support per-request max_tokens yet).
 # Set when enabling an LLM via LLM= so input + output stay within model context (e.g. 14k).
@@ -169,37 +165,20 @@ helm_pgvector_args = \
 helm_llm_service_args = \
     $(if $(HF_TOKEN),--set llm-service.secret.hf_token=$(HF_TOKEN),) \
     $(if $(LLM),--set global.models.$(LLM).enabled=true,) \
-    $(if $(SAFETY),--set global.models.$(SAFETY).enabled=true,) \
     $(if $(LLM_TOLERATION),--set-json global.models.$(LLM).tolerations='$(call TOLERATIONS_TEMPLATE,$(LLM_TOLERATION))',) \
-    $(if $(SAFETY_TOLERATION),--set-json global.models.$(SAFETY).tolerations='$(call TOLERATIONS_TEMPLATE,$(SAFETY_TOLERATION))',) \
-    $(if $(and $(LLM_URL),$(if $(SAFETY),,yes)),--set llm-service.enabled=false,)
-
-helm_promptguard_args = \
-    $(if $(PROMPTGUARD_ENABLED),--set promptGuard.enabled=$(PROMPTGUARD_ENABLED) \
-        --set llama-stack.models.$(PROMPTGUARD_MODEL).enabled=$(PROMPTGUARD_ENABLED) \
-        --set llama-stack.models.$(PROMPTGUARD_MODEL).url="http://$(MAIN_CHART_NAME)-promptguard.$(NAMESPACE).svc.cluster.local:8000/v1" \
-        --set global.models.$(PROMPTGUARD_MODEL).enabled=$(PROMPTGUARD_ENABLED) \
-        --set global.models.$(PROMPTGUARD_MODEL).url="http://$(MAIN_CHART_NAME)-promptguard.$(NAMESPACE).svc.cluster.local:8000/v1",) \
-    $(if $(PROMPTGUARD_MODEL_ID),--set promptGuard.modelId='$(PROMPTGUARD_MODEL_ID)',) \
-	$(if $(HF_TOKEN),--set promptGuard.huggingfaceToken='$(HF_TOKEN)',)
+    $(if $(LLM_URL),--set llm-service.enabled=false,)
 
 helm_llama_stack_args = \
     $(if $(LLM),--set global.models.$(LLM).enabled=true,) \
-    $(if $(SAFETY),--set global.models.$(SAFETY).enabled=true,) \
-    $(if $(SAFETY),--set global.models.$(SAFETY).registerShield=true,) \
     $(if $(LLM_URL),--set global.models.$(LLM).url='$(LLM_URL)',) \
     $(if $(LLM_ID),--set global.models.$(LLM).id='$(LLM_ID)',) \
     $(if $(LLM),--set global.models.$(LLM).maxTokens=$(LLM_MAX_TOKENS),) \
-    $(if $(SAFETY_URL),--set global.models.$(SAFETY).url='$(SAFETY_URL)',) \
-    $(if $(SAFETY_ID),--set global.models.$(SAFETY).id='$(SAFETY_ID)',) \
     $(if $(LLM_API_TOKEN),--set global.models.$(LLM).apiToken='$(LLM_API_TOKEN)',) \
-    $(if $(SAFETY_API_TOKEN),--set global.models.$(SAFETY).apiToken='$(SAFETY_API_TOKEN)',) \
     $(if $(LLAMA_STACK_ENV),--set-json llama-stack.secrets='$(LLAMA_STACK_ENV)',) \
     $(if $(LLAMASTACK_CLIENT_PORT),--set llamastack.port=$(LLAMASTACK_CLIENT_PORT),) \
     $(if $(LLAMASTACK_API_KEY),--set llamastack.apiKey='$(LLAMASTACK_API_KEY)',) \
     $(if $(LLAMASTACK_OPENAI_BASE_PATH),--set llamastack.openaiBasePath='$(LLAMASTACK_OPENAI_BASE_PATH)',) \
-    $(if $(LLAMASTACK_TIMEOUT),--set llamastack.timeout=$(LLAMASTACK_TIMEOUT),) \
-    $(helm_promptguard_args)
+    $(if $(LLAMASTACK_TIMEOUT),--set llamastack.timeout=$(LLAMASTACK_TIMEOUT),)
 
 helm_request_management_args = \
     $(if $(REQUEST_MANAGEMENT),--set requestManagement.enabled=$(REQUEST_MANAGEMENT),) \
@@ -281,7 +260,6 @@ help:
 	@echo "  build-mock-eventing-image            - Build the mock eventing service container image (checks lockfiles first)"
 	@echo "  build-mock-servicenow-image          - Build the mock ServiceNow server container image (checks lockfiles first)"
 	@echo "  build-zammad-bootstrap-image         - Build the Zammad bootstrap container image (checks lockfiles first)"
-	@echo "  build-promptguard-image              - Build the PromptGuard service container image (checks lockfiles first)"
 	@echo "  build-request-mgr-image              - Build the request manager container image (checks lockfiles first)"
 	@echo "                                        💡 Tip: If you encounter QEMU issues on Mac M1/M2/M3, add USE_PIP_INSTALL=true"
 	@echo ""
@@ -320,7 +298,6 @@ help:
 	@echo "  deps-mock-employee-data              - Install dependencies for mock employee data"
 	@echo "  deps-mock-servicenow                 - Install dependencies for mock ServiceNow"
 	@echo "  deps-tracing-config                  - Install dependencies for tracing-config"
-	@echo "  deps-promptguard                     - Install dependencies for PromptGuard"
 	@echo "  deps-evaluations                     - Install dependencies for evaluations"
 	@echo ""
 	@echo "Reinstall Commands:"
@@ -346,7 +323,6 @@ help:
 	@echo "  pull-mcp-zammad-image               - Pull Zammad MCP image"
 	@echo "  pull-mock-eventing-image            - Pull mock eventing image"
 	@echo "  pull-mock-servicenow-image          - Pull mock ServiceNow image"
-	@echo "  pull-promptguard-image              - Pull PromptGuard image"
 	@echo "  pull-zammad-bootstrap-image         - Pull Zammad bootstrap image"
 	@echo ""
 	@echo "Retag Commands (pull at REGISTRY/VERSION then tag -> NEW_REGISTRY/NEW_VERSION; set both NEW_* vars):"
@@ -358,7 +334,6 @@ help:
 	@echo "  retag-mcp-zammad-image              - Retag Zammad MCP image"
 	@echo "  retag-mock-eventing-image           - Retag mock eventing image"
 	@echo "  retag-mock-servicenow-image         - Retag mock ServiceNow image"
-	@echo "  retag-promptguard-image             - Retag PromptGuard image"
 	@echo "  retag-zammad-bootstrap-image        - Retag Zammad bootstrap image"
 	@echo ""
 	@echo "Push Commands:"
@@ -368,7 +343,6 @@ help:
 	@echo "  push-mcp-snow-image                 - Push the snow MCP server container image to registry"
 	@echo "  push-mcp-zammad-image               - Push the Zammad MCP server container image to registry"
 	@echo "  push-mock-eventing-image            - Push the mock eventing service container image to registry"
-	@echo "  push-promptguard-image              - Push the PromptGuard service container image to registry"
 	@echo "  push-request-mgr-image              - Push the request manager container image to registry"
 	@echo ""
 	@echo "Test Commands:"
@@ -464,11 +438,10 @@ help:
 	@echo "  Model Configuration:"
 	@echo "    HF_TOKEN                          - Hugging Face Token (will prompt if not provided)"
 	@echo "    LLM_ID                            - Model ID for LLM configuration"
-	@echo "    {SAFETY,LLM}                      - Model id as defined in values (eg. llama-3-2-1b-instruct)"
-	@echo "    {SAFETY,LLM}_URL                  - Model URL"
-	@echo "    {SAFETY,LLM}_API_TOKEN            - Model API token for remote models"
-	@echo "    {SAFETY,LLM}_TOLERATION           - Model pod toleration"
-	@echo "    PROMPTGUARD_MODEL                 - PromptGuard model name (default: llama-prompt-guard-2-86m)"
+	@echo "    LLM                               - Model id as defined in values (eg. llama-3-2-1b-instruct)"
+	@echo "    LLM_URL                           - Model URL"
+	@echo "    LLM_API_TOKEN                     - Model API token for remote models"
+	@echo "    LLM_TOLERATION                    - Model pod toleration"
 	@echo ""
 	@echo "  Integration Configuration:"
 	@echo "    ENABLE_SLACK                      - Set to 'true' to enable Slack integration and prompt for tokens"
@@ -616,7 +589,7 @@ check-deps-mcp-template: check-lockfile-shared-models check-lockfile-mcp-common
 
 # Build container images
 .PHONY: build-all-images
-build-all-images: build-request-mgr-image build-agent-service-image build-integration-dispatcher-image build-mcp-snow-image build-mcp-zammad-image build-mock-eventing-image build-mock-servicenow-image build-promptguard-image build-zammad-bootstrap-image
+build-all-images: build-request-mgr-image build-agent-service-image build-integration-dispatcher-image build-mcp-snow-image build-mcp-zammad-image build-mock-eventing-image build-mock-servicenow-image build-zammad-bootstrap-image
 	@echo "All container images built successfully!"
 
 
@@ -632,10 +605,6 @@ build-agent-service-image: check-lockfile-agent-service check-deps-services-temp
 .PHONY: build-integration-dispatcher-image
 build-integration-dispatcher-image: check-lockfile-integration-dispatcher check-deps-services-template
 	$(call build_template_image,$(INTEGRATION_DISPATCHER_IMG),integration dispatcher image,Containerfile.services-template,integration-dispatcher,integration_dispatcher.main,.)
-
-.PHONY: build-promptguard-image
-build-promptguard-image: check-lockfile-promptguard check-deps-services-template
-	$(call build_template_image,$(PROMPTGUARD_IMG),PromptGuard service image,Containerfile.services-template,promptguard-service,promptguard_service.server,.)
 
 .PHONY: build-mcp-snow-image
 build-mcp-snow-image: check-lockfile-mcp-snow check-deps-mcp-template
@@ -665,7 +634,7 @@ build-zammad-bootstrap-image: check-lockfile-zammad-bootstrap check-lockfile-moc
 
 # Push container images
 .PHONY: push-all-images
-push-all-images: push-request-mgr-image push-agent-service-image push-integration-dispatcher-image push-mcp-snow-image push-mcp-zammad-image push-mock-eventing-image push-mock-servicenow-image push-promptguard-image push-zammad-bootstrap-image
+push-all-images: push-request-mgr-image push-agent-service-image push-integration-dispatcher-image push-mcp-snow-image push-mcp-zammad-image push-mock-eventing-image push-mock-servicenow-image push-zammad-bootstrap-image
 	@echo "All container images pushed successfully!"
 
 
@@ -703,13 +672,9 @@ push-mock-servicenow-image:
 push-zammad-bootstrap-image:
 	$(call push_image,$(ZAMMAD_BOOTSTRAP_IMG) $(PUSH_EXTRA_AGRS),Zammad bootstrap image)
 
-.PHONY: push-promptguard-image
-push-promptguard-image:
-	$(call push_image,$(PROMPTGUARD_IMG) $(PUSH_EXTRA_AGRS),PromptGuard service image)
-
 # Pull images at REGISTRY/VERSION with --platform=$(ARCH)
 .PHONY: pull-all-images
-pull-all-images: pull-request-mgr-image pull-agent-service-image pull-integration-dispatcher-image pull-mcp-snow-image pull-mcp-zammad-image pull-mock-eventing-image pull-mock-servicenow-image pull-promptguard-image pull-zammad-bootstrap-image
+pull-all-images: pull-request-mgr-image pull-agent-service-image pull-integration-dispatcher-image pull-mcp-snow-image pull-mcp-zammad-image pull-mock-eventing-image pull-mock-servicenow-image pull-zammad-bootstrap-image
 	@echo "All images pulled successfully!"
 
 .PHONY: pull-request-mgr-image
@@ -744,13 +709,9 @@ pull-mock-servicenow-image:
 pull-zammad-bootstrap-image:
 	$(call pull_image,$(ZAMMAD_BOOTSTRAP_IMG),Zammad bootstrap image)
 
-.PHONY: pull-promptguard-image
-pull-promptguard-image:
-	$(call pull_image,$(PROMPTGUARD_IMG),PromptGuard service image)
-
 # Retag images from REGISTRY/VERSION to NEW_REGISTRY/NEW_VERSION (both NEW_* must be set)
 .PHONY: retag-all-images
-retag-all-images: retag-request-mgr-image retag-agent-service-image retag-integration-dispatcher-image retag-mcp-snow-image retag-mcp-zammad-image retag-mock-eventing-image retag-mock-servicenow-image retag-promptguard-image retag-zammad-bootstrap-image
+retag-all-images: retag-request-mgr-image retag-agent-service-image retag-integration-dispatcher-image retag-mcp-snow-image retag-mcp-zammad-image retag-mock-eventing-image retag-mock-servicenow-image retag-zammad-bootstrap-image
 	@echo "All images retagged to $(NEW_REGISTRY)/*:$(NEW_VERSION)"
 
 .PHONY: retag-request-mgr-image
@@ -785,9 +746,6 @@ retag-mock-servicenow-image: pull-mock-servicenow-image
 retag-zammad-bootstrap-image: pull-zammad-bootstrap-image
 	$(call retag_image,self-service-agent-zammad-bootstrap,Zammad bootstrap image)
 
-.PHONY: retag-promptguard-image
-retag-promptguard-image: pull-promptguard-image
-	$(call retag_image,self-service-agent-promptguard,PromptGuard service image)
 
 # Code quality
 .PHONY: lint
@@ -912,7 +870,7 @@ uninstall: helm-uninstall
 
 # Install dependencies (local dev)
 .PHONY: deps-all
-deps-all: deps-shared-models deps-shared-clients deps-tracing-config deps deps-request-manager deps-agent-service deps-integration-dispatcher deps-mcp-snow deps-mcp-zammad deps-mock-eventing deps-mock-employee-data deps-mock-servicenow deps-promptguard deps-evaluations deps-servicenow-bootstrap
+deps-all: deps-shared-models deps-shared-clients deps-tracing-config deps deps-request-manager deps-agent-service deps-integration-dispatcher deps-mcp-snow deps-mcp-zammad deps-mock-eventing deps-mock-employee-data deps-mock-servicenow deps-evaluations deps-servicenow-bootstrap
 	@echo "All dependencies installed successfully!"
 
 .PHONY: deps-shared-models
@@ -941,7 +899,7 @@ reinstall:
 	@echo "All dependencies reinstalled with latest code!"
 
 .PHONY: reinstall-all
-reinstall-all: reinstall-shared-models reinstall-shared-clients reinstall reinstall-request-manager reinstall-agent-service reinstall-integration-dispatcher reinstall-mcp-snow reinstall-mcp-zammad reinstall-mock-employee-data reinstall-mock-servicenow reinstall-promptguard reinstall-servicenow-bootstrap
+reinstall-all: reinstall-shared-models reinstall-shared-clients reinstall reinstall-request-manager reinstall-agent-service reinstall-integration-dispatcher reinstall-mcp-snow reinstall-mcp-zammad reinstall-mock-employee-data reinstall-mock-servicenow reinstall-servicenow-bootstrap
 	@echo "All project dependencies reinstalled successfully!"
 
 
@@ -1010,12 +968,6 @@ reinstall-mock-servicenow:
 		echo "Current SERVICENOW_INSTANCE_URL: $(SERVICENOW_INSTANCE_URL)"; \
 	fi
 
-.PHONY: reinstall-promptguard
-reinstall-promptguard:
-	@echo "Force reinstalling PromptGuard service dependencies..."
-	cd promptguard-service && uv sync --reinstall
-	@echo "PromptGuard service dependencies force reinstalled successfully!"
-
 .PHONY: deps-request-manager
 deps-request-manager:
 	@echo "Installing request manager dependencies..."
@@ -1069,11 +1021,6 @@ deps-mock-servicenow:
 		echo "Current SERVICENOW_INSTANCE_URL: $(SERVICENOW_INSTANCE_URL)"; \
 	fi
 
-.PHONY: deps-promptguard
-deps-promptguard:
-	@echo "Installing PromptGuard service dependencies..."
-	cd promptguard-service && uv sync
-	@echo "PromptGuard service dependencies installed successfully!"
 
 .PHONY: deps-tracing-config
 deps-tracing-config:
@@ -1103,7 +1050,7 @@ test-all: test-shared-models test-shared-clients test-request-manager test-agent
 MAKE_SAME := $(MAKE) -f $(firstword $(MAKEFILE_LIST))
 # All directories that have uv.lock (for check-lockfiles and update-lockfiles).
 # Export of requirements.txt only runs for dirs also in REQUIREMENTS_DIRS (see update_lockfile).
-LOCKFILE_DIRS := shared-models shared-clients agent-service request-manager integration-dispatcher mcp-servers/mcp-common mcp-servers/snow mcp-servers/zammad mock-eventing-service mock-employee-data promptguard-service scripts/servicenow-bootstrap zammad-bootstrap
+LOCKFILE_DIRS := shared-models shared-clients agent-service request-manager integration-dispatcher mcp-servers/mcp-common mcp-servers/snow mcp-servers/zammad mock-eventing-service mock-employee-data scripts/servicenow-bootstrap zammad-bootstrap
 
 define check_lockfile
 	@echo "📦 Checking $(1)..."
@@ -1175,7 +1122,7 @@ update-lockfiles: check-uv-version
 	@echo "🎉 All lockfiles updated successfully!"
 
 # Individual service lockfile targets
-.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-common check-lockfile-mcp-snow check-lockfile-mcp-zammad check-lockfile-mock-eventing check-lockfile-mock-employee-data check-lockfile-mock-servicenow check-lockfile-promptguard check-lockfile-servicenow-bootstrap check-lockfile-zammad-bootstrap
+.PHONY: check-lockfile-root check-lockfile-shared-models check-lockfile-shared-clients check-lockfile-agent-service check-lockfile-request-manager check-lockfile-integration-dispatcher check-lockfile-mcp-common check-lockfile-mcp-snow check-lockfile-mcp-zammad check-lockfile-mock-eventing check-lockfile-mock-employee-data check-lockfile-mock-servicenow check-lockfile-servicenow-bootstrap check-lockfile-zammad-bootstrap
 check-lockfile-root:
 	@echo "📦 Checking root project..."
 	@if uv lock --check; then \
@@ -1217,9 +1164,6 @@ check-lockfile-mock-employee-data:
 check-lockfile-mock-servicenow:
 	$(call check_lockfile,mock-service-now)
 
-check-lockfile-promptguard:
-	$(call check_lockfile,promptguard-service)
-
 check-lockfile-servicenow-bootstrap:
 	$(call check_lockfile,scripts/servicenow-bootstrap)
 
@@ -1227,7 +1171,7 @@ check-lockfile-zammad-bootstrap:
 	$(call check_lockfile,zammad-bootstrap)
 
 
-.PHONY: update-lockfile-shared-models update-lockfile-shared-clients update-lockfile-agent-service update-lockfile-request-manager update-lockfile-integration-dispatcher update-lockfile-mcp-common update-lockfile-mcp-snow update-lockfile-mcp-zammad update-lockfile-mock-eventing update-lockfile-mock-employee-data update-lockfile-mock-servicenow update-lockfile-promptguard update-lockfile-servicenow-bootstrap update-lockfile-zammad-bootstrap
+.PHONY: update-lockfile-shared-models update-lockfile-shared-clients update-lockfile-agent-service update-lockfile-request-manager update-lockfile-integration-dispatcher update-lockfile-mcp-common update-lockfile-mcp-snow update-lockfile-mcp-zammad update-lockfile-mock-eventing update-lockfile-mock-employee-data update-lockfile-mock-servicenow update-lockfile-servicenow-bootstrap update-lockfile-zammad-bootstrap
 update-lockfile-shared-models:
 	$(call update_lockfile,shared-models)
 
@@ -1261,9 +1205,6 @@ update-lockfile-mock-employee-data:
 update-lockfile-mock-servicenow:
 	$(call update_lockfile,mock-service-now)
 
-update-lockfile-promptguard:
-	$(call update_lockfile,promptguard-service)
-
 update-lockfile-servicenow-bootstrap:
 	$(call update_lockfile,scripts/servicenow-bootstrap)
 
@@ -1284,7 +1225,7 @@ _export-one-dir:
 # Requirements.txt management
 # REQUIREMENTS_DIRS = dirs we export requirements.txt for (subset of LOCKFILE_DIRS; see Lockfile management).
 # Only export/check requirements.txt for directories that are built into containers AND have uv.lock files:
-# - Services: agent-service, integration-dispatcher, promptguard-service, request-manager, mock-eventing-service, mock-service-now
+# - Services: agent-service, integration-dispatcher, request-manager, mock-eventing-service, mock-service-now
 # - MCP servers: mcp-servers/snow
 # - Dependencies copied into containers: shared-models, shared-clients, mock-employee-data
 # We exclude: evaluations, scripts/servicenow-bootstrap, root directory, tracing-config (no uv.lock)
@@ -1292,7 +1233,7 @@ _export-one-dir:
 # CI uses: astral-sh/setup-uv@v5 with version: "0.8.9"
 # To install locally: curl -LsSf https://astral.sh/uv/0.8.9/install.sh | sh
 # Or update: uv self update (may install newer version - check with make check-uv-version)
-REQUIREMENTS_DIRS := agent-service integration-dispatcher promptguard-service request-manager mock-eventing-service mock-service-now mcp-servers/snow mcp-servers/zammad shared-models shared-clients mock-employee-data zammad-bootstrap
+REQUIREMENTS_DIRS := agent-service integration-dispatcher request-manager mock-eventing-service mock-service-now mcp-servers/snow mcp-servers/zammad shared-models shared-clients mock-employee-data zammad-bootstrap
 # UV_VERSION: uv version for CI validation and container builds (default: 0.8.9, can be overridden)
 UV_VERSION ?= 0.8.9
 EXTRACT_TORCH_HASH_SCRIPT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))scripts/extract_torch_hash.py)
@@ -1634,7 +1575,6 @@ define helm_install_common
 		fi; \
 	done
 	@(kubectl get deploy/$(MAIN_CHART_NAME)-mock-eventing -n $(NAMESPACE) >/dev/null 2>&1 && echo "Waiting for mock eventing deployment..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-mock-eventing -n $(NAMESPACE) --timeout 5m || echo "Skipping mock eventing (not deployed)") && (kubectl get deploy/$(MAIN_CHART_NAME)-mock-servicenow -n $(NAMESPACE) >/dev/null 2>&1 && echo "Waiting for mock ServiceNow..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-mock-servicenow -n $(NAMESPACE) --timeout 5m || echo "Skipping mock ServiceNow (not deployed)")
-	$(if $(filter true,$(PROMPTGUARD_ENABLED)),@echo "Waiting for PromptGuard deployment..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-promptguard -n $(NAMESPACE) --timeout 10m,)
 	$(if $(filter true,$(ENABLE_LANGFUSE)),@echo "Waiting for Redis StatefulSet..." && kubectl rollout status statefulset/$(MAIN_CHART_NAME)-langfuse-redis -n $(NAMESPACE) --timeout 10m && echo "Waiting for MinIO StatefulSet..." && kubectl rollout status statefulset/$(MAIN_CHART_NAME)-minio -n $(NAMESPACE) --timeout 10m && echo "Waiting for ClickHouse StatefulSet..." && kubectl rollout status statefulset/$(MAIN_CHART_NAME)-clickhouse -n $(NAMESPACE) --timeout 10m && echo "Waiting for LangFuse Web deployment..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-langfuse -n $(NAMESPACE) --timeout 10m && echo "Waiting for LangFuse Worker deployment (runs ClickHouse migrations)..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-langfuse-worker -n $(NAMESPACE) --timeout 10m && echo "LangFuse URL: https://$$(kubectl get route $(MAIN_CHART_NAME)-langfuse -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null || echo 'Route not found')",)
 	@echo "$(MAIN_CHART_NAME) $(1) installed successfully"
 endef

@@ -153,8 +153,7 @@ The system uses an **Integration Defaults** approach with **User Overrides** to 
 - `DATABASE_URL`: PostgreSQL connection string
 - `SLACK_SIGNING_SECRET`: Slack webhook verification
 - `SNOW_API_KEY`, `HR_API_KEY`: External service API keys
-- `SAFETY`: Safety model for content moderation (e.g., meta-llama/Llama-Guard-3-8B)
-- `SAFETY_URL`: LlamaStack API endpoint for moderation (if shields enabled)
+- `USE_NEMO_GUARDRAILS`: Set to `true` to enable NeMo Guardrails input/output checks (deployed separately via `make deploy-nemo-guardrails`)
 - `LLM_MAX_TOKENS`: Max output tokens for the LLM when deploying with Makefile and `LLM=` (default 2048). Set in Helm as `global.models.<LLM>.maxTokens`; see `helm/values.yaml` and [Prompt Configuration Guide](guides/PROMPT_CONFIGURATION_GUIDE.md).
 
 ## Code Standards
@@ -192,7 +191,7 @@ make helm-install-test NAMESPACE=dev
 - **`docs/API_REFERENCE.md`**: Complete API documentation and endpoints
 - **`docs/SESSION_SERIALIZATION_RUNBOOK.md`**: Session request serialization (one-per-session FIFO, reclaim) — env vars, stuck/failed behavior, test strategy
 - **`guides/INTEGRATION_GUIDE.md`**: Complete integration and request management guide
-- **`guides/SAFETY_SHIELDS_GUIDE.md`**: Safety shields and content moderation configuration
+- **`guides/SAFETY_SHIELDS_GUIDE.md`**: NeMo Guardrails — content moderation and safety configuration
 - **`guides/PERFORMANCE_SCALING_GUIDE.md`**: Performance characteristics, scaling strategies, and optimization approaches
 - **`docs/ARCHITECTURE_DIAGRAMS.md`**: System architecture and flow diagrams
 - **`docs/CHANNEL_BEHAVIOR.md`**: Per-integration session policy, delivery binding, registry, adding channels
@@ -257,11 +256,10 @@ The system uses eventing-based communication with the following core components:
 - **User Context**: User metadata and preferences tracking
 
 ### Safety & Content Moderation
-- **Input Shields**: Validate user input before processing using Llama Guard 3 or compatible models
-- **Output Shields**: Check agent responses before delivery to users
-- **Category Filtering**: Configure ignored categories to handle false positives in business workflows
-- **Llama Guard Integration**: OpenAI-compatible moderation API via LlamaStack
-- **Per-Agent Configuration**: Enable shields selectively based on agent risk profile
+- **Input Rail**: Validate raw user messages before processing via NeMo Guardrails self-check
+- **Output Rail**: Check agent responses before delivery via NeMo Guardrails self-check
+- **NeMo Guardrails**: Deployed separately via `make deploy-nemo-guardrails`; enabled via `USE_NEMO_GUARDRAILS=true`
+- **Optional JailbreakDetect**: GPU-based NemoGuard NIM for dedicated jailbreak classification
 
 ## Related Documentation
 

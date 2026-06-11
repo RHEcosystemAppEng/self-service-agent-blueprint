@@ -14,10 +14,6 @@ model. Some of the limitations include:
 * Only the small prompting approach can be used. There is a version of the small prompt
   [lg-prompt-small-scout.yaml](https://github.com/rh-ai-quickstart/it-self-service-agent/blob/main/agent-service/config/lg-prompts/lg-prompt-small-scout.yaml)
   which has been tweaked for better behavior with Llama-4-Scout-17B-16E.
-* The current integration with PromptGuard does not work with the small prompt approach. This is because
-  the requests crafted by the small prompt approach are sent to the model versus the raw user requests and the
-  crafted requests are often flagged by the safety models as unsafe. This is an area for future investigation for us even though
-  the small prompt approach makes the agent more resistant to prompt injection style attacks
 * The agent may be slower and less consistent in its responses. Slower as more retries may be needed to complete tool calls and
   knowledge base lookups and less consistent due to the generally lower capability of the smaller model.
 
@@ -478,19 +474,10 @@ On the other hand, you can see that the small prompt made 2.1 times as many requ
 
 ---
 
-### Setting up PromptGuard (optional)
+### Setting up guardrails (optional)
 
-The current PromptGuard implementation does not work with the small prompting approach and since the Llama-4-Scout-17B-16E
-cannot support the big prompt approach we are not able to experiment with PromptGuard in this journey. You may still want to
-read through the PromptGuard section in the main
-[README.md](../../README.md#setting-up-promptguard-optional)
-even though you cannot follow the steps outlined.
-
----
-### Setting up safety shields (optional)
-
-Follow the same steps in the main [README.md](../../README.md#setting-up-safety-shields-optional)
-for setting up Safety shields then return to this flow.
+Follow the same steps in the main [README.md](../../README.md#setting-up-guardrails-optional)
+for setting up guardrails then return to this flow.
 
 ---
 
@@ -594,7 +581,7 @@ Step-by-step guides for integrations, deployment, and advanced features:
 - [Email Integration](guides/EMAIL_SETUP.md) - Configure email integration
 - [ServiceNow Setup (Automated)](guides/SERVICE_NOW_BOOTSTRAP_AUTOMATED.md) - Automated ServiceNow configuration
 - [ServiceNow Setup (Manual)](guides/SERVICE_NOW_BOOTSTRAP_MANUAL.md) - Manual ServiceNow configuration
-- [Safety Shields](guides/SAFETY_SHIELDS_GUIDE.md) - Content moderation and safety configuration
+- [Guardrails](guides/SAFETY_SHIELDS_GUIDE.md) - Content moderation and safety configuration
 - [Performance & Scaling](guides/PERFORMANCE_SCALING_GUIDE.md) - Scaling guidance and best practices
 - [Authentication](guides/AUTHENTICATION_GUIDE.md) - Authentication patterns and configuration
 - [Integration Development](guides/INTEGRATION_GUIDE.md) - Building custom integrations
