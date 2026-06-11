@@ -5,7 +5,10 @@ from typing import Any, List, Optional
 from deepeval.metrics import ConversationalGEval
 from deepeval.models import DeepEvalBaseLLM
 from deepeval.test_case import TurnParams
-from helpers.conversation_metadata_eval import ConversationMetadataEval
+from helpers.conversation_metadata_deterministic_eval import (
+    ConversationMetadataDeterministicEval,
+)
+from helpers.conversation_metadata_llm_eval import ConversationMetadataLLMEval
 
 
 def get_metrics(
@@ -72,9 +75,24 @@ def get_metrics(
                 "PASS if the agent responds normally even if it cannot fully resolve the user's issue.",
             ],
         ),
-        ConversationMetadataEval(
-            name="Correct conversation metadata",
+        ConversationMetadataDeterministicEval(
+            name="Correct conversation metadata — deterministic (predefined)",
             threshold=1.0,
+        ),
+        ConversationMetadataLLMEval(
+            name="Correct conversation metadata — LLM (generated)",
+            threshold=1.0,
+            model=custom_model,
+            evaluation_steps=[
+                "Check each assistant turn's actual_conversation_metadata against these state machine rules:",
+                "Ticket starts as: state=open, owner=agent.general, group=Users",
+                "While agent is handling the request: state=open, owner=agent.general, group=Users",
+                "User asks to close the ticket: state=closed, owner=agent.general, group=Users",
+                "User asks to escalate: state=open, owner=-, group=human_managed_tickets",
+                "PASS if ALL metadata transitions are correct and consistent with the rules.",
+                "FAIL if ANY metadata transition violates the rules.",
+                "Report which turn(s) and field(s) did not match.",
+            ],
         ),
     ]
 

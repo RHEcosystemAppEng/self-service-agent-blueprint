@@ -8,10 +8,10 @@ User turns hold expected metadata, assistant turns hold actual metadata.
 The metric compares all fields in each pair and reports mismatches.
 
 Usage:
-    from helpers.conversation_metadata_eval import ConversationMetadataEval
+    from helpers.conversation_metadata_deterministic_eval import ConversationMetadataDeterministicEval
 
-    metric = ConversationMetadataEval(
-        name="Correct conversation metadata",
+    metric = ConversationMetadataDeterministicEval(
+        name="Correct conversation metadata — deterministic (predefined)",
         threshold=1.0,
     )
 """
@@ -22,9 +22,10 @@ from deepeval.metrics import BaseConversationalMetric
 from deepeval.test_case import ConversationalTestCase
 
 
-class ConversationMetadataEval(BaseConversationalMetric):
+class ConversationMetadataDeterministicEval(BaseConversationalMetric):
     """
-    Deterministic metric that compares expected vs actual metadata per turn pair.
+    Deterministic metric that validates predefined conversation by comparing
+    expected vs actual metadata per turn pair.
 
     For each user turn with additional_metadata (expected), finds the immediately
     following assistant turn's additional_metadata (actual) and compares all fields.
@@ -35,7 +36,7 @@ class ConversationMetadataEval(BaseConversationalMetric):
 
     def __init__(
         self,
-        name: str = "Correct conversation metadata",
+        name: str = "Correct conversation metadata — deterministic (predefined)",
         threshold: float = 1.0,
         include_reason: bool = True,
         async_mode: bool = True,
