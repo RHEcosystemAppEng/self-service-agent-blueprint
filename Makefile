@@ -1771,6 +1771,12 @@ helm-install-ticketing: namespace helm-depend
 		echo "  Waiting for $$dep..."; \
 		kubectl rollout status deploy/$$dep -n $(NAMESPACE) --timeout=10m; \
 	done
+	@echo "  Waiting for bootstrap job to complete (Zammad API token + webhook setup)..."
+	@kubectl wait --for=condition=complete --timeout=15m job/$(MAIN_CHART_NAME)-bootstrap -n $(NAMESPACE)
+	@echo "  Waiting for post-bootstrap restarts (MCP, dispatcher, request-manager)..."
+	@kubectl rollout status deploy/mcp-zammad-mcp -n $(NAMESPACE) --timeout=5m
+	@kubectl rollout status deploy/$(MAIN_CHART_NAME)-integration-dispatcher -n $(NAMESPACE) --timeout=5m
+	@kubectl rollout status deploy/$(MAIN_CHART_NAME)-request-manager -n $(NAMESPACE) --timeout=5m
 	@if [ "$(ZAMMAD_DEMO_SITE_ENABLED)" = "true" ]; then \
 		echo "Installing same-host Zammad demo site (Helm release zammad-demo-site)..."; \
 		ZAMMAD_FQDN="$(ZAMMAD_FQDN)"; \
