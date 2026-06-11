@@ -510,7 +510,7 @@
     var HUB_CHANNEL = 'zammad-demo-hub';
     var SESSION_KEY = 'zammad-demo-last-user';
     var SHELL_URL = (function() {
-      var p = window.location.pathname.replace(/[^/]*$/, '');
+      var p = window.location.pathname.replace(/\/?$/, '/');
       return p + 'zammad-shell.html';
     })();
 
