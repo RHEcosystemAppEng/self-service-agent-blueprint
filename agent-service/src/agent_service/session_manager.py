@@ -356,14 +356,14 @@ class ResponsesSessionManager(BaseSessionManager):
                 logger.error("Conversation session not initialized")
                 return "Error: Conversation session not initialized"
 
-            # Raw message input shield: runs before the state machine sees the message
+            # Raw message input guardrail: runs before the state machine sees the message
             if self.current_agent_name and self.agent_manager:
                 agent = self.agent_manager.get_agent(self.current_agent_name)
                 if agent:
                     is_safe, error_message = await agent.check_input_shield(text)
                     if not is_safe:
                         logger.info(
-                            "Input blocked by raw message shield",
+                            "Input blocked by raw message guardrail",
                             agent_name=self.current_agent_name,
                             user_id=self.user_id,
                         )
@@ -390,7 +390,7 @@ class ResponsesSessionManager(BaseSessionManager):
 
             processed_response = await self._handle_routing(processed_response, text)
 
-            # Raw response output shield: runs before the response is returned to the user
+            # Raw response output guardrail: runs before the response is returned to the user
             if self.current_agent_name and self.agent_manager:
                 agent = self.agent_manager.get_agent(self.current_agent_name)
                 if agent:
@@ -399,7 +399,7 @@ class ResponsesSessionManager(BaseSessionManager):
                     )
                     if not is_safe:
                         logger.info(
-                            "Output blocked by raw response shield",
+                            "Output blocked by raw response guardrail",
                             agent_name=self.current_agent_name,
                             user_id=self.user_id,
                         )

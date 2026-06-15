@@ -5,7 +5,6 @@ This module provides centralized factory functions for creating LlamaStack clien
 1. Native LlamaStack client (LlamaStackClient):
    - Model listing (models.list())
    - Response generation (responses.create())
-   - Content moderation (moderations.create())
 
 2. OpenAI-compatible client (openai.OpenAI):
    - Vector store management (knowledge bases)
@@ -113,7 +112,6 @@ def create_llamastack_client(
     This client is used for:
     - Model listing (models.list())
     - Response generation (responses.create())
-    - Content moderation (moderations.create())
 
     Args:
         timeout: Request timeout in seconds.
@@ -178,7 +176,6 @@ def create_async_llamastack_client(
     This async client is used for:
     - Model listing (await models.list())
     - Response generation (await responses.create())
-    - Content moderation (await moderations.create())
 
     Uses httpx.AsyncClient under the hood for true async I/O, allowing
     high concurrency without blocking the event loop or requiring thread pools.

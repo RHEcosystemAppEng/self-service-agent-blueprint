@@ -3,8 +3,8 @@ Fault injection wrapper for testing API resilience.
 
 This wrapper injects failures ONLY into responses.create() calls (the main
 response generation endpoint). All other API calls (models.list(),
-moderations.create(), vector_stores.list(), etc.) pass through unchanged
-to avoid breaking initialization, safety checks, and infrastructure operations.
+vector_stores.list(), etc.) pass through unchanged to avoid breaking
+initialization and infrastructure operations.
 
 Enabled via environment variables:
   FAULT_INJECTION_ENABLED=1                # Enable fault injection
@@ -77,9 +77,6 @@ class FaultInjectingAsyncLlamaStackClient:
         # Only inject faults into responses.create() - all other APIs pass through unchanged
         self.responses = self._wrap_namespace(
             wrapped_client.responses, inject_faults=True
-        )
-        self.moderations = self._wrap_namespace(
-            wrapped_client.moderations, inject_faults=False
         )
         self.models = self._wrap_namespace(wrapped_client.models, inject_faults=False)
         self.vector_stores = self._wrap_namespace(

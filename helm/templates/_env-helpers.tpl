@@ -304,39 +304,6 @@ Generate Agent Service specific environment variables
   value: {{ $value | quote }}
 {{- end }}
 {{- end }}
-{{/* Safety/Shield Configuration */}}
-{{- $safetyModel := "" }}
-{{- $safetyUrl := "" }}
-{{/* Check if safety is configured in values.yaml */}}
-{{- if hasKey .Values "safety" }}
-{{- if .Values.safety.model }}
-{{- $safetyModel = .Values.safety.model }}
-{{- end }}
-{{- if .Values.safety.url }}
-{{- $safetyUrl = .Values.safety.url }}
-{{- end }}
-{{- end }}
-{{/* Check for enabled models in global.models (from Makefile) */}}
-{{- if hasKey .Values "global" }}
-{{- if hasKey .Values.global "models" }}
-{{- range $modelName, $modelConfig := .Values.global.models }}
-{{- if and (hasKey $modelConfig "enabled") $modelConfig.enabled (hasKey $modelConfig "url") }}
-{{/* Check if this looks like a safety/guard model */}}
-{{- if or (contains "guard" ($modelName | lower)) (contains "safety" ($modelName | lower)) }}
-{{- $safetyModel = $modelName }}
-{{- $safetyUrl = $modelConfig.url }}
-{{- end }}
-{{- end }}
-{{- end }}
-{{- end }}
-{{- end }}
-{{/* Only set environment variables if both model and URL are configured */}}
-{{- if and $safetyModel $safetyUrl }}
-- name: SAFETY
-  value: {{ $safetyModel | quote }}
-- name: SAFETY_URL
-  value: {{ $safetyUrl | quote }}
-{{- end }}
 {{/* NeMo Guardrails Configuration */}}
 {{- if and (hasKey .Values "nemoGuardrails") .Values.nemoGuardrails.enabled }}
 - name: USE_NEMO_GUARDRAILS

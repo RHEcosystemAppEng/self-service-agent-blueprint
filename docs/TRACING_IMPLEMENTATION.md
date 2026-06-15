@@ -285,7 +285,7 @@ HTTPXClientInstrumentor automatically adds:
 ## Future Improvements
 
 1. **Async span creation**: Update decorator to handle async functions
-2. **Span events**: Add events for key operations (e.g., shield checks, tool approvals)
+2. **Span events**: Add events for key operations (e.g., guardrail checks, tool approvals)
 3. **Baggage propagation**: Propagate additional metadata via OpenTelemetry Baggage API
 4. **Metrics integration**: Add metrics for trace sampling, span counts, etc.
 5. **Llama Stack instrumentation**: Contribute OpenTelemetry instrumentation to Llama Stack project

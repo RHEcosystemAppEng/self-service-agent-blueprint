@@ -2,8 +2,6 @@
 # Apply SSA demo manifests from helm export
 # Typically invoked via: make ansible-apply-demo NAMESPACE=<ns>
 #
-# Future: Add conditional waits for promptguard and langfuse when
-# promptguard_enabled / enable_langfuse are true (see helm_install_common).
 # Or directly: ansible-playbook ansible/playbooks/apply-demo-manifests.yml -e "target_namespace=<ns>" -e "helm_export_dir=ansible/helm-export"
 
 - name: Apply SSA demo manifests

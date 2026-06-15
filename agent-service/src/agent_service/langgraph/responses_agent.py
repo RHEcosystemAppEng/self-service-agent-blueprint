@@ -54,52 +54,12 @@ class Agent:
         # Defer tools initialization to first use
         self.tools: list[Any] | None = None
 
-        # Load shield configuration for input/output moderation
-        # Check if SAFETY environment variables are configured
-        safety_model = os.getenv("SAFETY")
-        safety_url = os.getenv("SAFETY_URL")
-        shields_available = bool(safety_model and safety_url)
-
-        if shields_available:
-            self.input_shields = self.config.get("input_shields", [])
-            self.output_shields = self.config.get("output_shields", [])
-        else:
-            # Disable shields if SAFETY environment not configured
-            self.input_shields = []
-            self.output_shields = []
-            if self.config.get("input_shields") or self.config.get("output_shields"):
-                logger.warning(
-                    "Shields configured in agent but SAFETY/SAFETY_URL environment variables not set. Shields will be disabled.",
-                    agent_name=agent_name,
-                )
-
-        # Load categories to ignore (for handling false positives)
-        self.ignored_input_categories = set(
-            self.config.get("ignored_input_shield_categories", [])
-        )
-        self.ignored_output_categories = set(
-            self.config.get("ignored_output_shield_categories", [])
-        )
-
         logger.info(
             "Initialized Agent",
             agent_name=agent_name,
             model="deferred" if self.model is None else self.model,
             tool_count="deferred" if self.tools is None else len(self.tools),
         )
-        if self.input_shields:
-            logger.info("Input shields configured", shields=self.input_shields)
-            if self.ignored_input_categories:
-                logger.info(
-                    "Ignored input categories", categories=self.ignored_input_categories
-                )
-        if self.output_shields:
-            logger.info("Output shields configured", shields=self.output_shields)
-            if self.ignored_output_categories:
-                logger.info(
-                    "Ignored output categories",
-                    categories=self.ignored_output_categories,
-                )
 
     async def _get_model_for_agent(self) -> str:
         """Get the model to use for the agent from configuration."""
@@ -322,136 +282,6 @@ class Agent:
         logger.info("Built tools array", tool_count=len(tools_to_use))
 
         return tools_to_use
-
-    async def _run_moderation_shields(
-        self,
-        content: Any,
-        shield_models: list[str],
-        check_type: str = "input",
-    ) -> tuple[bool, Optional[str]]:
-        """
-        Run moderation checks using OpenAI-compatible moderation API.
-
-        Args:
-            content: Either a string (for output) or list of message dicts (for input)
-            shield_models: List of moderation model names (e.g., ["llama-guard-3"])
-            check_type: "input" or "output" for logging purposes
-
-        Returns:
-            Tuple of (is_safe, error_message)
-            - is_safe: True if content passes all shields
-            - error_message: User-facing message if blocked, None if safe
-        """
-        if not shield_models or len(shield_models) == 0:
-            return True, None
-
-        # Use configured ignored categories from agent config based on check type
-        if check_type == "input":
-            ignored_categories = self.ignored_input_categories
-        elif check_type == "output":
-            ignored_categories = self.ignored_output_categories
-        else:
-            ignored_categories = set()
-
-        # Prepare input for moderation API
-        moderation_input: Any
-        log_preview: str
-
-        if isinstance(content, str):
-            # Output shield: single string
-            moderation_input = content
-            log_preview = content[:100]
-        elif isinstance(content, list):
-            # Input shield: list of messages
-            # Only check the last message (most recent user input)
-            if len(content) == 0:
-                return True, None
-
-            last_msg = content[-1]
-            if isinstance(last_msg, dict) and "content" in last_msg:
-                moderation_input = str(last_msg["content"])
-            elif isinstance(last_msg, str):
-                moderation_input = last_msg
-            else:
-                logger.warning(
-                    "Invalid last message format for moderation",
-                    message_type=type(last_msg).__name__,
-                )
-                return True, None
-
-            log_preview = f"last message, {len(moderation_input)} chars"
-        else:
-            logger.warning(
-                "Invalid content type for moderation",
-                content_type=type(content).__name__,
-            )
-            return True, None
-
-        for shield_model in shield_models:
-            try:
-                logger.debug(
-                    "Running shield on content",
-                    check_type=check_type,
-                    shield_model=shield_model,
-                    preview=log_preview,
-                )
-
-                # Call OpenAI-compatible moderation API
-                moderation_response = await self.async_llama_client.moderations.create(
-                    input=moderation_input, model=shield_model
-                )
-
-                # Check if content was flagged
-                if moderation_response.results and len(moderation_response.results) > 0:
-                    result = moderation_response.results[0]
-
-                    if result.flagged:
-                        # Check if any flagged categories are NOT in the ignored list
-                        flagged_categories = {
-                            cat
-                            for cat, is_flagged in (result.categories or {}).items()
-                            if is_flagged and cat not in ignored_categories
-                        }
-
-                        if flagged_categories:
-                            # Log the violation with details including full content
-                            logger.warning(
-                                "Content flagged by shield",
-                                check_type=check_type,
-                                shield_model=shield_model,
-                                categories=result.categories,
-                                scores=result.category_scores,
-                                content=repr(moderation_input),
-                            )
-
-                            # Return user-facing message
-                            user_message = (
-                                result.user_message
-                                or "I apologize, but I cannot process that request due to safety concerns."
-                            )
-                            return False, user_message
-                        else:
-                            # Only ignored categories were flagged - allow content
-                            logger.info(
-                                "Content flagged by shield but only in ignored categories",
-                                check_type=check_type,
-                                shield_model=shield_model,
-                                categories=result.categories,
-                            )
-
-            except Exception as e:
-                logger.error(
-                    "Error running shield",
-                    check_type=check_type,
-                    shield_model=shield_model,
-                    error=str(e),
-                    error_type=type(e).__name__,
-                )
-                # Fail open - continue to next shield or allow if last shield
-                continue
-
-        # All shields passed
-        return True, None
 
     async def _check_nemo_guardrails(
         self, text: str, role: str = "user"
@@ -724,28 +554,6 @@ class Agent:
             current_state_name: Optional name of the current state from the state machine YAML
         """
         try:
-            # INPUT SHIELD: Check user input before processing.
-            # Skipped when USE_NEMO_GUARDRAILS — raw message check already ran in session_manager.
-            if (
-                self.input_shields
-                and not USE_NEMO_GUARDRAILS
-                and messages
-                and len(messages) > 0
-            ):
-                is_safe, error_message = await self._run_moderation_shields(
-                    messages, self.input_shields, "input"
-                )
-                if not is_safe:
-                    logger.info(
-                        "Input blocked by shield",
-                        agent_name=self.agent_name,
-                        messages=repr(messages),
-                    )
-                    return (
-                        error_message
-                        or "I apologize, but I cannot process that request due to safety concerns."
-                    )
-
             # Start with the main system message
             messages_with_system = [{"role": "system", "content": self.system_message}]
 
@@ -885,22 +693,6 @@ class Agent:
                     error_type=type(e).__name__,
                 )
                 return f"Error processing response: {e}"
-
-            # OUTPUT SHIELD: Check agent response before returning
-            if self.output_shields and response_text:
-                is_safe, error_message = await self._run_moderation_shields(
-                    response_text, self.output_shields, "output"
-                )
-                if not is_safe:
-                    logger.info(
-                        "Output blocked by shield",
-                        agent_name=self.agent_name,
-                        response_text=repr(response_text),
-                    )
-                    return (
-                        error_message
-                        or "I apologize, but I cannot provide that response due to safety concerns."
-                    )
 
             return response_text
 
