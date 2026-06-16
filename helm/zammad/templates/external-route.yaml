@@ -11,13 +11,14 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/component: zammad
   annotations:
-    haproxy.router.openshift.io/timeout: "300s"
+    # WebSocket/ActionCable (/ws, /cable) and long-poll need longer-lived connections.
+    haproxy.router.openshift.io/timeout: "3600s"
 spec:
   # Keep the main Zammad route at / so a path-prefixed Route (demo site, e.g. /demo-portal) can share this host.
   path: /
   to:
     kind: Service
-    name: {{ default .Release.Name .Values.zammad.fullnameOverride }}-nginx
+    name: {{ if .Values.edgeProxy.disableAttachments }}{{ include "ticketingZammad.edgeProxyService" . }}{{ else }}{{ include "ticketingZammad.zammadNginxService" . }}{{ end }}
     weight: 100
   port:
     targetPort: http

@@ -1074,6 +1074,31 @@ def ensure_agent_overviews() -> None:
     )
 
 
+def ensure_websocket_backend() -> None:
+    """Legacy UI must use /ws on the public host (not websocketPort :6042)."""
+    for setting in api("GET", "settings"):
+        if setting.get("name") != "websocket_backend":
+            continue
+        # Zammad stores the active value in state_current.value; fall back to state.
+        state_current = setting.get("state_current")
+        if isinstance(state_current, dict):
+            current = state_current.get("value", setting.get("state"))
+        else:
+            current = state_current or setting.get("state")
+        if current == "websocket":
+            print("  websocket_backend already websocket")
+            return
+        api("PUT", f"settings/{setting['id']}", json={"state_current": {"value": "websocket"}})
+        print(f"  websocket_backend set to websocket (was {current!r})")
+        return
+    print("  WARNING: websocket_backend setting not found", file=sys.stderr)
+
+
+def ensure_ssa_zammad_ui() -> None:
+    print("\n[6b/7] SSA Zammad UI (websocket backend)...")
+    ensure_websocket_backend()
+
+
 def ensure_integration_webhook_and_trigger():
     """Create or update Zammad Webhook + Trigger for integration-dispatcher POST /zammad/webhook."""
     endpoint = os.environ.get("ZAMMAD_INTEGRATION_WEBHOOK_URL", "").strip()
@@ -1296,6 +1321,7 @@ def main():
         )
 
     ensure_integration_webhook_and_trigger()
+    ensure_ssa_zammad_ui()
 
     print("\n[7/7] Ensuring admin overviews for AI agent statistics...")
     ensure_agent_overviews()

@@ -1,11 +1,42 @@
 {{- if .Values.externalRoute.enabled }}
+{{- $edgeEnabled := .Values.edgeProxy.disableAttachments }}
 ---
-# Allow ingress from OpenShift router to Zammad nginx (for ssa-zammad Route)
-# Zammad pods use app.kubernetes.io/instance=zammad, not self-service-agent
+# Allow ingress from OpenShift router to Zammad edge proxy or nginx (ssa-zammad Route).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: {{ .Release.Name }}-allow-zammad-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: zammad
+spec:
+  podSelector:
+    matchLabels:
+      {{- if $edgeEnabled }}
+      app.kubernetes.io/component: zammad-edge
+      {{- else }}
+      app.kubernetes.io/name: zammad
+      app.kubernetes.io/component: zammad-nginx
+      {{- end }}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          network.openshift.io/policy-group: ingress
+    ports:
+    - protocol: TCP
+      port: 8080
+{{- if $edgeEnabled }}
+---
+# Edge proxy → zammad-nginx (HTML, assets, API pass-through).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-allow-zammad-edge-to-nginx
   namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
@@ -20,10 +51,63 @@ spec:
   - Ingress
   ingress:
   - from:
-    - namespaceSelector:
+    - podSelector:
         matchLabels:
-          network.openshift.io/policy-group: ingress
+          app.kubernetes.io/component: zammad-edge
     ports:
     - protocol: TCP
       port: 8080
+---
+# Edge proxy → zammad-websocket (direct /ws WebSocket, avoids double-hop).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-allow-zammad-edge-to-websocket
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: zammad
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: zammad
+      app.kubernetes.io/component: zammad-websocket
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: zammad-edge
+    ports:
+    - protocol: TCP
+      port: 6042
+---
+# Edge proxy → zammad-railsserver (direct /cable ActionCable, avoids double-hop).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-allow-zammad-edge-to-railsserver
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: zammad
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: zammad
+      app.kubernetes.io/component: zammad-railsserver
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: zammad-edge
+    ports:
+    - protocol: TCP
+      port: 3000
+{{- end }}
 {{- end }}

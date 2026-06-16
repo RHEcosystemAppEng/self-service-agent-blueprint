@@ -8,6 +8,14 @@ zammad: {}
 externalRoute:
   enabled: false
 
+# Optional nginx edge proxy in front of stock zammad-nginx (no Zammad image/chart changes).
+# When disableAttachments is true and externalRoute is enabled, the Route targets the edge proxy:
+#   - 403 on /api/v1/upload_caches (upload API)
+#   - CSS injection to hide attachment controls in the web UI
+edgeProxy:
+  disableAttachments: false
+  image: nginxinc/nginx-unprivileged:1.27-alpine
+
 bootstrap:
   # imageTag ↔ Makefile BASE_VERSION / scripts/bump-release.sh. Ticketing overrides via helm-install-ticketing overlay.
   imageRegistry: quay.io/rh-ai-quickstart
