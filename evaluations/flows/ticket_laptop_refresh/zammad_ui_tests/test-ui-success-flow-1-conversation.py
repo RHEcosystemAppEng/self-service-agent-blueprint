@@ -9,7 +9,6 @@ from typing import Any
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
-
 OWNER_ID_TO_DISPLAY: dict[str, str] = {
     "agent.laptop-specialist": "laptop",
     "manager1": "manager",
@@ -17,7 +16,9 @@ OWNER_ID_TO_DISPLAY: dict[str, str] = {
 
 
 def _load_conversation() -> list[dict[str, Any]]:
-    flow_file = Path(__file__).resolve().parent.parent / "conversations" / "success-flow-1.json"
+    flow_file = (
+        Path(__file__).resolve().parent.parent / "conversations" / "success-flow-1.json"
+    )
     with open(flow_file) as f:
         data = json.load(f)
     return [msg for msg in data["conversation"] if msg["role"] == "user"]
@@ -80,7 +81,9 @@ def _assert_metadata(step: int, page: Page, expected: dict[str, Any]) -> None:
     owner = _scrape_owner(page)
     group = _scrape_group(page)
 
-    print(f"  Step {step + 1} metadata: state={state!r}, owner={owner!r}, group={group!r}")
+    print(
+        f"  Step {step + 1} metadata: state={state!r}, owner={owner!r}, group={group!r}"
+    )
 
     if "state" in expected:
         assert expected["state"].lower() in state.lower(), (
@@ -158,9 +161,7 @@ def test_laptop_refresh_conversation(
 
     customer_page.get_by_role("button", name="Create").click()
 
-    customer_page.wait_for_url(
-        lambda url: "#ticket/zoom/" in url, timeout=30_000
-    )
+    customer_page.wait_for_url(lambda url: "#ticket/zoom/" in url, timeout=30_000)
     customer_page.wait_for_load_state("networkidle")
 
     ticket_id = customer_page.url.split("/")[-1]
