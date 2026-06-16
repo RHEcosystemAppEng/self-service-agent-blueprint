@@ -1707,7 +1707,7 @@ helm-install-ticketing: namespace helm-depend
 		true)
 	@rm -f $(ZAMMAD_TICKETING_OVERLAY)
 	@echo "Waiting for Zammad deployments to be ready..."
-	@for dep in zammad-nginx zammad-railsserver zammad-websocket zammad-scheduler mcp-zammad-mcp; do \
+	@for dep in zammad-edge zammad-nginx zammad-railsserver zammad-websocket zammad-scheduler mcp-zammad-mcp; do \
 		echo "  Waiting for $$dep..."; \
 		kubectl rollout status deploy/$$dep -n $(NAMESPACE) --timeout=10m; \
 	done

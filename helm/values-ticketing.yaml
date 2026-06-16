@@ -37,6 +37,10 @@ ticketingZammad:
   externalRoute:
     enabled: true
 
+  # Nginx edge proxy: hide attachment UI (CSS) and block upload API (403). Stock Zammad image unchanged.
+  edgeProxy:
+    disableAttachments: true
+
   # Upstream Zammad subchart values
   zammad:
     # Keep service names as zammad-* regardless of Helm release name
@@ -74,6 +78,10 @@ ticketingZammad:
           - 10.0.0.0/8
           - 172.16.0.0/12
           - 192.168.0.0/16
+        # Edge proxy + OpenShift Route: inner nginx must tell Rails the client used HTTPS (CSRF/session cookies).
+        extraHeaders:
+          - 'X-Forwarded-Proto https'
+          - 'X-Forwarded-Ssl on'
       railsserver:
         trustedProxies: "['127.0.0.1', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16']"
 
