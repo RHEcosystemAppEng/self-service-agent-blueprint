@@ -1088,7 +1088,11 @@ def ensure_websocket_backend() -> None:
         if current == "websocket":
             print("  websocket_backend already websocket")
             return
-        api("PUT", f"settings/{setting['id']}", json={"state_current": {"value": "websocket"}})
+        api(
+            "PUT",
+            f"settings/{setting['id']}",
+            json={"state_current": {"value": "websocket"}},
+        )
         print(f"  websocket_backend set to websocket (was {current!r})")
         return
     print("  WARNING: websocket_backend setting not found", file=sys.stderr)
