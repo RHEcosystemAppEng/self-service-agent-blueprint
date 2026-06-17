@@ -1971,13 +1971,13 @@ helm-uninstall:
 	@helm uninstall zammad-demo-site -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true
 	@kubectl delete jobs -n $(NAMESPACE) -l app.kubernetes.io/component=zammad-bootstrap --ignore-not-found --wait=false 2>/dev/null || true
 	@sleep 5
-	@for pvc in $$(kubectl get pvc -n $(NAMESPACE) -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n' | grep -E '^data-(zammad|$(MAIN_CHART_NAME))-(elasticsearch|postgresql|redis|memcached)' || true); do kubectl delete pvc $$pvc -n $(NAMESPACE) --ignore-not-found; done
+	@for pvc in $$(kubectl get pvc -n $(NAMESPACE) -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n' | grep -E '^data-(zammad|$(MAIN_CHART_NAME))-(elasticsearch|postgresql|redis|memcached|langfuse-redis)' || true); do kubectl delete pvc $$pvc -n $(NAMESPACE) --ignore-not-found; done
 	@echo "Removing ServiceNow credentials secret from $(NAMESPACE)"
 	@kubectl delete secret $(MAIN_CHART_NAME)-servicenow-credentials -n $(NAMESPACE) --ignore-not-found || true
 	@echo "Removing Zammad credentials secret from $(NAMESPACE)"
 	@kubectl delete secret $(ZAMMAD_CREDENTIALS_SECRET) -n $(NAMESPACE) --ignore-not-found || true
 	@echo "Removing pgvector, init job, and LangFuse PVCs from $(NAMESPACE)"
-	@kubectl get pvc -n $(NAMESPACE) -o custom-columns=NAME:.metadata.name 2>/dev/null | grep -E '^(pg.*-data|self-service-agent-init-status|data-self-service-agent-(clickhouse|redis|minio)-.*)' | xargs -I {} kubectl delete pvc -n $(NAMESPACE) {} --ignore-not-found ||:
+	@kubectl get pvc -n $(NAMESPACE) -o custom-columns=NAME:.metadata.name 2>/dev/null | grep -E '^(pg.*-data|$(MAIN_CHART_NAME)-init-status|data-$(MAIN_CHART_NAME)-(clickhouse|redis|minio|langfuse-redis)-.*)' | xargs -I {} kubectl delete pvc -n $(NAMESPACE) {} --ignore-not-found ||:
 	@echo "Deleting remaining pods in namespace $(NAMESPACE)"
 	@kubectl delete pods -n $(NAMESPACE) --all || true
 	@echo "Checking for any remaining resources in namespace $(NAMESPACE)..."
