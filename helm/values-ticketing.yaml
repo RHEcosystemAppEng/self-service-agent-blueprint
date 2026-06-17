@@ -103,6 +103,9 @@ ticketingZammad:
           openshift:
             adaptSecurityContext: force
 
+mockServiceNow:
+  enabled: false
+
 knowledgeBases:
   configMaps:
     - name: kb-general-support
@@ -115,5 +118,7 @@ requestManagement:
 
 mcp-servers:
   mcp-servers:
+    self-service-agent-snow:
+      enabled: false
     zammad-mcp:
       enabled: true
