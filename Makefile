@@ -1561,7 +1561,6 @@ define helm_install_common
 		"deploy/$(MAIN_CHART_NAME)-integration-dispatcher:integration dispatcher" \
 		"deploy/$(MAIN_CHART_NAME)-agent-service:agent service" \
 		"deploy/llamastack:llamastack" \
-		"deploy/mcp-self-service-agent-snow:mcp-self-service-agent-snow" \
 		"statefulset/pgvector:pgvector" \
 		"job/$(MAIN_CHART_NAME)-db-migration:db-migration" \
 		"job/$(MAIN_CHART_NAME)-init:init"; do \
@@ -1574,7 +1573,7 @@ define helm_install_common
 			kubectl rollout status $$res -n $(NAMESPACE) --timeout 10m; \
 		fi; \
 	done
-	@(kubectl get deploy/$(MAIN_CHART_NAME)-mock-eventing -n $(NAMESPACE) >/dev/null 2>&1 && echo "Waiting for mock eventing deployment..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-mock-eventing -n $(NAMESPACE) --timeout 5m || echo "Skipping mock eventing (not deployed)") && (kubectl get deploy/$(MAIN_CHART_NAME)-mock-servicenow -n $(NAMESPACE) >/dev/null 2>&1 && echo "Waiting for mock ServiceNow..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-mock-servicenow -n $(NAMESPACE) --timeout 5m || echo "Skipping mock ServiceNow (not deployed)")
+	@(kubectl get deploy/mcp-self-service-agent-snow -n $(NAMESPACE) >/dev/null 2>&1 && echo "Waiting for snow MCP deployment..." && kubectl rollout status deploy/mcp-self-service-agent-snow -n $(NAMESPACE) --timeout 5m || echo "Skipping snow MCP (not deployed)") && (kubectl get deploy/$(MAIN_CHART_NAME)-mock-eventing -n $(NAMESPACE) >/dev/null 2>&1 && echo "Waiting for mock eventing deployment..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-mock-eventing -n $(NAMESPACE) --timeout 5m || echo "Skipping mock eventing (not deployed)") && (kubectl get deploy/$(MAIN_CHART_NAME)-mock-servicenow -n $(NAMESPACE) >/dev/null 2>&1 && echo "Waiting for mock ServiceNow..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-mock-servicenow -n $(NAMESPACE) --timeout 5m || echo "Skipping mock ServiceNow (not deployed)")
 	$(if $(filter true,$(ENABLE_LANGFUSE)),@echo "Waiting for Redis StatefulSet..." && kubectl rollout status statefulset/$(MAIN_CHART_NAME)-langfuse-redis -n $(NAMESPACE) --timeout 10m && echo "Waiting for MinIO StatefulSet..." && kubectl rollout status statefulset/$(MAIN_CHART_NAME)-minio -n $(NAMESPACE) --timeout 10m && echo "Waiting for ClickHouse StatefulSet..." && kubectl rollout status statefulset/$(MAIN_CHART_NAME)-clickhouse -n $(NAMESPACE) --timeout 10m && echo "Waiting for LangFuse Web deployment..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-langfuse -n $(NAMESPACE) --timeout 10m && echo "Waiting for LangFuse Worker deployment (runs ClickHouse migrations)..." && kubectl rollout status deploy/$(MAIN_CHART_NAME)-langfuse-worker -n $(NAMESPACE) --timeout 10m && echo "LangFuse URL: https://$$(kubectl get route $(MAIN_CHART_NAME)-langfuse -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null || echo 'Route not found')",)
 	@echo "$(MAIN_CHART_NAME) $(1) installed successfully"
 endef
