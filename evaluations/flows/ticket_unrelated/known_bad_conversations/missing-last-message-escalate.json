@@ -1,0 +1,35 @@
+{
+  "metadata": {
+    "authoritative_user_id": "carlos.rodriguez@company.com",
+    "description": "Known bad conversation - User requests ticket escalation but agent confirmation message is missing"
+  },
+  "conversation": [
+    {
+      "role": "user",
+      "content": "My VPN keeps disconnecting every few minutes",
+      "expected_conversation_metadata": {
+        "state": "open",
+        "owner": "agent.general",
+        "group": "Users"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "Hello! I'm a general support agent and I'll do my best to help based on my general knowledge. Feel free to ask follow-up questions at any time. If your issue is resolved you can ask to close the ticket, or escalate if you need further human assistance.\n\nFrequent VPN disconnections are often caused by an unstable internet connection, an outdated VPN client, or a misconfigured idle timeout setting. Try restarting your VPN client and checking for updates.",
+      "actual_conversation_metadata": {
+        "state": "open",
+        "owner": "agent.general",
+        "group": "Users"
+      }
+    },
+    {
+      "role": "user",
+      "content": "Please escalate this to a network specialist",
+      "expected_conversation_metadata": {
+        "state": "open",
+        "owner": "-",
+        "group": "human_managed_tickets"
+      }
+    }
+  ]
+}

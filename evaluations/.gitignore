@@ -9,5 +9,6 @@ results/**/conversation_results/*
 !results/ticket_laptop_refresh/conversation_results/known_good_flow.json
 
 results/**/deep_eval_results/
+results/**/known_bad_results/
 
 results/token_usage/*
