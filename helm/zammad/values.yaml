@@ -6,15 +6,24 @@ zammad: {}
 
 # OpenShift Route for external access to Zammad Web UI
 externalRoute:
-  enabled: false
+  enabled: true
 
 # Optional nginx edge proxy in front of stock zammad-nginx (no Zammad image/chart changes).
-# When disableAttachments is true and externalRoute is enabled, the Route targets the edge proxy:
+# When disableAttachments is true, the edge proxy is deployed regardless of externalRoute:
 #   - 403 on /api/v1/upload_caches (upload API)
 #   - CSS injection to hide attachment controls in the web UI
+# When externalRoute is also enabled, the Route targets the edge proxy.
 edgeProxy:
   disableAttachments: false
   image: nginxinc/nginx-unprivileged:1.27-alpine
+  # Reverse-proxy the demo site through the edge proxy so both share the same origin.
+  # Required for port-forward access (no external route) so one-click sign-in works.
+  # The demo site Service must exist before the edge proxy starts (Makefile pre-creates it).
+  demoSiteProxy:
+    enabled: false
+    service: zammad-demo-site
+    port: 80
+    pathPrefix: /demo-portal
 
 bootstrap:
   # imageTag ↔ Makefile BASE_VERSION / scripts/bump-release.sh. Ticketing overrides via helm-install-ticketing overlay.

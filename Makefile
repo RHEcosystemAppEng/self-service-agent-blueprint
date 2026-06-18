@@ -229,6 +229,8 @@ ZAMMAD_TICKETING_OVERLAY = /tmp/ssa-zammad-$(NAMESPACE)-overlay.yaml
 # Must match autoWizard.config in helm/values-ticketing.yaml (for UI login).
 ZAMMAD_ADMIN_EMAIL ?= admin@zammad.local
 ZAMMAD_ADMIN_PASSWORD ?= ZammadR0cks!
+# Set to false to skip the public OpenShift Route and use oc port-forward instead.
+ZAMMAD_EXTERNAL_ROUTE ?= true
 
 # Extra args for helm-install-ticketing: Zammad MCP server image and credentials wiring.
 helm_ticketing_args = \
@@ -1659,19 +1661,39 @@ helm-install-ticketing: namespace helm-depend
 		--from-literal=zammad-api-url="$(ZAMMAD_URL)/api/v1" \
 		--from-literal=zammad-http-token="" \
 		-n $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
-	@# Compute cluster-specific values (OpenShift UID, FQDN) and write temp overlay file.
+	@# Compute FQDN, install demo site (before main chart so its Service exists for the edge
+	@# proxy — nginx resolves upstream hostnames at config load time), then write overlay.
 	@ZAMMAD_UID=$$(kubectl get namespace $(NAMESPACE) -o jsonpath='{.metadata.annotations.openshift\.io/sa\.scc\.uid-range}' 2>/dev/null | cut -d'/' -f1); \
 	ZAMMAD_FQDN="$(ZAMMAD_FQDN)"; \
-	if [ -z "$$ZAMMAD_FQDN" ]; then \
+	if [ "$(ZAMMAD_EXTERNAL_ROUTE)" = "true" ] && [ -z "$$ZAMMAD_FQDN" ]; then \
 		APPS_DOMAIN=$$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}' 2>/dev/null); \
 		if [ -n "$$APPS_DOMAIN" ]; then \
 			ZAMMAD_FQDN="ssa-zammad-$(NAMESPACE).$$APPS_DOMAIN"; \
 			echo "Pre-computed Zammad FQDN: $$ZAMMAD_FQDN"; \
 		fi; \
 	fi; \
+	if [ "$(ZAMMAD_DEMO_SITE_ENABLED)" = "true" ]; then \
+		echo "Installing demo site chart (before main chart so Service exists for edge proxy)..."; \
+		DEMO_SITE_HELM_ARGS="--set enabled=true --set pathPrefix=/$(ZAMMAD_DEMO_SITE_PATH)"; \
+		if [ "$(ZAMMAD_EXTERNAL_ROUTE)" = "true" ] && [ -n "$$ZAMMAD_FQDN" ]; then \
+			DEMO_SITE_HELM_ARGS="$$DEMO_SITE_HELM_ARGS --set zammadRouteHost=$$ZAMMAD_FQDN --set publicUrl=https://$$ZAMMAD_FQDN"; \
+		else \
+			DEMO_SITE_HELM_ARGS="$$DEMO_SITE_HELM_ARGS --set externalRoute=false --set publicUrl=http://localhost:8080"; \
+		fi; \
+		helm upgrade --install zammad-demo-site helm/zammad-demo-site/ -n $(NAMESPACE) $$DEMO_SITE_HELM_ARGS; \
+	fi; \
 	[ -n "$$ZAMMAD_UID" ] && echo "OpenShift: using namespace UID $$ZAMMAD_UID for restricted SCC" || true; \
 	{ \
 		printf 'ticketingZammad:\n'; \
+		if [ "$(ZAMMAD_EXTERNAL_ROUTE)" != "true" ]; then \
+			printf '  externalRoute:\n'; \
+			printf '    enabled: false\n'; \
+			if [ "$(ZAMMAD_DEMO_SITE_ENABLED)" = "true" ]; then \
+				printf '  edgeProxy:\n'; \
+				printf '    demoSiteProxy:\n'; \
+				printf '      enabled: true\n'; \
+			fi; \
+		fi; \
 		printf '  bootstrap:\n'; \
 		printf '    imageRegistry: "%s"\n' '$(REGISTRY)'; \
 		printf '    imageRepository: "%s"\n' 'self-service-agent-zammad-bootstrap'; \
@@ -1701,12 +1723,15 @@ helm-install-ticketing: namespace helm-depend
 		-f $(ZAMMAD_TICKETING_OVERLAY) \
 		--timeout 25m \
 		--set mcp-servers.mcp-servers.zammad-mcp.enabled=true \
+		--set requestManagement.integrationDispatcher.externalAccess.enabled=false \
 		$(helm_ticketing_args) \
 		$(PROMPT_OVERRIDES),\
 		true)
 	@rm -f $(ZAMMAD_TICKETING_OVERLAY)
 	@echo "Waiting for Zammad deployments to be ready..."
-	@for dep in zammad-edge zammad-nginx zammad-railsserver zammad-websocket zammad-scheduler mcp-zammad-mcp; do \
+	@ZAMMAD_DEPS="zammad-nginx zammad-railsserver zammad-websocket zammad-scheduler mcp-zammad-mcp"; \
+	if kubectl get deploy/zammad-edge -n $(NAMESPACE) >/dev/null 2>&1; then ZAMMAD_DEPS="zammad-edge $$ZAMMAD_DEPS"; fi; \
+	for dep in $$ZAMMAD_DEPS; do \
 		echo "  Waiting for $$dep..."; \
 		kubectl rollout status deploy/$$dep -n $(NAMESPACE) --timeout=10m; \
 	done
@@ -1716,18 +1741,7 @@ helm-install-ticketing: namespace helm-depend
 	@kubectl rollout status deploy/mcp-zammad-mcp -n $(NAMESPACE) --timeout=5m
 	@kubectl rollout status deploy/$(MAIN_CHART_NAME)-integration-dispatcher -n $(NAMESPACE) --timeout=5m
 	@kubectl rollout status deploy/$(MAIN_CHART_NAME)-request-manager -n $(NAMESPACE) --timeout=5m
-	@if [ "$(ZAMMAD_DEMO_SITE_ENABLED)" = "true" ]; then \
-		echo "Installing same-host Zammad demo site (Helm release zammad-demo-site)..."; \
-		ZAMMAD_FQDN="$(ZAMMAD_FQDN)"; \
-		if [ -z "$$ZAMMAD_FQDN" ]; then \
-			APPS_DOMAIN=$$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}' 2>/dev/null); \
-			[ -n "$$APPS_DOMAIN" ] && ZAMMAD_FQDN="ssa-zammad-$(NAMESPACE).$$APPS_DOMAIN"; \
-		fi; \
-		DEMO_SITE_HELM_ARGS="--set enabled=true"; \
-		[ -n "$$ZAMMAD_FQDN" ] && DEMO_SITE_HELM_ARGS="$$DEMO_SITE_HELM_ARGS --set publicUrl=https://$$ZAMMAD_FQDN"; \
-		DEMO_SITE_HELM_ARGS="$$DEMO_SITE_HELM_ARGS --set pathPrefix=/$(ZAMMAD_DEMO_SITE_PATH)"; \
-		helm upgrade --install zammad-demo-site helm/zammad-demo-site/ -n $(NAMESPACE) $$DEMO_SITE_HELM_ARGS; \
-	else \
+	@if [ "$(ZAMMAD_DEMO_SITE_ENABLED)" != "true" ]; then \
 		helm uninstall zammad-demo-site -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true; \
 	fi
 	@echo "  Waiting for terminating pods to finish..."
@@ -1759,7 +1773,7 @@ _helm-install-ticketing-print-checklist:
 	@echo ""
 	@echo "  1. Zammad URLs:"
 	@ZAMMAD_ROUTE=$$(oc get route ssa-zammad -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null); \
-	ZAMMAD_DEMO_SITE_INSTALLED=$$(oc get route ssa-zammad-demo-site -n $(NAMESPACE) -o name 2>/dev/null); \
+	ZAMMAD_DEMO_SITE_INSTALLED=$$(kubectl get svc zammad-demo-site -n $(NAMESPACE) -o name 2>/dev/null); \
 	if [ -z "$$ZAMMAD_ROUTE" ]; then ZAMMAD_ROUTE=$$(oc get route -n $(NAMESPACE) -l app.kubernetes.io/instance=zammad -o jsonpath='{.items[0].spec.host}' 2>/dev/null); fi; \
 	if [ -n "$$ZAMMAD_ROUTE" ]; then \
 		echo "     Web UI: https://$$ZAMMAD_ROUTE"; \
@@ -1770,29 +1784,19 @@ _helm-install-ticketing-print-checklist:
 			echo "     Demo site: not installed — ZAMMAD_DEMO_SITE_ENABLED was not true. Re-run with ZAMMAD_DEMO_SITE_ENABLED=true (default) or omit it."; \
 		fi; \
 	else \
-		echo "     Port-forward: kubectl port-forward -n $(NAMESPACE) svc/zammad-nginx 8080:8080"; \
-		echo "     Web UI: http://localhost:8080"; \
-		echo "     API:    http://localhost:8080/api/v1"; \
+		echo "     No Route found. Port-forward to access Zammad:"; \
+		if kubectl get deploy/zammad-edge -n $(NAMESPACE) >/dev/null 2>&1; then \
+			echo "     oc port-forward -n $(NAMESPACE) svc/zammad-edge 8080:8080"; \
+		else \
+			echo "     oc port-forward -n $(NAMESPACE) svc/zammad-nginx 8080:8080"; \
+		fi; \
+		echo "     Web UI:    http://localhost:8080"; \
+		echo "     API:       http://localhost:8080/api/v1"; \
+		if [ -n "$$ZAMMAD_DEMO_SITE_INSTALLED" ]; then \
+			echo "     Demo site: http://localhost:8080/$(ZAMMAD_DEMO_SITE_PATH)/"; \
+		fi; \
 	fi; \
-	echo ""; \
-	if [ -n "$$ZAMMAD_DEMO_SITE_INSTALLED" ]; then \
-		echo "  2. Demo site: login at /$(ZAMMAD_DEMO_SITE_PATH)/; chat widget snippet + preview at /$(ZAMMAD_DEMO_SITE_PATH)/chat-snippet.html on the Web UI host. Admin → Channels → Chat (agents must be available for the widget)."; \
-		echo "     Full chat → agent reply loop needs integration-dispatcher + webhook/MCP when enabled."; \
-		echo ""; \
-	fi
-	@echo "  3. Zammad FQDN: pre-computed / Makefile overlay when needed so the Route and HTTPS behave correctly."
-	@echo ""
-	@echo "  4. If the MCP token was not written by the bootstrap Job:"
-	@echo "     - kubectl logs -n $(NAMESPACE) job/$(MAIN_CHART_NAME)-bootstrap"
-	@echo "       (or: kubectl logs -n $(NAMESPACE) -l app.kubernetes.io/component=zammad-bootstrap)"
-	@echo "     - Ensure ticketingZammad.bootstrap.createToken and credentialsSecret match your cluster."
-	@echo ""
-	@echo "  5. Webhook: ticketing defaults enable ticketingZammad.bootstrap.integrationWebhook; the post-install bootstrap Job creates the Webhook + Trigger → integration-dispatcher (README.md § Integration with Zammad ticketing). Set ticketingZammad.webhookSecret so $(MAIN_CHART_NAME)-integration-secrets includes zammad-webhook-secret for HMAC verification."
-	@echo ""
-	@echo "  Admin login defaults: ZAMMAD_ADMIN_EMAIL / ZAMMAD_ADMIN_PASSWORD (see Makefile; must match autoWizard in helm/values-ticketing.yaml)."
-	@echo "  Optional: TEST_USERS (comma-separated emails) on helm-install-ticketing → bootstrap Job provisions mock-employee-data customers in Zammad."
-	@echo "  More: README.md, docs/HELM_EXPORT_ANSIBLE.md"
-	@echo ""
+	echo "";
 
 # Install with full Knative eventing (production mode)
 .PHONY: helm-install-prod
