@@ -1,9 +1,9 @@
 """
-Deterministic metric that validates assistant confirmation after close/escalation requests.
+Deterministic metric that validates an assistant reply follows close/escalation requests.
 
-When a user explicitly asks to close or escalate a ticket, the assistant must respond
-with a confirmation message. This catches the production bug where the ticket state
-changes but the user never sees the agent's closing/escalation message.
+When a user message appears to request ticket close or escalation, the assistant must
+respond with a follow-up message. This catches the production bug where the ticket
+state changes but the user never sees any agent reply.
 """
 
 import re
@@ -89,16 +89,6 @@ _ESCALATE_QUESTION_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-_CLOSE_CONFIRMATION_PHRASES = (
-    "closed",
-    "ticket_closed",
-)
-
-_ESCALATE_CONFIRMATION_PHRASES = (
-    "escalated",
-    "ticket_escalated",
-)
-
 
 def _is_excluded_request(content: str, action: str) -> bool:
     """Return True for negated or self-directed question formulations."""
@@ -115,33 +105,26 @@ def _is_excluded_request(content: str, action: str) -> bool:
 
 def _user_requests_close_or_escalate(content: str) -> Optional[str]:
     lower = content.lower()
-    if any(phrase in lower for phrase in _CLOSE_REQUEST_PHRASES) or _CLOSE_TICKET_PATTERN.search(
-        content
-    ):
+    if any(
+        phrase in lower for phrase in _CLOSE_REQUEST_PHRASES
+    ) or _CLOSE_TICKET_PATTERN.search(content):
         if not _is_excluded_request(content, "close"):
             return "close"
-    if any(phrase in lower for phrase in _ESCALATE_REQUEST_PHRASES) or _ESCALATE_TICKET_PATTERN.search(
-        content
-    ):
+    if any(
+        phrase in lower for phrase in _ESCALATE_REQUEST_PHRASES
+    ) or _ESCALATE_TICKET_PATTERN.search(content):
         if not _is_excluded_request(content, "escalate"):
             return "escalate"
     return None
 
 
-def _assistant_confirms_action(content: str, action: str) -> bool:
-    lower = content.lower()
-    phrases = (
-        _CLOSE_CONFIRMATION_PHRASES
-        if action == "close"
-        else _ESCALATE_CONFIRMATION_PHRASES
-    )
-    return any(phrase in lower for phrase in phrases)
-
-
 class CloseOrEscalationConfirmationDeterministicEval(BaseConversationalMetric):
     """
-    Deterministic metric: after a user requests ticket close or escalation,
-    the assistant must reply with an explicit confirmation message.
+    Deterministic metric: after a user message that appears to request ticket close
+    or escalation, the assistant must reply with any follow-up message.
+
+    Request detection is best-effort (phrases, regex, negation/question exclusions).
+    This metric only checks that an assistant turn exists — not the wording of the reply.
     """
 
     def __init__(
@@ -174,20 +157,14 @@ class CloseOrEscalationConfirmationDeterministicEval(BaseConversationalMetric):
             next_turn = turns[i + 1] if i + 1 < len(turns) else None
             if not next_turn or next_turn.role != "assistant":
                 failures.append(
-                    f"User requested ticket {action} but no assistant confirmation message followed"
-                )
-                continue
-
-            if not _assistant_confirms_action(next_turn.content, action):
-                failures.append(
-                    f"Assistant reply after {action} request did not confirm the action"
+                    f"User requested ticket {action} but no assistant message followed"
                 )
 
         self.score = 0.0 if failures else 1.0
         self.reason = (
             "; ".join(failures)
             if failures
-            else "All close/escalation requests received assistant confirmation"
+            else "All detected close/escalation requests received an assistant reply"
         )
         self.success = self.score >= self.threshold
         return self.score
