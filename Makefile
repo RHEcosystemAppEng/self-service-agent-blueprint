@@ -1730,6 +1730,22 @@ helm-install-ticketing: namespace helm-depend
 	else \
 		helm uninstall zammad-demo-site -n $(NAMESPACE) --ignore-not-found 2>/dev/null || true; \
 	fi
+	@echo "  Waiting for terminating pods to finish..."
+	@TIMEOUT=120; ELAPSED=0; \
+	while [ $$ELAPSED -lt $$TIMEOUT ]; do \
+		TERMINATING=$$(kubectl get pods -n $(NAMESPACE) --no-headers 2>/dev/null | grep -c Terminating || true); \
+		if [ "$$TERMINATING" -eq 0 ]; then \
+			echo "  No terminating pods remaining."; \
+			break; \
+		fi; \
+		echo "  Waiting for $$TERMINATING terminating pod(s)... ($${ELAPSED}s elapsed)"; \
+		sleep 5; \
+		ELAPSED=$$((ELAPSED + 5)); \
+	done; \
+	if [ $$ELAPSED -ge $$TIMEOUT ]; then \
+		echo "  Warning: Timed out waiting for terminating pods after $${TIMEOUT}s"; \
+		kubectl get pods -n $(NAMESPACE); \
+	fi
 	@$(MAKE) print-urls
 	@echo "Step 3/3: Printing checklist..."
 	@$(MAKE) _helm-install-ticketing-print-checklist NAMESPACE=$(NAMESPACE)
