@@ -26,6 +26,7 @@ spec:
       transaction.state.log.replication.factor: {{ .Values.requestManagement.kafka.config.transactionStateLogReplicationFactor }}
       auto.create.topics.enable: false
     # Resources moved to KafkaNodePool
+  {{- if or .Values.requestManagement.kafka.entityOperator.topicOperator.resources .Values.requestManagement.kafka.entityOperator.userOperator.resources }}
   entityOperator:
     {{- if .Values.requestManagement.kafka.entityOperator.topicOperator.resources }}
     topicOperator:
@@ -37,6 +38,7 @@ spec:
       resources:
         {{- toYaml .Values.requestManagement.kafka.entityOperator.userOperator.resources | nindent 8 }}
     {{- end }}
+  {{- end }}
 ---
 # KafkaNodePool for managing Kafka broker storage and resources
 apiVersion: kafka.strimzi.io/v1beta2
