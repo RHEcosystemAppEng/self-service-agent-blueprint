@@ -1,4 +1,4 @@
-{{- if and .Values.externalRoute.enabled .Values.edgeProxy.disableAttachments }}
+{{- if .Values.edgeProxy.disableAttachments }}
 {{- $zammadNginx := include "ticketingZammad.zammadNginxService" . -}}
 {{- $zammadWebsocket := include "ticketingZammad.zammadWebsocketService" . -}}
 {{- $zammadRailsserver := include "ticketingZammad.zammadRailsserverService" . -}}
@@ -92,6 +92,25 @@ data:
     {{ include "ticketingZammad.edgeProxyHtmlLocation" (dict "location" "= /" "zammadNginx" $zammadNginx "headInject" $disableAttachmentsHead) }}
     {{ include "ticketingZammad.edgeProxyHtmlLocation" (dict "location" "^~ /desktop" "zammadNginx" $zammadNginx "headInject" $disableAttachmentsHead) }}
     {{ include "ticketingZammad.edgeProxyHtmlLocation" (dict "location" "^~ /app" "zammadNginx" $zammadNginx "headInject" $disableAttachmentsHead) }}
+
+{{- if .Values.edgeProxy.demoSiteProxy.enabled }}
+{{- $demoSvc := .Values.edgeProxy.demoSiteProxy.service }}
+{{- $demoPort := .Values.edgeProxy.demoSiteProxy.port | default 80 }}
+{{- $demoPath := .Values.edgeProxy.demoSiteProxy.pathPrefix | default "/demo-portal" | trimSuffix "/" }}
+        location = {{ $demoPath }} {
+            return 301 {{ $demoPath }}/;
+        }
+
+        location {{ $demoPath }}/ {
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $forwarded_proto;
+            proxy_set_header X-Forwarded-Host $http_host;
+            proxy_pass http://{{ $demoSvc }}:{{ $demoPort }};
+        }
+{{- end }}
 
         location / {
             proxy_http_version 1.1;

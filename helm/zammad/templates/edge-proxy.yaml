@@ -1,4 +1,4 @@
-{{- if and .Values.externalRoute.enabled .Values.edgeProxy.disableAttachments }}
+{{- if .Values.edgeProxy.disableAttachments }}
 {{- $edgeSvc := include "ticketingZammad.edgeProxyService" . -}}
 ---
 apiVersion: apps/v1
