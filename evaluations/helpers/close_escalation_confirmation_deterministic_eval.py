@@ -1,9 +1,9 @@
 """
-Deterministic metric that validates an assistant reply follows close/escalation requests.
+Deterministic metric that validates every user turn receives an assistant reply.
 
-When a user message appears to request ticket close or escalation, the assistant must
-respond with a follow-up message. This catches the production bug where the ticket
-state changes but the user never sees any agent reply.
+This catches the production bug where ticket state changes but the user never sees
+any agent reply — including close/escalate requests phrased in ways phrase matching
+may miss (e.g. "Mark this as resolved").
 """
 
 import re
@@ -120,11 +120,10 @@ def _user_requests_close_or_escalate(content: str) -> Optional[str]:
 
 class CloseOrEscalationConfirmationDeterministicEval(BaseConversationalMetric):
     """
-    Deterministic metric: after a user message that appears to request ticket close
-    or escalation, the assistant must reply with any follow-up message.
+    Deterministic metric: every user turn must be followed by an assistant reply.
 
-    Request detection is best-effort (phrases, regex, negation/question exclusions).
-    This metric only checks that an assistant turn exists — not the wording of the reply.
+    Close/escalate phrase matching is best-effort and used only to label failures
+    (close / escalate / other). It does not gate whether the check runs.
     """
 
     def __init__(
@@ -150,21 +149,20 @@ class CloseOrEscalationConfirmationDeterministicEval(BaseConversationalMetric):
             if turn.role != "user":
                 continue
 
-            action = _user_requests_close_or_escalate(turn.content)
-            if action is None:
+            next_turn = turns[i + 1] if i + 1 < len(turns) else None
+            if next_turn and next_turn.role == "assistant":
                 continue
 
-            next_turn = turns[i + 1] if i + 1 < len(turns) else None
-            if not next_turn or next_turn.role != "assistant":
-                failures.append(
-                    f"User requested ticket {action} but no assistant message followed"
-                )
+            request_type = _user_requests_close_or_escalate(turn.content) or "other"
+            failures.append(
+                f"User message ({request_type} request) had no assistant reply following"
+            )
 
         self.score = 0.0 if failures else 1.0
         self.reason = (
             "; ".join(failures)
             if failures
-            else "All detected close/escalation requests received an assistant reply"
+            else "All user turns received an assistant reply"
         )
         self.success = self.score >= self.threshold
         return self.score
