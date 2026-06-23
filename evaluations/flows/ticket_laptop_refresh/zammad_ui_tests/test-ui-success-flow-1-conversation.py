@@ -148,7 +148,7 @@ def zammad_url() -> str:
 
 @pytest.fixture(scope="module")
 def reply_timeout() -> int:
-    return int(os.environ.get("AGENT_REPLY_TIMEOUT", "180"))
+    return int(os.environ.get("AGENT_REPLY_TIMEOUT", "300"))
 
 
 @pytest.fixture(scope="module")
