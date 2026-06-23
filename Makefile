@@ -1386,7 +1386,7 @@ test-zammad-ui-conversation:
 		echo "Error: set ZAMMAD_URL or NAMESPACE"; \
 		exit 1; \
 	fi
-	cd evaluations/flows/ticket_laptop_refresh/zammad_ui_tests && uv sync --group dev && uv run playwright install chromium && ZAMMAD_URL=$(ZAMMAD_URL) uv run python -m pytest test-ui-success-flow-1-conversation.py -v $(ARGS)
+	cd evaluations/flows/ticket_laptop_refresh/zammad_ui_tests && uv sync --group dev && uv run python -m playwright install chromium && ZAMMAD_URL=$(ZAMMAD_URL) uv run python -m pytest test-ui-success-flow-1-conversation.py -v $(ARGS)
 
 .PHONY: sync-evaluations
 sync-evaluations:
