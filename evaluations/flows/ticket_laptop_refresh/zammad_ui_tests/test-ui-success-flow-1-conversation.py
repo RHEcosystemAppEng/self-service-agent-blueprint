@@ -102,8 +102,11 @@ def _check_metadata_fields(
 
 
 def _assert_metadata(
-    step: int, page: Page, expected: dict[str, Any],
-    retries: int = 3, delay: float = 5.0,
+    step: int,
+    page: Page,
+    expected: dict[str, Any],
+    retries: int = 3,
+    delay: float = 5.0,
 ) -> None:
     for attempt in range(retries):
         if attempt > 0:
