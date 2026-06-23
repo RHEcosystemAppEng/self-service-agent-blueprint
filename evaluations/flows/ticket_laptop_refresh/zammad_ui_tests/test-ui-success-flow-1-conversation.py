@@ -43,6 +43,8 @@ def _article_count(page: Page) -> int:
 def _wait_for_agent_reply(page: Page, count_before: int, timeout_s: int) -> None:
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
+        page.reload()
+        page.wait_for_load_state("networkidle")
         if _article_count(page) > count_before:
             time.sleep(2)
             return
