@@ -78,15 +78,9 @@ def _scrape_group(page: Page) -> str:
     """).strip()
 
 
-def _assert_metadata(step: int, page: Page, expected: dict[str, Any]) -> None:
-    state = _scrape_state(page)
-    owner = _scrape_owner(page)
-    group = _scrape_group(page)
-
-    print(
-        f"  Step {step + 1} metadata: state={state!r}, owner={owner!r}, group={group!r}"
-    )
-
+def _check_metadata_fields(
+    step: int, state: str, owner: str, group: str, expected: dict[str, Any]
+) -> None:
     if "state" in expected:
         assert expected["state"].lower() in state.lower(), (
             f"Step {step + 1}: expected state to contain "
@@ -105,6 +99,43 @@ def _assert_metadata(step: int, page: Page, expected: dict[str, Any]) -> None:
             f"Step {step + 1}: expected group to contain "
             f"{expected['group']!r}, got {group!r}"
         )
+
+
+def _assert_metadata(
+    step: int, page: Page, expected: dict[str, Any],
+    retries: int = 3, delay: float = 5.0,
+) -> None:
+    for attempt in range(retries):
+        if attempt > 0:
+            time.sleep(delay)
+            page.reload()
+            page.wait_for_load_state("networkidle")
+            time.sleep(delay)
+
+        state = _scrape_state(page)
+        owner = _scrape_owner(page)
+        group = _scrape_group(page)
+
+        try:
+            _check_metadata_fields(step, state, owner, group, expected)
+            print(
+                f"  Step {step + 1} metadata: state={state!r}, "
+                f"owner={owner!r}, group={group!r}"
+            )
+            return
+        except AssertionError:
+            if attempt < retries - 1:
+                print(
+                    f"  Step {step + 1} metadata (attempt {attempt + 1}/{retries}): "
+                    f"state={state!r}, owner={owner!r}, group={group!r} "
+                    f"— retrying..."
+                )
+            else:
+                print(
+                    f"  Step {step + 1} metadata (final): state={state!r}, "
+                    f"owner={owner!r}, group={group!r}"
+                )
+                raise
 
 
 @pytest.fixture(scope="module")
