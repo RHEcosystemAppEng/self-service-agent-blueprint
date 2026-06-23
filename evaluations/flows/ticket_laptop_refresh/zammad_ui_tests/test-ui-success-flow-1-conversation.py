@@ -183,6 +183,8 @@ def test_laptop_refresh_conversation(
     for idx in range(1, len(turns)):
         msg = turns[idx]["content"]
 
+        count = _article_count(customer_page)
+
         reply_box = customer_page.locator(
             ".article-new .richtext-content[contenteditable='true']"
         )
@@ -192,7 +194,6 @@ def test_laptop_refresh_conversation(
 
         customer_page.get_by_role("button", name="Update").click()
         time.sleep(5)
-        count = _article_count(customer_page)
 
         print(
             f"Step {idx + 1}: sent {msg!r}, articles={count}, waiting for agent reply..."
