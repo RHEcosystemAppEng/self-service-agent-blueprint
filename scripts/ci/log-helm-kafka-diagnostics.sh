@@ -9,6 +9,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+cd "${REPO_ROOT}"
+
 NAMESPACE="${NAMESPACE:-self-service-agent-ci-project-1}"
 KAFKA_NAME="${KAFKA_NAME:-self-service-agent-kafka}"
 CHART_NAME="${CHART_NAME:-self-service-agent}"
