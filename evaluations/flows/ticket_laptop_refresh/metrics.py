@@ -11,8 +11,8 @@ from typing import Any, List, Optional
 from deepeval.metrics import ConversationalGEval
 from deepeval.models import DeepEvalBaseLLM
 from deepeval.test_case import ConversationalTestCase, TurnParams
-from helpers.close_escalation_confirmation_deterministic_eval import (
-    CloseOrEscalationConfirmationDeterministicEval,
+from helpers.user_turn_assistant_reply_deterministic_eval import (
+    UserTurnAssistantReplyDeterministicEval,
 )
 from helpers.conversation_metadata_deterministic_eval import (
     ConversationMetadataDeterministicEval,
@@ -352,7 +352,7 @@ def get_metrics(
                 "IMPORTANT: Do NOT require the agent to confirm the ticket was sent. Do NOT fail this metric because the ticket was never sent. Do NOT consider whether the laptop selection was valid or invalid.",
             ],
         ),
-        CloseOrEscalationConfirmationDeterministicEval(
+        UserTurnAssistantReplyDeterministicEval(
             threshold=1.0,
         ),
         ConversationMetadataDeterministicEval(

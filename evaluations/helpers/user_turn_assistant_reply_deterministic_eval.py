@@ -118,17 +118,17 @@ def _user_requests_close_or_escalate(content: str) -> Optional[str]:
     return None
 
 
-class CloseOrEscalationConfirmationDeterministicEval(BaseConversationalMetric):
+class UserTurnAssistantReplyDeterministicEval(BaseConversationalMetric):
     """
     Deterministic metric: every user turn must be followed by an assistant reply.
 
     Close/escalate phrase matching is best-effort and used only to label failures
-    (close / escalate / other). It does not gate whether the check runs.
+    (close / escalate / general). It does not gate whether the check runs.
     """
 
     def __init__(
         self,
-        name: str = "Close or Escalation Confirmation — deterministic",
+        name: str = "User Turn Assistant Reply — deterministic",
         threshold: float = 1.0,
         include_reason: bool = True,
         async_mode: bool = True,
@@ -153,7 +153,7 @@ class CloseOrEscalationConfirmationDeterministicEval(BaseConversationalMetric):
             if next_turn and next_turn.role == "assistant":
                 continue
 
-            request_type = _user_requests_close_or_escalate(turn.content) or "other"
+            request_type = _user_requests_close_or_escalate(turn.content) or "general"
             failures.append(
                 f"User message ({request_type} request) had no assistant reply following"
             )
