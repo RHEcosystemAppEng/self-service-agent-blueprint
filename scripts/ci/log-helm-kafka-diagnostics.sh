@@ -69,19 +69,30 @@ log_pre_install() {
   section "entityOperator values in chart defaults"
   grep -A 6 'entityOperator:' helm/values.yaml 2>/dev/null | head -8 || true
   if [ -f helm/values-production.yaml ]; then
-    echo "(values-production.yaml has no entityOperator overrides)"
-    grep 'entityOperator' helm/values-production.yaml 2>/dev/null || true
+    local found
+    found=$(grep 'entityOperator' helm/values-production.yaml 2>/dev/null || true)
+    if [ -z "$found" ]; then
+      echo "(values-production.yaml has no entityOperator overrides)"
+    else
+      echo "(values-production.yaml entityOperator overrides found:)"
+      echo "$found"
+    fi
   fi
 
   helm_prod_template_args
   make helm-depend >/dev/null 2>&1 || true
 
+  KAFKA_CLUSTER_YAML="$(helm template "${HELM_TEMPLATE_ARGS[@]}" --show-only templates/kafka-cluster.yaml 2>/dev/null || true)"
+  KAFKA_YAML="$(echo "$KAFKA_CLUSTER_YAML" | awk '/^kind: Kafka$/,/^---$/')"
+
   section "Rendered Kafka CR (helm template)"
-  helm template "${HELM_TEMPLATE_ARGS[@]}" --show-only templates/kafka-cluster.yaml 2>/dev/null | \
-    awk '/^kind: Kafka$/,/^---$/' || warn "Could not render kafka-cluster.yaml"
+  if [ -n "$KAFKA_YAML" ]; then
+    echo "$KAFKA_YAML"
+  else
+    warn "Could not render kafka-cluster.yaml"
+  fi
 
   section "entityOperator serialization check (rendered manifest)"
-  KAFKA_YAML="$(helm template "${HELM_TEMPLATE_ARGS[@]}" --show-only templates/kafka-cluster.yaml 2>/dev/null | awk '/^kind: Kafka$/,/^---$/')"
   if [ -z "$KAFKA_YAML" ]; then
     warn "No Kafka manifest rendered (eventing disabled or template missing?)"
   elif echo "$KAFKA_YAML" | grep -q 'entityOperator: null'; then
@@ -90,13 +101,13 @@ log_pre_install() {
     warn "Rendered Kafka CR contains bare 'entityOperator:' with no child keys"
   elif echo "$KAFKA_YAML" | grep -q '^  entityOperator:'; then
     echo "entityOperator key is present in rendered manifest"
-    echo "$KAFKA_YAML" | awk '/^  entityOperator:/,/^  [a-zA-Z]/ {print}'
+    echo "$KAFKA_YAML" | awk '/^  entityOperator:/{flag=1; print; next} flag && /^  [a-zA-Z]/{exit} flag{print}'
   else
     echo "entityOperator key is omitted from rendered manifest (expected when no operator resources are set)"
   fi
 
   section "Full helm template kafka-cluster.yaml (for log capture)"
-  helm template "${HELM_TEMPLATE_ARGS[@]}" --show-only templates/kafka-cluster.yaml 2>/dev/null || true
+  echo "$KAFKA_CLUSTER_YAML"
 }
 
 log_post_install() {
@@ -113,7 +124,8 @@ log_post_install() {
     echo -n "jsonpath .spec.entityOperator="
     kubectl get kafka "$KAFKA_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.entityOperator}' 2>/dev/null || true
     echo ""
-    kubectl get kafka "$KAFKA_NAME" -n "$NAMESPACE" -o yaml 2>/dev/null | awk '/^  entityOperator:/,/^  [a-z]/ {print}' | head -20
+    kubectl get kafka "$KAFKA_NAME" -n "$NAMESPACE" -o yaml 2>/dev/null | \
+      awk '/^  entityOperator:/{flag=1; print; next} flag && /^  [a-zA-Z]/{exit} flag{print}' | head -20
   else
     warn "Kafka CR ${KAFKA_NAME} not found in ${NAMESPACE}"
   fi
