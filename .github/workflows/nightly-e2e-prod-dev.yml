@@ -107,6 +107,12 @@ jobs:
           PROD_TOKEN: ${{ secrets.PROD_TOKEN }}
           PROD_SERVER: ${{ secrets.PROD_SERVER }}
 
+      - name: Log Helm and cluster tool versions
+        shell: bash
+        run: ./scripts/ci/log-helm-kafka-diagnostics.sh tools
+        env:
+          NAMESPACE: self-service-agent-ci-project-1
+
       - name: Make sure there are no pods running in the namespace
         continue-on-error: true
         shell: bash
@@ -125,6 +131,13 @@ jobs:
           echo "Commit SHA: ${COMMIT_SHA}"
           echo "Version with commit: ${VERSION_WITH_COMMIT}"
 
+      - name: Log pre-install Kafka manifest diagnostics
+        shell: bash
+        run: ./scripts/ci/log-helm-kafka-diagnostics.sh pre-install
+        env:
+          NAMESPACE: self-service-agent-ci-project-1
+          VERSION: ${{ steps.version.outputs.version }}
+
       - name: Install the quickstart
         shell: bash
         run: |
@@ -138,6 +151,13 @@ jobs:
           SERVICENOW_INSTANCE_URL: ${{ secrets.SERVICENOW_INSTANCE_URL }}
           SERVICENOW_API_KEY: ${{ secrets.SERVICENOW_API_KEY }}
           SERVICENOW_LAPTOP_REFRESH_ID: ${{ secrets.SERVICENOW_LAPTOP_REFRESH_ID }}
+
+      - name: Log post-install Kafka cluster diagnostics
+        if: always()
+        shell: bash
+        run: ./scripts/ci/log-helm-kafka-diagnostics.sh post-install
+        env:
+          NAMESPACE: self-service-agent-ci-project-1
 
       - name: Install evaluations dependencies
         shell: bash
