@@ -68,6 +68,11 @@ CONTAINER_TOOL ?= podman
 REGISTRY ?= quay.io/rh-ai-quickstart
 PYTHON_VERSION ?= 3.12
 ARCH ?= linux/amd64
+# Map ARCH to the OpenShift mirror path segment (linux/amd64 → x86_64, linux/arm64 → arm64).
+OC_ARCH := $(subst linux/amd64,x86_64,$(subst linux/arm64,arm64,$(ARCH)))
+# OpenShift client for make oc (stable-4.21 tracks latest 4.21.x; aligns with our OpenShift clusters).
+# README requires OpenShift 4.17.0+ for cluster features. Override: make oc OC_VERSION=stable-4.20
+OC_VERSION ?= stable-4.21
 # Pull policy: --policy=always for podman (pull newest); empty for docker (always pulls by default)
 PULL_POLICY := $(if $(filter podman,$(CONTAINER_TOOL)),--policy=always,)
 REQUEST_MGR_IMG ?= $(REGISTRY)/self-service-agent-request-manager:$(VERSION)
@@ -2061,7 +2066,7 @@ ifeq (,$(shell which oc 2>/dev/null))
 	@{ \
 	set -e ;\
 	mkdir -p $(dir $(OC)) ;\
-	curl -sSLo oc.tar.gz https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/4.11.6/openshift-client-linux.tar.gz ;\
+	curl -sSLo oc.tar.gz https://mirror.openshift.com/pub/openshift-v4/$(OC_ARCH)/clients/ocp/$(OC_VERSION)/openshift-client-linux.tar.gz ;\
 	tar -xf oc.tar.gz -C $(dir $(OC)) oc ;\
 	}
 else
