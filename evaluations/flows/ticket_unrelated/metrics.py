@@ -5,13 +5,13 @@ from typing import Any, List, Optional
 from deepeval.metrics import ConversationalGEval
 from deepeval.models import DeepEvalBaseLLM
 from deepeval.test_case import TurnParams
-from helpers.user_turn_assistant_reply_deterministic_eval import (
-    UserTurnAssistantReplyDeterministicEval,
-)
 from helpers.conversation_metadata_deterministic_eval import (
     ConversationMetadataDeterministicEval,
 )
 from helpers.conversation_metadata_llm_eval import ConversationMetadataLLMEval
+from helpers.user_turn_assistant_reply_deterministic_eval import (
+    UserTurnAssistantReplyDeterministicEval,
+)
 
 
 def get_metrics(

@@ -11,14 +11,14 @@ from typing import Any, List, Optional
 from deepeval.metrics import ConversationalGEval
 from deepeval.models import DeepEvalBaseLLM
 from deepeval.test_case import ConversationalTestCase, TurnParams
-from helpers.user_turn_assistant_reply_deterministic_eval import (
-    UserTurnAssistantReplyDeterministicEval,
-)
 from helpers.conversation_metadata_deterministic_eval import (
     ConversationMetadataDeterministicEval,
 )
 from helpers.conversation_metadata_llm_eval import ConversationMetadataLLMEval
 from helpers.load_conversation_context import load_default_context
+from helpers.user_turn_assistant_reply_deterministic_eval import (
+    UserTurnAssistantReplyDeterministicEval,
+)
 
 # Context directory for this flow (populated at eval time by copy_flow_context).
 # Path is relative to the evaluations/ working directory.
