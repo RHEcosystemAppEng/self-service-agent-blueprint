@@ -1385,6 +1385,12 @@ check-known-bad-conversations: sync-evaluations
 	uv --directory evaluations run evaluate.py --check
 	@echo "Evaluation check completed successfully!"
 
+.PHONY: check-known-bad-ticket-laptop-refresh
+check-known-bad-ticket-laptop-refresh: sync-evaluations
+	@echo "Running evaluation check on known bad ticket laptop refresh and ticket_unrelated flows..."
+	uv --directory evaluations run evaluate.py --check --flow ticket_laptop_refresh,ticket_unrelated
+	@echo "Evaluation check completed successfully!"
+
 .PHONY: test-short-ticket-laptop-refresh
 test-short-ticket-laptop-refresh:
 	@echo "Running short responses integration test for ticket-laptop-refresh flow..."

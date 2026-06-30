@@ -9,6 +9,9 @@ from helpers.conversation_metadata_deterministic_eval import (
     ConversationMetadataDeterministicEval,
 )
 from helpers.conversation_metadata_llm_eval import ConversationMetadataLLMEval
+from helpers.user_turn_assistant_reply_deterministic_eval import (
+    UserTurnAssistantReplyDeterministicEval,
+)
 
 
 def get_metrics(
@@ -45,6 +48,7 @@ def get_metrics(
                 "  - The ticket has been closed (e.g. 'Your ticket has been closed')",
                 "  - The ticket has been escalated for human review (e.g. 'Your ticket has been escalated for human review')",
                 "FAIL if the conversation ends without either of these confirmations.",
+                "FAIL if the user requests ticket close or escalation and the conversation ends without an assistant confirmation message following that request — even if the ticket state may have changed in the background.",
             ],
         ),
         ConversationalGEval(
@@ -74,6 +78,9 @@ def get_metrics(
                 "  - Tool call failures or stack traces visible in the response",
                 "PASS if the agent responds normally even if it cannot fully resolve the user's issue.",
             ],
+        ),
+        UserTurnAssistantReplyDeterministicEval(
+            threshold=1.0,
         ),
         ConversationMetadataDeterministicEval(
             name="Correct conversation metadata — deterministic (predefined)",

@@ -16,6 +16,9 @@ from helpers.conversation_metadata_deterministic_eval import (
 )
 from helpers.conversation_metadata_llm_eval import ConversationMetadataLLMEval
 from helpers.load_conversation_context import load_default_context
+from helpers.user_turn_assistant_reply_deterministic_eval import (
+    UserTurnAssistantReplyDeterministicEval,
+)
 
 # Context directory for this flow (populated at eval time by copy_flow_context).
 # Path is relative to the evaluations/ working directory.
@@ -198,6 +201,7 @@ def get_metrics(
                 "  3. Ticket closed — the agent states the ticket was closed",
                 "PASS this metric if and ONLY if the agent explicitly confirms one of these three actions.",
                 "FAIL this metric if the conversation ends with anything other than one of these three actions — including but not limited to: creating a ticket, asking a question, giving a vague statement, or simply stopping.",
+                "FAIL this metric if the user requests ticket close or escalation and the conversation ends without an assistant confirmation message following that request — even if the ticket state may have changed in the background.",
                 "CRITICAL: The confirmation must be a statement that the action was performed, not a question asking whether to perform it.",
             ],
         ),
@@ -347,6 +351,9 @@ def get_metrics(
                 "FAIL this metric ONLY if: the ticket is explicitly sent to the manager WITHOUT the agent having asked for confirmation first, or before the user responds.",
                 "IMPORTANT: Do NOT require the agent to confirm the ticket was sent. Do NOT fail this metric because the ticket was never sent. Do NOT consider whether the laptop selection was valid or invalid.",
             ],
+        ),
+        UserTurnAssistantReplyDeterministicEval(
+            threshold=1.0,
         ),
         ConversationMetadataDeterministicEval(
             name="Correct conversation metadata — deterministic (predefined)",
