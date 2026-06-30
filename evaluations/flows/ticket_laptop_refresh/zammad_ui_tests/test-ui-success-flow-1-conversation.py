@@ -70,12 +70,14 @@ def _scrape_owner(page: Page) -> str:
 
 
 def _scrape_group(page: Page) -> str:
-    return page.evaluate("""
+    return page.evaluate(
+        """
         () => {
             const el = document.querySelector('[data-attribute-name="group_id"] .js-input');
             return el ? (el.value || el.textContent || '') : '';
         }
-    """).strip()
+    """
+    ).strip()
 
 
 def _check_metadata_fields(
