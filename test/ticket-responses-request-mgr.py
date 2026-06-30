@@ -2,10 +2,10 @@
 """
 CLI chat with Request Manager via Zammad ticket articles.
 
-Creates customer articles in Zammad (integration trigger → dispatcher → Request Manager)
-and polls ``GET /api/v1/conversations`` until each turn's ``agent_response`` is available.
-Conversation rows are matched by ``session_id`` ``zammad-{ticket_id}`` plus **new**
-``request_id`` per turn (snapshot taken before each article) so stale replies are not reused.
+Creates customer articles in Zammad (integration trigger → dispatcher → Zammad Articles)
+and polls Zammad for new agent-authored articles until each turn's response is available.
+Articles are matched by ``ticket_id`` and creation timestamp (snapshot taken before each
+customer article) so stale replies are not reused.
 
 Requires Zammad REST (ZAMMAD_URL, ZAMMAD_HTTP_TOKEN), Request Manager (REQUEST_MANAGER_URL),
 and ``USER_ID`` (customer email).
@@ -27,9 +27,10 @@ import os
 import sys
 import time
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 import httpx
-from shared_clients import CLIChatClient, RequestManagerClient
+from shared_clients import CLIChatClient
 from shared_models.utils import normalize_zammad_rest_api_base, zammad_rest_json_headers
 
 _HTTP_TIMEOUT = 10
@@ -54,9 +55,6 @@ _ZAMMAD_JSON_CLIENT_HEADERS = {
 }
 
 DEFAULT_TICKET_TITLE = "Laptop refresh help request"
-
-# RM polling: limit 1 / latest session slice used by snapshot + agent_reply poll.
-_RM_CONVERSATIONS_KW = {"limit": 1, "offset": 0, "include_messages": True}
 
 
 def _customer_password_effective(cli_password: str | None) -> str:
@@ -185,18 +183,6 @@ def _zammad_delete_ticket(base_url: str, token: str, ticket_id: int) -> None:
     httpx.delete(url, headers=zammad_rest_json_headers(token), timeout=_HTTP_TIMEOUT)
 
 
-def _conversation_entries_first_session(data: dict) -> list:
-    """First session's ``conversation`` list from GET /conversations-style payload."""
-    sessions = data.get("sessions")
-    if not isinstance(sessions, list) or not sessions:
-        return []
-    first = sessions[0]
-    if not isinstance(first, dict):
-        return []
-    conv = first.get("conversation")
-    return conv if isinstance(conv, list) else []
-
-
 def _zammad_verify_ticket_number_logged(
     api_base: str,
     token: str,
@@ -232,98 +218,104 @@ def _zammad_verify_ticket_number_logged(
         )
 
 
-def _request_ids_from_conversation(conv: list) -> set[str]:
-    out: set[str] = set()
-    for entry in conv:
-        if not isinstance(entry, dict):
-            continue
-        rid = entry.get("request_id")
-        if rid is not None:
-            out.add(str(rid))
+async def _zammad_get_ticket_articles(
+    base_url: str, token: str, ticket_id: int
+) -> list[dict[str, Any]]:
+    # gets ticket info from the zammad ticket that was created
+    url = f"{_api_v1(base_url)}/ticket_articles/by_ticket/{ticket_id}"
+    try:
+        response = httpx.get(
+            url, headers=zammad_rest_json_headers(token), timeout=_HTTP_TIMEOUT
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data if isinstance(data, list) else []
+    except Exception as ex:
+        print(f"[zammad] warning: could not get ticket articles: {ex}", file=sys.stderr)
+        return []
+
+
+async def _zammad_article_ids_snapshot(
+    base_url: str, token: str, ticket_id: int
+) -> set[int]:
+    """Returns all article ids from the zammad ticket that was created from the zammad article dictionary"""
+    data = await _zammad_get_ticket_articles(base_url, token, ticket_id)
+    if not isinstance(data, list):
+        return set()
+    out: set[int] = set()  # specified for integers
+    for article in data:
+        if isinstance(article, dict) and article.get("id") is not None:
+            article_id = int(article["id"])
+            if article_id > 0:
+                out.add(article_id)
+            else:
+                print(
+                    f"[zammad] warning: article id is not a positive integer, check other issues with the ticket: {article['id']}",
+                    file=sys.stderr,
+                )
+                continue
     return out
 
 
-async def _conversation_request_ids_snapshot(
-    rm_client: RequestManagerClient, *, session_id: str
-) -> set[str]:
-    """Return existing ``request_id`` values for this RM session (before posting a new Zammad article).
-
-    Session id is ``zammad-{ticket_id}`` and is stable for the ticket; each new turn adds a **new**
-    ``request_id``. Matching on message text alone can replay an old completed row — we only accept
-    rows whose ``request_id`` was **not** present in this snapshot.
-    """
-    try:
-        data = await rm_client.get_conversations(
-            session_id=session_id,
-            **_RM_CONVERSATIONS_KW,
-        )
-    except Exception:
-        return set()
-    if not isinstance(data, dict):
-        return set()
-    return _request_ids_from_conversation(_conversation_entries_first_session(data))
-
-
-async def _poll_conversation_for_agent_reply(
-    rm_client: RequestManagerClient,
+async def _poll_zammad_articles_for_agent_reply(
+    zammad_base_url: str,
+    zammad_token: str,
+    ticket_id: int,
     *,
-    session_id: str,
-    user_message: str,
-    baseline_request_ids: set[str],
+    baseline_article_ids: set[int],
     timeout_s: float,
     poll_interval_s: float,
 ) -> str:
-    """Wait until RM exposes ``agent_response`` for this user turn (webhook-driven path).
+    """Poll Zammad ticket articles until agent response appears.
 
-    ``baseline_request_ids`` must be taken **before** ``POST /ticket_articles`` so the new
-    RequestLog row (new ``request_id``) is not confused with prior turns on the same session.
+    Polls GET /ticket_articles/by_ticket/{ticket_id} looking for agent articles
+    with IDs NOT in baseline_article_ids (new since snapshot was taken).
+
+    Args:
+        zammad_base_url: Zammad base URL
+        zammad_token: Zammad API token
+        ticket_id: Zammad ticket ID
+        baseline_article_ids: Article IDs that existed before customer posted
+        timeout_s: Max seconds to wait
+        poll_interval_s: Seconds between polls
+
+    Returns:
+        Agent article body (stripped) or timeout error message
     """
+
+    ZAMMAD_AGENT_ID = 1
     deadline = time.monotonic() + timeout_s
-    target = user_message.strip()
     interval = max(0.25, poll_interval_s)
 
     while time.monotonic() < deadline:
-        try:
-            data = await rm_client.get_conversations(
-                session_id=session_id,
-                **_RM_CONVERSATIONS_KW,
-            )
-        except Exception as ex:
-            print(
-                f"[rm] poll: get_conversations failed: {ex}",
-                file=sys.stderr,
-            )
+        articles = await _zammad_get_ticket_articles(
+            zammad_base_url, zammad_token, ticket_id
+        )
+
+        if not isinstance(articles, list) or not articles:
             await asyncio.sleep(interval)
             continue
 
-        if not isinstance(data, dict):
-            await asyncio.sleep(interval)
-            continue
-
-        conv = _conversation_entries_first_session(data)
-        if not conv:
-            await asyncio.sleep(interval)
-            continue
-
-        for entry in reversed(conv):
+        for entry in reversed(articles):
             if not isinstance(entry, dict):
                 continue
-            um = (entry.get("user_message") or "").strip()
-            if um != target:
+            article_id = entry.get("id")
+            sender_id = entry.get("sender_id")
+            body = entry.get("body")
+            if article_id is None:
                 continue
-            rid = entry.get("request_id")
-            if rid is None or str(rid) in baseline_request_ids:
+            if int(article_id) in baseline_article_ids:
                 continue
-            ar = entry.get("agent_response")
-            if ar is not None and str(ar).strip():
-                return str(ar).strip()
-            break
+            if sender_id != ZAMMAD_AGENT_ID:
+                continue
+            if body is not None and str(body).strip():
+                return str(body).strip()
 
         await asyncio.sleep(interval)
 
     return (
-        f"Timeout after {timeout_s:.0f}s waiting for agent_response "
-        f"(session_id={session_id!r}; check webhook, dispatcher, RM logs)."
+        f"Timeout after {timeout_s:.0f}s waiting for agent article "
+        f"(ticket_id={ticket_id!r}; check zammad, dispatcher logs)."
     )
 
 
@@ -515,7 +507,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=TRIGGER_POLL_INTERVAL,
         dest="poll_interval",
         help=(
-            "Seconds between GET /api/v1/conversations polls "
+            "Seconds between Zammad ticket articles polls (GET /api/v1/ticket_articles/by_ticket/{ticket_id})"
             f"(default {TRIGGER_POLL_INTERVAL}; env TRIGGER_POLL_INTERVAL)."
         ),
     )
@@ -608,9 +600,8 @@ async def main() -> None:
     )
 
     async def send_to_agent(msg: str) -> str:
-        session_sid = f"zammad-{ticket_id}"
-        baseline_ids = await _conversation_request_ids_snapshot(
-            rm, session_id=session_sid
+        baseline_article_ids = await _zammad_article_ids_snapshot(
+            zammad_base_url, zammad_token, ticket_id
         )
         article_id = _zammad_add_customer_article(
             zammad_base_url,
@@ -621,20 +612,18 @@ async def main() -> None:
         )
         if article_id is None:
             return "Error: could not create customer article in Zammad"
-        return await _poll_conversation_for_agent_reply(
-            rm,
-            session_id=session_sid,
-            user_message=msg,
-            baseline_request_ids=baseline_ids,
+        return await _poll_zammad_articles_for_agent_reply(
+            zammad_base_url,
+            zammad_token,
+            ticket_id,
+            baseline_article_ids=baseline_article_ids,
             timeout_s=args.poll_timeout,
             poll_interval_s=args.poll_interval,
         )
 
     print(f"Using user ID: {user_id}")
-    print(
-        "Request Manager: poll GET /api/v1/conversations for replies (webhook-driven ingest)"
-    )
-    print("Using LangGraph state machine for conversation management")
+    print(f"Polling Zammad ticket articles for replies:{zammad_base_url}")
+    print("Using LangGraph State Machines for conversation management")
 
     try:
         await _chat_loop_with_conversation_metadata(
