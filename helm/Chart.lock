@@ -4,7 +4,7 @@ dependencies:
   version: 0.1.0
 - name: llm-service
   repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
-  version: 0.5.6
+  version: 0.5.10
 - name: llama-stack
   repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
   version: 0.8.5
@@ -14,5 +14,5 @@ dependencies:
 - name: ticketingZammad
   repository: file://./zammad
   version: 0.1.0
-digest: sha256:0d76fee0a49fb2f60016e464051ab04b8c52b0baa2661828d49f6374d21d9971
-generated: "2026-06-09T09:32:36.545631665-04:00"
+digest: sha256:75405e4e01978d9d22118f52b88398e075536742b0c030b2b6f59d9b94e311d0
+generated: "2026-07-01T10:37:44.6954806+05:30"

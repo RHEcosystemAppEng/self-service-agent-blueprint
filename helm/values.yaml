@@ -90,6 +90,20 @@ tolerations: []
 
 affinity: {}
 
+# CPU-specific optimization settings for Intel Xeon. Disabled by default so GPU workflows remain unchanged.
+cpuOptimizations:
+  enabled: false            # Set to true to enable cpu runtime tweaks and env injection
+  installIntelRuntime: false # When true, images built with INSTALL_INTEL_RUNTIME=true will install libgomp
+  defaultCpuThreads: 4      # Default value for OMP_NUM_THREADS / MKL_NUM_THREADS
+  # Example env vars (chart templates may choose to inject these when cpuOptimizations.enabled=true)
+  env:
+    - name: OMP_NUM_THREADS
+      value: "4"
+    - name: MKL_NUM_THREADS
+      value: "4"
+    - name: KMP_AFFINITY
+      value: "granularity=fine,compact,1,0"
+
 llama_stack_url: http://llamastack:8321
 
 # Knowledge Base Configuration
@@ -360,6 +374,54 @@ ticketingZammad:
 # Enable/disable the llm-service dependency
 llm-service:
   enabled: true
+  # Xeon deployment 
+  # Uncomment to force CPU/Xeon runtime instead of GPU/default behavior.
+  # device: xeon
+  
+  deviceConfigs:
+    xeon:
+      image: "registry.redhat.io/rhaii/vllm-cpu-rhel9:3.4.0"
+  
+  servingRuntime:
+    env:
+    - name: HOME
+      value: /vllm
+    - name: HF_HUB_OFFLINE
+      value: "0"
+    - name: HF_TOKEN
+      valueFrom:
+        secretKeyRef:
+          key: HF_TOKEN
+          name: huggingface-secret
+  # Xeon model tuning example (uncomment when using device: xeon)
+  # models:
+  #   llama-3-2-3b-instruct:
+  #     resources:
+  #       requests:
+  #         cpu: "32"
+  #         memory: 64Gi
+  #       limits:
+  #         cpu: "32"
+  #         memory: 64Gi
+  #     args:
+  #       - --enable-auto-tool-choice
+  #       - --chat-template
+  #       - /chat-templates/tool_chat_template_llama3.2_json.jinja
+  #       - --tool-call-parser
+  #       - llama3_json
+  #       - --max-model-len
+  #       - "8192"
+  #       - --max-num-seqs
+  #       - "2"
+
+  # Optional service-level resource tuning for Xeon deployments
+  # resources:
+  #   requests:
+  #     cpu: "8"
+  #     memory: "32Gi"
+  #   limits:
+  #     cpu: "16"
+  #     memory: "64Gi"
 
 # Mock ServiceNow Server Configuration (for testing and development)
 mockServiceNow:

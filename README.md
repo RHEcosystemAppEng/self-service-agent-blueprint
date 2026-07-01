@@ -482,7 +482,24 @@ make build-all-images USE_PIP_INSTALL=true
 
 This workaround uses `pip install` from `requirements.txt` instead of `uv sync`, which can avoid QEMU emulation issues when cross-compiling for Linux on Apple Silicon. Note that the default `uv sync` method is faster and more reliable on native Linux/CI environments.
 
-#### Step 4: deploy with Helm
+#### Step 4: configure compute device (optional)
+
+By default, the deployment uses GPU/default chart behavior. To deploy on Intel Xeon CPU-only infrastructure, edit `helm/values.yaml` and uncomment the device setting:
+
+```yaml
+llm-service:
+  enabled: true
+  device: xeon  # <-- Uncomment for Xeon CPU deployment; leave commented for GPU (default)
+```
+
+**Optional Xeon tuning (examples in `helm/values.yaml`):**
+- Xeon-specific proxy settings for restricted networks
+- CPU-tuned model args (`--max-num-seqs=2`)
+- Xeon resource sizing examples in `models` and `resources`
+
+Note: llm-service `0.5.10` is required for Xeon image support.
+
+#### Step 5: deploy with Helm
 
 ```bash
 # Login to OpenShift
@@ -501,7 +518,7 @@ make helm-install-test NAMESPACE=$NAMESPACE
 - ✓ All pods running
 - ✓ Routes created
 
-#### Step 5: verify deployment
+#### Step 6: verify deployment
 
 ```bash
 # Check deployment status
@@ -520,9 +537,18 @@ oc get routes -n $NAMESPACE
 - Agent service initialization completed successfully
 
 **You should now be able to:**
-- ✓ Deploy the system to OpenShift
+- ✓ Deploy the system to OpenShift (GPU or CPU)
 - ✓ Monitor pods and services
 - ✓ Troubleshoot deployment issues
+
+**Testing CPU deployment:**
+```bash
+# Verify llm-service pod is running (check it's using CPU image)
+oc get pods -n $NAMESPACE -l app.kubernetes.io/name=llm-service
+
+# Check the vLLM container is using CPU image
+oc describe pod -n $NAMESPACE -l app.kubernetes.io/name=llm-service | grep image
+```
 
 ---
 
