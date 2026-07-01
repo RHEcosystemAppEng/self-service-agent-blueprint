@@ -410,7 +410,7 @@ llm-service:
   #       - --tool-call-parser
   #       - llama3_json
   #       - --max-model-len
-  #       - "8192"
+  #       - "14336"
   #       - --max-num-seqs
   #       - "2"
 

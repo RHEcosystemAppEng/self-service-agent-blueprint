@@ -493,11 +493,8 @@ llm-service:
 ```
 
 **Optional Xeon tuning (examples in `helm/values.yaml`):**
-- Xeon-specific proxy settings for restricted networks
 - CPU-tuned model args (`--max-num-seqs=2`)
 - Xeon resource sizing examples in `models` and `resources`
-
-Note: llm-service `0.5.10` is required for Xeon image support.
 
 #### Step 5: deploy with Helm
 
@@ -540,15 +537,6 @@ oc get routes -n $NAMESPACE
 - ✓ Deploy the system to OpenShift (GPU or CPU)
 - ✓ Monitor pods and services
 - ✓ Troubleshoot deployment issues
-
-**Testing CPU deployment:**
-```bash
-# Verify llm-service pod is running (check it's using CPU image)
-oc get pods -n $NAMESPACE -l app.kubernetes.io/name=llm-service
-
-# Check the vLLM container is using CPU image
-oc describe pod -n $NAMESPACE -l app.kubernetes.io/name=llm-service | grep image
-```
 
 ---
 
