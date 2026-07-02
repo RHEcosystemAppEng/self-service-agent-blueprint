@@ -90,20 +90,6 @@ tolerations: []
 
 affinity: {}
 
-# CPU-specific optimization settings for Intel Xeon. Disabled by default so GPU workflows remain unchanged.
-cpuOptimizations:
-  enabled: false            # Set to true to enable cpu runtime tweaks and env injection
-  installIntelRuntime: false # When true, images built with INSTALL_INTEL_RUNTIME=true will install libgomp
-  defaultCpuThreads: 4      # Default value for OMP_NUM_THREADS / MKL_NUM_THREADS
-  # Example env vars (chart templates may choose to inject these when cpuOptimizations.enabled=true)
-  env:
-    - name: OMP_NUM_THREADS
-      value: "4"
-    - name: MKL_NUM_THREADS
-      value: "4"
-    - name: KMP_AFFINITY
-      value: "granularity=fine,compact,1,0"
-
 llama_stack_url: http://llamastack:8321
 
 # Knowledge Base Configuration
@@ -375,7 +361,7 @@ ticketingZammad:
 llm-service:
   enabled: true
   # Xeon deployment 
-  # Uncomment to force CPU/Xeon runtime instead of GPU/default behavior.
+  # Uncomment to select CPU/Xeon runtime instead of GPU/default behavior.
   # device: xeon
   
   deviceConfigs:
