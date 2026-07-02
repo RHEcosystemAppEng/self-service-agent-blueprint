@@ -9,10 +9,27 @@ from typing import Any
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
-OWNER_ID_TO_DISPLAY: dict[str, str] = {
-    "agent.laptop-specialist": "laptop",
-    "manager1": "manager",
-}
+_owner_display_cache: dict[str, str] = {}
+
+
+def _resolve_owner_display(page: Page, owner_login: str) -> str:
+    """Resolve an owner login to the Zammad display name via the in-browser User model."""
+    if owner_login in _owner_display_cache:
+        return _owner_display_cache[owner_login]
+    result = page.evaluate(
+        """
+        (login) => {
+            try {
+                const user = App.User.all().find(u => u.login === login);
+                return user ? user.displayName() : null;
+            } catch (_) { return null; }
+        }
+    """,
+        owner_login,
+    )
+    display = result if result else owner_login
+    _owner_display_cache[owner_login] = display
+    return display
 
 
 def _load_conversation() -> list[dict[str, Any]]:
@@ -86,36 +103,30 @@ def _scrape_owner(page: Page) -> str:
 
 
 def _scrape_group(page: Page) -> str:
-    return page.evaluate(
-        """
+    return page.evaluate("""
         () => {
             const el = document.querySelector('[data-attribute-name="group_id"] .js-input');
             return el ? (el.value || el.textContent || '') : '';
         }
-    """
-    ).strip()
+    """).strip()
 
 
 def _check_metadata_fields(
     step: int, state: str, owner: str, group: str, expected: dict[str, Any]
 ) -> None:
     if "state" in expected:
-        assert expected["state"].lower() in state.lower(), (
-            f"Step {step + 1}: expected state to contain "
-            f"{expected['state']!r}, got {state!r}"
+        assert expected["state"].lower() == state.lower(), (
+            f"Step {step + 1}: expected state " f"{expected['state']!r}, got {state!r}"
         )
 
     if "owner" in expected:
-        display_name = OWNER_ID_TO_DISPLAY.get(expected["owner"], expected["owner"])
-        assert display_name.lower() in owner.lower(), (
-            f"Step {step + 1}: expected owner to contain "
-            f"{display_name!r} (from ID {expected['owner']!r}), got {owner!r}"
+        assert expected["owner"].lower() == owner.lower(), (
+            f"Step {step + 1}: expected owner " f"{expected['owner']!r}, got {owner!r}"
         )
 
     if "group" in expected:
-        assert expected["group"].lower() in group.lower(), (
-            f"Step {step + 1}: expected group to contain "
-            f"{expected['group']!r}, got {group!r}"
+        assert expected["group"].lower() == group.lower(), (
+            f"Step {step + 1}: expected group " f"{expected['group']!r}, got {group!r}"
         )
 
 
@@ -126,6 +137,10 @@ def _assert_metadata(
     retries: int = 3,
     delay: float = 5.0,
 ) -> None:
+    resolved = dict(expected)
+    if "owner" in resolved:
+        resolved["owner"] = _resolve_owner_display(page, resolved["owner"])
+
     for attempt in range(retries):
         if attempt > 0:
             time.sleep(delay)
@@ -138,7 +153,7 @@ def _assert_metadata(
         group = _scrape_group(page)
 
         try:
-            _check_metadata_fields(step, state, owner, group, expected)
+            _check_metadata_fields(step, state, owner, group, resolved)
             print(
                 f"  Step {step + 1} metadata: state={state!r}, "
                 f"owner={owner!r}, group={group!r}"
