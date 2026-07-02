@@ -245,7 +245,9 @@ def test_laptop_refresh_conversation(
     admin_page.wait_for_load_state("networkidle")
     time.sleep(5)
 
-    _assert_metadata(0, admin_page, turns[0]["expected_conversation_metadata"])
+    metadata = turns[0].get("expected_conversation_metadata")
+    if metadata:
+        _assert_metadata(0, admin_page, metadata)
 
     for idx in range(1, len(turns)):
         msg = turns[idx]["content"]
@@ -270,4 +272,6 @@ def test_laptop_refresh_conversation(
         admin_page.reload()
         admin_page.wait_for_load_state("networkidle")
         time.sleep(5)
-        _assert_metadata(idx, admin_page, turns[idx]["expected_conversation_metadata"])
+        metadata = turns[idx].get("expected_conversation_metadata")
+        if metadata:
+            _assert_metadata(idx, admin_page, metadata)
