@@ -381,6 +381,13 @@ llm-service:
   deviceConfigs:
     xeon:
       image: "registry.redhat.io/rhaii/vllm-cpu-rhel9:3.4.0"
+      env:
+      # jemalloc memory allocator not supported on this image, using libomp instead
+      - name: LD_PRELOAD
+        value: "/usr/lib64/libomp.so"
+      # KV cache space in GiB (do not add GiB suffix)
+      - name: VLLM_CPU_KVCACHE_SPACE
+        value: "20"
   
   servingRuntime:
     env:
@@ -393,6 +400,7 @@ llm-service:
         secretKeyRef:
           key: HF_TOKEN
           name: huggingface-secret
+          
   # Xeon model tuning example (uncomment when using device: xeon)
   # models:
   #   llama-3-2-3b-instruct:
@@ -413,15 +421,6 @@ llm-service:
   #       - "14336"
   #       - --max-num-seqs
   #       - "2"
-
-  # Optional service-level resource tuning for Xeon deployments
-  # resources:
-  #   requests:
-  #     cpu: "8"
-  #     memory: "32Gi"
-  #   limits:
-  #     cpu: "16"
-  #     memory: "64Gi"
 
 # Mock ServiceNow Server Configuration (for testing and development)
 mockServiceNow:
