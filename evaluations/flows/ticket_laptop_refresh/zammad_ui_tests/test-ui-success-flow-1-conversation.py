@@ -40,12 +40,28 @@ def _article_count(page: Page) -> int:
     return page.locator(".ticket-article-item").count()
 
 
+def _latest_article_is_from_agent(page: Page) -> bool:
+    """Check whether the last article on the page was sent by an Agent (sender_id 1)."""
+    return page.evaluate("""
+        () => {
+            const items = document.querySelectorAll('.ticket-article-item');
+            if (items.length === 0) return false;
+            const lastId = items[items.length - 1].getAttribute('data-id');
+            if (!lastId) return false;
+            try {
+                const article = App.TicketArticle.find(parseInt(lastId, 10));
+                return article && article.sender_id === 1;
+            } catch (_) { return false; }
+        }
+    """)
+
+
 def _wait_for_agent_reply(page: Page, count_before: int, timeout_s: int) -> None:
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         page.reload()
         page.wait_for_load_state("networkidle")
-        if _article_count(page) > count_before:
+        if _article_count(page) > count_before and _latest_article_is_from_agent(page):
             time.sleep(2)
             return
         time.sleep(3)
