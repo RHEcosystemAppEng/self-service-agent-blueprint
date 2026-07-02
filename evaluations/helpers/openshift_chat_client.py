@@ -340,7 +340,7 @@ class OpenShiftChatClient:
             logger.debug("Process terminated while reading conversation metadata")
             return
         try:
-            ready, _, _ = select.select([self.process.stdout], [], [], 5.0)
+            ready, _, _ = select.select([self.process.stdout], [], [], 60.0)
             if not ready:
                 return
             line = self.process.stdout.readline()
