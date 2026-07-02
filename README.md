@@ -444,7 +444,7 @@ export NAMESPACE=your-namespace
 
 # Set LLM configuration
 export LLM=llama-3-3-70b-instruct-w8a8
-export LLM_ID=llama-3-3-70b-instruct-w8a8
+export LLM_ID=meta-llama/Llama-3.3-70B-Instruct
 export LLM_API_TOKEN=your-api-token
 export LLM_URL=https://your-llm-endpoint
 # Optional: export LLM_MAX_TOKENS=2048   # max output tokens (default when using Makefile); see Prompt Configuration Guide
@@ -1016,7 +1016,7 @@ cd evaluations/
 # Set LLM endpoint for evaluation (can use different model than agent)
 export LLM_API_TOKEN=your-api-token
 export LLM_URL=https://your-evaluation-llm-endpoint
-export LLM_ID=llama-3-3-70b-instruct-w8a8
+export LLM_ID=meta-llama/Llama-3.3-70B-Instruct
 
 uv venv
 source .venv/bin/activate
@@ -1897,7 +1897,7 @@ cd evaluations/
 # Set LLM endpoint for evaluation (can use different model than agent)
 export LLM_API_TOKEN=your-api-token
 export LLM_URL=https://your-evaluation-llm-endpoint
-export LLM_ID=llama-3-3-70b-instruct-w8a8
+export LLM_ID=meta-llama/Llama-3.3-70B-Instruct
 
 uv venv
 source .venv/bin/activate
