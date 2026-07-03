@@ -125,6 +125,27 @@ class CustomLLM(DeepEvalBaseLLM):
             if schema is not None and content:
                 try:
                     data = json.loads(content)
+                    # GPT-OSS-120b sometimes wraps output in {"final": "{...}"} or
+                    # emits malformed keys like {"final{": 0, "reason": "..."}.
+                    # Unwrap/remap any key starting with "final".
+                    if isinstance(data, dict) and "score" not in data:
+                        final_key = next(
+                            (k for k in data if k.startswith("final")), None
+                        )
+                        if final_key is not None:
+                            inner = data[final_key]
+                            if isinstance(inner, (int, float)):
+                                data = {
+                                    "score": inner,
+                                    "reason": data.get("reason", ""),
+                                }
+                            elif isinstance(inner, str):
+                                try:
+                                    data = json.loads(inner)
+                                except json.JSONDecodeError:
+                                    pass
+                            elif isinstance(inner, dict):
+                                data = inner
                     return schema(**data)
                 except (json.JSONDecodeError, Exception) as e:
                     logger.error(f"Failed to parse response as {schema.__name__}: {e}")
@@ -213,6 +234,27 @@ class CustomLLM(DeepEvalBaseLLM):
             if schema is not None and content:
                 try:
                     data = json.loads(content)
+                    # GPT-OSS-120b sometimes wraps output in {"final": "{...}"} or
+                    # emits malformed keys like {"final{": 0, "reason": "..."}.
+                    # Unwrap/remap any key starting with "final".
+                    if isinstance(data, dict) and "score" not in data:
+                        final_key = next(
+                            (k for k in data if k.startswith("final")), None
+                        )
+                        if final_key is not None:
+                            inner = data[final_key]
+                            if isinstance(inner, (int, float)):
+                                data = {
+                                    "score": inner,
+                                    "reason": data.get("reason", ""),
+                                }
+                            elif isinstance(inner, str):
+                                try:
+                                    data = json.loads(inner)
+                                except json.JSONDecodeError:
+                                    pass
+                            elif isinstance(inner, dict):
+                                data = inner
                     return schema(**data)
                 except (json.JSONDecodeError, Exception) as e:
                     logger.error(f"Failed to parse response as {schema.__name__}: {e}")
