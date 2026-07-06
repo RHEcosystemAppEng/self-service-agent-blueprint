@@ -58,7 +58,7 @@ def _article_count(page: Page) -> int:
 
 
 def _latest_article_is_from_agent(page: Page) -> bool:
-    """Check whether the last article on the page was sent by an Agent (sender_id 1)."""
+    """Check whether the last article on the page was sent by an Agent."""
     return page.evaluate("""
         () => {
             const items = document.querySelectorAll('.ticket-article-item');
@@ -66,8 +66,10 @@ def _latest_article_is_from_agent(page: Page) -> bool:
             const lastId = items[items.length - 1].getAttribute('data-id');
             if (!lastId) return false;
             try {
+                const agentSender = App.TicketArticleSender.findByAttribute('name', 'Agent');
+                if (!agentSender) return false;
                 const article = App.TicketArticle.find(parseInt(lastId, 10));
-                return article && article.sender_id === 1;
+                return article && article.sender_id === agentSender.id;
             } catch (_) { return false; }
         }
     """)
