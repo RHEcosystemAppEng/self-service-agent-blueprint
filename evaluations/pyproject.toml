@@ -138,5 +138,6 @@ module = [
     "deepeval.*",
     "shared_clients",
     "shared_clients.*",
+    "playwright.*",
 ]
 ignore_missing_imports = true

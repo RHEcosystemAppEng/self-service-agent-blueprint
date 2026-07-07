@@ -228,7 +228,8 @@ helm_demo_email_args = \
 
 # Ticketing: Zammad in-cluster URL and MCP secret wiring
 ZAMMAD_CREDENTIALS_SECRET ?= $(MAIN_CHART_NAME)-zammad-credentials
-ZAMMAD_URL ?= http://zammad-nginx.$(NAMESPACE).svc.cluster.local:8080
+_ZAMMAD_ROUTE_HOST := $(shell oc get route ssa-zammad -n $(NAMESPACE) -o jsonpath='{.spec.host}' 2>/dev/null)
+ZAMMAD_URL ?= $(if $(_ZAMMAD_ROUTE_HOST),https://$(_ZAMMAD_ROUTE_HOST),http://zammad-nginx.$(NAMESPACE).svc.cluster.local:8080)
 # Temp overlay file for cluster-specific Zammad Helm values (bootstrap image registry/tag, FQDN, OpenShift UID). Written by helm-install-ticketing.
 ZAMMAD_TICKETING_OVERLAY = /tmp/ssa-zammad-$(NAMESPACE)-overlay.yaml
 # Must match autoWizard.config in helm/values-ticketing.yaml (for UI login).
@@ -387,6 +388,7 @@ help:
 	@echo "  test-servicenow-bootstrap          - Run tests for ServiceNow automation scripts"
 	@echo "  test-mock-employee-data            - Run tests for mock employee data"
 	@echo "  test-mock-servicenow               - Run tests for mock ServiceNow"
+	@echo "  test-zammad-ui-conversation        - Run Playwright UI test for Zammad laptop-refresh conversation (requires ZAMMAD_URL or NAMESPACE)"
 	@echo "  test-short-resp-integration-request-mgr - Run short responses integration tests with Request Manager"
 	@echo "  test-short-ticket-laptop-refresh   - Run short responses integration tests for ticket-laptop-refresh flow"
 	@echo "  test-long-resp-integration-request-mgr - Run long responses integration tests with Request Manager"
@@ -1377,6 +1379,14 @@ test-mock-employee-data:
 .PHONY: test-mock-servicenow
 test-mock-servicenow:
 	$(call run_pytest,mock servicenow,mock-service-now)
+
+.PHONY: test-zammad-ui-conversation
+test-zammad-ui-conversation:
+	@if [ -z "$(NAMESPACE)" ] && [ -z "$${ZAMMAD_URL}" ]; then \
+		echo "Error: set ZAMMAD_URL or NAMESPACE"; \
+		exit 1; \
+	fi
+	cd evaluations/flows/ticket_laptop_refresh/zammad_ui_tests && uv sync --group dev && uv run python -m playwright install chromium && ZAMMAD_URL=$(ZAMMAD_URL) uv run python -m pytest test-ui-success-flow-1-conversation.py -v $(ARGS)
 
 .PHONY: sync-evaluations
 sync-evaluations:
