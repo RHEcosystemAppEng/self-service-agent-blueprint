@@ -54,13 +54,14 @@ def _sign_in(page: Page, zammad_url: str, email: str, password: str) -> None:
 
 
 def _article_count(page: Page) -> int:
-    return page.locator(".ticket-article-item").count()
+    return int(page.locator(".ticket-article-item").count())
 
 
 def _latest_article_is_from_agent(page: Page) -> bool:
     """Check whether the last article on the page was sent by an Agent."""
-    return page.evaluate(
-        """
+    return bool(
+        page.evaluate(
+            """
         () => {
             const items = document.querySelectorAll('.ticket-article-item');
             if (items.length === 0) return false;
@@ -74,6 +75,7 @@ def _latest_article_is_from_agent(page: Page) -> bool:
             } catch (_) { return false; }
         }
     """
+        )
     )
 
 
@@ -95,25 +97,27 @@ def _wait_for_agent_reply(page: Page, count_before: int, timeout_s: int) -> None
 def _scrape_state(page: Page) -> str:
     el = page.locator(".sidebar-content select[name='state_id'] option:checked")
     if el.count() > 0:
-        return el.first.inner_text().strip()
+        return str(el.first.inner_text()).strip()
     return ""
 
 
 def _scrape_owner(page: Page) -> str:
     el = page.locator(".sidebar-content select[name='owner_id'] option:checked")
     if el.count() > 0:
-        return el.first.inner_text().strip()
+        return str(el.first.inner_text()).strip()
     return ""
 
 
 def _scrape_group(page: Page) -> str:
-    return page.evaluate(
-        """
+    return str(
+        page.evaluate(
+            """
         () => {
             const el = document.querySelector('[data-attribute-name="group_id"] .js-input');
             return el ? (el.value || el.textContent || '') : '';
         }
     """
+        )
     ).strip()
 
 
