@@ -59,7 +59,8 @@ def _article_count(page: Page) -> int:
 
 def _latest_article_is_from_agent(page: Page) -> bool:
     """Check whether the last article on the page was sent by an Agent."""
-    return page.evaluate("""
+    return page.evaluate(
+        """
         () => {
             const items = document.querySelectorAll('.ticket-article-item');
             if (items.length === 0) return false;
@@ -72,7 +73,8 @@ def _latest_article_is_from_agent(page: Page) -> bool:
                 return article && article.sender_id === agentSender.id;
             } catch (_) { return false; }
         }
-    """)
+    """
+    )
 
 
 def _wait_for_agent_reply(page: Page, count_before: int, timeout_s: int) -> None:
@@ -105,12 +107,14 @@ def _scrape_owner(page: Page) -> str:
 
 
 def _scrape_group(page: Page) -> str:
-    return page.evaluate("""
+    return page.evaluate(
+        """
         () => {
             const el = document.querySelector('[data-attribute-name="group_id"] .js-input');
             return el ? (el.value || el.textContent || '') : '';
         }
-    """).strip()
+    """
+    ).strip()
 
 
 def _check_metadata_fields(
