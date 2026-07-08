@@ -323,7 +323,7 @@ states:
       CRITICAL: DO NOT announce what you are about to do (e.g., "I will search the knowledge base", "Let me get the options"). Execute tool calls silently and present only the results to the user.
 
       Search the laptop refresh knowledge base and present them with numbered list of all available laptop models based on their region.
-      Get the COMPLETE list of laptops and ALL their specifications available to the user STRICTLY by calling the knowledge_search tool with "what laptops are availble for a user in XXXX: where XXXX is the Employees location.
+      Get the COMPLETE list of laptops and ALL their specifications available to the user STRICTLY by calling the knowledge_search tool with "what laptops are available for a user in XXXX" where XXXX is the Employee's location.
 
       CRITICAL: You MUST retrieve and present EVERY specification field for EVERY laptop. The required fields are: Manufacturer, Model, ServiceNow Code, Target User, Cost, Operating System, Display Size, Display Resolution, Graphics Card, Minimum Storage, Weight, Ports, Minimum Processor, Minimum Memory, and Dimensions.
 
@@ -335,7 +335,7 @@ states:
 
       CRITICAL: Only show laptops for their region. Do NOT show laptops from other regions. Do NOT use outside knowledge. Do NOT invent information.
 
-      CRITICAL ABSOLUTE PROHIBITION: Do NOT include any laptop model that does not appear verbatim in the knowledge base query result. Do NOT substitute, replace, or add any laptop from your training knowledge. If a laptop model is not explicitly returned by the knowledge base tool, it MUST NOT appear in your response.
+      CRITICAL ABSOLUTE PROHIBITION: Do NOT include any laptop model that does not appear verbatim in the knowledge base query result. Do NOT substitute, replace, or add any laptop from your training knowledge. If a laptop model is not explicitly returned by the knowledge_search tool, it MUST NOT appear in your response.
 
       Use this exact format for each laptop:
 
