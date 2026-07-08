@@ -5,3 +5,4 @@ helm_export_dir: "ansible/helm-export"
 test_email_server_manifest: "test-email-server/test-email-server-greenmail.yaml"
 main_chart_name: "self-service-agent"
 enable_langfuse: false
+enable_mlflow: false

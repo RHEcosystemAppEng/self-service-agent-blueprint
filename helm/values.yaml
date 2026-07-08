@@ -692,6 +692,18 @@ security:
     imapLeaseDuration: "120"  # Leader election lease duration in seconds (default: 120 - should be 2x poll interval)
     imapLeaseRenewalInterval: ""  # Lease renewal interval in seconds (optional, defaults to lease_duration // 2)
 
+# MLflow Tracing (RHOAI cluster-level MLflow server)
+mlflow:
+  enabled: false
+  # RHOAI cluster-level MLflow tracking URI.
+  # Override only if your RHOAI installation uses a non-standard namespace.
+  # NOTE: the API is served at the root, not under the /mlflow UI prefix.
+  trackingUri: "https://mlflow.redhat-ods-applications.svc.cluster.local:8443"
+  # Defaults to "<release-name>-<YYYYMMDD-HHMM>" at deploy time. Override to pin a fixed name across upgrades.
+  experimentName: ""
+  # Bearer token for RHOAI OAuth. Leave empty to use the projected ServiceAccount token.
+  authToken: ""
+
 # LangFuse Observability Platform
 # Enable with: export ENABLE_LANGFUSE=true before running make install (or make helm-install-test / helm-install-prod)
 langfuse:

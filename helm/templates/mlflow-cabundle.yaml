@@ -1,0 +1,15 @@
+{{- if .Values.mlflow.enabled }}
+---
+# OpenShift's service CA controller injects the cluster service CA certificate
+# into this ConfigMap automatically via the annotation below. The agent-service
+# mounts it and uses it to verify the RHOAI MLflow server's TLS certificate.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "self-service-agent.fullname" . }}-mlflow-cabundle
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "self-service-agent.labels" . | nindent 4 }}
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+{{- end }}

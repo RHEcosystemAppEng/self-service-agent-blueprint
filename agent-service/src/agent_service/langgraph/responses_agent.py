@@ -1,5 +1,6 @@
 import asyncio
 import os
+import time
 from typing import Any, Dict, Optional
 
 import httpx
@@ -9,6 +10,7 @@ from opentelemetry.propagate import inject
 from shared_models import configure_logging
 from tracing_config.auto_tracing import tracingIsActive
 
+from .mlflow_tracking import trace_llm_call
 from .util import load_config_from_path, resolve_agent_service_path
 
 logger = configure_logging("agent-service")
@@ -598,28 +600,47 @@ class Agent:
                 tools_to_use = self.tools
 
             # Only pass tools if tools_to_use is not empty
-            if tools_to_use:
-                response = await self.async_llama_client.responses.create(
-                    input=messages_with_system,
-                    model=self.model,
-                    **response_config,
-                    tools=tools_to_use,
-                )
-            else:
-                response = await self.async_llama_client.responses.create(
-                    input=messages_with_system,
-                    model=self.model,
-                    **response_config,
-                )
+            _t0 = time.monotonic()
+            _llm_exc: Optional[Exception] = None
+            try:
+                if tools_to_use:
+                    response = await self.async_llama_client.responses.create(
+                        input=messages_with_system,
+                        model=self.model,
+                        **response_config,
+                        tools=tools_to_use,
+                    )
+                else:
+                    response = await self.async_llama_client.responses.create(
+                        input=messages_with_system,
+                        model=self.model,
+                        **response_config,
+                    )
+            except Exception as _exc:
+                _llm_exc = _exc
+                raise
+            finally:
+                _elapsed_ms = int((time.monotonic() - _t0) * 1000)
+                if _llm_exc is not None:
+                    trace_llm_call(
+                        messages=messages_with_system,
+                        model=self.model,
+                        temperature=response_config.get("temperature", 0.0),
+                        prompt_tokens=0,
+                        completion_tokens=0,
+                        latency_ms=_elapsed_ms,
+                        error=_llm_exc,
+                    )
 
             # Import token counting if available
+            _prompt_tokens, _completion_tokens = 0, 0
             try:
                 from .token_counter import count_tokens_from_response
 
                 # Use provided token context or fallback to default
                 context = token_context or "chat_agent"
 
-                count_tokens_from_response(
+                _prompt_tokens, _completion_tokens = count_tokens_from_response(
                     response, self.model, context, messages_with_system
                 )
             except ImportError:
@@ -694,6 +715,16 @@ class Agent:
                 )
                 return f"Error processing response: {e}"
 
+            trace_llm_call(
+                messages=messages_with_system,
+                model=self.model,
+                temperature=response_config.get("temperature", 0.0),
+                prompt_tokens=_prompt_tokens,
+                completion_tokens=_completion_tokens,
+                latency_ms=_elapsed_ms,
+                response=response,
+                response_text=response_text,
+            )
             return response_text
 
         except TimeoutError as e:
