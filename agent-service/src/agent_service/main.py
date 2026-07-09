@@ -42,12 +42,14 @@ from tracing_config.auto_tracing import (
 )
 
 from . import __version__
+from .langgraph.mlflow_tracking import configure_mlflow
 from .session_manager import ResponsesSessionManager
 
 # Configure structured logging and auto tracing
 SERVICE_NAME = "agent-service"
 logger = configure_logging(SERVICE_NAME)
 auto_tracing_run(SERVICE_NAME, logger)
+configure_mlflow()
 
 # Agent session lock timeout: must be >= AGENT_TIMEOUT so queued requests can wait
 _AGENT_LOCK_TIMEOUT = int(os.getenv("SESSION_LOCK_WAIT_TIMEOUT", "180"))

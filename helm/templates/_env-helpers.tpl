@@ -249,6 +249,24 @@ Generate Request Manager specific environment variables
 Generate Agent Service specific environment variables
 */}}
 {{- define "self-service-agent.agentServiceEnvVars" -}}
+{{/* MLflow Tracing Configuration (RHOAI 3.4 namespace-scoped MLflow) */}}
+{{- if .Values.mlflow.enabled }}
+- name: MLFLOW_ENABLED
+  value: "true"
+- name: MLFLOW_TRACKING_URI
+  value: {{ .Values.mlflow.trackingUri | quote }}
+- name: MLFLOW_TRACKING_SERVER_CERT_PATH
+  value: "/etc/ssl/certs/mlflow-ca/service-ca.crt"
+- name: MLFLOW_EXPERIMENT_NAME
+  value: {{ .Values.mlflow.experimentName | default (printf "%s-%s" .Release.Name (now | date "20060102-1504")) | quote }}
+{{- if .Values.mlflow.authToken }}
+- name: MLFLOW_TRACKING_TOKEN
+  value: {{ .Values.mlflow.authToken | quote }}
+{{- end }}
+{{- else }}
+- name: MLFLOW_ENABLED
+  value: "false"
+{{- end }}
 {{/* LangFuse Observability Configuration */}}
 {{- if .Values.langfuse.enabled }}
 - name: LANGFUSE_ENABLED

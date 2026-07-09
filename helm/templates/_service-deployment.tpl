@@ -151,8 +151,20 @@ spec:
           timeoutSeconds: {{- if eq $serviceName "integration-dispatcher" }} 10{{- else }} 3{{- end }}
           failureThreshold: {{- if eq $serviceName "agent-service" }} 60{{- else if eq $serviceName "integration-dispatcher" }} 30{{- else }} 30{{- end }}
         {{- end }}
+        {{- if and (eq $serviceName "agent-service") $context.Values.mlflow.enabled }}
+        volumeMounts:
+        - name: mlflow-cabundle
+          mountPath: /etc/ssl/certs/mlflow-ca
+          readOnly: true
+        {{- end }}
       restartPolicy: Always
       terminationGracePeriodSeconds: {{- if eq $serviceName "agent-service" }} 60{{- else }} 30{{- end }}
+      {{- if and (eq $serviceName "agent-service") $context.Values.mlflow.enabled }}
+      volumes:
+      - name: mlflow-cabundle
+        configMap:
+          name: {{ $fullName }}-mlflow-cabundle
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

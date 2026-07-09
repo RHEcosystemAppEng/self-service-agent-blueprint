@@ -17,6 +17,8 @@ from langgraph.graph.message import add_messages
 from langgraph.types import Command
 from shared_models import configure_logging
 
+from .mlflow_tracking import mlflow_turn_span, mlflowIsActive
+
 # Import PostgreSQL checkpoint utilities
 from .postgres_checkpoint import get_postgres_checkpointer, reset_postgres_checkpointer
 from .util import resolve_agent_service_path
@@ -1441,7 +1443,28 @@ class ConversationSession:
         Returns:
             The agent's response message as a string
         """
+        if not mlflowIsActive():
+            return await self._send_message_impl(message, token_context, state_patch)
+        async with mlflow_turn_span(
+            thread_id=self.thread_id,
+            agent_name=self.agent.config.get("name"),
+            user_id=self.authoritative_user_id,
+        ) as span:
+            if span:
+                span.set_inputs({"message": message})
+            response = await self._send_message_impl(
+                message, token_context, state_patch
+            )
+            if span:
+                span.set_outputs({"response": response})
+            return response
 
+    async def _send_message_impl(
+        self,
+        message: str,
+        token_context: Optional[str] = None,
+        state_patch: Optional[dict[str, Any]] = None,
+    ) -> str:
         # Handle special commands
         if message.lower() in ["quit", "exit", "q"]:
             return "Session ended."

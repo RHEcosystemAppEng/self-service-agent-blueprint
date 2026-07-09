@@ -1533,6 +1533,7 @@ define helm_install_common
 	@$(eval REPLICA_COUNT_ARGS := $(helm_replica_count_args))
 	@$(eval TEST_USERS_ARGS := $(helm_test_users_args))
 	@$(eval LANGFUSE_ARGS := $(if $(filter true,$(ENABLE_LANGFUSE)),--set langfuse.enabled=true,))
+	@$(eval MLFLOW_ARGS := $(if $(filter true,$(ENABLE_MLFLOW)),--set mlflow.enabled=true,))
 	@$(eval FAULT_INJECTION_ARGS := $(helm_fault_injection_args))
 
 	@echo "Creating ServiceNow credentials secret..."
@@ -1574,6 +1575,7 @@ define helm_install_common
 		$(REPLICA_COUNT_ARGS) \
 		$(TEST_USERS_ARGS) \
 		$(LANGFUSE_ARGS) \
+		$(MLFLOW_ARGS) \
 		$(FAULT_INJECTION_ARGS) \
 		$(DEFAULT_AGENT_ID_ARG) \
 		$(if $(filter-out "",$(2)),$(2),) \
@@ -1630,6 +1632,7 @@ define helm_export
 		$(helm_replica_count_args) \
 		$(helm_test_users_args) \
 		$(if $(filter true,$(ENABLE_LANGFUSE)),--set langfuse.enabled=true,) \
+		$(if $(filter true,$(ENABLE_MLFLOW)),--set mlflow.enabled=true,) \
 		$(helm_fault_injection_args) \
 		$(DEFAULT_AGENT_ID_ARG) \
 		$(if $(filter-out "",$(1)),$(1),) \
