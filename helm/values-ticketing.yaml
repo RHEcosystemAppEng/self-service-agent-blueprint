@@ -18,9 +18,9 @@ ticketingZammad:
       enabled: true
       # url: omit to use http://<mainChartReleaseName>-integration-dispatcher.<namespace>.svc.cluster.local/zammad/webhook
       mainChartReleaseName: "self-service-agent"
-      # Webhook trigger: limit to group(s) by name (bootstrap resolves to ids). Override with triggerGroupIds if you prefer numeric ids.
-      triggerGroupNames: "Users"
-      # Do not POST to the agent after manager handoff (same tag as ZAMMAD_TAG_MANAGER_REVIEW / send_to_manager_review).
+      # Remove or comment out — group filter is too brittle when agents move tickets
+      # triggerGroupNames: "Users"
+      triggerSkipGroupFilter: true
       triggerTagsExclude: "pending-manager-review"
     adminEmail: "admin@zammad.local"
     adminPassword: "ZammadR0cks!"
