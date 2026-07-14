@@ -168,9 +168,10 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--message-timeout",
         type=int,
-        default=60,
-        help="Timeout in seconds for individual message send/response operations (default: 60). "
-        "Increase for slower agents or high concurrency scenarios.",
+        default=None,
+        help="Timeout in seconds for individual message send/response operations. "
+        "Default: auto — 60 for chat-responses-request-mgr.py; "
+        "TRIGGER_POLL_TIMEOUT+60 (240s by default) for ticket-responses-request-mgr.py.",
     )
     parser.add_argument(
         "--use-structured-output",
@@ -596,6 +597,16 @@ if __name__ == "__main__":
         flow_scenario = flow_module.get_scenario(args.use_structured_output)
         logger.info(f"Using flow '{args.flow}': saving to {results_dir}")
 
+    from helpers.message_timeout import resolve_message_timeout
+
+    message_timeout = resolve_message_timeout(test_script, args.message_timeout)
+    if args.message_timeout is None:
+        logger.info(
+            "Auto message-timeout=%ss for test script %s",
+            message_timeout,
+            test_script,
+        )
+
     # Get API configuration from environment variables
     api_key, api_endpoint, model_name = get_api_configuration()
 
@@ -651,7 +662,7 @@ if __name__ == "__main__":
                 args.max_turns,
                 test_script,
                 reset_conversation,
-                args.message_timeout,
+                message_timeout,
                 args.use_structured_output,
                 results_dir,
                 flow_scenario,

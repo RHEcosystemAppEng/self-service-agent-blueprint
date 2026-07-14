@@ -547,9 +547,10 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--message-timeout",
         type=int,
-        default=60,
-        help="Timeout in seconds for individual message send/response operations in generator.py (default: 60). "
-        "Increase for slower agents or high concurrency scenarios.",
+        default=None,
+        help="Timeout in seconds for individual message send/response operations. "
+        "Default: auto — 60 for chat-responses-request-mgr.py; "
+        "TRIGGER_POLL_TIMEOUT+60 (240s by default) for ticket-responses-request-mgr.py.",
     )
     parser.add_argument(
         "--validate-full-laptop-details",
@@ -937,7 +938,7 @@ def run_evaluation_pipeline(
     test_script: str = "chat-responses-request-mgr.py",
     reset_conversation: bool = False,
     concurrency: int = 1,
-    message_timeout: int = 60,
+    message_timeout: Optional[int] = None,
     validate_full_laptop_details: bool = True,
     use_structured_output: bool = False,
     conversation_source: str = "generate",
@@ -961,7 +962,9 @@ def run_evaluation_pipeline(
         test_script: Name of the test script to execute
         reset_conversation: Send 'reset' message at the start of each conversation
         concurrency: Number of parallel workers for generator.py (default: 1)
-        message_timeout: Timeout for individual message send/response operations (default: 60)
+        message_timeout: Timeout for individual message send/response operations, forwarded
+            to run_conversations.py/generator.py as-is. None lets those scripts pick a
+            script-aware default (see helpers.message_timeout).
         validate_full_laptop_details: Enable validation of all 15 laptop specification fields (default: True)
         use_structured_output: Enable structured output with Pydantic schema validation (default: False)
         conversation_source: "generate" to run generator.py, "export" to run export_conversations_from_api.py (default: generate)
@@ -993,9 +996,9 @@ def run_evaluation_pipeline(
         run_conversations_args = [
             "--test-script",
             test_script,
-            "--message-timeout",
-            str(message_timeout),
         ]
+        if message_timeout is not None:
+            run_conversations_args.extend(["--message-timeout", str(message_timeout)])
         if reset_conversation:
             run_conversations_args.append("--reset-conversation")
         if flow:
@@ -1031,9 +1034,9 @@ def run_evaluation_pipeline(
             str(max_turns),
             "--test-script",
             test_script,
-            "--message-timeout",
-            str(message_timeout),
         ]
+        if message_timeout is not None:
+            generator_args.extend(["--message-timeout", str(message_timeout)])
         if concurrency > 1:
             generator_args.extend(["--concurrency", str(concurrency)])
         if reset_conversation:
