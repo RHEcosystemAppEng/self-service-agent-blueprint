@@ -2,8 +2,11 @@
 # Zammad subchart values go under the "zammad" key.
 # Override via helm/values-ticketing.yaml (when deployed as a subchart of the main chart).
 
-zammad: {}
-
+zammad:
+  zammadConfig:
+    railsserver:
+      webConcurrency: 2
+  
 # OpenShift Route for external access to Zammad Web UI
 externalRoute:
   enabled: true
