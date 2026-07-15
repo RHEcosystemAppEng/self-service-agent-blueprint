@@ -17,7 +17,7 @@ image:
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   # Anchor: bump once here; subchart defaults (e.g. mcp-servers Snow) alias this tag.
-  tag: &releaseImageTag "0.0.14"
+  tag: &releaseImageTag "0.0.15"
 
 # Test Integration Configuration
 testIntegrationEnabled: false
