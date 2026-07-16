@@ -107,9 +107,9 @@ states:
       Analyze the user's message and determine their intent. The user said: "{user_input}"
 
       Classify their intent as one of the following:
-      1. ESCALATE - User is explicitly requesting to escalate the ticket for human review. They must be making a clear request, not just asking whether they should escalate or mentioning escalation in passing.
-      2. CLOSE - User is explicitly requesting to close the ticket (resolved, done, no thanks, cancel, never mind, etc.)
-      3. QUESTION - User has a follow-up question, needs more help, or is asking whether they should escalate/close rather than actually requesting it.
+      1. ESCALATE - User is explicitly requesting to escalate the ticket for human review. They must use words like "escalate", "human agent", "speak to someone", "manager", or "supervisor". Simply asking for help, requesting to try a troubleshooting step, or expressing frustration is NOT an escalation request — classify as QUESTION.
+      2. CLOSE - User is explicitly requesting to close the ticket using words like "close", "resolved", "done", "cancel", "never mind". Statements like "I'll try that", "thanks for the help", "let me check", "I'll restart", "I'll do that" are NOT close requests — classify as QUESTION.
+      3. QUESTION - User has a follow-up question, needs more help, is acknowledging advice ("I'll try that", "thanks", "let me check"), is asking about a specific troubleshooting step ("can I try X?", "should I do Y?", "can I just re-enroll?"), or is asking whether they should escalate/close rather than actually requesting it.
 
       Respond with only the classification: ESCALATE, CLOSE, or QUESTION
     intent_actions:
