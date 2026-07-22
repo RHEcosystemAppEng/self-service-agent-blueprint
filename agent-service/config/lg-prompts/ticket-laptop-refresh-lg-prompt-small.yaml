@@ -311,7 +311,7 @@ states:
   # State 5: Select Laptop
   select_laptop:
     type: "llm_processor"
-    temperature: 0.2
+    temperature: 0.1
     allowed_tools: []
     failure_transition: "waiting_proceed_confirmation"
     prompt: |
