@@ -5,7 +5,7 @@
 zammad:
   zammadConfig:
     railsserver:
-      webConcurrency: 4
+      webConcurrency: 2
   
 # OpenShift Route for external access to Zammad Web UI
 externalRoute:
