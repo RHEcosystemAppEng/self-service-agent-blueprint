@@ -11,15 +11,15 @@ TICKET_RESPONSES_SCRIPT = "ticket-responses-request-mgr.py"
 TICKET_HARNESS_POLL_BUFFER_SEC = 60
 
 
-def ticket_harness_poll_timeout() -> float:
+def ticket_harness_poll_timeout() -> int:
     """Match test/ticket-responses-request-mgr.py TRIGGER_POLL_TIMEOUT default."""
-    return float(os.environ.get("TRIGGER_POLL_TIMEOUT", "180"))
+    return int(os.environ.get("TRIGGER_POLL_TIMEOUT", "180"))
 
 
 def default_message_timeout_for_script(test_script: str) -> int:
     """Infer a safe per-message timeout from the harness script name."""
     if Path(test_script).name == TICKET_RESPONSES_SCRIPT:
-        return int(ticket_harness_poll_timeout() + TICKET_HARNESS_POLL_BUFFER_SEC)
+        return ticket_harness_poll_timeout() + TICKET_HARNESS_POLL_BUFFER_SEC
     return DEFAULT_CHAT_MESSAGE_TIMEOUT
 
 
