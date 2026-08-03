@@ -1184,14 +1184,17 @@ def main() -> int:
             effective_msg_timeout = resolve_message_timeout(
                 test_script, args.message_timeout
             )
+            MAX_PIPELINE_TIMEOUT = 2700  # 45 minutes
             min_timeout = args.num_conversations * effective_msg_timeout * 3
-            args.timeout = max(600, min_timeout)
+            args.timeout = min(MAX_PIPELINE_TIMEOUT, max(600, min_timeout))
             logger.info(
                 "Auto pipeline timeout=%ss "
-                "(num_conversations=%s × message_timeout=%ss × 3, min 600s)",
+                "(num_conversations=%s × message_timeout=%ss × 3, "
+                "floor 600s, cap %ss)",
                 args.timeout,
                 args.num_conversations,
                 effective_msg_timeout,
+                MAX_PIPELINE_TIMEOUT,
             )
 
         if args.check:
