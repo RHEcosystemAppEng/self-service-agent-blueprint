@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 
 import argparse
+import logging
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from helpers.run_conversation_flow import ConversationFlowTester
 
@@ -89,6 +92,12 @@ if __name__ == "__main__":
     from helpers.message_timeout import resolve_message_timeout
 
     message_timeout = resolve_message_timeout(test_script, args.message_timeout)
+    if args.message_timeout is None:
+        logger.info(
+            "Auto message-timeout=%ss for test script %s",
+            message_timeout,
+            test_script,
+        )
 
     tester = ConversationFlowTester(
         test_script=test_script,
