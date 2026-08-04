@@ -510,9 +510,8 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--timeout",
         type=int,
-        default=None,
-        help="Timeout in seconds for each script execution. "
-        "Default: auto — max(600, num_conversations × max_turns × message_timeout).",
+        default=2700,
+        help="Timeout in seconds for each script execution (default: 2700s / 45 min).",
     )
     parser.add_argument(
         "--max-turns",
@@ -1177,25 +1176,6 @@ def main() -> int:
         else:
             test_script = args.test_script or "chat-responses-request-mgr.py"
             reset_conversation = args.reset_conversation
-
-        if args.timeout is None:
-            from helpers.message_timeout import resolve_message_timeout
-
-            effective_msg_timeout = resolve_message_timeout(
-                test_script, args.message_timeout
-            )
-            MAX_PIPELINE_TIMEOUT = 2700  # 45 minutes
-            min_timeout = args.num_conversations * effective_msg_timeout * 3
-            args.timeout = min(MAX_PIPELINE_TIMEOUT, max(600, min_timeout))
-            logger.info(
-                "Auto pipeline timeout=%ss "
-                "(num_conversations=%s × message_timeout=%ss × 3, "
-                "floor 600s, cap %ss)",
-                args.timeout,
-                args.num_conversations,
-                effective_msg_timeout,
-                MAX_PIPELINE_TIMEOUT,
-            )
 
         if args.check:
             if len(flow_names) > 1:
