@@ -1,7 +1,5 @@
 """Resolve per-message timeouts for evaluation harness subprocesses."""
 
-from __future__ import annotations
-
 import os
 from pathlib import Path
 
