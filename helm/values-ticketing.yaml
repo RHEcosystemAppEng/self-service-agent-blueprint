@@ -21,7 +21,7 @@ ticketingZammad:
       # Remove or comment out — group filter is too brittle when agents move tickets
       # triggerGroupNames: "Users"
       triggerSkipGroupFilter: true
-      triggerTagsExclude: "pending-manager-review"
+      triggerTagsExclude: "pending-manager-review,escalated-human-review"
     adminEmail: "admin@zammad.local"
     adminPassword: "ZammadR0cks!"
     autowizardToken: "ssa-zammad-autowizard-9f3a2b1c"
