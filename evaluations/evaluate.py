@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 
 def run_script(
-    script_name: str, args: Optional[List[str]] = None, timeout: int = 600
+    script_name: str, args: Optional[List[str]] = None, timeout: int = 2700
 ) -> bool:
     """
     Run a Python script with optional arguments and timeout, showing real-time output.
@@ -610,7 +610,7 @@ def _parse_arguments() -> argparse.Namespace:
 
 
 def run_check_known_bad_conversations(
-    timeout: int = 600,
+    timeout: int = 2700,
     validate_full_laptop_details: bool = True,
     use_structured_output: bool = False,
     flow: Optional[str] = None,
@@ -933,7 +933,7 @@ def run_check_known_bad_conversations(
 
 def run_evaluation_pipeline(
     num_conversations: int = 20,
-    timeout: int = 600,
+    timeout: int = 2700,
     max_turns: int = 20,
     test_script: str = "chat-responses-request-mgr.py",
     reset_conversation: bool = False,
@@ -1150,6 +1150,17 @@ def main() -> int:
         if args.flow and args.all_flows:
             logger.error("--flow and --all-flows are mutually exclusive")
             return 1
+
+        if (
+            args.message_timeout is not None
+            and args.message_timeout >= args.timeout
+        ):
+            logger.warning(
+                "⚠️  --message-timeout (%ss) >= --timeout (%ss); "
+                "the subprocess may be killed before a single message completes.",
+                args.message_timeout,
+                args.timeout,
+            )
 
         # Parse comma-separated flow names
         flow_names = (
