@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 
 def run_script(
-    script_name: str, args: Optional[List[str]] = None, timeout: int = 600
+    script_name: str, args: Optional[List[str]] = None, timeout: int = 2700
 ) -> bool:
     """
     Run a Python script with optional arguments and timeout, showing real-time output.
@@ -510,8 +510,8 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--timeout",
         type=int,
-        default=600,
-        help="Timeout in seconds for each script execution (default: 600)",
+        default=2700,
+        help="Timeout in seconds for each script execution (default: 2700s / 45 min).",
     )
     parser.add_argument(
         "--max-turns",
@@ -547,9 +547,10 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--message-timeout",
         type=int,
-        default=60,
-        help="Timeout in seconds for individual message send/response operations in generator.py (default: 60). "
-        "Increase for slower agents or high concurrency scenarios.",
+        default=None,
+        help="Timeout in seconds for individual message send/response operations. "
+        "Default: auto — 60 for chat-responses-request-mgr.py; "
+        "TRIGGER_POLL_TIMEOUT+60 (240s by default) for ticket-responses-request-mgr.py.",
     )
     parser.add_argument(
         "--validate-full-laptop-details",
@@ -609,7 +610,7 @@ def _parse_arguments() -> argparse.Namespace:
 
 
 def run_check_known_bad_conversations(
-    timeout: int = 600,
+    timeout: int = 2700,
     validate_full_laptop_details: bool = True,
     use_structured_output: bool = False,
     flow: Optional[str] = None,
@@ -932,12 +933,12 @@ def run_check_known_bad_conversations(
 
 def run_evaluation_pipeline(
     num_conversations: int = 20,
-    timeout: int = 600,
+    timeout: int = 2700,
     max_turns: int = 20,
     test_script: str = "chat-responses-request-mgr.py",
     reset_conversation: bool = False,
     concurrency: int = 1,
-    message_timeout: int = 60,
+    message_timeout: Optional[int] = None,
     validate_full_laptop_details: bool = True,
     use_structured_output: bool = False,
     conversation_source: str = "generate",
@@ -961,7 +962,9 @@ def run_evaluation_pipeline(
         test_script: Name of the test script to execute
         reset_conversation: Send 'reset' message at the start of each conversation
         concurrency: Number of parallel workers for generator.py (default: 1)
-        message_timeout: Timeout for individual message send/response operations (default: 60)
+        message_timeout: Timeout for individual message send/response operations, forwarded
+            to run_conversations.py/generator.py as-is. None lets those scripts pick a
+            script-aware default (see helpers.calculate_message_timeout).
         validate_full_laptop_details: Enable validation of all 15 laptop specification fields (default: True)
         use_structured_output: Enable structured output with Pydantic schema validation (default: False)
         conversation_source: "generate" to run generator.py, "export" to run export_conversations_from_api.py (default: generate)
@@ -993,9 +996,9 @@ def run_evaluation_pipeline(
         run_conversations_args = [
             "--test-script",
             test_script,
-            "--message-timeout",
-            str(message_timeout),
         ]
+        if message_timeout is not None:
+            run_conversations_args.extend(["--message-timeout", str(message_timeout)])
         if reset_conversation:
             run_conversations_args.append("--reset-conversation")
         if flow:
@@ -1031,9 +1034,9 @@ def run_evaluation_pipeline(
             str(max_turns),
             "--test-script",
             test_script,
-            "--message-timeout",
-            str(message_timeout),
         ]
+        if message_timeout is not None:
+            generator_args.extend(["--message-timeout", str(message_timeout)])
         if concurrency > 1:
             generator_args.extend(["--concurrency", str(concurrency)])
         if reset_conversation:
@@ -1147,6 +1150,14 @@ def main() -> int:
         if args.flow and args.all_flows:
             logger.error("--flow and --all-flows are mutually exclusive")
             return 1
+
+        if args.message_timeout is not None and args.message_timeout >= args.timeout:
+            logger.warning(
+                "⚠️  --message-timeout (%ss) >= --timeout (%ss); "
+                "the subprocess may be killed before a single message completes.",
+                args.message_timeout,
+                args.timeout,
+            )
 
         # Parse comma-separated flow names
         flow_names = (
