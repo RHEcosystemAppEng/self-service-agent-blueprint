@@ -1,7 +1,7 @@
 {{- if and .Values.requestManagement.enabled .Values.requestManagement.knative.eventing.enabled }}
 ---
-# Using Red Hat AMQ Streams (Streams for Apache Kafka) v3.0.0-13
-apiVersion: kafka.strimzi.io/v1beta2
+# Using Red Hat AMQ Streams (Streams for Apache Kafka) v3.1.x
+apiVersion: kafka.strimzi.io/v1
 kind: Kafka
 metadata:
   name: {{ .Values.requestManagement.kafka.name }}
@@ -41,7 +41,7 @@ spec:
   {{- end }}
 ---
 # KafkaNodePool for managing Kafka broker storage and resources
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaNodePool
 metadata:
   name: {{ .Values.requestManagement.kafka.name }}-pool
