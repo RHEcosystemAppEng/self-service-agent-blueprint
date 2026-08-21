@@ -289,7 +289,7 @@ Generate Agent Service specific environment variables
 {{- end }}
 {{/* LLM Service Configuration */}}
 - name: LLAMA_STACK_URL
-  value: {{ .Values.llama_stack_url | default "http://llamastack:8321" | quote }}
+  value: {{ .Values.llama_stack_url | default "http://ogx-ai:8321" | quote }}
 {{/* LlamaStack OpenAI Client Configuration */}}
 {{- if hasKey .Values "llamastack" }}
 {{- if .Values.llamastack.port }}

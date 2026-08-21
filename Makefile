@@ -179,7 +179,7 @@ helm_llama_stack_args = \
     $(if $(LLM_ID),--set global.models.$(LLM).id='$(LLM_ID)',) \
     $(if $(LLM),--set global.models.$(LLM).maxTokens=$(LLM_MAX_TOKENS),) \
     $(if $(LLM_API_TOKEN),--set global.models.$(LLM).apiToken='$(LLM_API_TOKEN)',) \
-    $(if $(LLAMA_STACK_ENV),--set-json llama-stack.secrets='$(LLAMA_STACK_ENV)',) \
+    $(if $(LLAMA_STACK_ENV),--set-json ogx-ai.secrets='$(LLAMA_STACK_ENV)',) \
     $(if $(LLAMASTACK_CLIENT_PORT),--set llamastack.port=$(LLAMASTACK_CLIENT_PORT),) \
     $(if $(LLAMASTACK_API_KEY),--set llamastack.apiKey='$(LLAMASTACK_API_KEY)',) \
     $(if $(LLAMASTACK_OPENAI_BASE_PATH),--set llamastack.openaiBasePath='$(LLAMASTACK_OPENAI_BASE_PATH)',) \
@@ -195,11 +195,11 @@ helm_request_management_args = \
 
 helm_generic_args = \
 	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set otelExporter=$(OTEL_EXPORTER_OTLP_ENDPOINT),) \
-	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set llama-stack.otelExporter=$(OTEL_EXPORTER_OTLP_ENDPOINT),) \
-	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set-string llama-stack.secrets.OTEL_SERVICE_NAME=llamastack,) \
-	$(if $(findstring jaeger,$(OTEL_EXPORTER_OTLP_ENDPOINT)),--set-string llama-stack.secrets.OTEL_METRICS_EXPORTER=none,) \
-	$(if $(findstring jaeger,$(OTEL_EXPORTER_OTLP_ENDPOINT)),--set-string llama-stack.secrets.OTEL_LOGS_EXPORTER=none,) \
-	$(if $(findstring jaeger,$(OTEL_EXPORTER_OTLP_ENDPOINT)),--set-string llama-stack.secrets.OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,) \
+	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set ogx-ai.otelExporter=$(OTEL_EXPORTER_OTLP_ENDPOINT),) \
+	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set-string ogx-ai.secrets.OTEL_SERVICE_NAME=ogx-ai,) \
+	$(if $(findstring jaeger,$(OTEL_EXPORTER_OTLP_ENDPOINT)),--set-string ogx-ai.secrets.OTEL_METRICS_EXPORTER=none,) \
+	$(if $(findstring jaeger,$(OTEL_EXPORTER_OTLP_ENDPOINT)),--set-string ogx-ai.secrets.OTEL_LOGS_EXPORTER=none,) \
+	$(if $(findstring jaeger,$(OTEL_EXPORTER_OTLP_ENDPOINT)),--set-string ogx-ai.secrets.OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf,) \
 	$(if $(OTEL_EXPORTER_OTLP_ENDPOINT),--set mcp-servers.mcp-servers.self-service-agent-snow.env.OTEL_EXPORTER_OTLP_ENDPOINT="$(OTEL_EXPORTER_OTLP_ENDPOINT)")
 
 helm_replica_count_args = \
@@ -1585,7 +1585,7 @@ define helm_install_common
 		"deploy/$(MAIN_CHART_NAME)-request-manager:request manager" \
 		"deploy/$(MAIN_CHART_NAME)-integration-dispatcher:integration dispatcher" \
 		"deploy/$(MAIN_CHART_NAME)-agent-service:agent service" \
-		"deploy/llamastack:llamastack" \
+		"deploy/ogx-ai:ogx-ai" \
 		"statefulset/pgvector:pgvector" \
 		"job/$(MAIN_CHART_NAME)-db-migration:db-migration" \
 		"job/$(MAIN_CHART_NAME)-init:init"; do \
@@ -2261,7 +2261,7 @@ deploy-nemo-guardrails: namespace
 	@helm upgrade --install nemo-guardrails $(NEMO_GUARDRAILS_CHART) \
 		-n $(NAMESPACE) \
 		$(if $(NGC_API_KEY),--set ngcApiKey=$(NGC_API_KEY),) \
-		--set llm.url=http://llamastack:8321/v1 \
+		--set llm.url=http://ogx-ai:8321/v1 \
 		--set llm.modelId=$(LLM_ID) \
 		$(if $(filter true,$(JAILBREAK_DETECT)),--set jailbreakDetect.enabled=true,) \
 		$(if $(SAFETY_TOLERATION),--set jailbreakDetect.gpuToleration=$(SAFETY_TOLERATION),)
