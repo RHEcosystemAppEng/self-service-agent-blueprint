@@ -307,6 +307,53 @@ ticketingZammad:
 # Enable/disable the llm-service dependency
 llm-service:
   enabled: true
+  # Xeon deployment 
+  # Uncomment to select CPU/Xeon runtime instead of GPU/default behavior.
+  # device: xeon
+  
+  deviceConfigs:
+    xeon:
+      image: "registry.redhat.io/rhaii/vllm-cpu-rhel9:3.4.0"
+      env:
+      # jemalloc memory allocator not supported on this image, using libomp instead
+      - name: LD_PRELOAD
+        value: "/usr/lib64/libomp.so"
+      # KV cache space in GiB (do not add GiB suffix)
+      - name: VLLM_CPU_KVCACHE_SPACE
+        value: "20"
+  
+  servingRuntime:
+    env:
+    - name: HOME
+      value: /vllm
+    - name: HF_HUB_OFFLINE
+      value: "0"
+    - name: HF_TOKEN
+      valueFrom:
+        secretKeyRef:
+          key: HF_TOKEN
+          name: huggingface-secret
+          
+  # Xeon model tuning example (uncomment when using device: xeon)
+  # models:
+  #   llama-3-2-3b-instruct:
+  #     resources:
+  #       requests:
+  #         cpu: "32"
+  #         memory: 64Gi
+  #       limits:
+  #         cpu: "32"
+  #         memory: 64Gi
+  #     args:
+  #       - --enable-auto-tool-choice
+  #       - --chat-template
+  #       - /chat-templates/tool_chat_template_llama3.2_json.jinja
+  #       - --tool-call-parser
+  #       - llama3_json
+  #       - --max-model-len
+  #       - "14336"
+  #       - --max-num-seqs
+  #       - "2"
 
 # Mock ServiceNow Server Configuration (for testing and development)
 mockServiceNow:

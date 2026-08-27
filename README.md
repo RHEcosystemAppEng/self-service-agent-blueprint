@@ -441,7 +441,7 @@ export NAMESPACE=your-namespace
 
 # Set LLM configuration
 export LLM=llama-3-3-70b-instruct-w8a8
-export LLM_ID=llama-3-3-70b-instruct-w8a8
+export LLM_ID=meta-llama/Llama-3.3-70B-Instruct
 export LLM_API_TOKEN=your-api-token
 export LLM_URL=https://your-llm-endpoint
 # Optional: export LLM_MAX_TOKENS=2048   # max output tokens (default when using Makefile); see Prompt Configuration Guide
@@ -479,7 +479,21 @@ make build-all-images USE_PIP_INSTALL=true
 
 This workaround uses `pip install` from `requirements.txt` instead of `uv sync`, which can avoid QEMU emulation issues when cross-compiling for Linux on Apple Silicon. Note that the default `uv sync` method is faster and more reliable on native Linux/CI environments.
 
-#### Step 4: deploy with Helm
+#### Step 4: configure compute device (optional)
+
+By default, the deployment uses GPU/default chart behavior. To deploy on Intel Xeon CPU-only infrastructure, edit `helm/values.yaml` and uncomment the device setting:
+
+```yaml
+llm-service:
+  enabled: true
+  device: xeon  # <-- Uncomment for Xeon CPU deployment; leave commented for GPU (default)
+```
+
+**Optional Xeon tuning (examples in `helm/values.yaml`):**
+- CPU-tuned model args (`--max-num-seqs=2`)
+- Xeon resource sizing examples in `models` and `resources`
+
+#### Step 5: deploy with Helm
 
 ```bash
 # Login to OpenShift
@@ -498,7 +512,7 @@ make helm-install-test NAMESPACE=$NAMESPACE
 - ✓ All pods running
 - ✓ Routes created
 
-#### Step 5: verify deployment
+#### Step 6: verify deployment
 
 ```bash
 # Check deployment status
@@ -517,7 +531,7 @@ oc get routes -n $NAMESPACE
 - Agent service initialization completed successfully
 
 **You should now be able to:**
-- ✓ Deploy the system to OpenShift
+- ✓ Deploy the system to OpenShift (GPU or CPU)
 - ✓ Monitor pods and services
 - ✓ Troubleshoot deployment issues
 
@@ -999,7 +1013,7 @@ cd evaluations/
 # Set LLM endpoint for evaluation (can use different model than agent)
 export LLM_API_TOKEN=your-api-token
 export LLM_URL=https://your-evaluation-llm-endpoint
-export LLM_ID=llama-3-3-70b-instruct-w8a8
+export LLM_ID=meta-llama/Llama-3.3-70B-Instruct
 
 uv venv
 source .venv/bin/activate
@@ -1856,7 +1870,7 @@ cd evaluations/
 # Set LLM endpoint for evaluation (can use different model than agent)
 export LLM_API_TOKEN=your-api-token
 export LLM_URL=https://your-evaluation-llm-endpoint
-export LLM_ID=llama-3-3-70b-instruct-w8a8
+export LLM_ID=meta-llama/Llama-3.3-70B-Instruct
 
 uv venv
 source .venv/bin/activate
