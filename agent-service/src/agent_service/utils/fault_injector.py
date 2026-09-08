@@ -43,8 +43,8 @@ class EmptyResponse:
         self.id = "fault-injection-empty"  # Valid ID to avoid quota check failures
 
 
-class FaultInjectingAsyncLlamaStackClient:
-    """Wrapper that randomly injects failures into AsyncLlamaStackClient calls."""
+class FaultInjectingAsyncOgxClient:
+    """Wrapper that randomly injects failures into AsyncOgxClient calls."""
 
     # All possible error types for random selection
     ERROR_TYPES = ["timeout", "connection", "api_error", "empty_response"]
@@ -57,7 +57,7 @@ class FaultInjectingAsyncLlamaStackClient:
     ):
         """
         Args:
-            wrapped_client: The real AsyncLlamaStackClient to wrap
+            wrapped_client: The real AsyncOgxClient to wrap
             failure_rate: Probability of failure (0.0 to 1.0). E.g., 0.1 = 10% chance
             error_type: Type of error to simulate (timeout|connection|api_error|empty_response|rand)
         """
@@ -212,7 +212,7 @@ def wrap_client_with_fault_injection(client: Any) -> Any:
 
         # Build error type description
         if error_type == "rand":
-            error_type_desc = f"rand (randomly: {', '.join(FaultInjectingAsyncLlamaStackClient.ERROR_TYPES)})"
+            error_type_desc = f"rand (randomly: {', '.join(FaultInjectingAsyncOgxClient.ERROR_TYPES)})"
         else:
             error_type_desc = error_type
 
@@ -224,6 +224,6 @@ def wrap_client_with_fault_injection(client: Any) -> Any:
             scope="responses.create() only - other API calls unaffected",
         )
 
-        return FaultInjectingAsyncLlamaStackClient(client, rate, error_type)
+        return FaultInjectingAsyncOgxClient(client, rate, error_type)
 
     return client

@@ -89,7 +89,7 @@ tolerations: []
 
 affinity: {}
 
-llama_stack_url: http://llamastack:8321
+llama_stack_url: http://ogx-ai:8321
 
 # Knowledge Base Configuration
 knowledgeBases:
@@ -109,7 +109,7 @@ knowledgeBases:
 # (LLAMASTACK_SERVICE_HOST and LLAMASTACK_SERVICE_PORT). Only override if needed.
 llamastack:
   # Post-init scaling configuration
-  # When enabled, llama-stack starts with 1 replica (from llama-stack chart default)
+  # When enabled, ogx-ai starts with 1 replica (from ogx-ai chart default)
   # After init job completes, this job scales deployment to targetReplicas
   # Note: This is controlled by REPLICA_COUNT in Makefile - if REPLICA_COUNT is set,
   #       this will be enabled automatically and targetReplicas will be set to REPLICA_COUNT
@@ -129,7 +129,7 @@ llamastack:
 nemoGuardrails:
   enabled: false
 
-# PostgreSQL configuration for llama-stack agent persistence
+# PostgreSQL configuration for ogx-ai agent persistence
 # max_connections=200 for all envs; unified pool sizes (test/prod same).
 pgvector:
   args:
@@ -141,40 +141,40 @@ pgvector:
     - name: llama_responses
       vectordb: false
 
-# Llama Stack agents configuration with PostgreSQL persistence
-llama-stack:
-  replicaCount: 1
-  initContainers:
-    enabled: true
-  resources: {}
+ogx-ai:
+  image:
+    tag: rhoai-v3.5-latest
 
-  # Override volumes to use emptyDir instead of PVC for multi-replica support
-  # Since all persistence is handled by PostgreSQL, we don't need a shared PVC
+  # TODO: interim file_processors override; remove when the ogx-1.2.0 chart is added.
+  command:
+    - /bin/sh
+    - -c
+    - |
+      /opt/app-root/bin/python3 <<'PY'
+      t = open('/app-config/config.yaml').read()
+      if '- file_processors' not in t:
+          t = t.replace('  - files\n', '  - files\n  - file_processors\n', 1)
+      if '\n  file_processors:\n' not in t:
+          t = t.replace('providers:\n', 'providers:\n  file_processors:\n  - provider_id: auto\n    provider_type: inline::auto\n', 1)
+      open('/.cache/config.yaml', 'w').write(t)
+      PY
+      exec /opt/app-root/bin/ogx run --insecure /.cache/config.yaml
+
+  env:
+    - name: RUN_CONFIG_PATH
+      value: /app-config/config.yaml
+    - name: HF_HOME
+      value: /.cache/huggingface
+
   volumes:
     - configMap:
         defaultMode: 420
         name: run-config
       name: run-config-volume
     - emptyDir: {}
-      name: dot-llama
+      name: dot-ogx-ai
     - emptyDir: {}
       name: cache
-
-  # Configure metadata store to use PostgreSQL for multi-replica support
-  metadataStore:
-    type: postgres
-    db_path: null  # Explicitly unset SQLite field
-    host: ${env.POSTGRES_HOST:=pgvector}
-    port: ${env.POSTGRES_PORT:=5432}
-    db: ${env.POSTGRES_DBNAME:=rag_blueprint}
-    user: ${env.POSTGRES_USER:=postgres}
-    password: ${env.POSTGRES_PASSWORD:=rag_password}
-    namespace: llamastack_registry
-
-  # Configure vector_io kvstore to use PostgreSQL for multi-replica support
-  vectorIOKvstore:
-    namespace: llamastack_vector_io
-    backend: kv_default
 
   storage:
     backends:
@@ -192,19 +192,6 @@ llama-stack:
         db: llama_responses
         user: ${env.POSTGRES_USER:=postgres}
         password: ${env.POSTGRES_PASSWORD:=rag_password}
-
-  providers:
-    agents:
-      - provider_id: meta-ref-postgres
-        provider_type: inline::meta-reference
-        config:
-          persistence:
-            agent_state:
-              backend: kv_default
-              namespace: agents
-            responses:
-              backend: sql_default
-              table_name: responses
 
 mcp-servers:
   enabled: true

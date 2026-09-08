@@ -5,14 +5,14 @@ dependencies:
 - name: llm-service
   repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
   version: 0.5.6
-- name: llama-stack
+- name: ogx-ai
   repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
-  version: 0.8.5
+  version: 0.8.6
 - name: mcp-servers
   repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
   version: 0.5.17
 - name: ticketingZammad
   repository: file://./zammad
   version: 0.1.0
-digest: sha256:0d76fee0a49fb2f60016e464051ab04b8c52b0baa2661828d49f6374d21d9971
-generated: "2026-06-09T09:32:36.545631665-04:00"
+digest: sha256:ecd99acead70700a15c38c7d7b5951cc9283462fdfa1563d1cc8fa368c66df5a
+generated: "2026-08-25T01:19:26.334671341+03:00"

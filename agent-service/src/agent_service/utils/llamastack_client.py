@@ -1,8 +1,8 @@
-"""Factory for creating LlamaStack clients (both native and OpenAI-compatible).
+"""Factory for creating OGX clients (both native and OpenAI-compatible).
 
-This module provides centralized factory functions for creating LlamaStack clients:
+This module provides centralized factory functions for creating OGX clients:
 
-1. Native LlamaStack client (LlamaStackClient):
+1. Native OGX client (OgxClient):
    - Model listing (models.list())
    - Response generation (responses.create())
 
@@ -11,7 +11,7 @@ This module provides centralized factory functions for creating LlamaStack clien
    - Assistant/thread operations
    - File uploads
 
-Note: LlamaStack running in-cluster doesn't require authentication by default,
+Note: OGX running in-cluster doesn't require authentication by default,
 so the api_key is set to a dummy value to satisfy the OpenAI client library's
 requirement that an API key be provided. The actual security boundary is at
 the network level (services communicate within the Kubernetes cluster).
@@ -34,7 +34,7 @@ def create_llamastack_openai_client(
     openai_base_path: Optional[str] = None,
 ) -> openai.OpenAI:
     """
-    Create an OpenAI client configured for LlamaStack.
+    Create an OpenAI client configured for OGX.
 
     This function provides a centralized way to create OpenAI clients with
     consistent configuration across the agent service. All configuration can
@@ -43,9 +43,9 @@ def create_llamastack_openai_client(
     Args:
         timeout: Request timeout in seconds.
             Default: LLAMASTACK_TIMEOUT env var or 120
-        llamastack_host: LlamaStack hostname (without protocol).
-            Default: LLAMASTACK_SERVICE_HOST env var (Kubernetes auto-injected) or "llamastack"
-        port: LlamaStack port number.
+        llamastack_host: OGX hostname (without protocol).
+            Default: LLAMASTACK_SERVICE_HOST env var (Kubernetes auto-injected) or "ogx-ai"
+        port: OGX port number.
             Default: LLAMASTACK_CLIENT_PORT env var (Helm override) or
                      LLAMASTACK_SERVICE_PORT env var (Kubernetes auto-injected) or 8321
         api_key: API key for authentication.
@@ -67,7 +67,7 @@ def create_llamastack_openai_client(
     """
     # Get configuration from parameters or environment variables
     # Host: Use Kubernetes auto-injected LLAMASTACK_SERVICE_HOST
-    host = llamastack_host or os.environ.get("LLAMASTACK_SERVICE_HOST", "llamastack")
+    host = llamastack_host or os.environ.get("LLAMASTACK_SERVICE_HOST", "ogx-ai")
 
     # Port: Check Helm override first, then Kubernetes auto-injected, then default
     # Note: We avoid LLAMASTACK_PORT as Kubernetes sets it to "tcp://host:port" format
@@ -89,7 +89,7 @@ def create_llamastack_openai_client(
     base_url = f"http://{host}:{port_num}{path}"
 
     logger.debug(
-        "Creating OpenAI client for LlamaStack",
+        "Creating OpenAI client for OGX",
         base_url=base_url,
         timeout=timeout_val,
     )
@@ -107,7 +107,7 @@ def create_llamastack_client(
     port: Optional[int] = None,
 ) -> Any:
     """
-    Create a native LlamaStack client.
+    Create a native OGX client.
 
     This client is used for:
     - Model listing (models.list())
@@ -116,14 +116,14 @@ def create_llamastack_client(
     Args:
         timeout: Request timeout in seconds.
             Default: LLAMASTACK_TIMEOUT env var or 120.0
-        llamastack_host: LlamaStack hostname (without protocol).
-            Default: LLAMASTACK_SERVICE_HOST env var (Kubernetes auto-injected) or "llamastack"
-        port: LlamaStack port number.
+        llamastack_host: OGX hostname (without protocol).
+            Default: LLAMASTACK_SERVICE_HOST env var (Kubernetes auto-injected) or "ogx-ai"
+        port: OGX port number.
             Default: LLAMASTACK_CLIENT_PORT env var (Helm override) or
                      LLAMASTACK_SERVICE_PORT env var (Kubernetes auto-injected) or 8321
 
     Returns:
-        Configured LlamaStackClient instance
+        Configured OgxClient instance
 
     Environment Variables (priority order):
         LLAMASTACK_SERVICE_HOST: Kubernetes-injected hostname (auto-discovered from service)
@@ -132,11 +132,11 @@ def create_llamastack_client(
         LLAMASTACK_TIMEOUT: Request timeout in seconds (default: "120.0")
 
     """
-    from llama_stack_client import LlamaStackClient
+    from ogx_client import OgxClient
 
     # Get configuration from parameters or environment variables
     # Host: Use Kubernetes auto-injected LLAMASTACK_SERVICE_HOST
-    host = llamastack_host or os.environ.get("LLAMASTACK_SERVICE_HOST", "llamastack")
+    host = llamastack_host or os.environ.get("LLAMASTACK_SERVICE_HOST", "ogx-ai")
 
     # Port: Check Helm override first, then Kubernetes auto-injected, then default
     # Note: We avoid LLAMASTACK_PORT as Kubernetes sets it to "tcp://host:port" format
@@ -154,12 +154,12 @@ def create_llamastack_client(
     base_url = f"http://{host}:{port_num}"
 
     logger.debug(
-        "Creating LlamaStack client",
+        "Creating OGX client",
         base_url=base_url,
         timeout=timeout_val,
     )
 
-    return LlamaStackClient(
+    return OgxClient(
         base_url=base_url,
         timeout=timeout_val,
     )
@@ -171,7 +171,7 @@ def create_async_llamastack_client(
     port: Optional[int] = None,
 ) -> Any:
     """
-    Create an async native LlamaStack client.
+    Create an async native OGX client.
 
     This async client is used for:
     - Model listing (await models.list())
@@ -183,14 +183,14 @@ def create_async_llamastack_client(
     Args:
         timeout: Request timeout in seconds.
             Default: LLAMASTACK_TIMEOUT env var or 120.0
-        llamastack_host: LlamaStack hostname (without protocol).
-            Default: LLAMASTACK_SERVICE_HOST env var (Kubernetes auto-injected) or "llamastack"
-        port: LlamaStack port number.
+        llamastack_host: OGX hostname (without protocol).
+            Default: LLAMASTACK_SERVICE_HOST env var (Kubernetes auto-injected) or "ogx-ai"
+        port: OGX port number.
             Default: LLAMASTACK_CLIENT_PORT env var (Helm override) or
                      LLAMASTACK_SERVICE_PORT env var (Kubernetes auto-injected) or 8321
 
     Returns:
-        Configured AsyncLlamaStackClient instance
+        Configured AsyncOgxClient instance
 
     Environment Variables (priority order):
         LLAMASTACK_SERVICE_HOST: Kubernetes-injected hostname (auto-discovered from service)
@@ -199,11 +199,11 @@ def create_async_llamastack_client(
         LLAMASTACK_TIMEOUT: Request timeout in seconds (default: "120.0")
 
     """
-    from llama_stack_client import AsyncLlamaStackClient
+    from ogx_client import AsyncOgxClient
 
     # Get configuration from parameters or environment variables
     # Host: Use Kubernetes auto-injected LLAMASTACK_SERVICE_HOST
-    host = llamastack_host or os.environ.get("LLAMASTACK_SERVICE_HOST", "llamastack")
+    host = llamastack_host or os.environ.get("LLAMASTACK_SERVICE_HOST", "ogx-ai")
 
     # Port: Check Helm override first, then Kubernetes auto-injected, then default
     # Note: We avoid LLAMASTACK_PORT as Kubernetes sets it to "tcp://host:port" format
@@ -221,12 +221,12 @@ def create_async_llamastack_client(
     base_url = f"http://{host}:{port_num}"
 
     logger.debug(
-        "Creating async LlamaStack client",
+        "Creating async OGX client",
         base_url=base_url,
         timeout=timeout_val,
     )
 
-    client = AsyncLlamaStackClient(
+    client = AsyncOgxClient(
         base_url=base_url,
         timeout=timeout_val,
     )

@@ -7,8 +7,8 @@
 
 testIntegrationEnabled: true
 
-# Subchart resources (llamastack, pgvector, mcp-servers)
-llama-stack:
+# Subchart resources (ogx-ai, pgvector, mcp-servers)
+ogx-ai:
   resources:
     requests:
       cpu: 500m

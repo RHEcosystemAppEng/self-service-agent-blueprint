@@ -36,7 +36,7 @@ spec:
         - name: INIT_JOB_NAME
           value: "self-service-agent-init"
         - name: DEPLOYMENT_NAME
-          value: "llamastack"
+          value: "ogx-ai"
         - name: TARGET_REPLICAS
           value: {{ .Values.llamastack.postInitScaling.targetReplicas | quote }}
         - name: TIMEOUT_SECONDS
